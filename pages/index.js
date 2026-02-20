@@ -281,7 +281,7 @@ function Hero() {
 					className="flex flex-wrap items-center justify-center gap-3 mb-4"
 				>
 					<motion.a
-						href="#"
+						href="/app"
 						whileHover={{
 							scale: 1.04,
 							y: -2,
@@ -1829,7 +1829,7 @@ function Footer() {
 /* ── Root ── */
 export default function inkgestLanding() {
 	const { user } = useSelector((state) => state?.user);
-	if (user.isAuthenticated) {
+	if (user?.isAuthenticated) {
 		return <Redirect href="/app" />;
 	}
 	return (

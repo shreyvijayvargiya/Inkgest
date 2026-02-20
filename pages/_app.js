@@ -1,5 +1,4 @@
 import React from "react";
-import { useRouter } from "next/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
@@ -24,29 +23,19 @@ const queryClient = new QueryClient({
 });
 
 const MyApp = ({ Component, pageProps }) => {
-	const router = useRouter();
-	const isAdminRoute = router.pathname.startsWith("/admin");
-
-	// Only wrap with Redux for app routes (not admin)
-	const AppComponent = isAdminRoute ? (
-		<Component {...pageProps} />
-	) : (
-		<Provider store={store}>
-			<PersistGate loading={null} persistor={persistor}>
-				<Component {...pageProps} />
-			</PersistGate>
-		</Provider>
-	);
-
 	return (
 		<QueryClientProvider client={queryClient}>
 			{/* PostHog Provider - Session Replays & Product Analytics */}
 			<PostHogProvider>
-				{/* Automatic SEO tags based on route - configured in lib/config/seo.js */}
-				<SEO />
-				{/* Analytics Tracker - tracks once per session */}
-				<AnalyticsTracker />
-				{AppComponent}
+				<Provider store={store}>
+					<PersistGate loading={null} persistor={persistor}>
+						{/* Automatic SEO tags based on route - configured in lib/config/seo.js */}
+						<SEO />
+						{/* Analytics Tracker - tracks once per session */}
+						<AnalyticsTracker />
+						<Component {...pageProps} />
+					</PersistGate>
+				</Provider>
 				<ToastContainer
 					position="top-right"
 					autoClose={3000}
