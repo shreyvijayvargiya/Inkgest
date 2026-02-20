@@ -1,5 +1,52 @@
 const urlRegex = /^https?:\/\/\S+$/i;
 
+const MAX_URLS = 10;
+const MAX_CHARS_PER_SOURCE = 15000;
+
+const FORMATS = {
+	substack: {
+		label: "Substack Newsletter",
+		system:
+			"You are a Substack newsletter writer. Create an engaging email newsletter with: catchy subject line, personal intro, 3-5 main sections with subheadings, and a conversational CTA. Use storytelling and keep it scannable.",
+		maxTokens: 2000,
+	},
+	linkedin: {
+		label: "LinkedIn Post",
+		system:
+			"You are a LinkedIn content expert. Create a professional LinkedIn post (max 3000 chars). Start with a strong single-line hook, use short paragraphs, include 3-5 key takeaways with emojis, end with a question to drive engagement.",
+		maxTokens: 800,
+	},
+	twitter_thread: {
+		label: "Twitter Thread",
+		system:
+			"You are a Twitter/X thread expert. Create a numbered thread of 5-10 tweets. Tweet 1 must hook readers immediately. Each tweet is max 280 chars. Use numbers (1/, 2/, ...), sparse emojis, and end with a CTA tweet. Separate tweets with a blank line.",
+		maxTokens: 1000,
+	},
+	blog_post: {
+		label: "Blog Post",
+		system:
+			"You are an expert blog writer. Create an SEO-friendly blog post with: H1 title, meta description, introduction, 4-6 H2 sections with detailed content, bullet points, and a conclusion with CTA.",
+		maxTokens: 3000,
+	},
+	email_digest: {
+		label: "Email Digest",
+		system:
+			"You are writing a weekly email digest. Create a curated summary with: catchy subject line, brief intro, 3-5 sections (one per source) with key takeaway + why it matters, and brief closing note.",
+		maxTokens: 1500,
+	},
+};
+
+const STYLES = {
+	casual:
+		"friendly, conversational, use 'you', contractions, simple everyday words",
+	professional:
+		"formal, authoritative, industry terminology acceptable, third-person where appropriate",
+	educational:
+		"clear, structured, explain concepts step-by-step, use relatable examples",
+	persuasive:
+		"compelling, benefit-focused, strong CTAs, create urgency without being pushy",
+};
+
 function clampText(text, maxChars) {
 	if (!text) return "";
 	if (text.length <= maxChars) return text;
@@ -51,8 +98,6 @@ async function openRouterChat({
 }
 
 async function firecrawlScrapeMarkdown({ url, apiKey }) {
-	// Firecrawl scrape API (best-effort). If your Firecrawl workspace expects a different header,
-	// adjust here to match your Firecrawl docs/account.
 	const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
 		method: "POST",
 		headers: {
@@ -73,7 +118,6 @@ async function firecrawlScrapeMarkdown({ url, apiKey }) {
 		);
 	}
 
-	// Common shapes seen in Firecrawl responses
 	const markdown =
 		data?.data?.markdown ||
 		data?.markdown ||
@@ -105,21 +149,48 @@ export default async function handler(req, res) {
 				.json({ error: "OPENROUTER_API_KEY is not configured" });
 		}
 
-		const { urls, prompt, model: requestedModel } = req.body || {};
+		const {
+			urls,
+			prompt,
+			model: requestedModel,
+			format = "substack",
+			style = "casual",
+			userId,
+		} = req.body || {};
+
+		// userId is required — no anonymous generation
+		if (!userId || typeof userId !== "string" || !userId.trim()) {
+			return res.status(401).json({
+				error: "Authentication required. Please sign in to generate drafts.",
+			});
+		}
+
 		const safePrompt = String(prompt || "").trim();
 		const urlList = Array.isArray(urls)
 			? urls.map((u) => String(u || "").trim()).filter(Boolean)
 			: [];
 
-		// Prompt is required; URLs are optional.
 		if (!safePrompt) {
 			return res.status(400).json({ error: "Please provide a prompt" });
 		}
+
+		if (!FORMATS[format]) {
+			return res.status(400).json({
+				error: `Invalid format. Options: ${Object.keys(FORMATS).join(", ")}`,
+			});
+		}
+
+		if (urlList.length > MAX_URLS) {
+			return res.status(400).json({
+				error: `Maximum ${MAX_URLS} URLs allowed per request`,
+			});
+		}
+
 		if (urlList.some((u) => !urlRegex.test(u))) {
 			return res.status(400).json({ error: "One or more URLs are invalid" });
 		}
 
-		// Scrape all URLs if provided (best-effort: keep successes, report failures)
+		// Scrape all URLs — best-effort, collect successes and errors
 		const sources = [];
 		const scrapeErrors = [];
 
@@ -139,21 +210,25 @@ export default async function handler(req, res) {
 					scrapeErrors.push({ url, error: e?.message || "Scrape failed" });
 				}
 			}
+
+			// All URLs were provided but every one failed
+			if (sources.length === 0) {
+				return res.status(422).json({
+					error:
+						"All URL scrapes failed. Please check the URLs and try again.",
+					details: scrapeErrors,
+				});
+			}
 		}
 
-		// Build prompt with size limits to reduce token blowups
-		const perSourceLimit = 12000;
+		// Build combined source content with per-source char limit
 		const combined = sources
 			.map((s, idx) => {
 				const titleLine = s.title ? `Title: ${s.title}\n` : "";
-				return `SOURCE ${idx + 1}\nURL: ${s.url}\n${titleLine}\nCONTENT (markdown):\n${clampText(
-					s.markdown,
-					perSourceLimit,
-				)}\n`;
+				return `SOURCE ${idx + 1}\nURL: ${s.url}\n${titleLine}\nCONTENT (markdown):\n${clampText(s.markdown, MAX_CHARS_PER_SOURCE)}\n`;
 			})
 			.join("\n\n---\n\n");
 
-		// Default to a small/cheap model. Override via env OPENROUTER_MODEL or request body `model`.
 		const model =
 			String(requestedModel || "").trim() ||
 			process.env.OPENROUTER_MODEL ||
@@ -162,19 +237,15 @@ export default async function handler(req, res) {
 		const referer =
 			process.env.OPENROUTER_HTTP_REFERER ||
 			(req.headers.origin ? String(req.headers.origin) : undefined);
-		const title = process.env.OPENROUTER_APP_TITLE || "Inkgest Automations";
+		const appTitle = process.env.OPENROUTER_APP_TITLE || "Inkgest";
 
-		const system = [
-			"You are an expert newsletter writer.",
-			sources.length
-				? "Generate a polished newsletter draft based ONLY on the sources provided."
-				: "Generate a polished newsletter draft based ONLY on the user's prompt (no sources were provided). Avoid inventing specific facts or quotes.",
-			"Output MUST be Markdown (no code fences).",
-			"Include: catchy subject line, short intro, 3–7 sections with headings + bullet takeaways, and a closing CTA.",
-			sources.length
-				? "If a claim isn't supported by the sources, omit it."
-				: "Don't claim you scraped or read any URLs.",
-		].join("\n");
+		const formatConfig = FORMATS[format];
+		const styleNote = STYLES[style] ? `\nTONE: ${STYLES[style]}` : "";
+		const sourceInstruction = sources.length
+			? "Generate the content based ONLY on the sources provided. If a claim isn't in the sources, omit it."
+			: "Generate the content based ONLY on the user's prompt (no sources provided). Don't invent specific facts or quote URLs you didn't read.";
+
+		const system = `${formatConfig.system}\n${sourceInstruction}${styleNote}\nOutput MUST be Markdown (no code fences).`;
 
 		const user = [
 			`USER PROMPT:\n${safePrompt}`,
@@ -188,16 +259,18 @@ export default async function handler(req, res) {
 				{ role: "system", content: system },
 				{ role: "user", content: user },
 			],
-			// Keep output reasonably sized; raise if you want longer newsletters
-			maxTokens: 2000,
+			maxTokens: formatConfig.maxTokens,
 			temperature: 0.6,
 			referer,
-			title,
+			title: appTitle,
 		});
 
 		return res.status(200).json({
 			success: true,
 			model,
+			format,
+			formatLabel: formatConfig.label,
+			style,
 			content,
 			sources: sources.map((s) => ({ url: s.url, title: s.title })),
 			scrapeErrors,

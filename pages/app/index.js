@@ -110,6 +110,22 @@ const Icons = {
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
 
+/* ─── Format / Style config (mirrors API) ─── */
+const FORMATS = [
+	{ id: "substack", label: "Newsletter", icon: "✉️" },
+	{ id: "linkedin", label: "LinkedIn", icon: "💼" },
+	{ id: "twitter_thread", label: "Thread", icon: "🐦" },
+	{ id: "blog_post", label: "Blog Post", icon: "📝" },
+	{ id: "email_digest", label: "Digest", icon: "📰" },
+];
+
+const STYLES = [
+	{ id: "casual", label: "Casual" },
+	{ id: "professional", label: "Professional" },
+	{ id: "educational", label: "Educational" },
+	{ id: "persuasive", label: "Persuasive" },
+];
+
 /* ─── Upgrade Banner ─── */
 function UpgradeBanner({ used, limit, onUpgrade }) {
 	const pct = (used / limit) * 100;
@@ -342,6 +358,8 @@ export default function inkgestApp() {
 	const [search, setSearch] = useState("");
 	const [urls, setUrls] = useState([""]);
 	const [prompt, setPrompt] = useState("");
+	const [format, setFormat] = useState("substack");
+	const [style, setStyle] = useState("casual");
 	const [generating, setGenerating] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -402,7 +420,13 @@ export default function inkgestApp() {
 			const res = await fetch("/api/automations/newsletter-generate", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ urls: validUrls, prompt: prompt.trim() }),
+				body: JSON.stringify({
+					urls: validUrls,
+					prompt: prompt.trim(),
+					format,
+					style,
+					userId: reduxUser.uid,
+				}),
 			});
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Generation failed");
@@ -440,7 +464,9 @@ export default function inkgestApp() {
 				urls: validUrls,
 				words,
 				date,
-				tag: "Newsletter",
+				tag: data.formatLabel || "Newsletter",
+				format: data.format || format,
+				style: data.style || style,
 				createdAt: serverTimestamp(),
 			};
 
@@ -1129,6 +1155,89 @@ export default function inkgestApp() {
 								onFocus={(e) => (e.target.style.borderColor = T.warm)}
 								onBlur={(e) => (e.target.style.borderColor = T.border)}
 							/>
+						</div>
+
+						{/* Format selector */}
+						<div style={{ marginBottom: 16 }}>
+							<label
+								style={{
+									display: "block",
+									fontSize: 12,
+									fontWeight: 700,
+									textTransform: "uppercase",
+									letterSpacing: "0.08em",
+									color: T.muted,
+									marginBottom: 8,
+								}}
+							>
+								Format
+							</label>
+							<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+								{FORMATS.map((f) => (
+									<motion.button
+										key={f.id}
+										whileTap={{ scale: 0.96 }}
+										onClick={() => setFormat(f.id)}
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 5,
+											padding: "7px 13px",
+											borderRadius: 9,
+											fontSize: 13,
+											fontWeight: 600,
+											cursor: "pointer",
+											border: `1.5px solid ${format === f.id ? T.accent : T.border}`,
+											background: format === f.id ? T.accent : T.surface,
+											color: format === f.id ? "white" : T.muted,
+											transition: "all 0.15s",
+										}}
+									>
+										<span>{f.icon}</span>
+										{f.label}
+									</motion.button>
+								))}
+							</div>
+						</div>
+
+						{/* Style selector */}
+						<div style={{ marginBottom: 24 }}>
+							<label
+								style={{
+									display: "block",
+									fontSize: 12,
+									fontWeight: 700,
+									textTransform: "uppercase",
+									letterSpacing: "0.08em",
+									color: T.muted,
+									marginBottom: 8,
+								}}
+							>
+								Tone
+							</label>
+							<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+								{STYLES.map((s) => (
+									<motion.button
+										key={s.id}
+										whileTap={{ scale: 0.96 }}
+										onClick={() => setStyle(s.id)}
+										style={{
+											padding: "6px 12px",
+											borderRadius: 9,
+											fontSize: 13,
+											fontWeight: 600,
+											cursor: "pointer",
+											border: `1.5px solid ${style === s.id ? T.warm : T.border}`,
+											background:
+												style === s.id ? "#FEF3E2" : T.surface,
+											color: style === s.id ? T.warm : T.muted,
+											transition: "all 0.15s",
+										}}
+									>
+										{s.label}
+									</motion.button>
+								))}
+							</div>
 						</div>
 
 						{/* Generate button */}

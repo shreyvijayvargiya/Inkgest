@@ -998,21 +998,36 @@ export default function DraftPage() {
 										marginBottom: 12,
 									}}
 								>
+								<span
+									style={{
+										fontSize: 11,
+										fontWeight: 700,
+										background: "#F0ECE5",
+										color: T.muted,
+										padding: "2px 9px",
+										borderRadius: 100,
+									}}
+								>
+									{draft.tag}
+								</span>
+								{draft.style && (
 									<span
 										style={{
 											fontSize: 11,
-											fontWeight: 700,
-											background: "#F0ECE5",
-											color: T.muted,
+											fontWeight: 600,
+											background: "#FEF3E2",
+											color: T.warm,
 											padding: "2px 9px",
 											borderRadius: 100,
+											textTransform: "capitalize",
 										}}
 									>
-										{draft.tag}
+										{draft.style}
 									</span>
-									<span style={{ fontSize: 12, color: T.muted }}>
-										{draft.date}
-									</span>
+								)}
+								<span style={{ fontSize: 12, color: T.muted }}>
+									{draft.date}
+								</span>
 								</div>
 							<div
 								contentEditable
