@@ -1740,14 +1740,7 @@ function Footer() {
 					</div>
 					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
 						{[
-							{
-								title: "Product",
-								links: ["How it works", "Pricing", "FAQ", "Changelog"],
-							},
-							{
-								title: "Legal",
-								links: ["Privacy Policy", "Terms of Service", "Cookie Policy"],
-							},
+							
 							{
 								title: "Connect",
 								links: [
@@ -1823,8 +1816,10 @@ function Footer() {
 					>
 						Made for writers who publish on a deadline. Built using{" "}
 						<a
-							href="https://buildsaas.com"
+							href="https://buildsaas.dev"
 							target="_blank"
+							className="text-orange-500"
+							style={{ color: T.surface }}
 							rel="noopener noreferrer"
 						>
 							Buildsaas

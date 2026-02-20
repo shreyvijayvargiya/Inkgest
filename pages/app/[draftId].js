@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import { db } from "../../lib/config/firebase";
 import {
@@ -1025,23 +1026,73 @@ export default function DraftPage() {
 										{draft.date}
 									</span>
 								</div>
-								<div
-									contentEditable
-									suppressContentEditableWarning
-									data-placeholder="Untitled draft"
-									style={{
-										fontFamily: "'Instrument Serif',serif",
-										fontSize: "clamp(22px, 3vw, 30px)",
-										color: T.accent,
-										lineHeight: 1.2,
-										letterSpacing: "-0.5px",
-										outline: "none",
-										marginBottom: 16,
-										minHeight: 36,
-									}}
-									dangerouslySetInnerHTML={{ __html: draft.title }}
-								/>
-							</div>
+							<div
+								contentEditable
+								suppressContentEditableWarning
+								data-placeholder="Untitled draft"
+								style={{
+									fontFamily: "'Instrument Serif',serif",
+									fontSize: "clamp(22px, 3vw, 30px)",
+									color: T.accent,
+									lineHeight: 1.2,
+									letterSpacing: "-0.5px",
+									outline: "none",
+									marginBottom: 12,
+									minHeight: 36,
+								}}
+								dangerouslySetInnerHTML={{ __html: draft.title }}
+							/>
+							{/* Source links */}
+							{(() => {
+								const allUrls = Array.isArray(draft?.urls)
+									? draft.urls.filter(Boolean)
+									: draft?.url
+									? [draft.url]
+									: [];
+								if (allUrls.length === 0) return null;
+								return (
+									<div
+										style={{
+											display: "flex",
+											flexWrap: "wrap",
+											gap: 6,
+											marginBottom: 16,
+										}}
+									>
+										{allUrls.map((url, i) => (
+											<a
+												key={i}
+												href={url}
+												target="_blank"
+												rel="noopener noreferrer"
+												style={{
+													display: "inline-flex",
+													alignItems: "center",
+													gap: 5,
+													fontSize: 12,
+													color: T.warm,
+													background: "#FEF3E2",
+													border: `1px solid #F5C97A`,
+													borderRadius: 7,
+													padding: "3px 10px",
+													textDecoration: "none",
+													maxWidth: 320,
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+													whiteSpace: "nowrap",
+													transition: "opacity 0.15s",
+												}}
+												onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
+												onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+											>
+												<Icon d={Icons.link2} size={11} stroke={T.warm} />
+												{url}
+											</a>
+										))}
+									</div>
+								);
+							})()}
+						</div>
 
 							{/* Editor body */}
 							<div

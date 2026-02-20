@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail, Lock, LogOut, User } from "lucide-react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
 	signInWithEmail,
 	signInWithGoogle,
@@ -16,6 +16,17 @@ import {
 import { setUser, clearUser } from "../store/slices/userSlice";
 import { toast } from "react-toastify";
 import SignupModal from "./SignupModal";
+import { useRouter } from "next/router";
+
+/* ── Design tokens ── */
+const T = {
+	base: "#F7F5F0",
+	surface: "#FFFFFF",
+	accent: "#1A1A1A",
+	warm: "#C17B2F",
+	muted: "#7A7570",
+	border: "#E8E4DC",
+};
 
 const LoginModal = ({ isOpen, onClose }) => {
 	const dispatch = useDispatch();
@@ -24,6 +35,8 @@ const LoginModal = ({ isOpen, onClose }) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [user, setLocalUser] = useState(null);
 	const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+	const subscription = useSelector((state) => state.subscription);
+	const router = useRouter();
 
 	// Check for existing user in cookie on mount and when modal opens
 	useEffect(() => {
@@ -94,7 +107,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 		} catch (error) {
 			console.error("Google login error:", error);
 			toast.error(
-				error.message || "Failed to login with Google. Please try again."
+				error.message || "Failed to login with Google. Please try again.",
 			);
 		} finally {
 			setIsLoading(false);
@@ -120,6 +133,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 
 	if (!isOpen && !isSignupModalOpen) return null;
 
+	console.log(subscription, "user");
 	return (
 		<>
 			<AnimatePresence>
@@ -137,6 +151,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 							exit={{ scale: 0.9, opacity: 0 }}
 							onClick={(e) => e.stopPropagation()}
 							className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+							style={{ backgroundColor: T.base }}
 						>
 							{/* Header */}
 							<div className="flex items-center justify-between p-4 border-b border-zinc-200">
@@ -177,6 +192,43 @@ const LoginModal = ({ isOpen, onClose }) => {
 													{user.provider === "google" ? "Google" : "Email"}
 												</span>
 											</div>
+										</div>
+										<div className="flex items-center gap-2">
+											<h5 className="text-sm font-medium text-zinc-700">
+												Subscription Status:
+											</h5>
+											<p className="text-sm text-zinc-600 p-2 rounded-full ">
+												{subscription.isSubscribed ? (
+													<span className="text-green-500">Active</span>
+												) : (
+													<span className="text-red-500 flex gap-2 items-center">
+														Inactive{" "}
+														<motion.button
+															whileHover={{
+																scale: 1.02,
+																background: "#f5f0e8",
+															}}
+															onClick={() => router.push("/pricing")}
+															whileTap={{ scale: 0.97 }}
+															style={{
+																display: "block",
+																width: "100%",
+																background: "white",
+																color: T.accent,
+																padding: "8px",
+																borderRadius: 10,
+																fontSize: 14,
+																fontWeight: 700,
+																border: "none",
+																cursor: "pointer",
+																fontFamily: "'Outfit', sans-serif",
+															}}
+														>
+															Upgrade to Pro →
+														</motion.button>
+													</span>
+												)}
+											</p>
 										</div>
 										<motion.button
 											whileHover={{ scale: 1.02 }}

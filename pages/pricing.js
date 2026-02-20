@@ -111,7 +111,6 @@ const PricingPage = () => {
 			toast.error("Failed to login with Google. Please try again.");
 		}
 	};
-	console.log(reduxUser, user);
 
 	const plans = [
 		{
