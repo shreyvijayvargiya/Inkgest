@@ -701,7 +701,7 @@ const PricingPage = () => {
 								<motion.button
 									whileHover={{ background: "#F0ECE5" }}
 									whileTap={{ scale: 0.97 }}
-									onClick={() => handleCheckout(plan.id)}
+									onClick={() => router.push("/app")}
 									style={{
 										width: "100%",
 										padding: "13px",

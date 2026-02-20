@@ -1750,7 +1750,10 @@ function Footer() {
 							},
 							{
 								title: "Connect",
-								links: ["Twitter / X", "Medium", "Contact us"],
+								links: [
+									"https://x.com/@treyvijay",
+									"mailto:shreyvijayvargiya26@gmail.com",
+								],
 							},
 						].map((col) => (
 							<div key={col.title}>
@@ -1770,7 +1773,7 @@ function Footer() {
 								{col.links.map((l) => (
 									<a
 										key={l}
-										href="#"
+										href={l}
 										style={{
 											display: "block",
 											fontSize: 14,
@@ -1818,7 +1821,14 @@ function Footer() {
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						Made for writers who publish on a deadline.
+						Made for writers who publish on a deadline. Built using{" "}
+						<a
+							href="https://buildsaas.com"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							Buildsaas
+						</a>
 					</span>
 				</div>
 			</div>
