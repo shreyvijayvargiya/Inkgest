@@ -229,7 +229,7 @@ function Hero() {
 					}}
 				>
 					✦ <span style={{ color: T.warm, fontWeight: 700 }}>New</span> —
-					iHateReading Scraping URL reading is live
+					Inkgest version one is live
 				</motion.div>
 
 				{/* Headline */}
@@ -1740,7 +1740,6 @@ function Footer() {
 					</div>
 					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
 						{[
-							
 							{
 								title: "Connect",
 								links: [
