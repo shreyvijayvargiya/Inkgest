@@ -1417,25 +1417,6 @@ function Pricing() {
 						</motion.div>
 					</FadeUp>
 				</div>
-
-				<FadeUp delay={0.1}>
-					<p
-						style={{
-							fontSize: 13,
-							color: T.muted,
-							marginTop: 20,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Annual plan coming soon — 2 months free.{" "}
-						<a
-							href="#"
-							style={{ color: T.accent, textDecoration: "underline" }}
-						>
-							Get notified
-						</a>
-					</p>
-				</FadeUp>
 			</div>
 		</section>
 	);
@@ -1500,9 +1481,9 @@ function OpenSource() {
 									marginBottom: 32,
 								}}
 							>
-								inkgest is completely open source. Read the code, fork it, self-host
-								it, or contribute back. Built in public so you can see exactly
-								what runs when you paste a URL.
+								inkgest is completely open source. Read the code, fork it,
+								self-host it, or contribute back. Built in public so you can see
+								exactly what runs when you paste a URL.
 							</p>
 							<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
 								<motion.a
@@ -1572,14 +1553,33 @@ function OpenSource() {
 								}}
 							>
 								{[
-									{ icon: "🔍", title: "Full source code", body: "Every line of the app is public on GitHub." },
-									{ icon: "🍴", title: "Fork freely", body: "Clone and self-host your own instance in minutes." },
-									{ icon: "🤝", title: "Contributions welcome", body: "Open PRs, file issues, suggest features." },
-									{ icon: "🔒", title: "No hidden logic", body: "See exactly how drafts are generated end-to-end." },
+									{
+										icon: "🔍",
+										title: "Full source code",
+										body: "Every line of the app is public on GitHub.",
+									},
+									{
+										icon: "🍴",
+										title: "Fork freely",
+										body: "Clone and self-host your own instance in minutes.",
+									},
+									{
+										icon: "🤝",
+										title: "Contributions welcome",
+										body: "Open PRs, file issues, suggest features.",
+									},
+									{
+										icon: "🔒",
+										title: "No hidden logic",
+										body: "See exactly how drafts are generated end-to-end.",
+									},
 								].map((item) => (
 									<motion.div
 										key={item.title}
-										whileHover={{ y: -4, boxShadow: "0 12px 32px rgba(0,0,0,0.09)" }}
+										whileHover={{
+											y: -4,
+											boxShadow: "0 12px 32px rgba(0,0,0,0.09)",
+										}}
 										transition={{ duration: 0.22 }}
 										style={{
 											background: T.surface,
@@ -1588,7 +1588,9 @@ function OpenSource() {
 											padding: "20px 18px",
 										}}
 									>
-										<div style={{ fontSize: 22, marginBottom: 8 }}>{item.icon}</div>
+										<div style={{ fontSize: 22, marginBottom: 8 }}>
+											{item.icon}
+										</div>
 										<p
 											style={{
 												fontSize: 13,
@@ -1823,7 +1825,7 @@ function CTABanner() {
 						publish on a deadline every week.
 					</p>
 					<motion.a
-						href="#"
+						href="/app"
 						whileHover={{
 							scale: 1.04,
 							y: -2,
@@ -1856,7 +1858,7 @@ function CTABanner() {
 					>
 						Already have an account?{" "}
 						<a
-							href="#"
+							href="/login"
 							style={{ color: T.accent, textDecoration: "underline" }}
 						>
 							Log in
@@ -2024,9 +2026,9 @@ export default function inkgestLanding() {
 			<HowItWorks />
 			<StatsStrip />
 			{/* /<Testimonials /> */}
-		<Pricing />
-		<OpenSource />
-		<FAQ />
+			<Pricing />
+			<OpenSource />
+			<FAQ />
 			<CTABanner />
 			<Footer />
 		</div>
