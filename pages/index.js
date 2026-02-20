@@ -7,7 +7,7 @@ import {
 	AnimatePresence,
 } from "framer-motion";
 import { useSelector } from "react-redux";
-
+import { useRouter } from "next/router";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -1166,6 +1166,7 @@ function Pricing() {
 		"Cancel anytime",
 	];
 
+	const router = useRouter();
 	return (
 		<section
 			id="pricing"
@@ -1398,6 +1399,7 @@ function Pricing() {
 							<motion.button
 								whileHover={{ scale: 1.02, background: "#f5f0e8" }}
 								whileTap={{ scale: 0.97 }}
+								onClick={() => router.push("/pricing")}
 								style={{
 									display: "block",
 									width: "100%",

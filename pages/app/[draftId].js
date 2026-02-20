@@ -58,7 +58,9 @@ const isThisMonth = (val) => {
 	const d = getDateFromFirestore(val);
 	if (!d) return false;
 	const now = new Date();
-	return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+	return (
+		d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+	);
 };
 
 /* ─── Tiny icon components (inline SVG) ─── */
@@ -511,7 +513,9 @@ export default function DraftPage() {
 						}}
 					>
 						<motion.div
-							animate={{ width: `${((FREE_LIMIT - remaining) / FREE_LIMIT) * 100}%` }}
+							animate={{
+								width: `${((FREE_LIMIT - remaining) / FREE_LIMIT) * 100}%`,
+							}}
 							transition={{ duration: 0.6 }}
 							style={{ height: "100%", background: T.warm, borderRadius: 100 }}
 						/>
@@ -539,7 +543,6 @@ export default function DraftPage() {
 				</div>
 
 				<div style={{ flex: 1 }} />
-
 				{/* New draft button */}
 				<motion.button
 					whileHover={{
@@ -688,9 +691,7 @@ export default function DraftPage() {
 							</div>
 
 							{/* Draft list */}
-							<div
-								style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}
-							>
+							<div style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
 								<AnimatePresence>
 									{filtered.length === 0 ? (
 										<motion.div
@@ -860,17 +861,14 @@ export default function DraftPage() {
 								<TBtn
 									icon={Icons.list}
 									label="Bullet list"
-									onClick={() =>
-										document.execCommand("insertUnorderedList")
-									}
+									onClick={() => document.execCommand("insertUnorderedList")}
 								/>
 								<TBtn
 									icon={Icons.link2}
 									label="Link"
 									onClick={() => {
 										const url = window.prompt("URL:");
-										if (url)
-											document.execCommand("createLink", false, url);
+										if (url) document.execCommand("createLink", false, url);
 									}}
 								/>
 								<div
@@ -998,104 +996,108 @@ export default function DraftPage() {
 										marginBottom: 12,
 									}}
 								>
-								<span
-									style={{
-										fontSize: 11,
-										fontWeight: 700,
-										background: "#F0ECE5",
-										color: T.muted,
-										padding: "2px 9px",
-										borderRadius: 100,
-									}}
-								>
-									{draft.tag}
-								</span>
-								{draft.style && (
 									<span
 										style={{
 											fontSize: 11,
-											fontWeight: 600,
-											background: "#FEF3E2",
-											color: T.warm,
+											fontWeight: 700,
+											background: "#F0ECE5",
+											color: T.muted,
 											padding: "2px 9px",
 											borderRadius: 100,
-											textTransform: "capitalize",
 										}}
 									>
-										{draft.style}
+										{draft.tag}
 									</span>
-								)}
-								<span style={{ fontSize: 12, color: T.muted }}>
-									{draft.date}
-								</span>
+									{draft.style && (
+										<span
+											style={{
+												fontSize: 11,
+												fontWeight: 600,
+												background: "#FEF3E2",
+												color: T.warm,
+												padding: "2px 9px",
+												borderRadius: 100,
+												textTransform: "capitalize",
+											}}
+										>
+											{draft.style}
+										</span>
+									)}
+									<span style={{ fontSize: 12, color: T.muted }}>
+										{draft.date}
+									</span>
 								</div>
-							<div
-								contentEditable
-								suppressContentEditableWarning
-								data-placeholder="Untitled draft"
-								style={{
-									fontFamily: "'Instrument Serif',serif",
-									fontSize: "clamp(22px, 3vw, 30px)",
-									color: T.accent,
-									lineHeight: 1.2,
-									letterSpacing: "-0.5px",
-									outline: "none",
-									marginBottom: 12,
-									minHeight: 36,
-								}}
-								dangerouslySetInnerHTML={{ __html: draft.title }}
-							/>
-							{/* Source links */}
-							{(() => {
-								const allUrls = Array.isArray(draft?.urls)
-									? draft.urls.filter(Boolean)
-									: draft?.url
-									? [draft.url]
-									: [];
-								if (allUrls.length === 0) return null;
-								return (
-									<div
-										style={{
-											display: "flex",
-											flexWrap: "wrap",
-											gap: 6,
-											marginBottom: 16,
-										}}
-									>
-										{allUrls.map((url, i) => (
-											<a
-												key={i}
-												href={url}
-												target="_blank"
-												rel="noopener noreferrer"
-												style={{
-													display: "inline-flex",
-													alignItems: "center",
-													gap: 5,
-													fontSize: 12,
-													color: T.warm,
-													background: "#FEF3E2",
-													border: `1px solid #F5C97A`,
-													borderRadius: 7,
-													padding: "3px 10px",
-													textDecoration: "none",
-													maxWidth: 320,
-													overflow: "hidden",
-													textOverflow: "ellipsis",
-													whiteSpace: "nowrap",
-													transition: "opacity 0.15s",
-												}}
-												onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.75")}
-												onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-											>
-												<Icon d={Icons.link2} size={11} stroke={T.warm} />
-												{url}
-											</a>
-										))}
-									</div>
-								);
-							})()}
-						</div>
+								<div
+									contentEditable
+									suppressContentEditableWarning
+									data-placeholder="Untitled draft"
+									style={{
+										fontFamily: "'Instrument Serif',serif",
+										fontSize: "clamp(22px, 3vw, 30px)",
+										color: T.accent,
+										lineHeight: 1.2,
+										letterSpacing: "-0.5px",
+										outline: "none",
+										marginBottom: 12,
+										minHeight: 36,
+									}}
+									dangerouslySetInnerHTML={{ __html: draft.title }}
+								/>
+								{/* Source links */}
+								{(() => {
+									const allUrls = Array.isArray(draft?.urls)
+										? draft.urls.filter(Boolean)
+										: draft?.url
+											? [draft.url]
+											: [];
+									if (allUrls.length === 0) return null;
+									return (
+										<div
+											style={{
+												display: "flex",
+												flexWrap: "wrap",
+												gap: 6,
+												marginBottom: 16,
+											}}
+										>
+											{allUrls.map((url, i) => (
+												<a
+													key={i}
+													href={url}
+													target="_blank"
+													rel="noopener noreferrer"
+													style={{
+														display: "inline-flex",
+														alignItems: "center",
+														gap: 5,
+														fontSize: 12,
+														color: T.warm,
+														background: "#FEF3E2",
+														border: `1px solid #F5C97A`,
+														borderRadius: 7,
+														padding: "3px 10px",
+														textDecoration: "none",
+														maxWidth: 320,
+														overflow: "hidden",
+														textOverflow: "ellipsis",
+														whiteSpace: "nowrap",
+														transition: "opacity 0.15s",
+													}}
+													onMouseEnter={(e) =>
+														(e.currentTarget.style.opacity = "0.75")
+													}
+													onMouseLeave={(e) =>
+														(e.currentTarget.style.opacity = "1")
+													}
+												>
+													<Icon d={Icons.link2} size={11} stroke={T.warm} />
+													{url}
+												</a>
+											))}
+										</div>
+									);
+								})()}
+							</div>
 
 							{/* Editor body */}
 							<div
@@ -1136,9 +1138,7 @@ export default function DraftPage() {
 									flexShrink: 0,
 								}}
 							>
-								<div
-									style={{ display: "flex", alignItems: "center", gap: 6 }}
-								>
+								<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
 									<motion.div
 										animate={{ scale: [1, 1.2, 1] }}
 										transition={{ duration: 2, repeat: Infinity }}
@@ -1176,8 +1176,8 @@ export default function DraftPage() {
 										cursor: "pointer",
 									}}
 								>
-									<Icon d={Icons.refresh} size={12} stroke={T.muted} />{" "}
-									New draft
+									<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
+									draft
 								</motion.button>
 							</div>
 						</motion.div>
@@ -1285,7 +1285,6 @@ export default function DraftPage() {
 					</>
 				)}
 			</AnimatePresence>
-
 		</div>
 	);
 }
