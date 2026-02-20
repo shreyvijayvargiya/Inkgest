@@ -1,0 +1,32 @@
+---
+title: "Authentication"
+description: "Authentication guide for version 1"
+sidebar_order: 1
+visibility: "public"
+---
+
+# Authentication
+
+Version 1 authentication guide.
+
+## Overview
+
+Version 1 supports basic email/password authentication.
+
+## Setup
+
+1. Configure Firebase
+2. Enable Email/Password provider
+3. Set up environment variables
+
+## Example
+
+\`\`\`javascript
+import { signInWithEmailAndPassword } from 'firebase/auth';
+
+await signInWithEmailAndPassword(auth, email, password);
+\`\`\`
+
+## Note
+
+This is version 1 documentation. For enhanced features, see [version 2](/docs/v2/auth).

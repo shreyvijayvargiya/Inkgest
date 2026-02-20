@@ -1,0 +1,122 @@
+---
+title: "Authentication"
+description: "Complete guide to authentication in version 2"
+sidebar_order: 1
+visibility: "public"
+---
+
+# Authentication
+
+Version 2 includes a completely redesigned authentication system with enhanced security and better user experience.
+
+## Overview
+
+Our authentication system supports multiple providers and methods:
+
+- **Email/Password**: Traditional email-based authentication
+- **OAuth Providers**: Google, GitHub, and more
+- **Magic Links**: Passwordless authentication
+- **Multi-factor Authentication**: Enhanced security option
+
+## Quick Start
+
+### Basic Setup
+
+1. Configure your authentication provider
+2. Set up environment variables
+3. Initialize the auth client
+4. Protect your routes
+
+### Example Code
+
+\`\`\`typescript
+import { auth } from '@/lib/auth';
+
+// Sign in
+const user = await auth.signIn({
+  email: 'user@example.com',
+  password: 'password123'
+});
+
+// Sign out
+await auth.signOut();
+
+// Get current user
+const currentUser = await auth.getUser();
+\`\`\`
+
+## Configuration
+
+### Environment Variables
+
+Add these to your `.env.local`:
+
+\`\`\`env
+AUTH_SECRET=your-secret-key
+AUTH_URL=http://localhost:3000
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+\`\`\`
+
+## Advanced Features
+
+### Session Management
+
+Sessions are automatically managed and refreshed:
+
+\`\`\`typescript
+// Check session
+const session = await auth.getSession();
+
+if (!session) {
+  redirect('/login');
+}
+\`\`\`
+
+### Role-Based Access Control
+
+Implement role-based access:
+
+\`\`\`typescript
+const user = await auth.getUser();
+
+if (user.role === 'admin') {
+  // Admin-only code
+}
+\`\`\`
+
+## Security Best Practices
+
+1. Always use HTTPS in production
+2. Implement rate limiting
+3. Use strong password requirements
+4. Enable MFA for sensitive accounts
+5. Regularly rotate secrets
+
+## API Reference
+
+### Methods
+
+- \`signIn(credentials)\`: Authenticate a user
+- \`signOut()\`: End user session
+- \`getUser()\`: Get current authenticated user
+- \`getSession()\`: Get current session
+- \`refreshSession()\`: Refresh session token
+
+## Troubleshooting
+
+### Common Issues
+
+**"Invalid credentials" error:**
+- Verify email and password are correct
+- Check if account is activated
+- Ensure email verification is complete
+
+**Session expires quickly:**
+- Check session configuration
+- Verify token expiration settings
+
+## Next Steps
+
+- [User Management](./user-management)
+- [API Security](../api/security)

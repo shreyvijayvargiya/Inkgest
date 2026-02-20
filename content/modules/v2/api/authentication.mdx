@@ -1,0 +1,142 @@
+---
+title: "Authentication API"
+description: "API endpoints for authentication"
+sidebar_order: 2
+visibility: "public"
+---
+
+# Authentication API
+
+Complete reference for authentication endpoints in version 2.
+
+## Endpoints
+
+### POST /auth/signin
+
+Authenticate a user and receive an access token.
+
+**Request Body:**
+
+\`\`\`json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+\`\`\`
+
+**Response:**
+
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "123",
+      "email": "user@example.com",
+      "name": "John Doe"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresIn": 3600
+  }
+}
+\`\`\`
+
+### POST /auth/signout
+
+Invalidate the current session.
+
+**Headers:**
+- \`Authorization: Bearer YOUR_TOKEN\`
+
+**Response:**
+
+\`\`\`json
+{
+  "success": true,
+  "message": "Signed out successfully"
+}
+\`\`\`
+
+### GET /auth/user
+
+Get the current authenticated user.
+
+**Headers:**
+- \`Authorization: Bearer YOUR_TOKEN\`
+
+**Response:**
+
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "id": "123",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "role": "user"
+  }
+}
+\`\`\`
+
+### POST /auth/refresh
+
+Refresh an expired access token.
+
+**Request Body:**
+
+\`\`\`json
+{
+  "refreshToken": "your-refresh-token"
+}
+\`\`\`
+
+**Response:**
+
+\`\`\`json
+{
+  "success": true,
+  "data": {
+    "token": "new-access-token",
+    "expiresIn": 3600
+  }
+}
+\`\`\`
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| \`INVALID_CREDENTIALS\` | Email or password is incorrect |
+| \`ACCOUNT_LOCKED\` | Account has been locked |
+| \`EMAIL_NOT_VERIFIED\` | Email address not verified |
+| \`TOKEN_EXPIRED\` | Access token has expired |
+
+## Examples
+
+### JavaScript/TypeScript
+
+\`\`\`typescript
+const response = await fetch('https://api.example.com/v2/auth/signin', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    email: 'user@example.com',
+    password: 'password123',
+  }),
+});
+
+const data = await response.json();
+\`\`\`
+
+### cURL
+
+\`\`\`bash
+curl -X POST https://api.example.com/v2/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "password123"
+  }'
+\`\`\`

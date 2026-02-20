@@ -1,0 +1,96 @@
+---
+title: "Security Best Practices"
+description: "Security guidelines for version 2"
+sidebar_order: 2
+visibility: "internal"
+---
+
+# Security Best Practices
+
+Internal security documentation for version 2.
+
+## Authentication Security
+
+### Password Requirements
+
+- Minimum 12 characters
+- Mix of uppercase, lowercase, numbers, and symbols
+- No common passwords
+- Regular password rotation
+
+### Session Management
+
+- Use secure, httpOnly cookies
+- Implement CSRF protection
+- Set appropriate session timeouts
+- Rotate session tokens regularly
+
+## API Security
+
+### Rate Limiting
+
+Implement rate limiting to prevent abuse:
+
+\`\`\`typescript
+import rateLimit from 'express-rate-limit';
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+\`\`\`
+
+### Input Validation
+
+Always validate and sanitize user input:
+
+\`\`\`typescript
+import { z } from 'zod';
+
+const userSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(100),
+});
+
+const validated = userSchema.parse(userInput);
+\`\`\`
+
+## Data Protection
+
+### Encryption
+
+- Encrypt sensitive data at rest
+- Use TLS/SSL for data in transit
+- Hash passwords with bcrypt/argon2
+- Encrypt database connections
+
+### SQL Injection Prevention
+
+Use parameterized queries:
+
+\`\`\`typescript
+// ❌ Bad
+const query = `SELECT * FROM users WHERE email = '${email}'`;
+
+// ✅ Good
+const query = 'SELECT * FROM users WHERE email = ?';
+const result = await db.query(query, [email]);
+\`\`\`
+
+## Security Headers
+
+Implement security headers:
+
+\`\`\`typescript
+res.setHeader('X-Content-Type-Options', 'nosniff');
+res.setHeader('X-Frame-Options', 'DENY');
+res.setHeader('X-XSS-Protection', '1; mode=block');
+res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+\`\`\`
+
+## Regular Audits
+
+- Conduct security audits quarterly
+- Keep dependencies updated
+- Monitor for vulnerabilities
+- Review access logs regularly
