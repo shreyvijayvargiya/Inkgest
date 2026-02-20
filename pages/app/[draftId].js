@@ -268,9 +268,7 @@ export default function DraftPage() {
 	const { draftId } = router.query;
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 
-	const [draft, setDraft] = useState(null);
-	const [drafts, setDrafts] = useState([]);
-	const [loadingDraft, setLoadingDraft] = useState(true);
+	const queryClient = useQueryClient();
 	const [search, setSearch] = useState("");
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [copied, setCopied] = useState(false);
@@ -280,53 +278,41 @@ export default function DraftPage() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const editorRef = useRef(null);
 
+	/* All drafts for sidebar */
+	const { data: drafts = [] } = useQuery({
+		queryKey: ["drafts", reduxUser?.uid],
+		queryFn: async () => {
+			const q = query(
+				collection(db, "drafts"),
+				where("userId", "==", reduxUser.uid),
+				orderBy("createdAt", "desc"),
+			);
+			const snap = await getDocs(q);
+			return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+		},
+		enabled: !!reduxUser,
+		staleTime: 2 * 60 * 1000,
+	});
+
+	/* Single draft by ID */
+	const { data: draft, isLoading: loadingDraft } = useQuery({
+		queryKey: ["draft", draftId],
+		queryFn: async () => {
+			const snap = await getDoc(doc(db, "drafts", draftId));
+			if (!snap.exists()) {
+				router.replace("/app");
+				return null;
+			}
+			return { id: snap.id, ...snap.data() };
+		},
+		enabled: !!draftId,
+		staleTime: 5 * 60 * 1000,
+		retry: false,
+	});
+
 	/* Dynamic usage for navbar pill */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
 	const remaining = Math.max(0, FREE_LIMIT - used);
-
-	/* Load all drafts for sidebar — per user */
-	useEffect(() => {
-		if (!reduxUser) {
-			setDrafts([]);
-			return;
-		}
-		const loadDrafts = async () => {
-			try {
-				const q = query(
-					collection(db, "drafts"),
-					where("userId", "==", reduxUser.uid),
-					orderBy("createdAt", "desc"),
-				);
-				const snap = await getDocs(q);
-				setDrafts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-			} catch (e) {
-				console.error("Failed to load drafts", e);
-			}
-		};
-		loadDrafts();
-	}, [reduxUser]);
-
-	/* Load specific draft by ID */
-	useEffect(() => {
-		if (!draftId) return;
-		const loadDraft = async () => {
-			setLoadingDraft(true);
-			try {
-				const snap = await getDoc(doc(db, "drafts", draftId));
-				if (snap.exists()) {
-					setDraft({ id: snap.id, ...snap.data() });
-				} else {
-					router.replace("/app");
-				}
-			} catch (e) {
-				console.error("Failed to load draft", e);
-				router.replace("/app");
-			} finally {
-				setLoadingDraft(false);
-			}
-		};
-		loadDraft();
-	}, [draftId, router]);
 
 	/* Format markdown body to displayable HTML */
 	const formatBody = (body = "") => {
@@ -381,7 +367,9 @@ export default function DraftPage() {
 	const confirmDelete = async () => {
 		try {
 			await deleteDoc(doc(db, "drafts", deleteConfirm));
-			setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			queryClient.setQueryData(["drafts", reduxUser?.uid], (old = []) =>
+				old.filter((d) => d.id !== deleteConfirm),
+			);
 			if (deleteConfirm === draftId) {
 				router.push("/app");
 			}
