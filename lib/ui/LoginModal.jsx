@@ -133,7 +133,6 @@ const LoginModal = ({ isOpen, onClose }) => {
 
 	if (!isOpen && !isSignupModalOpen) return null;
 
-	console.log(subscription, "user");
 	return (
 		<>
 			<AnimatePresence>
@@ -339,22 +338,6 @@ const LoginModal = ({ isOpen, onClose }) => {
 											</svg>
 											{isLoading ? "Logging in..." : "Google"}
 										</motion.button>
-
-										<div className="text-center mt-4">
-											<p className="text-sm text-zinc-600">
-												Don't have an account?{" "}
-												<button
-													type="button"
-													onClick={() => {
-														setIsSignupModalOpen(true);
-														onClose();
-													}}
-													className="text-zinc-900 font-medium hover:underline"
-												>
-													sign up
-												</button>
-											</p>
-										</div>
 									</div>
 								)}
 							</div>
