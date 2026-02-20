@@ -943,7 +943,7 @@ function StatsStrip() {
 	const stats = [
 		{ num: "60", suffix: "s", label: "Average URL to draft time" },
 		{ num: "3", suffix: "hrs", label: "Saved per newsletter on average" },
-		{ num: "$12", suffix: "/mo", label: "Less than one coffee per week" },
+		{ num: "$5", suffix: "/mo", label: "Less than one coffee per week" },
 	];
 	return (
 		<div style={{ background: T.accent, padding: "56px 24px" }}>
@@ -1351,7 +1351,7 @@ function Pricing() {
 									lineHeight: 1,
 								}}
 							>
-								$12
+								$5
 								<span
 									style={{
 										fontSize: 18,

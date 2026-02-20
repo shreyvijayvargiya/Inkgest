@@ -132,7 +132,7 @@ const PricingPage = () => {
 		{
 			id: "9c912dd8-9153-48f9-bd30-2b6c97c184c8",
 			name: "Pro",
-			price: "$12",
+			price: "$5",
 			period: "month",
 			description: "Unlimited drafts for serious creators",
 			features: [

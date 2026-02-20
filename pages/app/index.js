@@ -171,7 +171,7 @@ function UpgradeBanner({ used, limit, onUpgrade }) {
 						}}
 					>
 						{remaining === 0
-							? "Upgrade to Pro for unlimited drafts — $12/mo"
+							? "Upgrade to Pro for unlimited drafts — $5/mo"
 							: "Upgrade to Pro before you run out"}
 					</p>
 				</div>
@@ -191,7 +191,7 @@ function UpgradeBanner({ used, limit, onUpgrade }) {
 						whiteSpace: "nowrap",
 					}}
 				>
-					Upgrade $12/mo →
+					Upgrade $5/mo →
 				</motion.button>
 			</div>
 			{remaining > 0 && (
@@ -1228,8 +1228,7 @@ export default function inkgestApp() {
 											fontWeight: 600,
 											cursor: "pointer",
 											border: `1.5px solid ${style === s.id ? T.warm : T.border}`,
-											background:
-												style === s.id ? "#FEF3E2" : T.surface,
+											background: style === s.id ? "#FEF3E2" : T.surface,
 											color: style === s.id ? T.warm : T.muted,
 											transition: "all 0.15s",
 										}}
