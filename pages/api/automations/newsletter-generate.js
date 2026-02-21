@@ -1,3 +1,5 @@
+import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+
 const urlRegex = /^https?:\/\/\S+$/i;
 
 const MAX_URLS = 10;
@@ -163,6 +165,12 @@ export default async function handler(req, res) {
 			return res.status(401).json({
 				error: "Authentication required. Please sign in to generate drafts.",
 			});
+		}
+
+		// Credit gate — 5 free AI generations per month; Pro = unlimited
+		const creditCheck = await checkAndIncrementCredit(userId.trim(), "llm");
+		if (!creditCheck.allowed) {
+			return res.status(429).json({ error: creditCheck.error });
 		}
 
 		const safePrompt = String(prompt || "").trim();

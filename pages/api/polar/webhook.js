@@ -157,6 +157,15 @@ async function handleSubscriptionEvent(event) {
 		updatedUserData.createdAt = serverTimestamp();
 	}
 
+	// Mark user as pro in the users collection (drives credit limits)
+	if (!isCancelled) {
+		await setDoc(
+			doc(db, "users", customerId),
+			{ plan: "pro" },
+			{ merge: true },
+		);
+	}
+
 	await setDoc(userRef, updatedUserData, { merge: true });
 
 	// Send appropriate emails based on subscription status
@@ -241,6 +250,13 @@ async function handleSubscriptionCanceledEvent(event) {
 		canceledAt: serverTimestamp(),
 		updatedAt: serverTimestamp(),
 	};
+
+	// Revert plan to free in the users collection
+	await setDoc(
+		doc(db, "users", customerId),
+		{ plan: "free" },
+		{ merge: true },
+	);
 
 	await setDoc(customerRef, updatedCustomerData, { merge: true });
 

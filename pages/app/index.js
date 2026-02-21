@@ -15,6 +15,7 @@ import {
 	where,
 	serverTimestamp,
 } from "firebase/firestore";
+import { getUserCredits, FREE_LLM_LIMIT, FREE_SCRAPE_LIMIT } from "../../lib/utils/credits";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -43,8 +44,6 @@ const T = {
 	border: "#E8E4DC",
 	sidebar: "#FDFCF9",
 };
-
-const FREE_LIMIT = 3;
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;
@@ -127,52 +126,50 @@ const STYLES = [
 ];
 
 /* ─── Upgrade Banner ─── */
-function UpgradeBanner({ used, limit, onUpgrade }) {
-	const pct = (used / limit) * 100;
-	const remaining = limit - used;
-	if (used < limit - 1) return null;
+function UpgradeBanner({ credits, onUpgrade }) {
+	if (!credits) return null;
+	const { plan, llmUsed, scrapeUsed, llmLimit, scrapeLimit } = credits;
+	if (plan === "pro") return null;
+	const llmOut = llmUsed >= llmLimit;
+	const scrapeOut = scrapeUsed >= scrapeLimit;
+	const anyOut = llmOut || scrapeOut;
+	const bothOut = llmOut && scrapeOut;
+	if (llmUsed < llmLimit - 1 && scrapeUsed < scrapeLimit - 1) return null;
+
+	let heading, sub;
+	if (bothOut) {
+		heading = "You've used all your free credits this month";
+		sub = "Upgrade to Pro for unlimited AI drafts & URL scrapes — $5/mo";
+	} else if (llmOut) {
+		heading = `AI generations used up (${llmLimit}/${llmLimit})`;
+		sub = "Upgrade to Pro for unlimited AI generations";
+	} else if (scrapeOut) {
+		heading = `URL scrapes used up (${scrapeLimit}/${scrapeLimit})`;
+		sub = "Upgrade to Pro for unlimited scrapes";
+	} else {
+		heading = "Almost out of free credits";
+		sub = "Upgrade to Pro before you run out";
+	}
+
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: -10 }}
 			animate={{ opacity: 1, y: 0 }}
 			style={{
-				background: remaining === 0 ? T.accent : "#FEF3E2",
-				border: `1px solid ${remaining === 0 ? T.accent : "#F5C97A"}`,
+				background: anyOut ? T.accent : "#FEF3E2",
+				border: `1px solid ${anyOut ? T.accent : "#F5C97A"}`,
 				borderRadius: 10,
 				padding: "12px 16px",
 				marginBottom: 16,
 			}}
 		>
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: 12,
-				}}
-			>
+			<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
 				<div>
-					<p
-						style={{
-							fontSize: 13,
-							fontWeight: 700,
-							color: remaining === 0 ? "white" : "#92400E",
-							marginBottom: 2,
-						}}
-					>
-						{remaining === 0
-							? "You've used all 3 free drafts"
-							: "1 free draft remaining"}
+					<p style={{ fontSize: 13, fontWeight: 700, color: anyOut ? "white" : "#92400E", marginBottom: 2 }}>
+						{heading}
 					</p>
-					<p
-						style={{
-							fontSize: 12,
-							color: remaining === 0 ? "rgba(255,255,255,0.65)" : "#B45309",
-						}}
-					>
-						{remaining === 0
-							? "Upgrade to Pro for unlimited drafts — $5/mo"
-							: "Upgrade to Pro before you run out"}
+					<p style={{ fontSize: 12, color: anyOut ? "rgba(255,255,255,0.65)" : "#B45309" }}>
+						{sub}
 					</p>
 				</div>
 				<motion.button
@@ -180,7 +177,7 @@ function UpgradeBanner({ used, limit, onUpgrade }) {
 					whileTap={{ scale: 0.97 }}
 					onClick={onUpgrade}
 					style={{
-						background: remaining === 0 ? T.warm : T.accent,
+						background: anyOut ? T.warm : T.accent,
 						color: "white",
 						border: "none",
 						padding: "8px 16px",
@@ -194,26 +191,6 @@ function UpgradeBanner({ used, limit, onUpgrade }) {
 					Upgrade $5/mo →
 				</motion.button>
 			</div>
-			{remaining > 0 && (
-				<div
-					style={{
-						marginTop: 10,
-						height: 3,
-						background: "#F5C97A",
-						borderRadius: 100,
-						overflow: "hidden",
-					}}
-				>
-					<div
-						style={{
-							height: "100%",
-							width: `${pct}%`,
-							background: T.warm,
-							borderRadius: 100,
-						}}
-					/>
-				</div>
-			)}
 		</motion.div>
 	);
 }
@@ -369,10 +346,19 @@ export default function inkgestApp() {
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
+	const [credits, setCredits] = useState(null); // { plan, llmUsed, scrapeUsed, llmLimit, scrapeLimit }
 
-	/* Dynamic usage — count this month's drafts for the logged-in user */
-	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
-	const remaining = Math.max(0, FREE_LIMIT - used);
+	/* Derived helpers */
+	const llmRemaining = credits
+		? credits.plan === "pro"
+			? Infinity
+			: Math.max(0, credits.llmLimit - credits.llmUsed)
+		: FREE_LLM_LIMIT;
+	const scrapeRemaining = credits
+		? credits.plan === "pro"
+			? Infinity
+			: Math.max(0, credits.scrapeLimit - credits.scrapeUsed)
+		: FREE_SCRAPE_LIMIT;
 
 	/* Load drafts per user from Firestore */
 	useEffect(() => {
@@ -396,6 +382,17 @@ export default function inkgestApp() {
 		loadDrafts();
 	}, [reduxUser]);
 
+	/* Load real credit state from Firestore */
+	useEffect(() => {
+		if (!reduxUser) {
+			setCredits(null);
+			return;
+		}
+		getUserCredits(reduxUser.uid)
+			.then(setCredits)
+			.catch((e) => console.error("Failed to load credits", e));
+	}, [reduxUser]);
+
 	/* Auto-generate after login if there was a pending request */
 	useEffect(() => {
 		if (reduxUser && pendingGenerateRef.current && prompt.trim()) {
@@ -413,7 +410,7 @@ export default function inkgestApp() {
 
 	const handleGenerate = async () => {
 		if (!prompt.trim() || generating) return;
-		if (remaining <= 0) {
+		if (llmRemaining <= 0) {
 			router.push("/pricing");
 			return;
 		}
@@ -481,6 +478,8 @@ export default function inkgestApp() {
 			]);
 			setUrls([""]);
 			setPrompt("");
+			// Refresh credits counter
+			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => {});
 			router.push(`/app/${docRef.id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
@@ -531,6 +530,7 @@ export default function inkgestApp() {
 	const handleScrape = async () => {
 		if (!scrapeUrl.trim() || scraping) return;
 		if (!reduxUser) { setLoginModalOpen(true); return; }
+		if (scrapeRemaining <= 0) { router.push("/pricing"); return; }
 		setScraping(true);
 		setGenerateError(null);
 		try {
@@ -563,6 +563,8 @@ export default function inkgestApp() {
 			const docRef = await addDoc(collection(db, "drafts"), draft);
 			setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
 			setScrapeUrl("");
+			// Refresh credits counter
+			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => {});
 			router.push(`/app/${docRef.id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Scrape failed");
@@ -669,59 +671,80 @@ export default function inkgestApp() {
 
 				<div style={{ width: 1, height: 20, background: T.border }} />
 
-				{/* Usage pill */}
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 8,
-						marginLeft: 4,
-						background: remaining === 0 ? "#FEF3E2" : T.base,
-						border: `1px solid ${remaining === 0 ? "#F5C97A" : T.border}`,
-						borderRadius: 100,
-						padding: "4px 12px",
-					}}
-				>
+				{/* Credits pill */}
+				{reduxUser && (
 					<div
 						style={{
-							width: 52,
-							height: 3,
-							background: T.border,
+							display: "flex",
+							alignItems: "center",
+							gap: 10,
+							marginLeft: 4,
+							background: T.base,
+							border: `1px solid ${(llmRemaining === 0 || scrapeRemaining === 0) ? "#F5C97A" : T.border}`,
 							borderRadius: 100,
-							overflow: "hidden",
+							padding: "4px 14px",
 						}}
 					>
-						<motion.div
-							animate={{
-								width: `${((FREE_LIMIT - remaining) / FREE_LIMIT) * 100}%`,
+						{credits?.plan === "pro" ? (
+							<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
+								∞ Pro
+							</span>
+						) : (
+							<>
+								{/* AI credits */}
+								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+									AI{" "}
+									<span style={{ fontWeight: 700, color: llmRemaining === 0 ? "#EF4444" : T.accent }}>
+										{credits ? `${credits.llmUsed}/${credits.llmLimit}` : `0/${FREE_LLM_LIMIT}`}
+									</span>
+								</span>
+								<div style={{ width: 1, height: 12, background: T.border }} />
+								{/* Scrape credits */}
+								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+									Scrape{" "}
+									<span style={{ fontWeight: 700, color: scrapeRemaining === 0 ? "#EF4444" : T.accent }}>
+										{credits ? `${credits.scrapeUsed}/${credits.scrapeLimit}` : `0/${FREE_SCRAPE_LIMIT}`}
+									</span>
+								</span>
+							</>
+						)}
+						<motion.button
+							whileHover={{ scale: 1.04 }}
+							whileTap={{ scale: 0.97 }}
+							onClick={() => router.push("/pricing")}
+							style={{
+								background: T.accent,
+								color: "white",
+								border: "none",
+								padding: "3px 10px",
+								borderRadius: 100,
+								fontSize: 11,
+								fontWeight: 700,
+								cursor: "pointer",
 							}}
-							transition={{ duration: 0.6 }}
-							style={{ height: "100%", background: T.warm, borderRadius: 100 }}
-						/>
+						>
+							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
+						</motion.button>
 					</div>
-					<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
-						{reduxUser
-							? `${remaining}/${FREE_LIMIT} left`
-							: `${FREE_LIMIT} free`}
-					</span>
-					<motion.button
-						whileHover={{ scale: 1.04 }}
-						whileTap={{ scale: 0.97 }}
-						onClick={() => router.push("/pricing")}
+				)}
+				{!reduxUser && (
+					<div
 						style={{
-							background: T.accent,
-							color: "white",
-							border: "none",
-							padding: "3px 10px",
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							marginLeft: 4,
+							background: T.base,
+							border: `1px solid ${T.border}`,
 							borderRadius: 100,
-							fontSize: 11,
-							fontWeight: 700,
-							cursor: "pointer",
+							padding: "4px 12px",
 						}}
 					>
-						Upgrade
-					</motion.button>
-				</div>
+						<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
+							{FREE_LLM_LIMIT} AI · {FREE_SCRAPE_LIMIT} scrapes free
+						</span>
+					</div>
+				)}
 
 				<div style={{ flex: 1 }} />
 
@@ -1131,7 +1154,7 @@ export default function inkgestApp() {
 						>
 							<div>
 								<p style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 2 }}>
-									{FREE_LIMIT} free drafts per month
+									{FREE_LLM_LIMIT} AI drafts · {FREE_SCRAPE_LIMIT} scrapes free/month
 								</p>
 								<p style={{ fontSize: 12, color: "#B45309" }}>
 									Sign in to start — no card required
@@ -1151,7 +1174,7 @@ export default function inkgestApp() {
 							</motion.button>
 						</motion.div>
 					)}
-					<UpgradeBanner used={used} limit={FREE_LIMIT} onUpgrade={() => router.push("/pricing")} />
+					<UpgradeBanner credits={credits} onUpgrade={() => router.push("/pricing")} />
 
 					{/* ── SCRAPE MODE ── */}
 					<AnimatePresence mode="wait">
@@ -1491,7 +1514,7 @@ export default function inkgestApp() {
 						</div>
 
 						{/* Generate button */}
-						{reduxUser && remaining === 0 ? (
+						{reduxUser && llmRemaining === 0 ? (
 							<motion.button
 								onClick={() => router.push("/pricing")}
 								whileHover={{
