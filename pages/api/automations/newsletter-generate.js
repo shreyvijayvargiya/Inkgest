@@ -97,6 +97,12 @@ async function openRouterChat({
 	return { content, raw: data };
 }
 
+function extractImages(links = []) {
+	return links
+		.filter((l) => typeof l === "string" && /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(l))
+		.slice(0, 12);
+}
+
 async function firecrawlScrapeMarkdown({ url, apiKey }) {
 	const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
 		method: "POST",
@@ -106,8 +112,8 @@ async function firecrawlScrapeMarkdown({ url, apiKey }) {
 		},
 		body: JSON.stringify({
 			url,
-			formats: ["markdown"],
-			onlyMainContent: true,
+			formats: ["markdown", "links"],
+			onlyMainContent: false, // broader to capture more images/links
 		}),
 	});
 
@@ -125,8 +131,10 @@ async function firecrawlScrapeMarkdown({ url, apiKey }) {
 		data?.data?.text ||
 		"";
 	const title = data?.data?.metadata?.title || data?.data?.title || "";
+	const links = data?.data?.links || [];
+	const images = extractImages(links);
 
-	return { markdown, title, raw: data };
+	return { markdown, title, images, links, raw: data };
 }
 
 export default async function handler(req, res) {
@@ -201,11 +209,13 @@ export default async function handler(req, res) {
 						url,
 						apiKey: firecrawlKey,
 					});
-					sources.push({
-						url,
-						title: scraped.title || "",
-						markdown: scraped.markdown || "",
-					});
+				sources.push({
+					url,
+					title: scraped.title || "",
+					markdown: scraped.markdown || "",
+					images: scraped.images || [],
+					links: scraped.links || [],
+				});
 				} catch (e) {
 					scrapeErrors.push({ url, error: e?.message || "Scrape failed" });
 				}
@@ -225,7 +235,13 @@ export default async function handler(req, res) {
 		const combined = sources
 			.map((s, idx) => {
 				const titleLine = s.title ? `Title: ${s.title}\n` : "";
-				return `SOURCE ${idx + 1}\nURL: ${s.url}\n${titleLine}\nCONTENT (markdown):\n${clampText(s.markdown, MAX_CHARS_PER_SOURCE)}\n`;
+				const imagesBlock = s.images?.length
+					? `\nIMAGES (embed these with ![alt](url) where relevant):\n${s.images.map((u) => `- ${u}`).join("\n")}\n`
+					: "";
+				const linksBlock = s.links?.length
+					? `\nKEY LINKS (use as inline hyperlinks where relevant):\n${s.links.slice(0, 10).map((u) => `- ${u}`).join("\n")}\n`
+					: "";
+				return `SOURCE ${idx + 1}\nURL: ${s.url}\n${titleLine}${imagesBlock}${linksBlock}\nCONTENT (markdown):\n${clampText(s.markdown, MAX_CHARS_PER_SOURCE)}\n`;
 			})
 			.join("\n\n---\n\n");
 
@@ -242,7 +258,10 @@ export default async function handler(req, res) {
 		const formatConfig = FORMATS[format];
 		const styleNote = STYLES[style] ? `\nTONE: ${STYLES[style]}` : "";
 		const sourceInstruction = sources.length
-			? "Generate the content based ONLY on the sources provided. If a claim isn't in the sources, omit it."
+			? `Generate the content based ONLY on the sources provided. If a claim isn't in the sources, omit it.
+Where images are provided, embed them naturally using Markdown: ![descriptive alt text](image_url).
+Where relevant links are provided, use them as inline hyperlinks: [anchor text](url).
+Do not include every image or link — only those that genuinely add value to the content.`
 			: "Generate the content based ONLY on the user's prompt (no sources provided). Don't invent specific facts or quote URLs you didn't read.";
 
 		const system = `${formatConfig.system}\n${sourceInstruction}${styleNote}\nOutput MUST be Markdown (no code fences).`;
@@ -272,7 +291,7 @@ export default async function handler(req, res) {
 			formatLabel: formatConfig.label,
 			style,
 			content,
-			sources: sources.map((s) => ({ url: s.url, title: s.title })),
+			sources: sources.map((s) => ({ url: s.url, title: s.title, images: s.images })),
 			scrapeErrors,
 		});
 	} catch (error) {

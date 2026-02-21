@@ -312,7 +312,64 @@ export default function DraftPage() {
 		retry: false,
 	});
 
-	/* Dynamic usage for navbar pill */
+	/* Video state */
+	const [generatingVideo, setGeneratingVideo] = useState(false);
+	const [videoUrl, setVideoUrl] = useState(null);
+	const [videoModalOpen, setVideoModalOpen] = useState(false);
+
+	/* Reset video state whenever draftId changes, then sync from loaded draft */
+	useEffect(() => {
+		setVideoUrl(null);
+		setVideoModalOpen(false);
+		setGeneratingVideo(false);
+	}, [draftId]);
+
+	useEffect(() => {
+		if (draft?.videoUrl) setVideoUrl(draft.videoUrl);
+	}, [draft?.videoUrl, draftId]);
+
+	/* Generate video — slideshow from draft images + Edge TTS narration of content */
+	const handleGenerateVideo = async () => {
+		if (generatingVideo || !reduxUser) return;
+
+		const images = draft?.images || [];
+		if (images.length === 0) {
+			alert("No images found for this draft. Generate a draft from URLs first so images can be collected.");
+			return;
+		}
+
+		setGeneratingVideo(true);
+		try {
+			const editorText = editorRef.current?.innerText || draft?.body || "";
+			const title = draft?.title || "Draft";
+
+			const response = await fetch("/api/video/generate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					images,
+					content: editorText,
+					title,
+					userId: reduxUser.uid,
+					draftId,
+				}),
+			});
+			const data = await response.json();
+			if (response.ok && data.success) {
+				setVideoUrl(data.videoUrl);
+				// Persist videoUrl to Firestore immediately
+				await updateDoc(doc(db, "drafts", draftId), { videoUrl: data.videoUrl });
+			} else {
+				console.error("Video generation failed:", data.error);
+			}
+		} catch (err) {
+			console.error("Video request failed:", err);
+		} finally {
+			setGeneratingVideo(false);
+		}
+	};
+
+
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
 	const remaining = Math.max(0, FREE_LIMIT - used);
 
@@ -356,7 +413,9 @@ export default function DraftPage() {
 		if (!draftId) return;
 		try {
 			const html = editorRef.current?.innerHTML || "";
-			await updateDoc(doc(db, "drafts", draftId), { body: html });
+			const update = { body: html };
+			if (videoUrl) update.videoUrl = videoUrl;
+			await updateDoc(doc(db, "drafts", draftId), update);
 		} catch (e) {
 			console.error("Save failed", e);
 		}
@@ -823,19 +882,20 @@ export default function DraftPage() {
 					}}
 				>
 					{draft && (
-						<motion.div
-							key={`editor-${draftId}`}
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							transition={{ duration: 0.25 }}
-							style={{
-								flex: 1,
-								display: "flex",
-								flexDirection: "column",
-								overflow: "hidden",
-							}}
-						>
-							{/* Editor top bar */}
+<motion.div
+								key={`editor-${draftId}`}
+								initial={{ opacity: 0 }}
+								animate={{ opacity: 1 }}
+								transition={{ duration: 0.25 }}
+								style={{
+									flex: 1,
+									display: "flex",
+									flexDirection: "column",
+									overflow: "hidden",
+								}}
+							>
+	
+
 							<div
 								style={{
 									padding: "12px 24px",
@@ -1099,6 +1159,75 @@ export default function DraftPage() {
 								})()}
 							</div>
 
+							{/* Source images gallery */}
+							{(() => {
+								const imgs = Array.isArray(draft?.images)
+									? draft.images.filter(Boolean)
+									: [];
+								if (imgs.length === 0) return null;
+								return (
+									<div
+										style={{
+											padding: "12px 40px 16px",
+											background: T.surface,
+											borderBottom: `1px solid ${T.border}`,
+										}}
+									>
+										<p
+											style={{
+												fontSize: 11,
+												fontWeight: 700,
+												textTransform: "uppercase",
+												letterSpacing: "0.07em",
+												color: T.muted,
+												marginBottom: 10,
+											}}
+										>
+											Source Images
+										</p>
+										<div
+											style={{
+												display: "flex",
+												gap: 10,
+												flexWrap: "wrap",
+											}}
+										>
+											{imgs.map((src, i) => (
+												<motion.a
+													key={i}
+													href={src}
+													target="_blank"
+													rel="noopener noreferrer"
+													whileHover={{ scale: 1.04, boxShadow: "0 4px 16px rgba(0,0,0,0.14)" }}
+													transition={{ duration: 0.15 }}
+													style={{
+														display: "block",
+														borderRadius: 8,
+														overflow: "hidden",
+														border: `1px solid ${T.border}`,
+														flexShrink: 0,
+													}}
+												>
+													<img
+														src={src}
+														alt={`source-image-${i + 1}`}
+														style={{
+															width: 96,
+															height: 64,
+															objectFit: "cover",
+															display: "block",
+														}}
+														onError={(e) => {
+															e.currentTarget.parentElement.style.display = "none";
+														}}
+													/>
+												</motion.a>
+											))}
+										</div>
+									</div>
+								);
+							})()}
+
 							{/* Editor body */}
 							<div
 								style={{
@@ -1158,6 +1287,61 @@ export default function DraftPage() {
 									{wordCount} words · ~{Math.ceil(wordCount / 200)} min read
 								</span>
 								<div style={{ flex: 1 }} />
+								{/* Generate video button */}
+								<motion.button
+									whileHover={{ background: generatingVideo ? undefined : "#F0ECE5" }}
+									whileTap={{ scale: generatingVideo ? 1 : 0.97 }}
+									onClick={handleGenerateVideo}
+									disabled={generatingVideo}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "5px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: generatingVideo ? T.muted : T.accent,
+										cursor: generatingVideo ? "not-allowed" : "pointer",
+										opacity: generatingVideo ? 0.6 : 1,
+									}}
+								>
+									{/* Film icon */}
+									<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={generatingVideo ? T.muted : T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>
+									</svg>
+									{generatingVideo ? "Generating…" : "Generate Video"}
+								</motion.button>
+
+								{/* Play / Download video button — shown once video is ready */}
+								{videoUrl && (
+									<motion.button
+										whileHover={{ background: "#FEF3E2" }}
+										whileTap={{ scale: 0.97 }}
+										onClick={() => setVideoModalOpen(true)}
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 5,
+											background: "#FEF3E2",
+											border: `1px solid #F5C97A`,
+											borderRadius: 8,
+											padding: "5px 12px",
+											fontSize: 12,
+											fontWeight: 600,
+											color: T.warm,
+											cursor: "pointer",
+										}}
+									>
+										<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.warm} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+											<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+										</svg>
+										Play Video
+									</motion.button>
+								)}
+
 								<motion.button
 									whileHover={{ scale: 1.03 }}
 									whileTap={{ scale: 0.97 }}
@@ -1176,14 +1360,139 @@ export default function DraftPage() {
 										cursor: "pointer",
 									}}
 								>
-									<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
-									draft
+									<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New draft
 								</motion.button>
 							</div>
 						</motion.div>
 					)}
 				</div>
 			</div>
+
+			{/* ── VIDEO PLAYER MODAL ── */}
+			<AnimatePresence>
+				{videoModalOpen && videoUrl && (
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						style={{
+							position: "fixed",
+							inset: 0,
+							background: "rgba(0,0,0,0.75)",
+							backdropFilter: "blur(8px)",
+							zIndex: 300,
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							padding: 24,
+						}}
+						onClick={() => setVideoModalOpen(false)}
+					>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.92, y: 20 }}
+							animate={{ opacity: 1, scale: 1, y: 0 }}
+							exit={{ opacity: 0, scale: 0.92, y: 20 }}
+							transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+							onClick={(e) => e.stopPropagation()}
+							style={{
+								background: "#1A1A1A",
+								borderRadius: 20,
+								padding: 20,
+								width: "100%",
+								maxWidth: 860,
+								boxShadow: "0 40px 100px rgba(0,0,0,0.6)",
+								border: "1px solid rgba(255,255,255,0.08)",
+							}}
+						>
+							{/* Header */}
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+									marginBottom: 16,
+									gap: 12,
+								}}
+							>
+								<p
+									style={{
+										fontSize: 15,
+										fontWeight: 700,
+										color: "white",
+										fontFamily: "'Instrument Serif',serif",
+										margin: 0,
+										overflow: "hidden",
+										textOverflow: "ellipsis",
+										whiteSpace: "nowrap",
+									}}
+								>
+									{draft?.title || "Video Preview"}
+								</p>
+								<div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+									<a
+										href={videoUrl}
+										download
+										target="_blank"
+										rel="noopener noreferrer"
+										style={{
+											display: "inline-flex",
+											alignItems: "center",
+											gap: 6,
+											fontSize: 12,
+											fontWeight: 600,
+											color: T.warm,
+											background: "#FEF3E2",
+											borderRadius: 8,
+											padding: "5px 12px",
+											textDecoration: "none",
+										}}
+									>
+										<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.warm} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+											<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+											<polyline points="7 10 12 15 17 10"/>
+											<line x1="12" y1="15" x2="12" y2="3"/>
+										</svg>
+										Download mp4
+									</a>
+									<motion.button
+										whileHover={{ background: "rgba(255,255,255,0.1)" }}
+										whileTap={{ scale: 0.93 }}
+										onClick={() => setVideoModalOpen(false)}
+										style={{
+											background: "rgba(255,255,255,0.06)",
+											border: "1px solid rgba(255,255,255,0.1)",
+											borderRadius: 8,
+											padding: "5px 11px",
+											fontSize: 14,
+											color: "rgba(255,255,255,0.5)",
+											cursor: "pointer",
+											lineHeight: 1,
+										}}
+									>
+										✕
+									</motion.button>
+								</div>
+							</div>
+
+							{/* Video player — centered, native controls */}
+							<video
+								key={videoUrl}
+								src={videoUrl}
+								controls
+								autoPlay
+								style={{
+									width: "100%",
+									borderRadius: 12,
+									background: "#000",
+									display: "block",
+									maxHeight: "calc(100vh - 160px)",
+									outline: "none",
+								}}
+							/>
+						</motion.div>
+					</motion.div>
+				)}
+			</AnimatePresence>
 
 			{/* ── DELETE CONFIRM MODAL ── */}
 			<AnimatePresence>

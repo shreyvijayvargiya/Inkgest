@@ -456,12 +456,20 @@ export default function inkgestApp() {
 				day: "numeric",
 			});
 
+			// Collect all images from all sources
+			const allImages = (data.sources || [])
+				.flatMap((s) => s.images || [])
+				.filter(Boolean)
+				.filter((v, i, a) => a.indexOf(v) === i) // dedupe
+				.slice(0, 20);
+
 			const draft = {
 				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content,
 				urls: validUrls,
+				images: allImages,
 				words,
 				date,
 				tag: data.formatLabel || "Newsletter",
