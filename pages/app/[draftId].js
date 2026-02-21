@@ -109,6 +109,319 @@ const Icons = {
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
 
+/* ─── Extract a single CSS property value from a CSS string ─── */
+const parseCSSProp = (cssStr = "", prop) => {
+	const m = cssStr.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`));
+	return m ? m[1].trim() : "";
+};
+
+/* ─── 12 predefined themes — each is a map of CSS strings ─── */
+const THEMES = {
+	ink: {
+		name: "Ink", label: "Warm editorial · Serif",
+		palette: ["#F7F5F0", "#1A1A1A", "#C17B2F", "#7A7570"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap",
+		bodyFont: "'Outfit', sans-serif", bg: "#F7F5F0", text: "#3A3530",
+		container: "max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Outfit',sans-serif;",
+		h1: "font-family:'Instrument Serif',serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
+		h2: "font-family:'Instrument Serif',serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
+		h3: "font-family:'Instrument Serif',serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
+		p: "font-size:16px;line-height:1.85;color:#3A3530;margin:0 0 14px;",
+		blockquote: "border-left:3px solid #C17B2F;padding:4px 0 4px 20px;color:#7A7570;font-style:italic;margin:20px 0;",
+		code: "background:#EDE9E2;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;",
+		strong: "color:#1A1A1A;font-weight:700;", a: "color:#C17B2F;",
+		li: "font-size:16px;line-height:1.8;color:#3A3530;margin:4px 0;",
+		hr: "border:none;border-top:1px solid #E8E4DC;margin:32px 0;",
+	},
+	midnight: {
+		name: "Midnight", label: "Dark minimal · Sans",
+		palette: ["#0D0D0D", "#E8E8E8", "#7C7CFF", "#444444"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
+		bodyFont: "'Inter', sans-serif", bg: "#0D0D0D", text: "#A8A8A8",
+		container: "max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Inter',sans-serif;",
+		h1: "font-family:'Inter',sans-serif;font-size:30px;color:#FFFFFF;line-height:1.2;margin:0 0 16px;font-weight:600;",
+		h2: "font-family:'Inter',sans-serif;font-size:20px;color:#D4D4D4;line-height:1.3;margin:32px 0 12px;font-weight:500;border-bottom:1px solid #222222;padding-bottom:8px;",
+		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;",
+		p: "font-size:15px;line-height:1.9;color:#A8A8A8;margin:0 0 14px;",
+		blockquote: "border-left:3px solid #7C7CFF;padding:4px 0 4px 20px;color:#666666;font-style:italic;margin:20px 0;",
+		code: "background:#1E1E1E;color:#7FDBCA;border-radius:4px;padding:2px 8px;font-family:'Courier New',monospace;font-size:13px;",
+		strong: "color:#FFFFFF;font-weight:600;", a: "color:#7C7CFF;",
+		li: "font-size:15px;line-height:1.8;color:#A8A8A8;margin:4px 0;",
+		hr: "border:none;border-top:1px solid #222222;margin:32px 0;",
+	},
+	paper: {
+		name: "Paper", label: "Classic editorial · Lora",
+		palette: ["#FFFEF9", "#1A1A2E", "#2A5298", "#888888"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;600&display=swap",
+		bodyFont: "'Source Sans 3', sans-serif", bg: "#FFFEF9", text: "#3C3C3C",
+		container: "max-width:680px;margin:0 auto;padding:52px 48px;background:#FFFEF9;font-family:'Source Sans 3',sans-serif;",
+		h1: "font-family:'Lora',serif;font-size:36px;color:#1A1A2E;line-height:1.15;margin:0 0 20px;font-weight:600;",
+		h2: "font-family:'Lora',serif;font-size:24px;color:#1A1A2E;line-height:1.3;margin:36px 0 14px;font-weight:400;",
+		h3: "font-family:'Lora',serif;font-size:19px;color:#1A1A2E;margin:24px 0 10px;font-weight:400;",
+		p: "font-size:17px;line-height:1.8;color:#3C3C3C;margin:0 0 16px;",
+		blockquote: "border-left:4px solid #2A5298;padding:8px 0 8px 24px;color:#666666;font-style:italic;margin:24px 0;font-family:'Lora',serif;font-size:18px;",
+		code: "background:#F0F0F0;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:13px;",
+		strong: "color:#1A1A2E;font-weight:600;", a: "color:#2A5298;",
+		li: "font-size:17px;line-height:1.8;color:#3C3C3C;margin:5px 0;",
+		hr: "border:none;border-top:2px solid #E0DDD5;margin:36px 0;",
+	},
+	forest: {
+		name: "Forest", label: "Earthy & natural · Merriweather",
+		palette: ["#F0F4F0", "#1B2E1B", "#2D6A4F", "#6B8F6B"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap",
+		bodyFont: "'DM Sans', sans-serif", bg: "#F0F4F0", text: "#2C3E2C",
+		container: "max-width:720px;margin:0 auto;padding:48px 52px;background:#F0F4F0;font-family:'DM Sans',sans-serif;",
+		h1: "font-family:'Merriweather',serif;font-size:32px;color:#1B2E1B;line-height:1.2;margin:0 0 16px;font-weight:700;",
+		h2: "font-family:'Merriweather',serif;font-size:21px;color:#2D6A4F;line-height:1.35;margin:32px 0 12px;font-weight:700;",
+		h3: "font-family:'Merriweather',serif;font-size:17px;color:#1B2E1B;margin:22px 0 8px;font-weight:400;",
+		p: "font-size:16px;line-height:1.85;color:#2C3E2C;margin:0 0 14px;",
+		blockquote: "border-left:4px solid #2D6A4F;background:#E8F0E8;padding:12px 20px;color:#4A6A4A;font-style:italic;margin:24px 0;border-radius:0 8px 8px 0;",
+		code: "background:#D8E8D8;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;color:#1B2E1B;",
+		strong: "color:#1B2E1B;font-weight:700;", a: "color:#2D6A4F;",
+		li: "font-size:16px;line-height:1.8;color:#2C3E2C;margin:5px 0;",
+		hr: "border:none;border-top:2px solid #C8D8C8;margin:32px 0;",
+	},
+	rose: {
+		name: "Rose", label: "Soft feminine · Cormorant",
+		palette: ["#FDF0F3", "#3D1A24", "#D4617A", "#B08090"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Nunito:wght@300;400;500;600&display=swap",
+		bodyFont: "'Nunito', sans-serif", bg: "#FDF0F3", text: "#4A2530",
+		container: "max-width:700px;margin:0 auto;padding:48px 52px;background:#FDF0F3;font-family:'Nunito',sans-serif;",
+		h1: "font-family:'Cormorant Garamond',serif;font-size:40px;color:#3D1A24;line-height:1.15;margin:0 0 18px;font-weight:600;font-style:italic;",
+		h2: "font-family:'Cormorant Garamond',serif;font-size:26px;color:#D4617A;line-height:1.3;margin:32px 0 12px;font-weight:600;",
+		h3: "font-family:'Cormorant Garamond',serif;font-size:20px;color:#3D1A24;margin:22px 0 8px;font-weight:400;",
+		p: "font-size:16px;line-height:1.9;color:#4A2530;margin:0 0 14px;",
+		blockquote: "border-left:3px solid #D4617A;padding:4px 0 4px 20px;color:#B08090;font-style:italic;margin:20px 0;font-family:'Cormorant Garamond',serif;font-size:18px;",
+		code: "background:#F5E0E5;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;",
+		strong: "color:#3D1A24;font-weight:700;", a: "color:#D4617A;",
+		li: "font-size:16px;line-height:1.8;color:#4A2530;margin:4px 0;",
+		hr: "border:none;border-top:1px solid #F0C8D0;margin:32px 0;",
+	},
+	slate: {
+		name: "Slate", label: "Corporate clean · IBM Plex",
+		palette: ["#F8F9FA", "#1A1F2E", "#3B82F6", "#6B7280"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap",
+		bodyFont: "'IBM Plex Sans', sans-serif", bg: "#F8F9FA", text: "#374151",
+		container: "max-width:740px;margin:0 auto;padding:48px 56px;background:#F8F9FA;font-family:'IBM Plex Sans',sans-serif;",
+		h1: "font-family:'IBM Plex Serif',serif;font-size:32px;color:#1A1F2E;line-height:1.2;margin:0 0 16px;font-weight:600;",
+		h2: "font-family:'IBM Plex Serif',serif;font-size:21px;color:#1A1F2E;line-height:1.35;margin:32px 0 12px;font-weight:600;border-bottom:2px solid #E5E7EB;padding-bottom:8px;",
+		h3: "font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:#1A1F2E;margin:22px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;",
+		p: "font-size:16px;line-height:1.8;color:#374151;margin:0 0 14px;",
+		blockquote: "border-left:4px solid #3B82F6;background:#EFF6FF;padding:12px 20px;color:#1D4ED8;margin:24px 0;font-style:italic;",
+		code: "background:#F3F4F6;border:1px solid #E5E7EB;border-radius:4px;padding:2px 6px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:#1A1F2E;",
+		strong: "color:#1A1F2E;font-weight:600;", a: "color:#3B82F6;",
+		li: "font-size:16px;line-height:1.8;color:#374151;margin:4px 0;",
+		hr: "border:none;border-top:1px solid #E5E7EB;margin:32px 0;",
+	},
+	obsidian: {
+		name: "Obsidian", label: "Terminal · JetBrains Mono",
+		palette: ["#0F0F0F", "#00FF88", "#CCCCCC", "#444444"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap",
+		bodyFont: "'JetBrains Mono', monospace", bg: "#0F0F0F", text: "#CCCCCC",
+		container: "max-width:740px;margin:0 auto;padding:48px 52px;background:#0F0F0F;font-family:'JetBrains Mono',monospace;",
+		h1: "font-family:'JetBrains Mono',monospace;font-size:24px;color:#00FF88;line-height:1.2;margin:0 0 16px;font-weight:500;",
+		h2: "font-family:'JetBrains Mono',monospace;font-size:18px;color:#00FF88;line-height:1.3;margin:32px 0 12px;font-weight:400;",
+		h3: "font-family:'JetBrains Mono',monospace;font-size:14px;color:#AAAAAA;margin:22px 0 8px;font-weight:400;",
+		p: "font-size:14px;line-height:1.9;color:#CCCCCC;margin:0 0 14px;",
+		blockquote: "border-left:3px solid #00FF88;padding:4px 0 4px 16px;color:#888888;font-style:italic;margin:20px 0;",
+		code: "background:#1A1A1A;border:1px solid #333333;color:#00FF88;border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:13px;",
+		strong: "color:#FFFFFF;font-weight:500;", a: "color:#00FF88;",
+		li: "font-size:14px;line-height:1.8;color:#CCCCCC;margin:4px 0;",
+		hr: "border:none;border-top:1px solid #222222;margin:32px 0;",
+	},
+	cream: {
+		name: "Cream", label: "Newsletter · Georgia",
+		palette: ["#FFF8EE", "#1A1A1A", "#EA580C", "#888888"],
+		fontUrl: "",
+		bodyFont: "Georgia, 'Times New Roman', serif", bg: "#FFF8EE", text: "#3A3A3A",
+		container: "max-width:620px;margin:0 auto;padding:52px 48px;background:#FFF8EE;font-family:Georgia,'Times New Roman',serif;",
+		h1: "font-family:Georgia,'Times New Roman',serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 18px;font-weight:normal;",
+		h2: "font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:normal;",
+		h3: "font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#1A1A1A;margin:22px 0 8px;",
+		p: "font-size:17px;line-height:1.8;color:#3A3A3A;margin:0 0 16px;",
+		blockquote: "border-left:4px solid #EA580C;padding:8px 0 8px 20px;color:#888888;font-style:italic;margin:24px 0;",
+		code: "background:#F5EDD8;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:13px;",
+		strong: "color:#1A1A1A;", a: "color:#EA580C;",
+		li: "font-size:17px;line-height:1.8;color:#3A3A3A;margin:5px 0;",
+		hr: "border:none;border-top:2px solid #E8D8C0;margin:36px 0;",
+	},
+	nordic: {
+		name: "Nordic", label: "Minimal white · Playfair",
+		palette: ["#FFFFFF", "#1D3461", "#1D3461", "#8899AA"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Figtree:wght@300;400;500;600&display=swap",
+		bodyFont: "'Figtree', sans-serif", bg: "#FFFFFF", text: "#444B58",
+		container: "max-width:720px;margin:0 auto;padding:56px 60px;background:#FFFFFF;font-family:'Figtree',sans-serif;",
+		h1: "font-family:'Playfair Display',serif;font-size:38px;color:#1D3461;line-height:1.15;margin:0 0 18px;font-weight:700;",
+		h2: "font-family:'Playfair Display',serif;font-size:24px;color:#1D3461;line-height:1.3;margin:36px 0 14px;font-weight:400;",
+		h3: "font-family:'Figtree',sans-serif;font-size:12px;color:#8899AA;margin:24px 0 8px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;",
+		p: "font-size:16px;line-height:1.9;color:#444B58;margin:0 0 16px;",
+		blockquote: "border-left:4px solid #1D3461;padding:8px 0 8px 24px;color:#8899AA;font-family:'Playfair Display',serif;font-style:italic;font-size:18px;margin:28px 0;",
+		code: "background:#F4F5F8;border-radius:4px;padding:2px 8px;font-family:monospace;font-size:13px;color:#1D3461;",
+		strong: "color:#1D3461;font-weight:600;", a: "color:#1D3461;border-bottom:1px solid #1D3461;text-decoration:none;",
+		li: "font-size:16px;line-height:1.8;color:#444B58;margin:5px 0;",
+		hr: "border:none;border-top:1px solid #E8ECF0;margin:40px 0;",
+	},
+	dusk: {
+		name: "Dusk", label: "Dark purple · DM Serif",
+		palette: ["#1E1B2E", "#F0EEFF", "#C084FC", "#7C6FA0"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap",
+		bodyFont: "'DM Sans', sans-serif", bg: "#1E1B2E", text: "#C5BEDC",
+		container: "max-width:720px;margin:0 auto;padding:48px 56px;background:#1E1B2E;font-family:'DM Sans',sans-serif;",
+		h1: "font-family:'DM Serif Display',serif;font-size:36px;color:#F0EEFF;line-height:1.2;margin:0 0 16px;font-weight:400;",
+		h2: "font-family:'DM Serif Display',serif;font-size:24px;color:#C084FC;line-height:1.3;margin:32px 0 12px;font-weight:400;",
+		h3: "font-family:'DM Sans',sans-serif;font-size:14px;color:#9B8DC0;margin:22px 0 8px;font-weight:500;",
+		p: "font-size:16px;line-height:1.9;color:#C5BEDC;margin:0 0 14px;",
+		blockquote: "border-left:3px solid #C084FC;padding:4px 0 4px 20px;color:#7C6FA0;font-style:italic;margin:20px 0;",
+		code: "background:#2A2540;color:#C084FC;border-radius:4px;padding:2px 8px;font-family:monospace;font-size:13px;",
+		strong: "color:#F0EEFF;font-weight:500;", a: "color:#C084FC;",
+		li: "font-size:16px;line-height:1.8;color:#C5BEDC;margin:4px 0;",
+		hr: "border:none;border-top:1px solid #2E2A42;margin:32px 0;",
+	},
+	sand: {
+		name: "Sand", label: "Notion-like · Jakarta Sans",
+		palette: ["#FAF9F7", "#37352F", "#0078D4", "#9B9B9B"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap",
+		bodyFont: "'Plus Jakarta Sans', sans-serif", bg: "#FAF9F7", text: "#37352F",
+		container: "max-width:740px;margin:0 auto;padding:44px 48px;background:#FAF9F7;font-family:'Plus Jakarta Sans',sans-serif;",
+		h1: "font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;color:#37352F;line-height:1.2;margin:0 0 16px;font-weight:700;",
+		h2: "font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;color:#37352F;line-height:1.35;margin:28px 0 10px;font-weight:600;",
+		h3: "font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:#37352F;margin:20px 0 8px;font-weight:600;",
+		p: "font-size:16px;line-height:1.75;color:#37352F;margin:0 0 8px;",
+		blockquote: "border-left:3px solid #BDBDBD;padding:4px 0 4px 14px;color:#9B9B9B;margin:16px 0;",
+		code: "background:#F1F0EE;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;color:#EB5757;",
+		strong: "color:#37352F;font-weight:700;", a: "color:#0078D4;text-decoration:underline;",
+		li: "font-size:16px;line-height:1.75;color:#37352F;margin:2px 0;",
+		hr: "background:#E8E7E4;border:none;height:1px;margin:28px 0;",
+	},
+	bold: {
+		name: "Bold", label: "Magazine editorial · Bebas",
+		palette: ["#F5F5F5", "#111111", "#DC2626", "#666666"],
+		fontUrl: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:ital,wght@0,400;0,500;1,400&display=swap",
+		bodyFont: "'Roboto', sans-serif", bg: "#F5F5F5", text: "#333333",
+		container: "max-width:740px;margin:0 auto;padding:48px 56px;background:#F5F5F5;font-family:'Roboto',sans-serif;",
+		h1: "font-family:'Bebas Neue',sans-serif;font-size:56px;color:#111111;line-height:1.0;margin:0 0 20px;letter-spacing:0.03em;",
+		h2: "font-family:'Bebas Neue',sans-serif;font-size:30px;color:#DC2626;line-height:1.1;margin:32px 0 14px;letter-spacing:0.05em;",
+		h3: "font-family:'Roboto',sans-serif;font-size:12px;color:#111111;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;",
+		p: "font-size:16px;line-height:1.8;color:#333333;margin:0 0 14px;",
+		blockquote: "border-left:6px solid #DC2626;padding:12px 24px;background:#FFFFFF;color:#666666;font-size:20px;font-style:italic;margin:24px 0;",
+		code: "background:#EBEBEB;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:13px;",
+		strong: "color:#111111;font-weight:700;", a: "color:#DC2626;",
+		li: "font-size:16px;line-height:1.8;color:#333333;margin:4px 0;",
+		hr: "border:none;border-top:3px solid #111111;margin:32px 0;",
+	},
+};
+
+/* ─── Inline markdown → HTML (links, images, bold, italic, code) ─── */
+const parseInlineMarkdown = (text = "") =>
+	text
+		/* images before links so ![...](...) doesn't match as a link */
+		.replace(
+			/!\[([^\]]*)\]\(([^)\s>]+)\)/g,
+			(_, alt, src) =>
+				`<img src="${src}" alt="${alt}" style="max-width:100%;height:auto;border-radius:6px;margin:10px 0;display:block;"/>`,
+		)
+		/* links */
+		.replace(
+			/\[([^\]]+)\]\(([^)\s>]+)\)/g,
+			(_, linkText, href) =>
+				`<a href="${href}" target="_blank" rel="noopener">${linkText}</a>`,
+		)
+		/* bold **…** and __…__ */
+		.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+		.replace(/__([^_\n]+)__/g, "<strong>$1</strong>")
+		/* italic *…* (single asterisk only — skip _…_ to avoid false-positives in URLs/CSS) */
+		.replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+		/* inline code */
+		.replace(/`([^`\n]+)`/g, "<code>$1</code>")
+		/* strikethrough ~~…~~ */
+		.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
+
+/* ─── Build a complete standalone HTML document with theme applied ─── */
+function buildThemedHTML(currentHTML = "", theme, title = "") {
+	if (!currentHTML.trim()) return "";
+
+	/* Get inner content of a node and run inline markdown on it */
+	const getInner = (node) => parseInlineMarkdown(node.innerHTML || node.textContent || "");
+
+	let body = "";
+	try {
+		const tmp = document.createElement("div");
+		tmp.innerHTML = currentHTML;
+
+		const processNode = (node) => {
+			const tag = node.nodeName?.toLowerCase();
+			if (!tag || tag === "#text") {
+				const t = (node.textContent || "").trim();
+				return t ? parseInlineMarkdown(t) : "";
+			}
+			const inner = getInner(node);
+			const text = (node.textContent || "").trim();
+
+			if (tag === "h1") return `<h1 style="${theme.h1}">${inner}</h1>\n`;
+			if (tag === "h2") return `<h2 style="${theme.h2}">${inner}</h2>\n`;
+			if (tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
+				return `<h3 style="${theme.h3}">${inner}</h3>\n`;
+			if (tag === "blockquote")
+				return `<blockquote style="${theme.blockquote}">${inner}</blockquote>\n`;
+			if (tag === "ul" || tag === "ol") {
+				const items = Array.from(node.children)
+					.filter((n) => n.nodeName?.toLowerCase() === "li")
+					.map((li) => `<li style="${theme.li}">${parseInlineMarkdown(li.innerHTML || "")}</li>`)
+					.join("\n");
+				return `<${tag} style="padding-left:24px;margin:0 0 14px;">${items}</${tag}>\n`;
+			}
+			if (tag === "pre")
+				return `<pre style="background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;">${node.textContent || ""}</pre>\n`;
+			if (tag === "hr") return `<hr style="${theme.hr}"/>\n`;
+			if (tag === "br" || !text) return `<br/>\n`;
+			if (tag === "img")
+				return `<img src="${node.getAttribute("src") || ""}" alt="${node.getAttribute("alt") || ""}" style="max-width:100%;height:auto;border-radius:6px;margin:12px 0;display:block;"/>\n`;
+			/* p, div, section, article → paragraph */
+			return `<p style="${theme.p}">${inner}</p>\n`;
+		};
+
+		tmp.childNodes.forEach((node) => {
+			body += processNode(node);
+		});
+	} catch {
+		body = `<p style="${theme.p}">${parseInlineMarkdown(currentHTML.replace(/<[^>]+>/g, ""))}</p>`;
+	}
+
+	const fontLink = theme.fontUrl
+		? `<link href="${theme.fontUrl}" rel="stylesheet"/>`
+		: "";
+
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>${title || "Draft"}</title>
+  ${fontLink}
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{background:${theme.bg};color:${theme.text};font-family:${theme.bodyFont};-webkit-font-smoothing:antialiased;}
+    a{${theme.a}}
+    strong,b{${theme.strong}}
+    em,i{font-style:italic;}
+    code{${theme.code}}
+    img{max-width:100%;height:auto;border-radius:6px;}
+    ul,ol{padding-left:24px;margin:0 0 14px;}
+    li{${theme.li}}
+    hr{${theme.hr}}
+    blockquote{${theme.blockquote}}
+    pre{background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;}
+  </style>
+</head>
+<body>
+  <div style="${theme.container}">
+    ${title ? `<h1 style="${theme.h1}">${title}</h1>` : ""}
+    ${body}
+  </div>
+</body>
+</html>`;
+}
+
 /* ─── Draft card in sidebar ─── */
 function DraftCard({ draft, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
@@ -278,6 +591,9 @@ export default function DraftPage() {
 	const [wordCount, setWordCount] = useState(0);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
+	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
+	const [copiedTheme, setCopiedTheme] = useState(null);
+	const [previewTheme, setPreviewTheme] = useState("ink");
 	const editorRef = useRef(null);
 
 	/* All drafts for sidebar */
@@ -379,6 +695,17 @@ export default function DraftPage() {
 			console.error("Delete failed", e);
 		}
 		setDeleteConfirm(null);
+	};
+
+	const handleCopyThemeHTML = (themeKey) => {
+		const theme = THEMES[themeKey];
+		if (!theme) return;
+		const html = editorRef.current?.innerHTML || draft?.body || "";
+		const title = draft?.title || "";
+		const output = buildThemedHTML(html, theme, title);
+		navigator.clipboard.writeText(output).catch(() => {});
+		setCopiedTheme(themeKey);
+		setTimeout(() => setCopiedTheme(null), 2200);
 	};
 
 	const filtered = drafts.filter(
@@ -1157,35 +1484,355 @@ export default function DraftPage() {
 								<span style={{ fontSize: 12, color: T.muted }}>
 									{wordCount} words · ~{Math.ceil(wordCount / 200)} min read
 								</span>
-								<div style={{ flex: 1 }} />
-								<motion.button
-									whileHover={{ scale: 1.03 }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => router.push("/app")}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 6,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "5px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.muted,
-										cursor: "pointer",
-									}}
-								>
-									<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
-									draft
-								</motion.button>
-							</div>
+							<div style={{ flex: 1 }} />
+
+							{/* Themes button */}
+							<motion.button
+								whileHover={{ background: "#F0ECE5" }}
+								whileTap={{ scale: 0.97 }}
+								onClick={() => setThemeDrawerOpen(true)}
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 5,
+									background: T.base,
+									border: `1px solid ${T.border}`,
+									borderRadius: 8,
+									padding: "5px 12px",
+									fontSize: 12,
+									fontWeight: 600,
+									color: T.accent,
+									cursor: "pointer",
+								}}
+							>
+								{/* Palette icon */}
+								<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+									<circle cx="13.5" cy="6.5" r=".5" fill={T.accent}/><circle cx="17.5" cy="10.5" r=".5" fill={T.accent}/><circle cx="8.5" cy="7.5" r=".5" fill={T.accent}/><circle cx="6.5" cy="12.5" r=".5" fill={T.accent}/>
+									<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+								</svg>
+								Themes
+							</motion.button>
+
+							<motion.button
+								whileHover={{ scale: 1.03 }}
+								whileTap={{ scale: 0.97 }}
+								onClick={() => router.push("/app")}
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 6,
+									background: T.base,
+									border: `1px solid ${T.border}`,
+									borderRadius: 8,
+									padding: "5px 12px",
+									fontSize: 12,
+									fontWeight: 600,
+									color: T.muted,
+									cursor: "pointer",
+								}}
+							>
+								<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
+								draft
+							</motion.button>
+						</div>
 						</motion.div>
 					)}
 				</div>
 			</div>
 
-			{/* ── DELETE CONFIRM MODAL ── */}
+			{/* ── THEMES MODAL ── full-screen two-panel preview */}
+		<AnimatePresence>
+			{themeDrawerOpen && (() => {
+				const activeTheme = THEMES[previewTheme];
+				const currentHTML = editorRef.current?.innerHTML || draft?.body || "";
+				const themedDoc = activeTheme
+					? buildThemedHTML(currentHTML, activeTheme, draft?.title || "")
+					: "";
+				const isCopied = copiedTheme === previewTheme;
+				return (
+					<>
+						{/* Backdrop */}
+						<motion.div
+							key="theme-backdrop"
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							onClick={() => setThemeDrawerOpen(false)}
+							style={{
+								position: "fixed", inset: 0,
+								background: "rgba(0,0,0,0.5)",
+								zIndex: 300,
+								backdropFilter: "blur(4px)",
+							}}
+						/>
+
+					{/* Centering shell — flexbox positions the modal, pointer-events:none lets backdrop work */}
+					<motion.div
+						key="theme-modal"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.22 }}
+						style={{
+							position: "fixed", inset: 0,
+							zIndex: 301,
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							pointerEvents: "none",
+						}}
+					>
+					{/* Actual modal panel */}
+					<motion.div
+						initial={{ scale: 0.95, y: 24 }}
+						animate={{ scale: 1, y: 0 }}
+						exit={{ scale: 0.95, y: 24 }}
+						transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+						style={{
+							width: "92vw", maxWidth: 1280,
+							height: "90vh",
+							background: T.surface,
+							borderRadius: 16,
+							border: `1px solid ${T.border}`,
+							display: "flex",
+							flexDirection: "column",
+							boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
+							overflow: "hidden",
+							pointerEvents: "all",
+						}}
+					>
+							{/* ─ Top bar ─ */}
+							<div
+								style={{
+									height: 56,
+									borderBottom: `1px solid ${T.border}`,
+									display: "flex",
+									alignItems: "center",
+									padding: "0 20px",
+									gap: 12,
+									flexShrink: 0,
+									background: T.surface,
+								}}
+							>
+								<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, fontFamily: "'Instrument Serif',serif" }}>
+									Export themes
+								</p>
+								<p style={{ fontSize: 12, color: T.muted }}>
+									— pick a theme to preview your content, then copy the HTML
+								</p>
+								<div style={{ flex: 1 }} />
+
+							{/* Download HTML */}
+							<motion.button
+								whileHover={{ background: "#F0ECE5" }}
+								whileTap={{ scale: 0.96 }}
+								onClick={() => {
+									if (!themedDoc) return;
+									const blob = new Blob([themedDoc], { type: "text/html;charset=utf-8" });
+									const a = document.createElement("a");
+									a.href = URL.createObjectURL(blob);
+									a.download = `${(draft?.title || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${activeTheme?.name?.toLowerCase() || "theme"}.html`;
+									a.click();
+									URL.revokeObjectURL(a.href);
+								}}
+								style={{
+									display: "flex", alignItems: "center", gap: 7,
+									background: T.base,
+									color: T.accent,
+									border: `1px solid ${T.border}`,
+									borderRadius: 9,
+									padding: "8px 16px",
+									fontSize: 13,
+									fontWeight: 600,
+									cursor: "pointer",
+								}}
+							>
+								<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+									<polyline points="7 10 12 15 17 10"/>
+									<line x1="12" y1="15" x2="12" y2="3"/>
+								</svg>
+								Download .html
+							</motion.button>
+
+							{/* Copy HTML — primary CTA */}
+							<motion.button
+								whileHover={{ background: isCopied ? "#2D6A4F" : "#333" }}
+								whileTap={{ scale: 0.96 }}
+								onClick={() => handleCopyThemeHTML(previewTheme)}
+								style={{
+									display: "flex", alignItems: "center", gap: 7,
+									background: isCopied ? "#2D6A4F" : T.accent,
+									color: "white",
+									border: "none",
+									borderRadius: 9,
+									padding: "8px 18px",
+									fontSize: 13,
+									fontWeight: 600,
+									cursor: "pointer",
+									transition: "background 0.2s",
+								}}
+							>
+								{isCopied ? (
+									<>
+										<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+											<polyline points="20 6 9 17 4 12"/>
+										</svg>
+										Copied!
+									</>
+								) : (
+									<>
+										<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+											<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+											<rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+										</svg>
+										Copy HTML — {activeTheme?.name}
+									</>
+								)}
+							</motion.button>
+
+							{/* Close */}
+								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.93 }}
+									onClick={() => setThemeDrawerOpen(false)}
+									style={{
+										background: "transparent",
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										width: 34, height: 34,
+										display: "flex", alignItems: "center", justifyContent: "center",
+										cursor: "pointer", flexShrink: 0,
+									}}
+								>
+									<svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth={2} strokeLinecap="round">
+										<path d="M18 6L6 18M6 6l12 12"/>
+									</svg>
+								</motion.button>
+							</div>
+
+							{/* ─ Body: sidebar + preview ─ */}
+							<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+								{/* Left: theme list */}
+								<div
+									style={{
+										width: 210,
+										borderRight: `1px solid ${T.border}`,
+										overflowY: "auto",
+										flexShrink: 0,
+										background: T.base,
+										padding: "12px 10px",
+										display: "flex",
+										flexDirection: "column",
+										gap: 3,
+									}}
+								>
+									{Object.entries(THEMES).map(([key, theme]) => {
+										const isActive = previewTheme === key;
+										const hColor = parseCSSProp(theme.h1, "color") || theme.text;
+										return (
+											<motion.button
+												key={key}
+												whileTap={{ scale: 0.97 }}
+												onClick={() => setPreviewTheme(key)}
+												style={{
+													background: isActive ? T.surface : "transparent",
+													border: `1.5px solid ${isActive ? T.border : "transparent"}`,
+													borderRadius: 10,
+													padding: "10px 12px",
+													cursor: "pointer",
+													display: "flex",
+													alignItems: "center",
+													gap: 10,
+													textAlign: "left",
+													boxShadow: isActive ? "0 1px 6px rgba(0,0,0,0.07)" : "none",
+												}}
+											>
+												{/* Color swatch strip */}
+												<div
+													style={{
+														width: 28, height: 28,
+														borderRadius: 7,
+														background: theme.bg,
+														border: "1px solid rgba(0,0,0,0.1)",
+														flexShrink: 0,
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														overflow: "hidden",
+													}}
+												>
+													<div style={{ width: 10, height: 10, borderRadius: "50%", background: hColor }} />
+												</div>
+												<div style={{ minWidth: 0 }}>
+													<p style={{
+														fontSize: 12, fontWeight: isActive ? 700 : 500,
+														color: isActive ? T.accent : "#555",
+														lineHeight: 1.3,
+													}}>
+														{theme.name}
+													</p>
+													<p style={{
+														fontSize: 10, color: T.muted,
+														overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
+														marginTop: 1,
+													}}>
+														{theme.label}
+													</p>
+												</div>
+												{isActive && (
+													<div style={{
+														marginLeft: "auto",
+														width: 6, height: 6,
+														borderRadius: "50%",
+														background: T.warm,
+														flexShrink: 0,
+													}} />
+												)}
+											</motion.button>
+										);
+									})}
+								</div>
+
+								{/* Right: iframe live preview */}
+								<div style={{ flex: 1, position: "relative", background: "#e5e7eb" }}>
+									{themedDoc ? (
+										<iframe
+											key={previewTheme}
+											srcDoc={themedDoc}
+											title={`Preview — ${activeTheme?.name}`}
+											sandbox="allow-same-origin"
+											style={{
+												width: "100%",
+												height: "100%",
+												border: "none",
+												display: "block",
+											}}
+										/>
+									) : (
+										<div style={{
+											height: "100%",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											color: T.muted,
+											fontSize: 14,
+										}}>
+											No content yet — write something in the editor first.
+										</div>
+									)}
+								</div>
+							</div>
+						</motion.div>
+					{/* end centering shell */}
+					</motion.div>
+				</>
+			);
+		})()}
+		</AnimatePresence>
+
+		{/* ── DELETE CONFIRM MODAL ── */}
 			<AnimatePresence>
 				{deleteConfirm && (
 					<>

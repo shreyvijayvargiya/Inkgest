@@ -365,6 +365,10 @@ export default function inkgestApp() {
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
+	const [draftMode, setDraftMode] = useState("ai"); // "ai" | "scrape" | "blank"
+	const [scrapeUrl, setScrapeUrl] = useState("");
+	const [scraping, setScraping] = useState(false);
+	const [blankTitle, setBlankTitle] = useState("");
 
 	/* Dynamic usage — count this month's drafts for the logged-in user */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
@@ -521,6 +525,73 @@ export default function inkgestApp() {
 
 	const removeUrl = (idx) => {
 		setUrls((prev) => prev.filter((_, i) => i !== idx));
+	};
+
+	/* Scrape a URL and open raw content in the editor */
+	const handleScrape = async () => {
+		if (!scrapeUrl.trim() || scraping) return;
+		if (!reduxUser) { setLoginModalOpen(true); return; }
+		setScraping(true);
+		setGenerateError(null);
+		try {
+			const res = await fetch("/api/scrape/url", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ url: scrapeUrl.trim(), userId: reduxUser.uid }),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Scrape failed");
+
+			const title = data.title || scrapeUrl.trim();
+			const words = (data.content || "").trim().split(/\s+/).length;
+			const now = new Date();
+			const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+			const preview = (data.content || "").slice(0, 180);
+
+			const draft = {
+				userId: reduxUser.uid,
+				title,
+				preview,
+				body: data.content || "",
+				urls: [scrapeUrl.trim()],
+				images: data.images || [],
+				words,
+				date,
+				tag: "Scraped",
+				createdAt: serverTimestamp(),
+			};
+			const docRef = await addDoc(collection(db, "drafts"), draft);
+			setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+			setScrapeUrl("");
+			router.push(`/app/${docRef.id}`);
+		} catch (e) {
+			setGenerateError(e?.message || "Scrape failed");
+		} finally {
+			setScraping(false);
+		}
+	};
+
+	/* Create a blank draft and open it */
+	const handleBlank = async () => {
+		if (!reduxUser) { setLoginModalOpen(true); return; }
+		const title = blankTitle.trim() || "Untitled draft";
+		const now = new Date();
+		const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+		const draft = {
+			userId: reduxUser.uid,
+			title,
+			preview: "",
+			body: "",
+			urls: [],
+			words: 0,
+			date,
+			tag: "Draft",
+			createdAt: serverTimestamp(),
+		};
+		const docRef = await addDoc(collection(db, "drafts"), draft);
+		setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+		setBlankTitle("");
+		router.push(`/app/${docRef.id}`);
 	};
 
 	return (
@@ -947,83 +1018,263 @@ export default function inkgestApp() {
 							margin: "0 auto",
 						}}
 					>
-						<div style={{ marginBottom: 28 }}>
-							<h1
-								style={{
-									fontFamily: "'Instrument Serif',serif",
-									fontSize: 32,
-									color: T.accent,
-									marginBottom: 6,
-									letterSpacing: "-0.5px",
-								}}
-							>
-								Generate a new draft
-							</h1>
-							<p style={{ fontSize: 15, color: T.muted, lineHeight: 1.6 }}>
-								Paste one or more URLs and describe your angle. We&apos;ll read
-								the pages and write a structured draft.
-							</p>
-						</div>
+					{/* ── Page heading ── */}
+					<div style={{ marginBottom: 24 }}>
+						<h1
+							style={{
+								fontFamily: "'Instrument Serif',serif",
+								fontSize: 32,
+								color: T.accent,
+								marginBottom: 6,
+								letterSpacing: "-0.5px",
+							}}
+						>
+							New draft
+						</h1>
+						<p style={{ fontSize: 15, color: T.muted, lineHeight: 1.6 }}>
+							Choose how you want to start writing.
+						</p>
+					</div>
 
-						{/* Not logged in info banner */}
-						{!reduxUser && (
-							<motion.div
-								initial={{ opacity: 0, y: -8 }}
-								animate={{ opacity: 1, y: 0 }}
-								style={{
-									background: "#FEF3E2",
-									border: "1px solid #F5C97A",
-									borderRadius: 10,
-									padding: "12px 16px",
-									marginBottom: 16,
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "space-between",
-									gap: 12,
-								}}
-							>
-								<div>
-									<p
-										style={{
-											fontSize: 13,
-											fontWeight: 700,
-											color: "#92400E",
-											marginBottom: 2,
-										}}
-									>
-										{FREE_LIMIT} free drafts per month
-									</p>
-									<p style={{ fontSize: 12, color: "#B45309" }}>
-										Sign in to start generating — no card required
-									</p>
-								</div>
+					{/* ── Mode selector cards ── */}
+					<div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+						{[
+							{
+								id: "ai",
+								icon: (
+									<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+									</svg>
+								),
+								label: "AI Draft",
+								desc: "URLs + prompt → full draft",
+							},
+							{
+								id: "scrape",
+								icon: (
+									<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+										<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+									</svg>
+								),
+								label: "Scrape URL",
+								desc: "Raw content into editor",
+							},
+							{
+								id: "blank",
+								icon: (
+									<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+									</svg>
+								),
+								label: "Blank editor",
+								desc: "Start from scratch",
+							},
+						].map((m) => {
+							const active = draftMode === m.id;
+							return (
 								<motion.button
-									whileHover={{ scale: 1.04 }}
+									key={m.id}
 									whileTap={{ scale: 0.97 }}
-									onClick={() => setLoginModalOpen(true)}
+									onClick={() => { setDraftMode(m.id); setGenerateError(null); }}
 									style={{
-										background: T.accent,
-										color: "white",
-										border: "none",
-										padding: "8px 16px",
-										borderRadius: 8,
-										fontSize: 13,
-										fontWeight: 700,
+										flex: 1,
+										background: active ? T.accent : T.surface,
+										border: `1.5px solid ${active ? T.accent : T.border}`,
+										borderRadius: 12,
+										padding: "14px 16px",
 										cursor: "pointer",
-										whiteSpace: "nowrap",
+										textAlign: "left",
+										transition: "all 0.15s",
 									}}
 								>
-									Sign in →
+									<div style={{
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										width: 28, height: 28,
+										borderRadius: 7,
+										background: active ? "rgba(255,255,255,0.15)" : T.base,
+										color: active ? "white" : T.warm,
+										marginBottom: 10,
+									}}>
+										{m.icon}
+									</div>
+									<p style={{ fontSize: 13, fontWeight: 700, color: active ? "white" : T.accent, marginBottom: 3 }}>
+										{m.label}
+									</p>
+									<p style={{ fontSize: 11, color: active ? "rgba(255,255,255,0.65)" : T.muted }}>
+										{m.desc}
+									</p>
 								</motion.button>
-							</motion.div>
-						)}
-						<UpgradeBanner
-							used={used}
-							limit={FREE_LIMIT}
-							onUpgrade={() => router.push("/pricing")}
-						/>
+							);
+						})}
+					</div>
 
-						{/* Multiple URLs input */}
+					{/* Not logged in info banner */}
+					{!reduxUser && (
+						<motion.div
+							initial={{ opacity: 0, y: -8 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								background: "#FEF3E2",
+								border: "1px solid #F5C97A",
+								borderRadius: 10,
+								padding: "12px 16px",
+								marginBottom: 16,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "space-between",
+								gap: 12,
+							}}
+						>
+							<div>
+								<p style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 2 }}>
+									{FREE_LIMIT} free drafts per month
+								</p>
+								<p style={{ fontSize: 12, color: "#B45309" }}>
+									Sign in to start — no card required
+								</p>
+							</div>
+							<motion.button
+								whileHover={{ scale: 1.04 }}
+								whileTap={{ scale: 0.97 }}
+								onClick={() => setLoginModalOpen(true)}
+								style={{
+									background: T.accent, color: "white", border: "none",
+									padding: "8px 16px", borderRadius: 8, fontSize: 13,
+									fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+								}}
+							>
+								Sign in →
+							</motion.button>
+						</motion.div>
+					)}
+					<UpgradeBanner used={used} limit={FREE_LIMIT} onUpgrade={() => router.push("/pricing")} />
+
+					{/* ── SCRAPE MODE ── */}
+					<AnimatePresence mode="wait">
+					{draftMode === "scrape" && (
+						<motion.div
+							key="scrape-form"
+							initial={{ opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: 8 }}
+							transition={{ duration: 0.18 }}
+						>
+							<div style={{ marginBottom: 20 }}>
+								<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+									URL to scrape
+								</label>
+								<input
+									type="url"
+									value={scrapeUrl}
+									onChange={(e) => setScrapeUrl(e.target.value)}
+									onKeyDown={(e) => e.key === "Enter" && handleScrape()}
+									placeholder="https://example.com/article"
+									style={{
+										width: "100%", background: T.surface,
+										border: `1.5px solid ${T.border}`, borderRadius: 11,
+										padding: "13px 16px", fontSize: 14, color: T.accent,
+										outline: "none", transition: "border-color 0.2s",
+									}}
+									onFocus={(e) => (e.target.style.borderColor = T.warm)}
+									onBlur={(e) => (e.target.style.borderColor = T.border)}
+								/>
+								<p style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>
+									Works with blog posts, news articles, Medium, Substack, docs
+								</p>
+							</div>
+							<motion.button
+								onClick={handleScrape}
+								disabled={scraping || !scrapeUrl.trim()}
+								whileHover={!scraping && scrapeUrl.trim() ? { scale: 1.02, y: -1, boxShadow: "0 8px 24px rgba(0,0,0,0.18)" } : {}}
+								whileTap={!scraping ? { scale: 0.97 } : {}}
+								style={{
+									width: "100%",
+									background: scraping || !scrapeUrl.trim() ? "#E8E4DC" : T.accent,
+									color: scraping || !scrapeUrl.trim() ? T.muted : "white",
+									border: "none", padding: "15px", borderRadius: 12,
+									fontSize: 16, fontWeight: 700,
+									cursor: scraping || !scrapeUrl.trim() ? "not-allowed" : "pointer",
+									display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+								}}
+							>
+								{scraping ? (
+									<>
+										<motion.span animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }} style={{ display: "inline-flex" }}>
+											<Icon d={Icons.refresh} size={18} stroke={T.muted} />
+										</motion.span>
+										Scraping…
+									</>
+								) : (
+									<>
+										<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+											<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+											<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+										</svg>
+										Scrape &amp; open in editor →
+									</>
+								)}
+							</motion.button>
+						</motion.div>
+					)}
+
+					{/* ── BLANK MODE ── */}
+					{draftMode === "blank" && (
+						<motion.div
+							key="blank-form"
+							initial={{ opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: 8 }}
+							transition={{ duration: 0.18 }}
+						>
+							<div style={{ marginBottom: 20 }}>
+								<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+									Draft title (optional)
+								</label>
+								<input
+									type="text"
+									value={blankTitle}
+									onChange={(e) => setBlankTitle(e.target.value)}
+									onKeyDown={(e) => e.key === "Enter" && handleBlank()}
+									placeholder="Untitled draft"
+									style={{
+										width: "100%", background: T.surface,
+										border: `1.5px solid ${T.border}`, borderRadius: 11,
+										padding: "13px 16px", fontSize: 14, color: T.accent,
+										outline: "none", transition: "border-color 0.2s",
+									}}
+									onFocus={(e) => (e.target.style.borderColor = T.warm)}
+									onBlur={(e) => (e.target.style.borderColor = T.border)}
+								/>
+							</div>
+							<motion.button
+								onClick={handleBlank}
+								whileHover={{ scale: 1.02, y: -1, boxShadow: "0 8px 24px rgba(0,0,0,0.18)" }}
+								whileTap={{ scale: 0.97 }}
+								style={{
+									width: "100%", background: T.accent, color: "white",
+									border: "none", padding: "15px", borderRadius: 12,
+									fontSize: 16, fontWeight: 700, cursor: "pointer",
+									display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+								}}
+							>
+								<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+									<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+									<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+								</svg>
+								Open blank editor →
+							</motion.button>
+						</motion.div>
+					)}
+					</AnimatePresence>
+
+					{/* ── AI MODE — existing form ── */}
+					{draftMode === "ai" && <>
+
+					{/* Multiple URLs input */}
 						<div style={{ marginBottom: 20 }}>
 							<label
 								style={{
@@ -1394,68 +1645,72 @@ export default function inkgestApp() {
 							</motion.div>
 						)}
 
-						{/* Tips */}
-						{!generating && (
-							<div
+					{/* Tips */}
+					{!generating && (
+						<div
+							style={{
+								marginTop: 28,
+								background: T.surface,
+								border: `1px solid ${T.border}`,
+								borderRadius: 12,
+								padding: "18px 20px",
+							}}
+						>
+							<p
 								style={{
-									marginTop: 28,
-									background: T.surface,
-									border: `1px solid ${T.border}`,
-									borderRadius: 12,
-									padding: "18px 20px",
+									fontSize: 12,
+									fontWeight: 700,
+									textTransform: "uppercase",
+									letterSpacing: "0.08em",
+									color: T.warm,
+									marginBottom: 12,
 								}}
 							>
-								<p
+								Tips for better drafts
+							</p>
+							{[
+								'Be specific about your audience — "indie founders" beats "entrepreneurs"',
+								"Mention tone: conversational, professional, direct, warm, opinionated",
+								'Add a word count target: "under 400 words" keeps it tight',
+								"Describe the action you want readers to take at the end",
+							].map((tip) => (
+								<div
+									key={tip}
 									style={{
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.08em",
-										color: T.warm,
-										marginBottom: 12,
+										display: "flex",
+										gap: 10,
+										marginBottom: 8,
+										alignItems: "flex-start",
 									}}
 								>
-									Tips for better drafts
-								</p>
-								{[
-									'Be specific about your audience — "indie founders" beats "entrepreneurs"',
-									"Mention tone: conversational, professional, direct, warm, opinionated",
-									'Add a word count target: "under 400 words" keeps it tight',
-									"Describe the action you want readers to take at the end",
-								].map((tip) => (
-									<div
-										key={tip}
+									<span
 										style={{
-											display: "flex",
-											gap: 10,
-											marginBottom: 8,
-											alignItems: "flex-start",
+											color: T.warm,
+											fontSize: 14,
+											lineHeight: 1.5,
+											flexShrink: 0,
 										}}
 									>
-										<span
-											style={{
-												color: T.warm,
-												fontSize: 14,
-												lineHeight: 1.5,
-												flexShrink: 0,
-											}}
-										>
-											✦
-										</span>
-										<p
-											style={{
-												fontSize: 13,
-												color: T.muted,
-												lineHeight: 1.6,
-											}}
-										>
-											{tip}
-										</p>
-									</div>
-								))}
+										✦
+									</span>
+								<p
+									style={{
+										fontSize: 13,
+										color: T.muted,
+										lineHeight: 1.6,
+									}}
+								>
+									{tip}
+								</p>
 							</div>
-						)}
-					</motion.div>
+						))}
+					</div>
+				)}
+
+				{/* close AI mode block */}
+				</>}
+
+				</motion.div>
 				</div>
 			</div>
 
