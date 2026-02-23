@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import InfographicsModal from "../../lib/ui/InfographicsModal";
+import AIChatSidebar from "../../lib/ui/AIChatSidebar";
 import { db } from "../../lib/config/firebase";
 import {
 	collection,
@@ -596,6 +597,7 @@ export default function DraftPage() {
 	const [copiedTheme, setCopiedTheme] = useState(null);
 	const [previewTheme, setPreviewTheme] = useState("ink");
 	const [infographicsOpen, setInfographicsOpen] = useState(false);
+	const [chatOpen, setChatOpen] = useState(false);
 	const editorRef = useRef(null);
 
 	/* All drafts for sidebar */
@@ -1515,33 +1517,60 @@ export default function DraftPage() {
 							Themes
 						</motion.button>
 
-						{/* Infographics button */}
-						<motion.button
-							whileHover={{ background: "#F0ECE5" }}
-							whileTap={{ scale: 0.97 }}
-							onClick={() => setInfographicsOpen(true)}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 5,
-								background: T.base,
-								border: `1px solid ${T.border}`,
-								borderRadius: 8,
-								padding: "5px 12px",
-								fontSize: 12,
-								fontWeight: 600,
-								color: T.accent,
-								cursor: "pointer",
-							}}
-						>
-							{/* Bar chart icon */}
-							<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-								<line x1="18" y1="20" x2="18" y2="10"/>
-								<line x1="12" y1="20" x2="12" y2="4"/>
-								<line x1="6" y1="20" x2="6" y2="14"/>
-							</svg>
-							Infographics
-						</motion.button>
+					{/* Infographics button */}
+					<motion.button
+						whileHover={{ background: "#F0ECE5" }}
+						whileTap={{ scale: 0.97 }}
+						onClick={() => setInfographicsOpen(true)}
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 5,
+							background: T.base,
+							border: `1px solid ${T.border}`,
+							borderRadius: 8,
+							padding: "5px 12px",
+							fontSize: 12,
+							fontWeight: 600,
+							color: T.accent,
+							cursor: "pointer",
+						}}
+					>
+						{/* Bar chart icon */}
+						<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+							<line x1="18" y1="20" x2="18" y2="10"/>
+							<line x1="12" y1="20" x2="12" y2="4"/>
+							<line x1="6" y1="20" x2="6" y2="14"/>
+						</svg>
+						Infographics
+					</motion.button>
+
+					{/* AI Chat button */}
+					<motion.button
+						whileHover={{ background: chatOpen ? "#C17B2F" : "#F0ECE5" }}
+						whileTap={{ scale: 0.97 }}
+						onClick={() => setChatOpen(v => !v)}
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 5,
+							background: chatOpen ? T.warm : T.base,
+							border: `1px solid ${chatOpen ? T.warm : T.border}`,
+							borderRadius: 8,
+							padding: "5px 12px",
+							fontSize: 12,
+							fontWeight: 600,
+							color: chatOpen ? "#FFFFFF" : T.accent,
+							cursor: "pointer",
+							transition: "all 0.18s",
+						}}
+					>
+						{/* Chat bubble icon */}
+						<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={chatOpen ? "#FFFFFF" : T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+						</svg>
+						AI Chat
+					</motion.button>
 
 							<motion.button
 								whileHover={{ scale: 1.03 }}
@@ -1963,16 +1992,26 @@ export default function DraftPage() {
 				)}
 		</AnimatePresence>
 
-		{/* ── INFOGRAPHICS MODAL ── */}
-		<InfographicsModal
-			open={infographicsOpen}
-			onClose={() => setInfographicsOpen(false)}
-			content={editorRef.current?.innerHTML || draft?.body || ""}
-			title={draft?.title || "Draft"}
-			userId={reduxUser?.uid || ""}
-			draftId={draftId}
-			savedInfographics={draft?.infographics || []}
-		/>
-	</div>
-	);
+	{/* ── INFOGRAPHICS MODAL ── */}
+	<InfographicsModal
+		open={infographicsOpen}
+		onClose={() => setInfographicsOpen(false)}
+		content={editorRef.current?.innerHTML || draft?.body || ""}
+		title={draft?.title || "Draft"}
+		userId={reduxUser?.uid || ""}
+		draftId={draftId}
+		savedInfographics={draft?.infographics || []}
+	/>
+
+	{/* ── AI CHAT SIDEBAR ── */}
+	<AIChatSidebar
+		open={chatOpen}
+		onClose={() => setChatOpen(false)}
+		editorRef={editorRef}
+		draftContent={editorRef.current?.innerHTML || draft?.body || ""}
+		draftTitle={draft?.title || "Draft"}
+		userId={reduxUser?.uid || ""}
+	/>
+</div>
+);
 }
