@@ -1,4 +1,5 @@
 import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 
 const urlRegex = /^https?:\/\/\S+$/i;
 
@@ -157,18 +158,25 @@ export default async function handler(req, res) {
 			model: requestedModel,
 			format = "substack",
 			style = "casual",
-			userId,
+			idToken,
 		} = req.body || {};
 
-		// userId is required — no anonymous generation
-		if (!userId || typeof userId !== "string" || !userId.trim()) {
+		// Require a signed Firebase ID token — verified server-side
+		if (!idToken) {
 			return res.status(401).json({
 				error: "Authentication required. Please sign in to generate drafts.",
 			});
 		}
 
+		let verifiedUid;
+		try {
+			verifiedUid = await verifyFirebaseToken(idToken);
+		} catch (authErr) {
+			return res.status(401).json({ error: authErr.message });
+		}
+
 		// Credit gate — 5 free AI generations per month; Pro = unlimited
-		const creditCheck = await checkAndIncrementCredit(userId.trim(), "llm");
+		const creditCheck = await checkAndIncrementCredit(verifiedUid, "llm");
 		if (!creditCheck.allowed) {
 			return res.status(429).json({ error: creditCheck.error });
 		}

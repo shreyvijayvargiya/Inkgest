@@ -4,6 +4,7 @@
  * No AI — content goes straight into the editor.
  */
 import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 
 const extractImages = (links = []) => {
 	const imgExts = /\.(jpg|jpeg|png|gif|webp|svg|avif)(\?|$)/i;
@@ -22,14 +23,22 @@ export default async function handler(req, res) {
 		return res.status(405).json({ error: "Method not allowed" });
 	}
 
-	const { url, userId } = req.body || {};
+	const { url, idToken } = req.body || {};
 
-	if (!userId || !userId.trim()) {
-		return res.status(401).json({ error: "Authentication required" });
+	// Require a signed Firebase ID token — verified server-side
+	if (!idToken) {
+		return res.status(401).json({ error: "Authentication required. Please sign in." });
+	}
+
+	let verifiedUid;
+	try {
+		verifiedUid = await verifyFirebaseToken(idToken);
+	} catch (authErr) {
+		return res.status(401).json({ error: authErr.message });
 	}
 
 	// Credit gate — 5 free scrapes per month; Pro = unlimited
-	const creditCheck = await checkAndIncrementCredit(userId.trim(), "scrape");
+	const creditCheck = await checkAndIncrementCredit(verifiedUid, "scrape");
 	if (!creditCheck.allowed) {
 		return res.status(429).json({ error: creditCheck.error });
 	}

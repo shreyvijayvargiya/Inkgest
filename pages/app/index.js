@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
 import LoginModal from "../../lib/ui/LoginModal";
-import { db } from "../../lib/config/firebase";
+import { db, auth } from "../../lib/config/firebase";
 import {
 	collection,
 	addDoc,
@@ -417,6 +417,12 @@ export default function inkgestApp() {
 		setGenerating(true);
 		setGenerateError(null);
 		try {
+			const idToken = await auth.currentUser?.getIdToken();
+			if (!idToken) {
+				setGenerateError("Session expired. Please sign in again.");
+				setGenerating(false);
+				return;
+			}
 			const validUrls = urls.map((u) => u.trim()).filter(Boolean);
 			const res = await fetch("/api/automations/newsletter-generate", {
 				method: "POST",
@@ -426,7 +432,7 @@ export default function inkgestApp() {
 					prompt: prompt.trim(),
 					format,
 					style,
-					userId: reduxUser.uid,
+					idToken,
 				}),
 			});
 			const data = await res.json();
@@ -534,10 +540,16 @@ export default function inkgestApp() {
 		setScraping(true);
 		setGenerateError(null);
 		try {
+			const idToken = await auth.currentUser?.getIdToken();
+			if (!idToken) {
+				setGenerateError("Session expired. Please sign in again.");
+				setScraping(false);
+				return;
+			}
 			const res = await fetch("/api/scrape/url", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ url: scrapeUrl.trim(), userId: reduxUser.uid }),
+				body: JSON.stringify({ url: scrapeUrl.trim(), idToken }),
 			});
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Scrape failed");

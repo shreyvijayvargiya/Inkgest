@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
+import InfographicsModal from "../../lib/ui/InfographicsModal";
 import { db } from "../../lib/config/firebase";
 import {
 	collection,
@@ -594,6 +595,7 @@ export default function DraftPage() {
 	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
 	const [copiedTheme, setCopiedTheme] = useState(null);
 	const [previewTheme, setPreviewTheme] = useState("ink");
+	const [infographicsOpen, setInfographicsOpen] = useState(false);
 	const editorRef = useRef(null);
 
 	/* All drafts for sidebar */
@@ -1486,32 +1488,60 @@ export default function DraftPage() {
 								</span>
 							<div style={{ flex: 1 }} />
 
-							{/* Themes button */}
-							<motion.button
-								whileHover={{ background: "#F0ECE5" }}
-								whileTap={{ scale: 0.97 }}
-								onClick={() => setThemeDrawerOpen(true)}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 5,
-									background: T.base,
-									border: `1px solid ${T.border}`,
-									borderRadius: 8,
-									padding: "5px 12px",
-									fontSize: 12,
-									fontWeight: 600,
-									color: T.accent,
-									cursor: "pointer",
-								}}
-							>
-								{/* Palette icon */}
-								<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-									<circle cx="13.5" cy="6.5" r=".5" fill={T.accent}/><circle cx="17.5" cy="10.5" r=".5" fill={T.accent}/><circle cx="8.5" cy="7.5" r=".5" fill={T.accent}/><circle cx="6.5" cy="12.5" r=".5" fill={T.accent}/>
-									<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
-								</svg>
-								Themes
-							</motion.button>
+						{/* Themes button */}
+						<motion.button
+							whileHover={{ background: "#F0ECE5" }}
+							whileTap={{ scale: 0.97 }}
+							onClick={() => setThemeDrawerOpen(true)}
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 5,
+								background: T.base,
+								border: `1px solid ${T.border}`,
+								borderRadius: 8,
+								padding: "5px 12px",
+								fontSize: 12,
+								fontWeight: 600,
+								color: T.accent,
+								cursor: "pointer",
+							}}
+						>
+							{/* Palette icon */}
+							<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+								<circle cx="13.5" cy="6.5" r=".5" fill={T.accent}/><circle cx="17.5" cy="10.5" r=".5" fill={T.accent}/><circle cx="8.5" cy="7.5" r=".5" fill={T.accent}/><circle cx="6.5" cy="12.5" r=".5" fill={T.accent}/>
+								<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+							</svg>
+							Themes
+						</motion.button>
+
+						{/* Infographics button */}
+						<motion.button
+							whileHover={{ background: "#F0ECE5" }}
+							whileTap={{ scale: 0.97 }}
+							onClick={() => setInfographicsOpen(true)}
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 5,
+								background: T.base,
+								border: `1px solid ${T.border}`,
+								borderRadius: 8,
+								padding: "5px 12px",
+								fontSize: 12,
+								fontWeight: 600,
+								color: T.accent,
+								cursor: "pointer",
+							}}
+						>
+							{/* Bar chart icon */}
+							<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+								<line x1="18" y1="20" x2="18" y2="10"/>
+								<line x1="12" y1="20" x2="12" y2="4"/>
+								<line x1="6" y1="20" x2="6" y2="14"/>
+							</svg>
+							Infographics
+						</motion.button>
 
 							<motion.button
 								whileHover={{ scale: 1.03 }}
@@ -1931,7 +1961,18 @@ export default function DraftPage() {
 						</motion.div>
 					</>
 				)}
-			</AnimatePresence>
-		</div>
+		</AnimatePresence>
+
+		{/* ── INFOGRAPHICS MODAL ── */}
+		<InfographicsModal
+			open={infographicsOpen}
+			onClose={() => setInfographicsOpen(false)}
+			content={editorRef.current?.innerHTML || draft?.body || ""}
+			title={draft?.title || "Draft"}
+			userId={reduxUser?.uid || ""}
+			draftId={draftId}
+			savedInfographics={draft?.infographics || []}
+		/>
+	</div>
 	);
 }
