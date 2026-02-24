@@ -72,8 +72,6 @@ export default async function handler(req, res) {
 				},
 				body: JSON.stringify({
 					url: url.trim(),
-					formats: ["markdown", "links"],
-					onlyMainContent: false,
 				}),
 			},
 		);
@@ -87,7 +85,7 @@ export default async function handler(req, res) {
 		}
 
 		const content = scrapeData?.data?.markdown || "";
-		const title = scrapeData?.data?.metadata?.title || url.trim();
+		const title = scrapeData?.data?.title || url.trim();
 		const links = scrapeData?.data?.links || [];
 		const images = extractImages(links);
 
