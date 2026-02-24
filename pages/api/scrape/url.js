@@ -76,7 +76,7 @@ export default async function handler(req, res) {
 			},
 		);
 
-		const scrapeData = await scrapeRes.json();
+		const scrapeData = await scrapeRes.json().catch(() => ({}));
 
 		if (!scrapeRes.ok) {
 			throw new Error(
@@ -84,9 +84,19 @@ export default async function handler(req, res) {
 			);
 		}
 
-		const content = scrapeData?.data?.markdown || "";
-		const title = scrapeData?.data?.title || url.trim();
-		const links = scrapeData?.data?.links || [];
+		const content =
+			scrapeData?.data?.markdown ||
+			scrapeData?.markdown ||
+			scrapeData?.data?.content ||
+			"";
+		const title =
+			scrapeData?.data?.metadata?.title ||
+			scrapeData?.data?.title ||
+			url.trim();
+		const links =
+			scrapeData?.data?.links ||
+			scrapeData?.links ||
+			[];
 		const images = extractImages(links);
 
 		if (!content.trim()) {

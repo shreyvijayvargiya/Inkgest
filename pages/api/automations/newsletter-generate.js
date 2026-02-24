@@ -101,21 +101,18 @@ async function openRouterChat({
 }
 
 async function firecrawlScrapeMarkdown({ url, apiKey }) {
-	const response = await fetch(
-		"https://ihatereading-api.vercel.app/scrap-url-puppeteer",
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${apiKey}`,
-			},
-			body: JSON.stringify({
-				url,
-				formats: ["markdown"],
-				onlyMainContent: true,
-			}),
+	const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${apiKey}`,
 		},
-	);
+		body: JSON.stringify({
+			url,
+			formats: ["markdown", "links"],
+			onlyMainContent: true,
+		}),
+	});
 
 	const data = await response.json().catch(() => ({}));
 	if (!response.ok) {
@@ -131,8 +128,9 @@ async function firecrawlScrapeMarkdown({ url, apiKey }) {
 		data?.data?.text ||
 		"";
 	const title = data?.data?.metadata?.title || data?.data?.title || "";
+	const links = data?.data?.links || data?.links || [];
 
-	return { markdown, title, raw: data };
+	return { markdown, title, links, raw: data };
 }
 
 export default async function handler(req, res) {
