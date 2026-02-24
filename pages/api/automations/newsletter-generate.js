@@ -101,18 +101,21 @@ async function openRouterChat({
 }
 
 async function firecrawlScrapeMarkdown({ url, apiKey }) {
-	const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+	const response = await fetch(
+		"https://ihatereading-api.vercel.app/scrap-url-puppeteer",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${apiKey}`,
+			},
+			body: JSON.stringify({
+				url,
+				formats: ["markdown"],
+				onlyMainContent: true,
+			}),
 		},
-		body: JSON.stringify({
-			url,
-			formats: ["markdown"],
-			onlyMainContent: true,
-		}),
-	});
+	);
 
 	const data = await response.json().catch(() => ({}));
 	if (!response.ok) {
@@ -230,8 +233,7 @@ export default async function handler(req, res) {
 			// All URLs were provided but every one failed
 			if (sources.length === 0) {
 				return res.status(422).json({
-					error:
-						"All URL scrapes failed. Please check the URLs and try again.",
+					error: "All URL scrapes failed. Please check the URLs and try again.",
 					details: scrapeErrors,
 				});
 			}

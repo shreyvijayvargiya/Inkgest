@@ -27,7 +27,9 @@ export default async function handler(req, res) {
 
 	// Require a signed Firebase ID token — verified server-side
 	if (!idToken) {
-		return res.status(401).json({ error: "Authentication required. Please sign in." });
+		return res
+			.status(401)
+			.json({ error: "Authentication required. Please sign in." });
 	}
 
 	let verifiedUid;
@@ -49,7 +51,9 @@ export default async function handler(req, res) {
 
 	const urlRegex = /^https?:\/\/.+/i;
 	if (!urlRegex.test(url.trim())) {
-		return res.status(400).json({ error: "Invalid URL — must start with http:// or https://" });
+		return res
+			.status(400)
+			.json({ error: "Invalid URL — must start with http:// or https://" });
 	}
 
 	const firecrawlKey = process.env.FIRECRAWL_API_KEY;
@@ -58,23 +62,28 @@ export default async function handler(req, res) {
 	}
 
 	try {
-		const scrapeRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${firecrawlKey}`,
+		const scrapeRes = await fetch(
+			"https://ihatereading-api.vercel.app/scrap-url-puppeteer",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${firecrawlKey}`,
+				},
+				body: JSON.stringify({
+					url: url.trim(),
+					formats: ["markdown", "links"],
+					onlyMainContent: false,
+				}),
 			},
-			body: JSON.stringify({
-				url: url.trim(),
-				formats: ["markdown", "links"],
-				onlyMainContent: false,
-			}),
-		});
+		);
 
 		const scrapeData = await scrapeRes.json();
 
 		if (!scrapeRes.ok) {
-			throw new Error(scrapeData?.error || `Firecrawl scrape failed (${scrapeRes.status})`);
+			throw new Error(
+				scrapeData?.error || `Firecrawl scrape failed (${scrapeRes.status})`,
+			);
 		}
 
 		const content = scrapeData?.data?.markdown || "";
@@ -83,7 +92,9 @@ export default async function handler(req, res) {
 		const images = extractImages(links);
 
 		if (!content.trim()) {
-			return res.status(422).json({ error: "Could not extract content from this URL" });
+			return res
+				.status(422)
+				.json({ error: "Could not extract content from this URL" });
 		}
 
 		return res.status(200).json({

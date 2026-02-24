@@ -1095,56 +1095,104 @@ export default function inkgestApp() {
 								label: "Scrape URL",
 								desc: "Raw content into editor",
 							},
-							{
-								id: "blank",
-								icon: (
-									<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-									</svg>
-								),
-								label: "Blank editor",
-								desc: "Start from scratch",
-							},
-						].map((m) => {
-							const active = draftMode === m.id;
-							return (
-								<motion.button
-									key={m.id}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => { setDraftMode(m.id); setGenerateError(null); }}
-									style={{
-										flex: 1,
-										background: active ? T.accent : T.surface,
-										border: `1.5px solid ${active ? T.accent : T.border}`,
-										borderRadius: 12,
-										padding: "14px 16px",
-										cursor: "pointer",
-										textAlign: "left",
-										transition: "all 0.15s",
-									}}
-								>
-									<div style={{
-										display: "inline-flex",
-										alignItems: "center",
-										justifyContent: "center",
-										width: 28, height: 28,
-										borderRadius: 7,
-										background: active ? "rgba(255,255,255,0.15)" : T.base,
-										color: active ? "white" : T.warm,
-										marginBottom: 10,
-									}}>
-										{m.icon}
-									</div>
-									<p style={{ fontSize: 13, fontWeight: 700, color: active ? "white" : T.accent, marginBottom: 3 }}>
-										{m.label}
-									</p>
-									<p style={{ fontSize: 11, color: active ? "rgba(255,255,255,0.65)" : T.muted }}>
-										{m.desc}
-									</p>
-								</motion.button>
-							);
-						})}
+						{
+							id: "blank",
+							icon: (
+								<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+									<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+									<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+								</svg>
+							),
+							label: "Blank editor",
+							desc: "Start from scratch",
+						},
+					].map((m) => {
+						const active = draftMode === m.id;
+						return (
+							<motion.button
+								key={m.id}
+								whileTap={{ scale: 0.97 }}
+								onClick={() => { setDraftMode(m.id); setGenerateError(null); }}
+								style={{
+									flex: 1,
+									background: active ? T.accent : T.surface,
+									border: `1.5px solid ${active ? T.accent : T.border}`,
+									borderRadius: 12,
+									padding: "14px 16px",
+									cursor: "pointer",
+									textAlign: "left",
+									transition: "all 0.15s",
+								}}
+							>
+								<div style={{
+									display: "inline-flex",
+									alignItems: "center",
+									justifyContent: "center",
+									width: 28, height: 28,
+									borderRadius: 7,
+									background: active ? "rgba(255,255,255,0.15)" : T.base,
+									color: active ? "white" : T.warm,
+									marginBottom: 10,
+								}}>
+									{m.icon}
+								</div>
+								<p style={{ fontSize: 13, fontWeight: 700, color: active ? "white" : T.accent, marginBottom: 3 }}>
+									{m.label}
+								</p>
+								<p style={{ fontSize: 11, color: active ? "rgba(255,255,255,0.65)" : T.muted }}>
+									{m.desc}
+								</p>
+							</motion.button>
+						);
+					})}
+
+					{/* ── Table Creator — navigates to its own page ── */}
+					<motion.button
+						whileTap={{ scale: 0.97 }}
+						onClick={() => router.push("/app/table-creator")}
+						style={{
+							flex: 1,
+							background: T.surface,
+							border: `1.5px solid ${T.border}`,
+							borderRadius: 12,
+							padding: "14px 16px",
+							cursor: "pointer",
+							textAlign: "left",
+							transition: "all 0.15s",
+							position: "relative",
+						}}
+					>
+						<div style={{
+							position: "absolute", top: 8, right: 10,
+							fontSize: 9, fontWeight: 700, color: T.warm,
+							background: "#FEF3E2", border: "1px solid #F5C97A",
+							borderRadius: 20, padding: "1px 6px",
+							letterSpacing: "0.05em", textTransform: "uppercase",
+						}}>
+							New
+						</div>
+						<div style={{
+							display: "inline-flex",
+							alignItems: "center",
+							justifyContent: "center",
+							width: 28, height: 28,
+							borderRadius: 7,
+							background: T.base,
+							color: T.warm,
+							marginBottom: 10,
+						}}>
+							<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+								<rect x="3" y="3" width="18" height="18" rx="2"/>
+								<path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+							</svg>
+						</div>
+						<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 3 }}>
+							Create Table
+						</p>
+						<p style={{ fontSize: 11, color: T.muted }}>
+							URL → AI-structured table
+						</p>
+					</motion.button>
 					</div>
 
 					{/* Not logged in info banner */}
