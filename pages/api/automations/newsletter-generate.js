@@ -261,7 +261,35 @@ export default async function handler(req, res) {
 			? "Generate the content based ONLY on the sources provided. If a claim isn't in the sources, omit it."
 			: "Generate the content based ONLY on the user's prompt (no sources provided). Don't invent specific facts or quote URLs you didn't read.";
 
-		const system = `${formatConfig.system}\n${sourceInstruction}${styleNote}\nOutput MUST be Markdown (no code fences).`;
+		const BLOCK_SYNTAX = `
+RICH CONTENT BLOCKS — use these in your output where they add value:
+
+Code blocks (standard markdown fencing with language identifier):
+\`\`\`javascript
+const example = "code here";
+\`\`\`
+Supported languages: javascript, typescript, python, css, html, bash, json, sql
+
+Callout blocks (for highlights, warnings, tips):
+:::info
+An informational note or tip.
+:::
+
+:::warning
+Something the reader should be careful about.
+:::
+
+:::success
+A positive outcome or confirmation.
+:::
+
+:::danger
+A critical error or destructive-action warning.
+:::
+
+Use callouts and code blocks sparingly — only when they genuinely improve clarity.`;
+
+		const system = `${formatConfig.system}\n${sourceInstruction}${styleNote}\nOutput in Markdown. You may use the following rich block types where appropriate:\n${BLOCK_SYNTAX}`;
 
 		const user = [
 			`USER PROMPT:\n${safePrompt}`,

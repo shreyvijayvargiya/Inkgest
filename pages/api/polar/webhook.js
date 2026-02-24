@@ -16,7 +16,6 @@ import {
 } from "../../../lib/utils/polar/customerUtils";
 import { enrichPlanData } from "../../../lib/utils/polar/planUtils";
 import {
-	getPaymentStatusFromSubscription,
 	verifyPaymentStatus,
 	storePaymentRecord,
 } from "../../../lib/utils/polar/paymentUtils";
@@ -252,11 +251,7 @@ async function handleSubscriptionCanceledEvent(event) {
 	};
 
 	// Revert plan to free in the users collection
-	await setDoc(
-		doc(db, "users", customerId),
-		{ plan: "free" },
-		{ merge: true },
-	);
+	await setDoc(doc(db, "users", customerId), { plan: "free" }, { merge: true });
 
 	await setDoc(customerRef, updatedCustomerData, { merge: true });
 

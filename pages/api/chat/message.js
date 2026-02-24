@@ -21,7 +21,31 @@ Rules:
 • Match the requested tone precisely.
 • When writing use **bold**, *italic*, ## headings, and - bullet lists where they add clarity.
 • If the user provides editor context (text between [Editor context: ...]), use it to inform your suggestions but don't repeat it back.
-• Keep responses focused and actionable.`;
+• Keep responses focused and actionable.
+
+RICH CONTENT BLOCKS — use these where they genuinely improve clarity:
+
+Code blocks (standard markdown fencing):
+\`\`\`javascript
+const example = "code";
+\`\`\`
+(supported: javascript, typescript, python, css, html, bash, json, sql)
+
+Callout blocks:
+:::info
+A helpful note or tip.
+:::
+:::warning
+Something to be careful about.
+:::
+:::success
+A positive confirmation.
+:::
+:::danger
+A critical warning.
+:::
+
+Use callouts sparingly. Only include them when they add real value to the response.`;
 
 export default async function handler(req, res) {
 	if (req.method !== "POST") {

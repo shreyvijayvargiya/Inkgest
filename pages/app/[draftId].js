@@ -579,6 +579,36 @@ function TBtn({ icon, label, onClick, active = false }) {
 	);
 }
 
+/* ═══════════════════════════════════════════
+   RICH EDITOR BLOCKS
+═══════════════════════════════════════════ */
+
+const CALLOUT_CONFIGS = {
+	info:    { emoji: "ℹ️",  border: "#3B82F6", bg: "#EFF6FF", textColor: "#1E40AF", label: "Info" },
+	warning: { emoji: "⚠️", border: "#F59E0B", bg: "#FFFBEB", textColor: "#92400E", label: "Warning" },
+	success: { emoji: "✅", border: "#10B981", bg: "#ECFDF5", textColor: "#065F46", label: "Success" },
+	danger:  { emoji: "🚨", border: "#EF4444", bg: "#FEF2F2", textColor: "#991B1B", label: "Danger" },
+};
+
+const LANG_OPTIONS = ["javascript","typescript","python","css","html","bash","json","sql","text"];
+
+function makeCalloutHtml(type, text = "") {
+	const c = CALLOUT_CONFIGS[type] || CALLOUT_CONFIGS.info;
+	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
+}
+
+function makeCodeBlockHtml(language = "javascript", code = "// Your code here") {
+	const lang = language.toLowerCase().trim() || "text";
+	const opts = LANG_OPTIONS.map(
+		(l) => `<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).toUpperCase() + l.slice(1)}</option>`,
+	).join("");
+	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
+}
+
+function makeButtonBlockHtml(text = "Click here →", href = "#") {
+	return `<p style="margin:16px 0"><a href="${href}" style="display:inline-block;background:#C17B2F;color:#FFFFFF;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;font-family:'Outfit',sans-serif;letter-spacing:0.01em">${text}</a></p>`;
+}
+
 /* ─── Draft Page ─── */
 export default function DraftPage() {
 	const router = useRouter();
@@ -598,6 +628,7 @@ export default function DraftPage() {
 	const [previewTheme, setPreviewTheme] = useState("ink");
 	const [infographicsOpen, setInfographicsOpen] = useState(false);
 	const [chatOpen, setChatOpen] = useState(false);
+	const [blockMenuOpen, setBlockMenuOpen] = useState(false);
 	const editorRef = useRef(null);
 
 	/* All drafts for sidebar */
@@ -636,20 +667,43 @@ export default function DraftPage() {
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
 	const remaining = Math.max(0, FREE_LIMIT - used);
 
-	/* Format markdown body to displayable HTML */
+	/* Format markdown body → editor HTML, handling rich blocks */
 	const formatBody = (body = "") => {
 		if (body.trim().startsWith("<")) return body;
-		return body
-			.split("\n")
-			.map((line) => {
-				if (line.startsWith("## "))
-					return `<h2 style="font-family:'Instrument Serif',serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
-				if (line.startsWith("# "))
-					return `<h1 style="font-family:'Instrument Serif',serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
-				if (line === "") return `<br/>`;
-				return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
-			})
-			.join("");
+
+		/* 1. Extract multi-line blocks into tokens so line-splitting is safe */
+		const tokens = [];
+		let text = body;
+
+		// Code fences  ```lang\ncode\n```
+		text = text.replace(/```(\w*)\r?\n([\s\S]*?)```/g, (_, lang, code) => {
+			const language = (lang.trim() || "text");
+			const escaped = code.trim()
+				.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+			const tok = `\x01BLK${tokens.length}\x01`;
+			tokens.push(makeCodeBlockHtml(language, escaped));
+			return tok;
+		});
+
+		// Callout blocks  :::type\ntext\n:::
+		text = text.replace(/:::(\w+)\r?\n([\s\S]*?):::/g, (_, type, content) => {
+			const innerHtml = content.trim().replace(/\n/g, "<br>");
+			const tok = `\x01BLK${tokens.length}\x01`;
+			tokens.push(makeCalloutHtml(type, innerHtml));
+			return tok;
+		});
+
+		/* 2. Process line by line */
+		const restore = (s) => s.replace(/\x01BLK(\d+)\x01/g, (_, i) => tokens[+i]);
+
+		return text.split("\n").map((line) => {
+			if (/\x01BLK\d+\x01/.test(line)) return restore(line);
+			if (line.startsWith("### ")) return `<h3 style="font-family:'Instrument Serif',serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
+			if (line.startsWith("## "))  return `<h2 style="font-family:'Instrument Serif',serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
+			if (line.startsWith("# "))   return `<h1 style="font-family:'Instrument Serif',serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
+			if (line.trim() === "")      return "<br/>";
+			return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
+		}).join("");
 	};
 
 	/* Set editor content when draft loads */
@@ -683,6 +737,71 @@ export default function DraftPage() {
 		setSaved(true);
 		setTimeout(() => setSaved(false), 2000);
 	};
+
+	/* ── Insert a rich block at the cursor ── */
+	const insertBlock = (type) => {
+		editorRef.current?.focus();
+		let html = "";
+		if (type === "code")   html = makeCodeBlockHtml("javascript", "// Your code here");
+		else if (type === "button") html = makeButtonBlockHtml();
+		else html = makeCalloutHtml(type, `${CALLOUT_CONFIGS[type]?.label || "Callout"} — edit this text.`);
+		if (html) {
+			document.execCommand("insertHTML", false, html + "<p><br></p>");
+			countWords();
+		}
+		setBlockMenuOpen(false);
+	};
+
+	/* ── Event delegation on the editor for code-block interactions ── */
+	useEffect(() => {
+		const el = editorRef.current;
+		if (!el) return;
+
+		const handleClick = (e) => {
+			if (e.target.dataset?.action === "copy-code") {
+				e.preventDefault();
+				const block = e.target.closest("[data-block=\"code\"]");
+				const code = block?.querySelector("code");
+				if (code) {
+					navigator.clipboard.writeText(code.innerText).catch(() => {});
+					const btn = e.target;
+					const prev = btn.textContent;
+					btn.textContent = "Copied!";
+					btn.style.color = "#10B981";
+					btn.style.borderColor = "#10B981";
+					setTimeout(() => {
+						btn.textContent = prev;
+						btn.style.color = "";
+						btn.style.borderColor = "";
+					}, 1800);
+				}
+			}
+		};
+
+		const handleChange = (e) => {
+			if (e.target.dataset?.action === "change-lang") {
+				// nothing extra needed — the native <select> already stores its value
+			}
+		};
+
+		el.addEventListener("click", handleClick);
+		el.addEventListener("change", handleChange);
+		return () => {
+			el.removeEventListener("click", handleClick);
+			el.removeEventListener("change", handleChange);
+		};
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	/* ── Close block-insert menu when clicking outside ── */
+	useEffect(() => {
+		if (!blockMenuOpen) return;
+		const close = (e) => {
+			if (!e.target.closest("[data-block-menu]")) setBlockMenuOpen(false);
+		};
+		document.addEventListener("mousedown", close);
+		return () => document.removeEventListener("mousedown", close);
+	}, [blockMenuOpen]);
 
 	const handleDelete = (id) => setDeleteConfirm(id);
 
@@ -1194,22 +1313,146 @@ export default function DraftPage() {
 									label="Bullet list"
 									onClick={() => document.execCommand("insertUnorderedList")}
 								/>
-								<TBtn
-									icon={Icons.link2}
-									label="Link"
-									onClick={() => {
-										const url = window.prompt("URL:");
-										if (url) document.execCommand("createLink", false, url);
-									}}
-								/>
-								<div
+							<TBtn
+								icon={Icons.link2}
+								label="Link"
+								onClick={() => {
+									const url = window.prompt("URL:");
+									if (url) document.execCommand("createLink", false, url);
+								}}
+							/>
+
+							{/* Divider */}
+							<div style={{ width: 1, height: 18, background: T.border, margin: "0 4px" }} />
+
+							{/* ── Insert block dropdown ── */}
+							<div data-block-menu style={{ position: "relative" }}>
+								<motion.button
+									onClick={() => setBlockMenuOpen(v => !v)}
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.95 }}
 									style={{
-										width: 1,
-										height: 18,
-										background: T.border,
-										margin: "0 4px",
+										display: "flex", alignItems: "center", gap: 5,
+										background: blockMenuOpen ? "#F0ECE5" : "transparent",
+										border: "none",
+										borderRadius: 7, padding: "5px 9px",
+										fontSize: 12, fontWeight: 600,
+										color: T.accent, cursor: "pointer",
+										transition: "background 0.15s",
 									}}
-								/>
+								>
+									<Icon d="M12 5v14M5 12h14" size={13} stroke={T.accent} />
+									Insert
+									<Icon d="M6 9l6 6 6-6" size={11} stroke={T.muted} strokeWidth={2} />
+								</motion.button>
+
+								<AnimatePresence>
+									{blockMenuOpen && (
+										<motion.div
+											initial={{ opacity: 0, y: 6, scale: 0.96 }}
+											animate={{ opacity: 1, y: 0, scale: 1 }}
+											exit={{ opacity: 0, y: 6, scale: 0.96 }}
+											transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+											style={{
+												position: "absolute",
+												top: "calc(100% + 6px)",
+												left: 0,
+												background: "#FFFFFF",
+												border: `1px solid ${T.border}`,
+												borderRadius: 12,
+												boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+												zIndex: 60,
+												overflow: "hidden",
+												minWidth: 195,
+												padding: 6,
+											}}
+										>
+											{/* Callouts section */}
+											<p style={{ fontSize: 10, fontWeight: 700, color: "#B0AAA3", textTransform: "uppercase", letterSpacing: "0.1em", padding: "3px 8px 6px", margin: 0 }}>
+												Callout
+											</p>
+											{["info","warning","success","danger"].map(type => {
+												const c = CALLOUT_CONFIGS[type];
+												return (
+													<motion.button
+														key={type}
+														onClick={() => insertBlock(type)}
+														whileHover={{ background: "#F7F5F0" }}
+														style={{
+															width: "100%", display: "flex", alignItems: "center", gap: 8,
+															background: "none", border: "none",
+															borderRadius: 8, padding: "7px 10px",
+															cursor: "pointer", textAlign: "left",
+															transition: "background 0.12s",
+														}}
+													>
+														<span style={{ fontSize: 15, width: 22, textAlign: "center" }}>{c.emoji}</span>
+														<div>
+															<p style={{ fontSize: 12, fontWeight: 600, color: c.textColor, margin: 0, lineHeight: 1.2 }}>{c.label}</p>
+															<p style={{ fontSize: 10.5, color: "#A8A29C", margin: 0 }}>Highlighted callout box</p>
+														</div>
+														<div style={{ flex: 1 }} />
+														<div style={{ width: 10, height: 10, borderRadius: 2, background: c.border, opacity: 0.7 }} />
+													</motion.button>
+												);
+											})}
+
+											{/* Divider */}
+											<div style={{ height: 1, background: T.border, margin: "5px 0" }} />
+											<p style={{ fontSize: 10, fontWeight: 700, color: "#B0AAA3", textTransform: "uppercase", letterSpacing: "0.1em", padding: "3px 8px 6px", margin: 0 }}>
+												More blocks
+											</p>
+
+											{/* Code block */}
+											<motion.button
+												onClick={() => insertBlock("code")}
+												whileHover={{ background: "#F7F5F0" }}
+												style={{
+													width: "100%", display: "flex", alignItems: "center", gap: 8,
+													background: "none", border: "none",
+													borderRadius: 8, padding: "7px 10px",
+													cursor: "pointer", textAlign: "left",
+													transition: "background 0.12s",
+												}}
+											>
+												<span style={{ fontSize: 15, width: 22, textAlign: "center" }}>{"</>"}</span>
+												<div>
+													<p style={{ fontSize: 12, fontWeight: 600, color: T.accent, margin: 0, lineHeight: 1.2 }}>Code block</p>
+													<p style={{ fontSize: 10.5, color: "#A8A29C", margin: 0 }}>Syntax-highlighted code</p>
+												</div>
+											</motion.button>
+
+											{/* Button */}
+											<motion.button
+												onClick={() => insertBlock("button")}
+												whileHover={{ background: "#F7F5F0" }}
+												style={{
+													width: "100%", display: "flex", alignItems: "center", gap: 8,
+													background: "none", border: "none",
+													borderRadius: 8, padding: "7px 10px",
+													cursor: "pointer", textAlign: "left",
+													transition: "background 0.12s",
+												}}
+											>
+												<span style={{ fontSize: 15, width: 22, textAlign: "center" }}>🔗</span>
+												<div>
+													<p style={{ fontSize: 12, fontWeight: 600, color: T.accent, margin: 0, lineHeight: 1.2 }}>CTA Button</p>
+													<p style={{ fontSize: 10.5, color: "#A8A29C", margin: 0 }}>Styled call-to-action link</p>
+												</div>
+											</motion.button>
+										</motion.div>
+									)}
+								</AnimatePresence>
+							</div>
+
+							<div
+								style={{
+									width: 1,
+									height: 18,
+									background: T.border,
+									margin: "0 4px",
+								}}
+							/>
 								{/* Source info */}
 								{sourceUrl && (
 									<div
