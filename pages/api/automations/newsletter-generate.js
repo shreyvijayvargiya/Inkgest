@@ -1,5 +1,11 @@
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
+import { checkRateLimit } from "../../../lib/utils/rateLimit";
+import { validateUrls } from "../../../lib/utils/urlAllowlist";
+
+export const config = {
+	api: { bodyParser: { sizeLimit: "1mb" } },
+};
 
 const urlRegex = /^https?:\/\/\S+$/i;
 
@@ -176,6 +182,15 @@ export default async function handler(req, res) {
 			return res.status(401).json({ error: authErr.message });
 		}
 
+		// Rate limit — per IP and per user
+		const rateLimit = await checkRateLimit(req, { identifier: verifiedUid });
+		if (!rateLimit.allowed) {
+			return res.status(429).json({
+				error: "Too many requests. Please try again later.",
+				retryAfter: rateLimit.resetIn,
+			});
+		}
+
 		// Credit gate — 5 free AI generations per month; Pro = unlimited
 		const creditCheck = await checkAndDeductCredit(verifiedUid, 1);
 		if (!creditCheck.allowed) {
@@ -205,6 +220,12 @@ export default async function handler(req, res) {
 
 		if (urlList.some((u) => !urlRegex.test(u))) {
 			return res.status(400).json({ error: "One or more URLs are invalid" });
+		}
+
+		// SSRF protection — block localhost, private IPs, file://
+		const urlValidation = validateUrls(urlList);
+		if (!urlValidation.valid) {
+			return res.status(400).json({ error: urlValidation.error });
 		}
 
 		// Scrape all URLs — best-effort, collect successes and errors

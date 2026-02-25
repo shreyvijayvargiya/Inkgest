@@ -1,5 +1,10 @@
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
+import { checkRateLimit } from "../../../lib/utils/rateLimit";
+
+export const config = {
+	api: { bodyParser: { sizeLimit: "1mb" } },
+};
 
 /**
  * POST /api/automations/infographics-generate
@@ -143,6 +148,15 @@ export default async function handler(req, res) {
 			verifiedUid = await verifyFirebaseToken(idToken);
 		} catch (authErr) {
 			return res.status(401).json({ error: authErr.message });
+		}
+
+		// Rate limit — per IP and per user
+		const rateLimit = await checkRateLimit(req, { identifier: verifiedUid });
+		if (!rateLimit.allowed) {
+			return res.status(429).json({
+				error: "Too many requests. Please try again later.",
+				retryAfter: rateLimit.resetIn,
+			});
 		}
 
 		if (!content || !stripHtml(content).length) {

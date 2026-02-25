@@ -8,9 +8,13 @@
  */
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
+import { checkRateLimit } from "../../../lib/utils/rateLimit";
 
 export const config = {
-	api: { responseLimit: false },
+	api: {
+		bodyParser: { sizeLimit: "1mb" },
+		responseLimit: false,
+	},
 };
 
 const SYSTEM = `You are Inkgest — an expert AI writing assistant for newsletter writers, bloggers, and indie founders.
@@ -66,6 +70,15 @@ export default async function handler(req, res) {
 		uid = await verifyFirebaseToken(idToken);
 	} catch (authErr) {
 		return res.status(401).json({ error: authErr.message });
+	}
+
+	// Rate limit — per IP and per user
+	const rateLimit = await checkRateLimit(req, { identifier: uid });
+	if (!rateLimit.allowed) {
+		return res.status(429).json({
+			error: "Too many requests. Please try again later.",
+			retryAfter: rateLimit.resetIn,
+		});
 	}
 
 	// Each chat message costs 0.25 credits

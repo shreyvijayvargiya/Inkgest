@@ -5,6 +5,12 @@
  */
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
+import { checkRateLimit } from "../../../lib/utils/rateLimit";
+import { validateUrl } from "../../../lib/utils/urlAllowlist";
+
+export const config = {
+	api: { bodyParser: { sizeLimit: "1mb" } },
+};
 
 const extractImages = (links = []) => {
 	const imgExts = /\.(jpg|jpeg|png|gif|webp|svg|avif)(\?|$)/i;
@@ -39,6 +45,15 @@ export default async function handler(req, res) {
 		return res.status(401).json({ error: authErr.message });
 	}
 
+	// Rate limit — per IP and per user
+	const rateLimit = await checkRateLimit(req, { identifier: verifiedUid });
+	if (!rateLimit.allowed) {
+		return res.status(429).json({
+			error: "Too many requests. Please try again later.",
+			retryAfter: rateLimit.resetIn,
+		});
+	}
+
 	// Credit gate — 5 free scrapes per month; Pro = unlimited
 	const creditCheck = await checkAndDeductCredit(verifiedUid, 1);
 	if (!creditCheck.allowed) {
@@ -54,6 +69,12 @@ export default async function handler(req, res) {
 		return res
 			.status(400)
 			.json({ error: "Invalid URL — must start with http:// or https://" });
+	}
+
+	// SSRF protection — block localhost, private IPs, file://
+	const urlValidation = validateUrl(url.trim());
+	if (!urlValidation.valid) {
+		return res.status(400).json({ error: urlValidation.error });
 	}
 
 	const firecrawlKey = process.env.FIRECRAWL_API_KEY;

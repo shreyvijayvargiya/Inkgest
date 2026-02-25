@@ -1,6 +1,9 @@
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
+import { checkRateLimit } from "../../../lib/utils/rateLimit";
+import { validateUrls } from "../../../lib/utils/urlAllowlist";
 
+// No body size limit — tables can be large
 const URL_REGEX = /^https?:\/\/\S+$/i;
 const MAX_CONTENT_CHARS = 14000;
 
@@ -102,7 +105,7 @@ export default async function handler(req, res) {
 		return res.status(405).json({ error: "Method not allowed" });
 	}
 
-	const { url, prompt: userPrompt, idToken } = req.body || {};
+	const { url, urls: urlsBody, prompt: userPrompt, idToken } = req.body || {};
 
 	// ── Auth ──────────────────────────────────────────────────────────────────
 	if (!idToken) {
@@ -115,9 +118,33 @@ export default async function handler(req, res) {
 		return res.status(401).json({ error: e.message });
 	}
 
+	// ── Rate limit ────────────────────────────────────────────────────────────
+	const rateLimit = await checkRateLimit(req, { identifier: uid });
+	if (!rateLimit.allowed) {
+		return res.status(429).json({
+			error: "Too many requests. Please try again later.",
+			retryAfter: rateLimit.resetIn,
+		});
+	}
+
 	// ── Validate input ────────────────────────────────────────────────────────
-	if (!url || !URL_REGEX.test(url.trim())) {
-		return res.status(400).json({ error: "A valid URL is required." });
+	const urlList = Array.isArray(urlsBody) && urlsBody.length > 0
+		? urlsBody.map((u) => String(u || "").trim()).filter(Boolean)
+		: url && String(url).trim()
+			? [String(url).trim()]
+			: [];
+	if (urlList.length === 0) {
+		return res.status(400).json({ error: "At least one valid URL is required." });
+	}
+	if (urlList.length > 10) {
+		return res.status(400).json({ error: "Maximum 10 URLs per request." });
+	}
+	if (urlList.some((u) => !URL_REGEX.test(u))) {
+		return res.status(400).json({ error: "One or more URLs are invalid." });
+	}
+	const urlValidation = validateUrls(urlList);
+	if (!urlValidation.valid) {
+		return res.status(400).json({ error: urlValidation.error });
 	}
 	if (!userPrompt?.trim()) {
 		return res
@@ -137,27 +164,41 @@ export default async function handler(req, res) {
 		return res.status(429).json({ error: creditCheck.error });
 	}
 
-	// ── Scrape ────────────────────────────────────────────────────────────────
-	let markdown;
-	try {
-		markdown = await scrapeUrl(url.trim(), firecrawlKey);
-	} catch (e) {
-		return res.status(502).json({ error: `Scrape failed: ${e.message}` });
+	// ── Scrape all URLs ─────────────────────────────────────────────────────
+	const sources = [];
+	const scrapeErrors = [];
+	for (const u of urlList) {
+		try {
+			const content = await scrapeUrl(u, firecrawlKey);
+			if (content?.trim()) {
+				sources.push({ url: u, content });
+			} else {
+				scrapeErrors.push({ url: u, error: "No content extracted" });
+			}
+		} catch (e) {
+			scrapeErrors.push({ url: u, error: e?.message || "Scrape failed" });
+		}
 	}
-	if (!markdown.trim()) {
-		return res
-			.status(422)
-			.json({ error: "Could not extract any content from this URL." });
+	if (sources.length === 0) {
+		return res.status(422).json({
+			error: "Could not extract content from any URL. Please check the URLs and try again.",
+			details: scrapeErrors,
+		});
 	}
+
+	const combinedContent = sources
+		.map((s, i) => `--- SOURCE ${i + 1}: ${s.url} ---\n\n${s.content}`)
+		.join("\n\n");
 
 	// ── LLM ───────────────────────────────────────────────────────────────────
 	let raw;
 	try {
+		const urlListStr = urlList.length === 1 ? urlList[0] : urlList.join(", ");
 		raw = await callOpenRouter(openRouterKey, [
 			{ role: "system", content: SYSTEM_PROMPT },
 			{
 				role: "user",
-				content: `URL: ${url.trim()}\n\nUser request: ${userPrompt.trim()}\n\nScraped content:\n${markdown}`,
+				content: `URL(s): ${urlListStr}\n\nUser request: ${userPrompt.trim()}\n\nScraped content from ${sources.length} source(s):\n\n${combinedContent}`,
 			},
 		]);
 	} catch (e) {
@@ -186,6 +227,8 @@ export default async function handler(req, res) {
 		description: tableData.description || "",
 		columns: tableData.columns,
 		rows: tableData.rows || [],
-		sourceUrl: url.trim(),
+		sourceUrls: urlList,
+		sourceUrl: urlList[0],
+		scrapeErrors: scrapeErrors.length > 0 ? scrapeErrors : undefined,
 	});
 }

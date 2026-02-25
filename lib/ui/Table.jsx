@@ -1,12 +1,38 @@
 import React from "react";
 
+/* Inkgest theme: base #F7F5F0, surface #FFFFFF, accent #1A1A1A, warm #C17B2F, muted #7A7570, border #E8E4DC */
+const inkgest = {
+	container: "w-full border border-[#E8E4DC] rounded-xl",
+	header: "border-b-2 border-[#E8E4DC] bg-[#F7F5F0]",
+	headerCell: "px-4 py-3 text-left text-xs font-semibold text-[#1A1A1A] tracking-wider",
+	headerCellSortable: "cursor-pointer hover:bg-[#E8E4DC]/50 transition-colors",
+	body: "divide-y divide-[#E8E4DC]",
+	row: "border-b border-[#E8E4DC] last:border-b-0 transition-colors",
+	rowHover: "hover:bg-[#FEF3E2]/50",
+	cell: "px-4 py-3 text-sm text-[#1A1A1A]",
+};
+
+const defaultStyles = {
+	container: "w-full border border-zinc-200 rounded-xl",
+	header: "border-b border-zinc-200",
+	headerCell: "px-4 py-3 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider",
+	headerCellSortable: "cursor-pointer hover:bg-zinc-50 transition-colors",
+	body: "divide-y divide-zinc-200",
+	row: "border-b border-zinc-200 rounded-xl last:border-b-0",
+	rowHover: "hover:bg-zinc-50/50 transition-colors",
+	cell: "px-4 py-3 text-sm text-zinc-900",
+};
+
+const getStyles = (variant) => (variant === "inkgest" ? inkgest : defaultStyles);
+
 /**
- * Table Component - Shadcn-style white table
+ * Table Component - Shadcn-style table with optional inkgest theme
  * Reusable table component for admin panels
  */
-export const Table = ({ className = "", children, ...props }) => {
+export const Table = ({ className = "", variant, children, ...props }) => {
+	const s = getStyles(variant);
 	return (
-		<div className="w-full border border-zinc-200 rounded-xl ">
+		<div className={`w-full overflow-x-auto ${s.container}`}>
 			<table className={`w-full ${className}`} {...props}>
 				{children}
 			</table>
@@ -17,12 +43,10 @@ export const Table = ({ className = "", children, ...props }) => {
 /**
  * Table Header Component
  */
-export const TableHeader = ({ className = "", children, ...props }) => {
+export const TableHeader = ({ className = "", variant, children, ...props }) => {
+	const s = getStyles(variant);
 	return (
-		<thead
-			className={`border-b border-zinc-200 ${className}`}
-			{...props}
-		>
+		<thead className={`${s.header} ${className}`} {...props}>
 			{children}
 		</thead>
 	);
@@ -31,12 +55,10 @@ export const TableHeader = ({ className = "", children, ...props }) => {
 /**
  * Table Body Component
  */
-export const TableBody = ({ className = "", children, ...props }) => {
+export const TableBody = ({ className = "", variant, children, ...props }) => {
+	const s = getStyles(variant);
 	return (
-		<tbody
-			className={`divide-y divide-zinc-200 ${className}`}
-			{...props}
-		>
+		<tbody className={`${s.body} ${className}`} {...props}>
 			{children}
 		</tbody>
 	);
@@ -47,16 +69,16 @@ export const TableBody = ({ className = "", children, ...props }) => {
  */
 export const TableRow = ({
 	className = "",
+	variant,
 	children,
 	onClick,
 	hover = true,
 	...props
 }) => {
+	const s = getStyles(variant);
 	return (
 		<tr
-			className={`border-b border-zinc-200 rounded-xl last:border-b-0 ${
-				hover ? "hover:bg-zinc-50/50 transition-colors" : ""
-			} ${onClick ? "cursor-pointer" : ""} ${className}`}
+			className={`${s.row} ${hover ? s.rowHover : ""} ${onClick ? "cursor-pointer" : ""} ${className}`}
 			onClick={onClick}
 			{...props}
 		>
@@ -70,18 +92,16 @@ export const TableRow = ({
  */
 export const TableHead = ({
 	className = "",
+	variant,
 	children,
 	onClick,
 	sortable = false,
 	...props
 }) => {
+	const s = getStyles(variant);
 	return (
 		<th
-			className={`px-4 py-3 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider ${
-				sortable || onClick
-					? "cursor-pointer hover:bg-zinc-50 transition-colors"
-					: ""
-			} ${className}`}
+			className={`${s.headerCell} ${sortable || onClick ? s.headerCellSortable : ""} ${className}`}
 			onClick={onClick}
 			{...props}
 		>
@@ -93,9 +113,10 @@ export const TableHead = ({
 /**
  * Table Cell Component
  */
-export const TableCell = ({ className = "", children, ...props }) => {
+export const TableCell = ({ className = "", variant, children, ...props }) => {
+	const s = getStyles(variant);
 	return (
-		<td className={`px-4 py-3 text-sm text-zinc-900 ${className}`} {...props}>
+		<td className={`${s.cell} ${className}`} {...props}>
 			{children}
 		</td>
 	);
