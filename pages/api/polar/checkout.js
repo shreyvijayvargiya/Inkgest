@@ -23,29 +23,48 @@ export default async function handler(req, res) {
 			});
 		}
 
-		// Create checkout session with Polar
-		const checkoutResponse = await fetch(`${POLAR_API_URL}/v1/checkouts`, {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${POLAR_ACCESS_TOKEN}`,
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
+		// Helper to create checkout request
+		const createCheckout = (includeCustomerId) => {
+			const body = {
 				product_id: planId,
-				customer_id: customerId || undefined,
 				success_url: `${req.headers.origin}/pricing?success=true`,
 				metadata: {
 					source: "saas-app",
 				},
-			}),
-		});
+			};
+			if (includeCustomerId && customerId) {
+				body.customer_id = customerId;
+			}
+			return fetch(`${POLAR_API_URL}/v1/checkouts`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${POLAR_ACCESS_TOKEN}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(body),
+			});
+		};
 
+		let checkoutResponse = await createCheckout(true);
+
+		// If customer doesn't exist (e.g. after switching Polar org/token), retry without customerId
 		if (!checkoutResponse.ok) {
 			const errorData = await checkoutResponse.json();
-			console.error("Polar checkout error:", errorData);
-			return res.status(checkoutResponse.status).json({
-				error: errorData.message || "Failed to create checkout",
-			});
+			const customerNotFound =
+				errorData.detail?.some?.((d) => d.msg === "Customer does not exist.") ??
+				false;
+
+			if (customerNotFound && customerId) {
+				checkoutResponse = await createCheckout(false);
+			}
+
+			if (!checkoutResponse.ok) {
+				const finalError = await checkoutResponse.json().catch(() => errorData);
+				console.error("Polar checkout error:", finalError);
+				return res.status(checkoutResponse.status).json({
+					error: finalError.message || "Failed to create checkout",
+				});
+			}
 		}
 
 		const checkoutData = await checkoutResponse.json();
