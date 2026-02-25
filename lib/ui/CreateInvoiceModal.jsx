@@ -7,7 +7,7 @@ import { getAllUsers } from "../api/users";
 import { getAllCustomers } from "../api/customers";
 import { getAllSubscribers } from "../api/subscribers";
 import { createInvoice, updateInvoice } from "../api/invoice";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const CreateInvoiceModal = ({ isOpen, onClose, invoiceToEdit = null }) => {
 	const [selectedClientType, setSelectedClientType] = useState("users");

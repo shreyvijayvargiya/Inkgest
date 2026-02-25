@@ -37,7 +37,7 @@ import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import CreateInvoiceModal from "../../../lib/ui/CreateInvoiceModal";
 import InvoiceModal from "../../../lib/ui/InvoiceModal";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const InvoiceTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -533,55 +533,55 @@ const InvoiceTab = ({ queryClient }) => {
 											</div>
 										</TableCell>
 										<TableCell>
-										<div className="text-xs text-zinc-600">
-											{formatDate(invoice.dueDate)}
-										</div>
-									</TableCell>
-									<TableCell>
-										<div className="flex items-center gap-2">
-											<motion.button
-												whileHover={{ scale: 1.1 }}
-												whileTap={{ scale: 0.9 }}
-												onClick={() => handleViewClick(invoice)}
-												className="p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-colors"
-												title="View Invoice"
-											>
-												<Eye className="w-4 h-4" />
-											</motion.button>
-											<motion.button
-												whileHover={{ scale: 1.1 }}
-												whileTap={{ scale: 0.9 }}
-												onClick={() => handleEditClick(invoice)}
-												className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-colors"
-												title="Edit Invoice"
-											>
-												<Edit className="w-4 h-4" />
-											</motion.button>
-											<motion.button
-												whileHover={{ scale: 1.1 }}
-												whileTap={{ scale: 0.9 }}
-												onClick={() => handleSendInvoice(invoice)}
-												className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-colors"
-												title="Send Invoice"
-											>
-												<Send className="w-4 h-4" />
-											</motion.button>
-											<motion.button
-												whileHover={{ scale: 1.1 }}
-												whileTap={{ scale: 0.9 }}
-												onClick={() => handleDeleteClick(invoice)}
-												className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
-												title="Delete Invoice"
-											>
-												<Trash2 className="w-4 h-4" />
-											</motion.button>
-										</div>
-									</TableCell>
-								</TableRow>
-							))
-						)}
-					</TableBody>
-				</Table>
+											<div className="text-xs text-zinc-600">
+												{formatDate(invoice.dueDate)}
+											</div>
+										</TableCell>
+										<TableCell>
+											<div className="flex items-center gap-2">
+												<motion.button
+													whileHover={{ scale: 1.1 }}
+													whileTap={{ scale: 0.9 }}
+													onClick={() => handleViewClick(invoice)}
+													className="p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-colors"
+													title="View Invoice"
+												>
+													<Eye className="w-4 h-4" />
+												</motion.button>
+												<motion.button
+													whileHover={{ scale: 1.1 }}
+													whileTap={{ scale: 0.9 }}
+													onClick={() => handleEditClick(invoice)}
+													className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-colors"
+													title="Edit Invoice"
+												>
+													<Edit className="w-4 h-4" />
+												</motion.button>
+												<motion.button
+													whileHover={{ scale: 1.1 }}
+													whileTap={{ scale: 0.9 }}
+													onClick={() => handleSendInvoice(invoice)}
+													className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-colors"
+													title="Send Invoice"
+												>
+													<Send className="w-4 h-4" />
+												</motion.button>
+												<motion.button
+													whileHover={{ scale: 1.1 }}
+													whileTap={{ scale: 0.9 }}
+													onClick={() => handleDeleteClick(invoice)}
+													className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
+													title="Delete Invoice"
+												>
+													<Trash2 className="w-4 h-4" />
+												</motion.button>
+											</div>
+										</TableCell>
+									</TableRow>
+								))
+							)}
+						</TableBody>
+					</Table>
 				)}
 			</div>
 

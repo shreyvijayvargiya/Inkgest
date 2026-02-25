@@ -1,4 +1,4 @@
-import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 
 /**
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
 			return res.status(400).json({ error: "Content is required — add some text to your draft first" });
 		}
 
-		const creditCheck = await checkAndIncrementCredit(verifiedUid, "llm");
+		const creditCheck = await checkAndDeductCredit(verifiedUid, 1);
 		if (!creditCheck.allowed) {
 			return res.status(429).json({ error: creditCheck.error });
 		}

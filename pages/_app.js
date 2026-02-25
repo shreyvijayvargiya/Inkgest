@@ -1,15 +1,13 @@
-import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
-import { ToastContainer } from "react-toastify";
 import { Analytics } from "@vercel/analytics/react";
-import "react-toastify/dist/ReactToastify.css";
 import "../styles/globals.css";
 import { store, persistor } from "../lib/store/store";
 import SEO from "../lib/modules/SEO";
 import AnalyticsTracker from "../lib/ui/AnalyticsTracker";
 import PostHogProvider from "../lib/ui/PostHogProvider";
+import { Toaster } from "sonner";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -36,18 +34,7 @@ const MyApp = ({ Component, pageProps }) => {
 						<Component {...pageProps} />
 					</PersistGate>
 				</Provider>
-				<ToastContainer
-					position="top-right"
-					autoClose={3000}
-					hideProgressBar={false}
-					newestOnTop={false}
-					closeOnClick
-					rtl={false}
-					pauseOnFocusLoss
-					draggable
-					pauseOnHover
-					theme="light"
-				/>
+				<Toaster />
 				{/* Vercel Analytics - Web Performance & Visitor Metrics */}
 				<Analytics />
 			</PostHogProvider>

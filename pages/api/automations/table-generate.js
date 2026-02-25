@@ -1,4 +1,4 @@
-import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 
 const URL_REGEX = /^https?:\/\/\S+$/i;
@@ -131,14 +131,10 @@ export default async function handler(req, res) {
 		return res.status(500).json({ error: "Server API keys not configured." });
 	}
 
-	// ── Credits — deduct SCRAPE first, then LLM ───────────────────────────────
-	const scrapeCheck = await checkAndIncrementCredit(uid, "scrape");
-	if (!scrapeCheck.allowed) {
-		return res.status(429).json({ error: scrapeCheck.error });
-	}
-	const llmCheck = await checkAndIncrementCredit(uid, "llm");
-	if (!llmCheck.allowed) {
-		return res.status(429).json({ error: llmCheck.error });
+	// ── Credits — table uses scrape + AI = 2 credits ─────────────────────────
+	const creditCheck = await checkAndDeductCredit(uid, 2);
+	if (!creditCheck.allowed) {
+		return res.status(429).json({ error: creditCheck.error });
 	}
 
 	// ── Scrape ────────────────────────────────────────────────────────────────

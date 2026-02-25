@@ -31,7 +31,7 @@ import {
 } from "../../../lib/ui/Table";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const WaitlistTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -610,9 +610,8 @@ const WaitlistTab = ({ queryClient }) => {
 				title="Remove Waitlist Entry"
 				message={
 					entryToDelete
-						? `Are you sure you want to remove ${
-								entryToDelete.name || entryToDelete.email
-						  } from the waitlist? This action cannot be undone.`
+						? `Are you sure you want to remove ${entryToDelete.name || entryToDelete.email
+						} from the waitlist? This action cannot be undone.`
 						: "Are you sure you want to remove this waitlist entry?"
 				}
 				confirmText="Remove"

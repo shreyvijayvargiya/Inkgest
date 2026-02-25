@@ -25,7 +25,7 @@ import {
 	getFormSubmissions,
 	deleteFormSubmission,
 } from "../../../lib/api/forms";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import TableSkeleton from "../../../lib/ui/TableSkeleton";
 import {
@@ -322,7 +322,7 @@ const FormsTab = ({ queryClient }) => {
 						Create Form
 					</motion.button>
 				)}
-				
+
 			</div>
 
 			{viewMode === "list" ? (
@@ -396,11 +396,10 @@ const FormsTab = ({ queryClient }) => {
 													</TableCell>
 													<TableCell>
 														<span
-															className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-																form.isPublished
+															className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${form.isPublished
 																	? "bg-green-100 text-green-800"
 																	: "bg-yellow-100 text-yellow-800"
-															}`}
+																}`}
 														>
 															{form.isPublished ? "Published" : "Draft"}
 														</span>
@@ -412,34 +411,34 @@ const FormsTab = ({ queryClient }) => {
 														{formatDate(form.createdAt)}
 													</TableCell>
 													<TableCell>
-													<div
-														className="flex items-center gap-2"
-														onClick={(e) => e.stopPropagation()}
-													>
-														<button
-															onClick={() => handleEditForm(form)}
-															className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
-															title="Edit form"
+														<div
+															className="flex items-center gap-2"
+															onClick={(e) => e.stopPropagation()}
 														>
-															<FileText className="w-4 h-4" />
-														</button>
-														{form.isPublished && (
 															<button
-																onClick={() => handleCopyFormUrl(form)}
-																className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-																title="Copy form URL"
+																onClick={() => handleEditForm(form)}
+																className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
+																title="Edit form"
 															>
-																<Copy className="w-4 h-4" />
+																<FileText className="w-4 h-4" />
 															</button>
-														)}
-														<button
-															onClick={() => handleDeleteForm(form.id)}
-															className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-															title="Delete form"
-														>
-															<Trash2 className="w-4 h-4" />
-														</button>
-													</div>
+															{form.isPublished && (
+																<button
+																	onClick={() => handleCopyFormUrl(form)}
+																	className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+																	title="Copy form URL"
+																>
+																	<Copy className="w-4 h-4" />
+																</button>
+															)}
+															<button
+																onClick={() => handleDeleteForm(form.id)}
+																className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+																title="Delete form"
+															>
+																<Trash2 className="w-4 h-4" />
+															</button>
+														</div>
 													</TableCell>
 												</TableRow>
 											))
@@ -734,29 +733,29 @@ const FormsTab = ({ queryClient }) => {
 
 														{(field.type === "select" ||
 															field.type === "radio") && (
-															<div>
-																<label className="block text-xs font-medium text-zinc-700 mb-1">
-																	Options (one per line) *
-																</label>
-																<textarea
-																	value={
-																		field.options
-																			? field.options.join("\n")
-																			: ""
-																	}
-																	onChange={(e) => {
-																		const options = e.target.value
-																			.split("\n")
-																			.map((opt) => opt.trim())
-																			.filter((opt) => opt !== "");
-																		handleUpdateField(field.id, { options });
-																	}}
-																	placeholder="Option 1&#10;Option 2&#10;Option 3"
-																	rows={3}
-																	className="w-full px-3 py-2 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-100 text-sm resize-none"
-																/>
-															</div>
-														)}
+																<div>
+																	<label className="block text-xs font-medium text-zinc-700 mb-1">
+																		Options (one per line) *
+																	</label>
+																	<textarea
+																		value={
+																			field.options
+																				? field.options.join("\n")
+																				: ""
+																		}
+																		onChange={(e) => {
+																			const options = e.target.value
+																				.split("\n")
+																				.map((opt) => opt.trim())
+																				.filter((opt) => opt !== "");
+																			handleUpdateField(field.id, { options });
+																		}}
+																		placeholder="Option 1&#10;Option 2&#10;Option 3"
+																		rows={3}
+																		className="w-full px-3 py-2 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-100 text-sm resize-none"
+																	/>
+																</div>
+															)}
 
 														{field.type === "rating" && (
 															<div>
@@ -913,11 +912,10 @@ const FormsTab = ({ queryClient }) => {
 											submissions.map((submission, index) => (
 												<tr
 													key={submission.id}
-													className={`${
-														index === submissions.length - 1
+													className={`${index === submissions.length - 1
 															? ""
 															: "border-b border-zinc-200"
-													} hover:bg-zinc-50 transition-colors`}
+														} hover:bg-zinc-50 transition-colors`}
 												>
 													<td className="py-3 px-4">
 														<div className="space-y-1">

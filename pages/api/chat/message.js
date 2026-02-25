@@ -7,6 +7,7 @@
  * Client reads: data: {"delta":"..."} chunks, terminated by data: [DONE]
  */
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
+import { checkAndDeductCredit } from "../../../lib/utils/credits";
 
 export const config = {
 	api: { responseLimit: false },
@@ -60,10 +61,17 @@ export default async function handler(req, res) {
 			.json({ error: "Authentication required. Please sign in." });
 	}
 
+	let uid;
 	try {
-		await verifyFirebaseToken(idToken);
+		uid = await verifyFirebaseToken(idToken);
 	} catch (authErr) {
 		return res.status(401).json({ error: authErr.message });
+	}
+
+	// Each chat message costs 0.25 credits
+	const creditCheck = await checkAndDeductCredit(uid, 0.25);
+	if (!creditCheck.allowed) {
+		return res.status(429).json({ error: creditCheck.error });
 	}
 
 	if (!Array.isArray(messages) || messages.length === 0) {

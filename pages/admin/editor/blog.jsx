@@ -24,7 +24,7 @@ import {
 } from "../../../lib/api/blog";
 import { uploadBlogImages } from "../../../lib/api/upload";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 
 const BlogEditorPage = () => {
@@ -314,8 +314,8 @@ const BlogEditorPage = () => {
 								whileTap={{ scale: 0.98 }}
 								onClick={() => setIsPreviewMode(!isPreviewMode)}
 								className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${isPreviewMode
-										? "bg-zinc-200 text-zinc-900"
-										: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+									? "bg-zinc-200 text-zinc-900"
+									: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
 									}`}
 							>
 								<Eye className="w-3.5 h-3.5" />
@@ -361,8 +361,8 @@ const BlogEditorPage = () => {
 				{/* Left Sidebar Drawer - Blogs List */}
 				<div
 					className={`fixed inset-y-0 lg:top-12 left-0 w-64 bg-white border-r border-zinc-200 flex flex-col z-50 lg:z-auto ${isSidebarOpen
-							? "translate-x-0"
-							: "-translate-x-full lg:translate-x-0"
+						? "translate-x-0"
+						: "-translate-x-full lg:translate-x-0"
 						} transition-transform duration-300 ease-in-out`}
 				>
 					<div className="p-3 border-b border-zinc-200">
@@ -422,8 +422,8 @@ const BlogEditorPage = () => {
 											setIsSidebarOpen(false);
 										}}
 										className={`p-2 rounded-xl cursor-pointer transition-colors mb-1 ${id === blog.id
-												? "bg-zinc-100 hover:bg-zinc-200 text-black  hover:text-zinc-900"
-												: "hover:bg-zinc-50 text-zinc-900"
+											? "bg-zinc-100 hover:bg-zinc-200 text-black  hover:text-zinc-900"
+											: "hover:bg-zinc-50 text-zinc-900"
 											}`}
 									>
 										<div className="text-xs font-medium truncate mb-1">
@@ -486,8 +486,8 @@ const BlogEditorPage = () => {
 				{/* Right Sidebar Drawer - Settings */}
 				<div
 					className={`fixed inset-y-0 lg:top-12 right-0 w-80 bg-white border-l border-zinc-200 p-4 overflow-y-auto z-50 lg:z-auto ${isSettingsOpen
-							? "translate-x-0"
-							: "translate-x-full lg:translate-x-0"
+						? "translate-x-0"
+						: "translate-x-full lg:translate-x-0"
 						} transition-transform duration-300 ease-in-out`}
 				>
 					<div className="flex items-center justify-between mb-4">

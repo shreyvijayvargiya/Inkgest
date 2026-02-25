@@ -35,7 +35,7 @@ import { getCachedUserRole, getUserRole } from "../../../lib/utils/getUserRole";
 import { getCurrentUserEmail } from "../../../lib/utils/getCurrentUserEmail";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const EmailTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -273,7 +273,7 @@ const EmailTab = ({ queryClient }) => {
 	};
 
 	const onSendEmai = async () => {
-		
+
 	}
 	// Send email
 	const handleSendEmail = async (email) => {
@@ -489,13 +489,12 @@ const EmailTab = ({ queryClient }) => {
 										</TableCell>
 										<TableCell>
 											<span
-												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-													email.status === "published"
+												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${email.status === "published"
 														? "bg-green-100 text-green-800"
 														: email.status === "scheduled"
 															? "bg-blue-100 text-blue-800"
 															: "bg-yellow-100 text-yellow-800"
-												}`}
+													}`}
 											>
 												{email.status || "draft"}
 											</span>
@@ -507,58 +506,58 @@ const EmailTab = ({ queryClient }) => {
 											{formatDate(email.createdAt)}
 										</TableCell>
 										<TableCell>
-										<div className="flex items-center gap-2">
-											{allowedActions.map((action) => {
-												if (action === "send" && email.status === "draft") {
-													return (
-														<motion.button
-															key="send"
-															whileHover={{ scale: 1.05 }}
-															whileTap={{ scale: 0.95 }}
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSendEmail(email);
-															}}
-															className="p-2 text-zinc-400 hover:text-green-600 transition-colors"
-															title="Send to Subscribers"
-														>
-															<Mail className="w-4 h-4" />
-														</motion.button>
-													);
-												}
-												if (action === "view") {
-													return (
-														<motion.button
-															key="preview"
-															whileHover={{ scale: 1.05 }}
-															whileTap={{ scale: 0.95 }}
-															onClick={(e) => {
-																e.stopPropagation();
-																handlePreviewEmail(email);
-															}}
-															className="p-2 text-zinc-400 hover:text-zinc-600 transition-colors"
-															title="Preview"
-														>
-															<Eye className="w-4 h-4" />
-														</motion.button>
-													);
-												}
-												return null;
-											})}
-											{/* Always show delete button with confirmation modal */}
-											<motion.button
-												whileHover={{ scale: 1.05 }}
-												whileTap={{ scale: 0.95 }}
-												onClick={(e) => {
-													e.stopPropagation();
-													handleDeleteEmail(email.id);
-												}}
-												className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
-												title="Delete"
-											>
-												<Trash2 className="w-4 h-4" />
-											</motion.button>
-										</div>
+											<div className="flex items-center gap-2">
+												{allowedActions.map((action) => {
+													if (action === "send" && email.status === "draft") {
+														return (
+															<motion.button
+																key="send"
+																whileHover={{ scale: 1.05 }}
+																whileTap={{ scale: 0.95 }}
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleSendEmail(email);
+																}}
+																className="p-2 text-zinc-400 hover:text-green-600 transition-colors"
+																title="Send to Subscribers"
+															>
+																<Mail className="w-4 h-4" />
+															</motion.button>
+														);
+													}
+													if (action === "view") {
+														return (
+															<motion.button
+																key="preview"
+																whileHover={{ scale: 1.05 }}
+																whileTap={{ scale: 0.95 }}
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handlePreviewEmail(email);
+																}}
+																className="p-2 text-zinc-400 hover:text-zinc-600 transition-colors"
+																title="Preview"
+															>
+																<Eye className="w-4 h-4" />
+															</motion.button>
+														);
+													}
+													return null;
+												})}
+												{/* Always show delete button with confirmation modal */}
+												<motion.button
+													whileHover={{ scale: 1.05 }}
+													whileTap={{ scale: 0.95 }}
+													onClick={(e) => {
+														e.stopPropagation();
+														handleDeleteEmail(email.id);
+													}}
+													className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
+													title="Delete"
+												>
+													<Trash2 className="w-4 h-4" />
+												</motion.button>
+											</div>
 										</TableCell>
 									</TableRow>
 								))

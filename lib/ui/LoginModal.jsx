@@ -14,9 +14,10 @@ import {
 	removeUserCookie,
 } from "../utils/cookies";
 import { setUser, clearUser } from "../store/slices/userSlice";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import SignupModal from "./SignupModal";
 import { useRouter } from "next/router";
+import { getUserCredits, FREE_CREDIT_LIMIT } from "../utils/credits";
 
 /* ── Design tokens ── */
 const T = {
@@ -28,6 +29,14 @@ const T = {
 	border: "#E8E4DC",
 };
 
+const CREDIT_COSTS = [
+	{ label: "AI Draft / Newsletter", cost: "1 credit" },
+	{ label: "URL Scrape", cost: "1 credit" },
+	{ label: "Table Creator (scrape + AI)", cost: "2 credits" },
+	{ label: "AI Chat message", cost: "¼ credit" },
+	{ label: "Blank Draft", cost: "Free" },
+];
+
 const LoginModal = ({ isOpen, onClose }) => {
 	const dispatch = useDispatch();
 	const [email, setEmail] = useState("");
@@ -35,6 +44,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [user, setLocalUser] = useState(null);
 	const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+	const [credits, setCredits] = useState(null);
 	const subscription = useSelector((state) => state.subscription);
 	const router = useRouter();
 
@@ -70,9 +80,12 @@ const LoginModal = ({ isOpen, onClose }) => {
 				setUserCookie(userData);
 				setLocalUser(userData);
 				dispatch(setUser(userData));
+				// Load credits whenever user state resolves
+				getUserCredits(firebaseUser.uid).then(setCredits).catch(() => {});
 			} else {
 				removeUserCookie();
 				setLocalUser(null);
+				setCredits(null);
 				dispatch(clearUser());
 			}
 		});
@@ -168,76 +181,145 @@ const LoginModal = ({ isOpen, onClose }) => {
 							{/* Body */}
 							<div className="p-6">
 								{user ? (
-									// User logged in - show user details
-									<div className="space-y-4">
-										<div className="flex items-center gap-4">
+									// ── Logged in ──────────────────────────────────────────
+									<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+										{/* Avatar + name */}
+										<div style={{ display: "flex", alignItems: "center", gap: 14 }}>
 											{user.photoURL ? (
 												<img
 													src={user.photoURL}
 													alt={user.displayName}
-													className="w-16 h-16 rounded-full object-cover"
+													style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${T.border}` }}
 												/>
 											) : (
-												<div className="w-16 h-16 rounded-full bg-zinc-200 flex items-center justify-center">
-													<User className="w-8 h-8 text-zinc-600" />
+												<div style={{ width: 52, height: 52, borderRadius: "50%", background: T.border, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+													<User size={22} color={T.muted} />
 												</div>
 											)}
-											<div className="flex-1">
-												<h4 className="text-lg font-semibold text-zinc-900">
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
 													{user.displayName}
-												</h4>
-												<p className="text-sm text-zinc-600">{user.email}</p>
-												<span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800 mt-1">
-													{user.provider === "google" ? "Google" : "Email"}
-												</span>
+												</p>
+												<p style={{ fontSize: 12, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+													{user.email}
+												</p>
 											</div>
+											{credits?.plan === "pro" ? (
+												<span style={{ fontSize: 11, fontWeight: 700, background: "#FEF3E2", color: T.warm, border: "1px solid #F5C97A", borderRadius: 100, padding: "3px 10px", flexShrink: 0 }}>
+													Pro ✦
+												</span>
+											) : (
+												<span style={{ fontSize: 11, fontWeight: 700, background: T.base, color: T.muted, border: `1px solid ${T.border}`, borderRadius: 100, padding: "3px 10px", flexShrink: 0 }}>
+													Free
+												</span>
+											)}
 										</div>
-										<div className="flex items-center gap-2">
-											<h5 className="text-sm font-medium text-zinc-700">
-												Subscription Status:
-											</h5>
-											<p className="text-sm text-zinc-600 p-2 rounded-full ">
-												{subscription.isSubscribed ? (
-													<span className="text-green-500">Active</span>
-												) : (
-													<span className="text-red-500 flex gap-2 items-center">
-														Inactive{" "}
-														<motion.button
-															whileHover={{
-																scale: 1.02,
-																background: "#f5f0e8",
+
+										{/* ── Credits section ── */}
+										<div style={{ background: T.base, border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" }}>
+											{credits?.plan === "pro" ? (
+												<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+													<div>
+														<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 2 }}>Unlimited credits</p>
+														<p style={{ fontSize: 11.5, color: T.muted }}>Pro plan — no monthly limits</p>
+													</div>
+													<span style={{ fontSize: 20 }}>∞</span>
+												</div>
+											) : (
+												<>
+													{/* Usage header */}
+													<div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+														<p style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
+															Monthly credits
+														</p>
+														<p style={{ fontSize: 12, fontWeight: 700, color: credits && credits.creditsUsed >= credits.creditsLimit ? "#EF4444" : T.accent }}>
+															{credits ? `${+credits.creditsUsed.toFixed(2)} / ${credits.creditsLimit}` : `— / ${FREE_CREDIT_LIMIT}`}
+														</p>
+													</div>
+
+													{/* Progress bar */}
+													<div style={{ height: 7, background: T.border, borderRadius: 100, overflow: "hidden", marginBottom: 8 }}>
+														<motion.div
+															initial={{ width: 0 }}
+															animate={{
+																width: credits
+																	? `${Math.min(100, (credits.creditsUsed / credits.creditsLimit) * 100)}%`
+																	: "0%"
 															}}
-															onClick={() => router.push("/pricing")}
-															whileTap={{ scale: 0.97 }}
+															transition={{ duration: 0.6, ease: "easeOut" }}
 															style={{
-																display: "block",
-																width: "100%",
-																background: "white",
-																color: T.accent,
-																padding: "8px",
-																borderRadius: 10,
-																fontSize: 14,
-																fontWeight: 700,
-																border: "none",
-																cursor: "pointer",
-																fontFamily: "'Outfit', sans-serif",
+																height: "100%",
+																borderRadius: 100,
+																background: credits && credits.creditsUsed >= credits.creditsLimit
+																	? "#EF4444"
+																	: credits && credits.creditsUsed >= credits.creditsLimit * 0.8
+																	? T.warm
+																	: "#4A7C59",
 															}}
-														>
-															Upgrade to Pro →
-														</motion.button>
-													</span>
-												)}
-											</p>
+														/>
+													</div>
+
+													{/* Remaining label */}
+													<p style={{ fontSize: 11, color: T.muted, marginBottom: 12 }}>
+														{credits
+															? credits.creditsUsed >= credits.creditsLimit
+																? "No credits left this month."
+																: `${+(credits.creditsLimit - credits.creditsUsed).toFixed(2)} credits remaining · resets on the 1st`
+															: "Loading…"}
+													</p>
+
+													{/* Cost breakdown */}
+													<div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+														{CREDIT_COSTS.map((row) => (
+															<div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+																<span style={{ fontSize: 11.5, color: T.muted }}>{row.label}</span>
+																<span style={{ fontSize: 11, fontWeight: 700, color: row.cost === "Free" ? "#4A7C59" : T.accent, background: row.cost === "Free" ? "#DCFCE7" : T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "1px 7px" }}>
+																	{row.cost}
+																</span>
+															</div>
+														))}
+													</div>
+												</>
+											)}
 										</div>
+
+										{/* Upgrade CTA (free plan only) */}
+										{credits?.plan !== "pro" && (
+											<motion.button
+												whileHover={{ scale: 1.02, y: -1 }}
+												whileTap={{ scale: 0.97 }}
+												onClick={() => { router.push("/pricing"); onClose(); }}
+												style={{
+													width: "100%", background: T.accent, color: "white",
+													border: "none", padding: "11px 16px",
+													borderRadius: 10, fontSize: 13, fontWeight: 700,
+													cursor: "pointer", fontFamily: "'Outfit', sans-serif",
+													display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+												}}
+											>
+												<span>✦</span> Upgrade to Pro — unlimited credits
+											</motion.button>
+										)}
+
+										{/* Logout */}
 										<motion.button
-											whileHover={{ scale: 1.02 }}
+											whileHover={{ scale: 1.01 }}
 											whileTap={{ scale: 0.98 }}
 											onClick={handleLogout}
 											disabled={isLoading}
-											className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+											style={{
+												width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+												background: "none", border: `1px solid ${T.border}`,
+												padding: "9px 16px", borderRadius: 10,
+												fontSize: 13, fontWeight: 600, color: T.muted,
+												cursor: isLoading ? "not-allowed" : "pointer",
+												fontFamily: "'Outfit', sans-serif",
+												opacity: isLoading ? 0.5 : 1,
+											}}
 										>
-											<LogOut className="w-4 h-4" />
-											{isLoading ? "Logging out..." : "Logout"}
+											<LogOut size={14} />
+											{isLoading ? "Logging out…" : "Log out"}
 										</motion.button>
 									</div>
 								) : (

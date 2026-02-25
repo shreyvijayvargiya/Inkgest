@@ -50,24 +50,6 @@ function FadeUp({ children, delay = 0, className = "" }) {
 	);
 }
 
-/* ── Animated cursor blink ── */
-function Cursor() {
-	return (
-		<motion.span
-			animate={{ opacity: [1, 0, 1] }}
-			transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-			style={{
-				display: "inline-block",
-				width: 3,
-				height: "0.85em",
-				background: T.warm,
-				borderRadius: 2,
-				marginLeft: 3,
-				verticalAlign: "middle",
-			}}
-		/>
-	);
-}
 
 /* ── Nav ── */
 function Nav() {
@@ -248,11 +230,12 @@ function Hero() {
 				>
 					Turn any article into
 					<br />
-					your next{" "}
-					<em style={{ fontStyle: "italic", color: T.warm }}>
-						newsletter draft
-					</em>
-					<Cursor />
+					<div className="gap-2 flex items-center justify-center">
+						{['newsletter,', 'blog,', 'infographics,', 'linkedin post,', 'tweets,', 'video'].map(item => <em className="text-4xl" style={{ fontStyle: "italic", color: T.warm }}>
+							{item}
+						</em>)}
+					</div>
+
 				</motion.h1>
 
 				{/* Sub */}
@@ -269,8 +252,7 @@ function Hero() {
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
-					Paste a URL, describe your angle. Get a structured draft ready to edit
-					and publish — in under 60 seconds.
+					Paste a URL, describe your angle. Get a structured newsletter, blog, infographic, linkedin post, tweets, video ready to edit and publish — in under 60 seconds.
 				</motion.p>
 
 				{/* CTAs */}
@@ -336,8 +318,8 @@ function Hero() {
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
-					<strong style={{ color: T.accent }}>3 free drafts</strong> · No credit
-					card · Takes 60 seconds
+					<strong style={{ color: T.accent }}>20 free credits</strong> · No credit
+					card · Cancel anytime
 				</motion.p>
 
 				{/* Demo card */}
@@ -756,7 +738,7 @@ function DemoCard() {
 			>
 				{[
 					{ label: copied ? "✓ Copied!" : "📋 Copy all", action: handleCopy },
-					{ label: "💾 Save draft", action: () => {} },
+					{ label: "💾 Save draft", action: () => { } },
 					{ label: "↺ Regenerate", action: handleGenerate },
 				].map(({ label, action }) => (
 					<motion.button

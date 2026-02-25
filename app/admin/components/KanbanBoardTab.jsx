@@ -49,7 +49,7 @@ import {
 	addAssigneeToTask,
 } from "../../../lib/api/tasks";
 import { getAllTeamMembers } from "../../../lib/api/teams";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 
 // Sortable Task Card Component
@@ -257,9 +257,8 @@ const DroppableColumn = ({ id, children }) => {
 	return (
 		<div
 			ref={setNodeRef}
-			className={`flex-shrink-0 w-80 bg-white rounded-xl p-4 border border-zinc-200 ${
-				isOver ? "ring-2 ring-zinc-900 ring-offset-2" : ""
-			}`}
+			className={`flex-shrink-0 w-80 bg-white rounded-xl p-4 border border-zinc-200 ${isOver ? "ring-2 ring-zinc-900 ring-offset-2" : ""
+				}`}
 		>
 			{children}
 		</div>
@@ -805,47 +804,44 @@ const KanbanBoardTab = ({ queryClient }) => {
 				</div>
 			</div>
 
-				<div className="flex items-center gap-1 mb-4 mx-4 rounded-xl p-1.5 bg-zinc-50 w-fit">
-					<motion.button
-						whileHover={{ scale: 1.02 }}
-						whileTap={{ scale: 0.98 }}
-						onClick={() => setViewMode("board")}
-						className={`px-2 py-1 rounded-xl text-sm font-medium flex items-center gap-2 ${
-							viewMode === "board"
-								? "bg-white border border-zinc-200 text-zinc-700"
-								: "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+			<div className="flex items-center gap-1 mb-4 mx-4 rounded-xl p-1.5 bg-zinc-50 w-fit">
+				<motion.button
+					whileHover={{ scale: 1.02 }}
+					whileTap={{ scale: 0.98 }}
+					onClick={() => setViewMode("board")}
+					className={`px-2 py-1 rounded-xl text-sm font-medium flex items-center gap-2 ${viewMode === "board"
+							? "bg-white border border-zinc-200 text-zinc-700"
+							: "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
 						}`}
-					>
-						<LayoutGrid className="w-3 h-3" />
-						Board
-					</motion.button>
-					<motion.button
-						whileHover={{ scale: 1.02 }}
-						whileTap={{ scale: 0.98 }}
-						onClick={() => setViewMode("list")}
-						className={`px-2 py-1 rounded-xl text-sm font-medium flex items-center gap-2 ${
-							viewMode === "list"
-								? "bg-white border border-zinc-200 text-zinc-700"
-								: "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+				>
+					<LayoutGrid className="w-3 h-3" />
+					Board
+				</motion.button>
+				<motion.button
+					whileHover={{ scale: 1.02 }}
+					whileTap={{ scale: 0.98 }}
+					onClick={() => setViewMode("list")}
+					className={`px-2 py-1 rounded-xl text-sm font-medium flex items-center gap-2 ${viewMode === "list"
+							? "bg-white border border-zinc-200 text-zinc-700"
+							: "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
 						}`}
-					>
-						<List className="w-3 h-3" />
-						List
-					</motion.button>
-					<motion.button
-						whileHover={{ scale: 1.02 }}
-						whileTap={{ scale: 0.98 }}
-						onClick={() => setViewMode("table")}
-						className={`px-2 py-1 rounded-xl text-sm font-medium flex items-center gap-2 ${
-							viewMode === "table"
-								? "bg-white border border-zinc-200 text-zinc-700"
-								: "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
+				>
+					<List className="w-3 h-3" />
+					List
+				</motion.button>
+				<motion.button
+					whileHover={{ scale: 1.02 }}
+					whileTap={{ scale: 0.98 }}
+					onClick={() => setViewMode("table")}
+					className={`px-2 py-1 rounded-xl text-sm font-medium flex items-center gap-2 ${viewMode === "table"
+							? "bg-white border border-zinc-200 text-zinc-700"
+							: "bg-zinc-100 border border-zinc-200 text-zinc-700 hover:bg-zinc-50"
 						}`}
-					>
-						<Table className="w-3 h-3" />
-						Table
-					</motion.button>
-				</div>
+				>
+					<Table className="w-3 h-3" />
+					Table
+				</motion.button>
+			</div>
 			{/* Top Action Bar */}
 			<div className="flex items-center justify-between mb-6 px-4">
 				<div className="flex items-center gap-3">
@@ -864,9 +860,8 @@ const KanbanBoardTab = ({ queryClient }) => {
 							whileHover={{ scale: 1.02 }}
 							whileTap={{ scale: 0.98 }}
 							onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-							className={`flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50 ${
-								hasActiveFilters ? "ring-2 ring-zinc-900" : ""
-							}`}
+							className={`flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50 ${hasActiveFilters ? "ring-2 ring-zinc-900" : ""
+								}`}
 						>
 							<FilterIcon className="w-4 h-4" />
 							Filters
@@ -1219,13 +1214,12 @@ const KanbanBoardTab = ({ queryClient }) => {
 											{task.progress || 0}%
 										</span>
 										<span
-											className={`px-2 py-1 rounded-xl text-xs font-medium flex-shrink-0 ${
-												task.status === "done"
+											className={`px-2 py-1 rounded-xl text-xs font-medium flex-shrink-0 ${task.status === "done"
 													? "bg-green-100 text-green-700"
 													: task.status === "in-progress"
 														? "bg-blue-100 text-blue-700"
 														: "bg-zinc-100 text-zinc-700"
-											}`}
+												}`}
 										>
 											{task.status}
 										</span>
@@ -1365,13 +1359,12 @@ const KanbanBoardTab = ({ queryClient }) => {
 										</td>
 										<td className="py-3 px-4">
 											<span
-												className={`px-2 py-1 rounded-xl text-xs font-medium ${
-													task.status === "done"
+												className={`px-2 py-1 rounded-xl text-xs font-medium ${task.status === "done"
 														? "bg-green-100 text-green-700"
 														: task.status === "in-progress"
 															? "bg-blue-100 text-blue-700"
 															: "bg-zinc-100 text-zinc-700"
-												}`}
+													}`}
 											>
 												{task.status}
 											</span>

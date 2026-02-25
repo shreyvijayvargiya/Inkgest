@@ -13,7 +13,7 @@ import {
 	setUserCookie,
 } from "../../lib/utils/cookies";
 import { signOutUser, onAuthStateChange } from "../../lib/api/auth";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const Navbar = () => {
 	const router = useRouter();
@@ -164,8 +164,8 @@ const Navbar = () => {
 									key={link.href}
 									href={link.href}
 									className={`text-sm font-medium transition-colors ${isActive(link.href)
-											? "text-zinc-900"
-											: "text-zinc-600 hover:text-zinc-900"
+										? "text-zinc-900"
+										: "text-zinc-600 hover:text-zinc-900"
 										}`}
 								>
 									{link.label}
@@ -299,8 +299,8 @@ const Navbar = () => {
 										href={link.href}
 										onClick={() => setIsMobileMenuOpen(false)}
 										className={`block text-sm font-medium transition-colors ${isActive(link.href)
-												? "text-zinc-900"
-												: "text-zinc-600 hover:text-zinc-900"
+											? "text-zinc-900"
+											: "text-zinc-600 hover:text-zinc-900"
 											}`}
 									>
 										{link.label}

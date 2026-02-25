@@ -40,7 +40,7 @@ import {
 	formatFileSize,
 	getFileTypeCategory,
 } from "../../../lib/api/assets";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
 

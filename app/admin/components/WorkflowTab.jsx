@@ -11,7 +11,7 @@ import {
 	Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import {
 	Plus,
 	Trash2,

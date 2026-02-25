@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Download, FileText, FileSpreadsheet, File, FileJson2 } from "lucide-react";
 import AnimatedDropdown from "./AnimatedDropdown";
 import { exportData } from "../api/export";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const ExportDropdown = ({ dataType, data, className = "" }) => {
 	const [isOpen, setIsOpen] = useState(false);
@@ -77,11 +77,10 @@ const ExportDropdown = ({ dataType, data, className = "" }) => {
 				key={option.value}
 				onClick={() => handleExport(option.value)}
 				disabled={isExporting}
-				className={`w-full px-4 py-1.5 text-left flex items-center gap-2 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed ${
-					isSelected
+				className={`w-full px-4 py-1.5 text-left flex items-center gap-2 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed ${isSelected
 						? "bg-zinc-50 text-zinc-900 font-medium"
 						: "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-				}`}
+					}`}
 			>
 				<div className={`p-1 rounded ${option.color}`}>
 					<Icon className="w-3 h-3" />

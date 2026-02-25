@@ -84,7 +84,7 @@ import {
 } from "../../../lib/ui/Table";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const COLUMN_TYPES = [
 	{ value: "text", label: "Text", description: "Plain text string" },
@@ -164,11 +164,10 @@ const ColumnEditorRow = ({ column, onUpdate, onRemove, index }) => {
 			<TableCell className="text-center">
 				<button
 					onClick={() => onUpdate({ required: !column.required })}
-					className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all mx-auto ${
-						column.required
+					className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all mx-auto ${column.required
 							? "bg-zinc-900 border-zinc-900 text-white"
 							: "bg-white border-zinc-200 text-transparent hover:border-zinc-300"
-					}`}
+						}`}
 				>
 					<Check className="w-3.5 h-3.5" />
 				</button>
@@ -322,10 +321,10 @@ const TableDetailView = ({ table, onBack }) => {
 					<p className="text-xs font-medium text-zinc-700">
 						{table.createdAt
 							? new Date(table.createdAt).toLocaleDateString("en-US", {
-									year: "numeric",
-									month: "short",
-									day: "numeric",
-								})
+								year: "numeric",
+								month: "short",
+								day: "numeric",
+							})
 							: table.isSystem
 								? "Built-in"
 								: "Unknown"}
@@ -339,11 +338,10 @@ const TableDetailView = ({ table, onBack }) => {
 				<div className="flex gap-1 p-1 bg-zinc-100 rounded-xl w-fit">
 					<button
 						onClick={() => setActiveDetailTab("columns")}
-						className={`p-2 text-xs font-medium rounded-xl transition-colors ${
-							activeDetailTab === "columns"
+						className={`p-2 text-xs font-medium rounded-xl transition-colors ${activeDetailTab === "columns"
 								? "bg-white text-zinc-900 shadow-sm"
 								: "text-zinc-600 hover:text-zinc-900"
-						}`}
+							}`}
 					>
 						<span className="flex items-center gap-2">
 							<Columns className="w-3 h-3" />
@@ -352,11 +350,10 @@ const TableDetailView = ({ table, onBack }) => {
 					</button>
 					<button
 						onClick={() => setActiveDetailTab("rows")}
-						className={`p-2 text-xs font-medium rounded-xl transition-colors ${
-							activeDetailTab === "rows"
+						className={`p-2 text-xs font-medium rounded-xl transition-colors ${activeDetailTab === "rows"
 								? "bg-white text-zinc-900 shadow-sm"
 								: "text-zinc-600 hover:text-zinc-900"
-						}`}
+							}`}
 					>
 						<span className="flex items-center gap-2">
 							<Rows3 className="w-3 h-3" />
@@ -992,32 +989,29 @@ const TablesTab = ({ queryClient, selectedTable, onTableSelect }) => {
 				<div className="flex gap-1 p-1 bg-zinc-100 rounded-xl w-fit">
 					<button
 						onClick={() => setFilterType("all")}
-						className={`p-2 text-xs font-medium rounded-xl transition-colors ${
-							filterType === "all"
+						className={`p-2 text-xs font-medium rounded-xl transition-colors ${filterType === "all"
 								? "bg-white text-zinc-900 shadow-sm"
 								: "text-zinc-600 hover:text-zinc-900"
-						}`}
+							}`}
 					>
 						All ({tables.length})
 					</button>
 					<button
 						onClick={() => setFilterType("system")}
-						className={`p-2 text-xs font-medium rounded-xl transition-colors flex items-center gap-2 ${
-							filterType === "system"
+						className={`p-2 text-xs font-medium rounded-xl transition-colors flex items-center gap-2 ${filterType === "system"
 								? "bg-white text-zinc-900 shadow-sm"
 								: "text-zinc-600 hover:text-zinc-900"
-						}`}
+							}`}
 					>
 						<Lock className="w-3.5 h-3.5" />
 						System ({systemCount})
 					</button>
 					<button
 						onClick={() => setFilterType("custom")}
-						className={`p-2 text-xs font-medium rounded-xl transition-colors flex items-center gap-2 ${
-							filterType === "custom"
+						className={`p-2 text-xs font-medium rounded-xl transition-colors flex items-center gap-2 ${filterType === "custom"
 								? "bg-white text-zinc-900 shadow-sm"
 								: "text-zinc-600 hover:text-zinc-900"
-						}`}
+							}`}
 					>
 						<Database className="w-3.5 h-3.5" />
 						Custom ({customCount})

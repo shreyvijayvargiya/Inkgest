@@ -31,7 +31,7 @@ import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import InvoiceModal from "../../../lib/ui/InvoiceModal";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
 import { deletePayment } from "../../../lib/api/payments";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const PAYMENTS_COLLECTION = "payments";
 
@@ -355,7 +355,7 @@ const PaymentsTab = ({ queryClient }) => {
 
 			{/* Stats Cards */}
 			<div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-4">
-			<motion.div
+				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
 					className="p-4 rounded-xl border border-zinc-200 bg-white"
@@ -599,9 +599,8 @@ const PaymentsTab = ({ queryClient }) => {
 				title="Delete Payment"
 				message={
 					paymentToDelete
-						? `Are you sure you want to delete payment ${
-								paymentToDelete.paymentId || paymentToDelete.id
-						  }? This action cannot be undone.`
+						? `Are you sure you want to delete payment ${paymentToDelete.paymentId || paymentToDelete.id
+						}? This action cannot be undone.`
 						: "Are you sure you want to delete this payment?"
 				}
 				confirmText="Delete"

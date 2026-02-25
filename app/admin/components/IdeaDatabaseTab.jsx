@@ -33,7 +33,7 @@ import {
 import { createTask } from "../../../lib/api/tasks";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const IdeaDatabaseTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -176,8 +176,8 @@ const IdeaDatabaseTab = ({ queryClient }) => {
 						ideaData.taskStatus === "todo"
 							? "backlog"
 							: ideaData.taskStatus === "in-progress"
-							? "in-progress"
-							: "done",
+								? "in-progress"
+								: "done",
 					priority: "Medium",
 					category: "Idea Database",
 				};
@@ -224,8 +224,8 @@ const IdeaDatabaseTab = ({ queryClient }) => {
 						data.taskStatus === "todo"
 							? "backlog"
 							: data.taskStatus === "in-progress"
-							? "in-progress"
-							: "done",
+								? "in-progress"
+								: "done",
 					priority: "Medium",
 					category: "Idea Database",
 				};
@@ -423,9 +423,8 @@ const IdeaDatabaseTab = ({ queryClient }) => {
 						whileHover={{ scale: 1.02 }}
 						whileTap={{ scale: 0.98 }}
 						onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-						className={`flex items-center gap-2 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50 ${
-							hasActiveFilters ? "ring-2 ring-zinc-900" : ""
-						}`}
+						className={`flex items-center gap-2 px-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50 ${hasActiveFilters ? "ring-2 ring-zinc-900" : ""
+							}`}
 					>
 						<FilterIcon className="w-4 h-4" />
 						Filter
@@ -548,8 +547,8 @@ const IdeaDatabaseTab = ({ queryClient }) => {
 											<div className="text-sm text-zinc-600 truncate max-w-xs">
 												{idea.content
 													? idea.content
-															.replace(/<[^>]*>/g, "")
-															.substring(0, 100)
+														.replace(/<[^>]*>/g, "")
+														.substring(0, 100)
 													: "No content"}
 											</div>
 										</TableCell>
@@ -557,13 +556,12 @@ const IdeaDatabaseTab = ({ queryClient }) => {
 											{idea.markAsTask && idea.taskStatus ? (
 												<div className="flex items-center gap-2">
 													<span
-														className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-															idea.taskStatus === "completed"
+														className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${idea.taskStatus === "completed"
 																? "bg-green-100 text-green-800"
 																: idea.taskStatus === "in-progress"
-																? "bg-blue-100 text-blue-800"
-																: "bg-zinc-100 text-zinc-800"
-														}`}
+																	? "bg-blue-100 text-blue-800"
+																	: "bg-zinc-100 text-zinc-800"
+															}`}
 													>
 														{idea.taskStatus}
 													</span>

@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Calendar, ArrowRight, Search } from "lucide-react";
 import { getAllBlogs } from "../lib/api/blog";
 import { addSubscriber } from "../lib/api/subscribers";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const BlogPage = () => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -25,7 +25,7 @@ const BlogPage = () => {
 		blog.title?.toLowerCase().includes(searchQuery.toLowerCase())
 	);
 
-	
+
 
 	const formatDate = (date) => {
 		if (!date) return "N/A";

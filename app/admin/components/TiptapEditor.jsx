@@ -42,7 +42,7 @@ import {
 	Table as TableIcon,
 	CheckSquare2,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
 import { CodeBlock, CodeGroup } from "../../../lib/ui/TiptapCodeExtensions";
 import { AnimatePresence } from "framer-motion";
@@ -233,12 +233,12 @@ const TiptapEditor = ({
 		onUpdate: ({ editor }) => {
 			// Mark this as an internal update (from editor itself)
 			isInternalUpdateRef.current = true;
-			
+
 			// Clear any existing timeout
 			if (updateTimeoutRef.current) {
 				clearTimeout(updateTimeoutRef.current);
 			}
-			
+
 			if (onChange) {
 				// Get markdown content using the Markdown extension
 				let markdown = "";
@@ -259,7 +259,7 @@ const TiptapEditor = ({
 
 				lastContentRef.current = markdown;
 				onChange(markdown);
-				
+
 				// Reset flag after React has processed the state update
 				// Use a small timeout to ensure useEffect runs first
 				updateTimeoutRef.current = setTimeout(() => {
@@ -296,7 +296,7 @@ const TiptapEditor = ({
 
 		// Compare with last known content to avoid unnecessary updates
 		const incomingContent = normalized.text || "";
-		
+
 		// Only update if content is actually different
 		if (currentContent === incomingContent && content) {
 			lastContentRef.current = incomingContent;
@@ -312,7 +312,7 @@ const TiptapEditor = ({
 		// Store selection before updating to restore it later
 		const { from, to } = editor.state.selection;
 		const wasFocused = editor.isFocused;
-		
+
 		// Set content - TipTap Markdown extension will automatically parse markdown
 		// It can handle both HTML and markdown input
 		if (normalized.content) {
@@ -327,17 +327,17 @@ const TiptapEditor = ({
 			requestAnimationFrame(() => {
 				try {
 					if (!editor || editor.isDestroyed) return;
-					
+
 					const docSize = editor.state.doc.content.size;
-					
+
 					// Only restore if positions are valid and document has content
 					if (docSize > 0) {
 						const safeFrom = Math.min(Math.max(0, from), docSize);
 						const safeTo = Math.min(Math.max(0, to), docSize);
-						
+
 						if (safeFrom >= 0 && safeTo >= 0) {
 							editor.commands.setTextSelection({ from: safeFrom, to: safeTo });
-							
+
 							// Restore focus if it was focused before
 							if (wasFocused) {
 								editor.commands.focus();
@@ -503,11 +503,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleBold().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("bold")
+					className={`p-1.5 rounded-xl ${editor.isActive("bold")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Bold"
 				>
 					<Bold className="w-3.5 h-3.5" />
@@ -516,11 +515,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleItalic().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("italic")
+					className={`p-1.5 rounded-xl ${editor.isActive("italic")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Italic"
 				>
 					<Italic className="w-3.5 h-3.5" />
@@ -529,11 +527,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleUnderline().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("underline")
+					className={`p-1.5 rounded-xl ${editor.isActive("underline")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Underline"
 				>
 					<UnderlineIcon className="w-3.5 h-3.5" />
@@ -542,11 +539,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleStrike().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("strike")
+					className={`p-1.5 rounded-xl ${editor.isActive("strike")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Strikethrough"
 				>
 					<Strikethrough className="w-3.5 h-3.5" />
@@ -555,11 +551,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleBlockquote().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("blockquote")
+					className={`p-1.5 rounded-xl ${editor.isActive("blockquote")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Quote"
 				>
 					<Quote className="w-3.5 h-3.5" />
@@ -570,11 +565,10 @@ const TiptapEditor = ({
 					onClick={() =>
 						editor.chain().focus().toggleHeading({ level: 1 }).run()
 					}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("heading", { level: 1 })
+					className={`p-1.5 rounded-xl ${editor.isActive("heading", { level: 1 })
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Heading 1"
 				>
 					<Heading1 className="w-3.5 h-3.5" />
@@ -585,11 +579,10 @@ const TiptapEditor = ({
 					onClick={() =>
 						editor.chain().focus().toggleHeading({ level: 2 }).run()
 					}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("heading", { level: 2 })
+					className={`p-1.5 rounded-xl ${editor.isActive("heading", { level: 2 })
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Heading 2"
 				>
 					<Heading2 className="w-3.5 h-3.5" />
@@ -599,11 +592,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleBulletList().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("bulletList")
+					className={`p-1.5 rounded-xl ${editor.isActive("bulletList")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Bullet List"
 				>
 					<List className="w-3.5 h-3.5" />
@@ -612,11 +604,10 @@ const TiptapEditor = ({
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={() => editor.chain().focus().toggleOrderedList().run()}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("orderedList")
+					className={`p-1.5 rounded-xl ${editor.isActive("orderedList")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Ordered List"
 				>
 					<ListOrdered className="w-3.5 h-3.5" />
@@ -635,11 +626,10 @@ const TiptapEditor = ({
 						// Toggle task list (will create one if it doesn't exist)
 						editor.chain().focus().toggleTaskList().run();
 					}}
-					className={`p-1.5 rounded-xl ${
-						editor.isActive("taskList")
+					className={`p-1.5 rounded-xl ${editor.isActive("taskList")
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
-					}`}
+						}`}
 					title="Task List"
 				>
 					<CheckSquare2 className="w-3.5 h-3.5" />
@@ -971,11 +961,10 @@ const TiptapEditor = ({
 							{/* Bold */}
 							<button
 								onClick={() => editor.chain().focus().toggleBold().run()}
-								className={`p-2 rounded transition-colors ${
-									editor.isActive("bold")
+								className={`p-2 rounded transition-colors ${editor.isActive("bold")
 										? "bg-zinc-300 text-zinc-900 font-bold"
 										: "hover:bg-zinc-100 text-zinc-700"
-								}`}
+									}`}
 								title="Bold"
 							>
 								<Bold className="w-3 h-3" />
@@ -984,11 +973,10 @@ const TiptapEditor = ({
 							{/* Italic */}
 							<button
 								onClick={() => editor.chain().focus().toggleItalic().run()}
-								className={`p-2 rounded transition-colors ${
-									editor.isActive("italic")
+								className={`p-2 rounded transition-colors ${editor.isActive("italic")
 										? "bg-zinc-300 text-zinc-900 font-bold"
 										: "hover:bg-zinc-100 text-zinc-700"
-								}`}
+									}`}
 								title="Italic"
 							>
 								<Italic className="w-3 h-3" />
@@ -997,11 +985,10 @@ const TiptapEditor = ({
 							{/* Underline */}
 							<button
 								onClick={() => editor.chain().focus().toggleUnderline().run()}
-								className={`p-2 rounded transition-colors ${
-									editor.isActive("underline")
+								className={`p-2 rounded transition-colors ${editor.isActive("underline")
 										? "bg-zinc-300 text-zinc-900 font-bold"
 										: "hover:bg-zinc-100 text-zinc-700"
-								}`}
+									}`}
 								title="Underline"
 							>
 								<UnderlineIcon className="w-3 h-3" />
@@ -1010,11 +997,10 @@ const TiptapEditor = ({
 							{/* Strikethrough */}
 							<button
 								onClick={() => editor.chain().focus().toggleStrike().run()}
-								className={`p-2 rounded transition-colors ${
-									editor.isActive("strike")
+								className={`p-2 rounded transition-colors ${editor.isActive("strike")
 										? "bg-zinc-300 text-zinc-900 font-bold"
 										: "hover:bg-zinc-100 text-zinc-700"
-								}`}
+									}`}
 								title="Strikethrough"
 							>
 								<Strikethrough className="w-3 h-3" />
@@ -1023,11 +1009,10 @@ const TiptapEditor = ({
 							{/* Inline Code */}
 							<button
 								onClick={() => editor.chain().focus().toggleCode().run()}
-								className={`p-2 rounded transition-colors ${
-									editor.isActive("code")
+								className={`p-2 rounded transition-colors ${editor.isActive("code")
 										? "bg-zinc-300 text-zinc-900 font-bold"
 										: "hover:bg-zinc-100 text-zinc-700"
-								}`}
+									}`}
 								title="Inline code"
 							>
 								<Code className="w-3 h-3" />
@@ -1045,11 +1030,10 @@ const TiptapEditor = ({
 											setLinkUrl(url);
 										}
 									}}
-									className={`p-2 rounded transition-colors ${
-										editor.isActive("link")
+									className={`p-2 rounded transition-colors ${editor.isActive("link")
 											? "bg-zinc-300 text-zinc-900 font-bold"
 											: "hover:bg-zinc-100 text-zinc-700"
-									}`}
+										}`}
 									title="Link"
 								>
 									<LinkIcon className="w-3 h-3" />
@@ -1153,9 +1137,8 @@ const TiptapEditor = ({
 														className="flex flex-col items-center gap-1 p-1 hover:bg-zinc-100 rounded transition-colors"
 													>
 														<div
-															className={`w-4 h-4 rounded border ${
-																color.value ? "" : "bg-white border-zinc-300"
-															}`}
+															className={`w-4 h-4 rounded border ${color.value ? "" : "bg-white border-zinc-300"
+																}`}
 															style={{
 																backgroundColor: color.value || "transparent",
 															}}
@@ -1179,12 +1162,12 @@ const TiptapEditor = ({
 										{editor.isActive("heading", { level: 1 })
 											? "Heading 1"
 											: editor.isActive("heading", { level: 2 })
-											? "Heading 2"
-											: editor.isActive("orderedList")
-											? "Ordered List"
-											: editor.isActive("bulletList")
-											? "Bullet List"
-											: "Text"}
+												? "Heading 2"
+												: editor.isActive("orderedList")
+													? "Ordered List"
+													: editor.isActive("bulletList")
+														? "Bullet List"
+														: "Text"}
 									</span>
 									<ChevronDown className="w-3 h-3 text-zinc-600" />
 								</button>
@@ -1201,13 +1184,12 @@ const TiptapEditor = ({
 													editor.chain().focus().setParagraph().run();
 													setTextTypeDropdownOpen(false);
 												}}
-												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${
-													!editor.isActive("heading") &&
-													!editor.isActive("orderedList") &&
-													!editor.isActive("bulletList")
+												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${!editor.isActive("heading") &&
+														!editor.isActive("orderedList") &&
+														!editor.isActive("bulletList")
 														? "bg-zinc-300 font-bold"
 														: ""
-												}`}
+													}`}
 											>
 												<Type className="w-4 h-4 text-zinc-500" />
 												Text
@@ -1221,11 +1203,10 @@ const TiptapEditor = ({
 														.run();
 													setTextTypeDropdownOpen(false);
 												}}
-												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${
-													editor.isActive("heading", { level: 1 })
+												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${editor.isActive("heading", { level: 1 })
 														? "bg-zinc-300 font-bold"
 														: ""
-												}`}
+													}`}
 											>
 												<Heading1 className="w-4 h-4 text-zinc-500" />
 												Heading 1
@@ -1239,11 +1220,10 @@ const TiptapEditor = ({
 														.run();
 													setTextTypeDropdownOpen(false);
 												}}
-												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${
-													editor.isActive("heading", { level: 2 })
+												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${editor.isActive("heading", { level: 2 })
 														? "bg-zinc-300 font-bold"
 														: ""
-												}`}
+													}`}
 											>
 												<Heading2 className="w-4 h-4 text-zinc-500" />
 												Heading 2
@@ -1254,11 +1234,10 @@ const TiptapEditor = ({
 													editor.chain().focus().toggleOrderedList().run();
 													setTextTypeDropdownOpen(false);
 												}}
-												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${
-													editor.isActive("orderedList")
+												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${editor.isActive("orderedList")
 														? "bg-zinc-300 font-bold"
 														: ""
-												}`}
+													}`}
 											>
 												<ListOrdered className="w-4 h-4 text-zinc-500" />
 												Ordered List (ol)
@@ -1268,11 +1247,10 @@ const TiptapEditor = ({
 													editor.chain().focus().toggleBulletList().run();
 													setTextTypeDropdownOpen(false);
 												}}
-												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${
-													editor.isActive("bulletList")
+												className={`w-full flex items-center gap-2 text-left p-1.5 rounded text-xs hover:bg-zinc-100 transition-colors ${editor.isActive("bulletList")
 														? "bg-zinc-300 font-bold"
 														: ""
-												}`}
+													}`}
 											>
 												<List className="w-4 h-4 text-zinc-500" />
 												Bullet List (ul)

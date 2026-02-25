@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { createProduct, updateProduct } from "../api/products";
 import AnimatedDropdown from "./AnimatedDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const ProductModal = ({
 	isOpen,
@@ -478,9 +478,8 @@ const ProductModal = ({
 															<Upload className="w-4 h-4" />
 															<span>Upload Images (Multiple)</span>
 															<ChevronDown
-																className={`w-4 h-4 text-zinc-400 transition-transform ml-auto ${
-																	isOpen ? "rotate-180" : ""
-																}`}
+																className={`w-4 h-4 text-zinc-400 transition-transform ml-auto ${isOpen ? "rotate-180" : ""
+																	}`}
 															/>
 														</>
 													)}

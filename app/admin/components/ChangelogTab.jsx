@@ -29,7 +29,7 @@ import {
 	updateChangelog,
 	deleteChangelog,
 } from "../../../lib/api/changelog";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 
 const ChangelogTab = ({ queryClient }) => {
@@ -234,8 +234,8 @@ const ChangelogTab = ({ queryClient }) => {
 		const grouped = {};
 		const filtered = selectedCategoryFilter
 			? changelogs.filter((changelog) =>
-					changelog.categories?.includes(selectedCategoryFilter)
-				)
+				changelog.categories?.includes(selectedCategoryFilter)
+			)
 			: changelogs;
 
 		filtered.forEach((changelog) => {
@@ -460,10 +460,10 @@ const ChangelogTab = ({ queryClient }) => {
 												))}
 												{(!changelog.categories ||
 													changelog.categories.length === 0) && (
-													<span className="text-xs text-zinc-400">
-														No categories
-													</span>
-												)}
+														<span className="text-xs text-zinc-400">
+															No categories
+														</span>
+													)}
 											</div>
 										</TableCell>
 										<TableCell className="text-zinc-600">
@@ -472,22 +472,22 @@ const ChangelogTab = ({ queryClient }) => {
 											</div>
 										</TableCell>
 										<TableCell>
-										<div className="flex items-center gap-2">
-											<button
-												onClick={() => handleEditChangelog(changelog)}
-												className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
-												title="Edit changelog"
-											>
-												<Edit className="w-4 h-4" />
-											</button>
-											<button
-												onClick={() => handleDeleteChangelog(changelog.id)}
-												className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-												title="Delete changelog"
-											>
-												<Trash2 className="w-4 h-4" />
-											</button>
-										</div>
+											<div className="flex items-center gap-2">
+												<button
+													onClick={() => handleEditChangelog(changelog)}
+													className="p-1.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded-xl transition-colors"
+													title="Edit changelog"
+												>
+													<Edit className="w-4 h-4" />
+												</button>
+												<button
+													onClick={() => handleDeleteChangelog(changelog.id)}
+													className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+													title="Delete changelog"
+												>
+													<Trash2 className="w-4 h-4" />
+												</button>
+											</div>
 										</TableCell>
 									</TableRow>
 								))
@@ -595,11 +595,10 @@ const ChangelogTab = ({ queryClient }) => {
 														key={category}
 														type="button"
 														onClick={() => handleToggleCategory(category)}
-														className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-															changelogForm.categories?.includes(category)
+														className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${changelogForm.categories?.includes(category)
 																? "bg-zinc-900 text-white"
 																: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-														}`}
+															}`}
 													>
 														{category}
 													</button>
@@ -692,11 +691,10 @@ const ChangelogTab = ({ queryClient }) => {
 										</span>
 										<button
 											onClick={() => setSelectedCategoryFilter(null)}
-											className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-												!selectedCategoryFilter
+											className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${!selectedCategoryFilter
 													? "bg-zinc-200 text-zinc-900"
 													: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-											}`}
+												}`}
 										>
 											All
 										</button>
@@ -704,11 +702,10 @@ const ChangelogTab = ({ queryClient }) => {
 											<button
 												key={category}
 												onClick={() => setSelectedCategoryFilter(category)}
-												className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-													selectedCategoryFilter === category
+												className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${selectedCategoryFilter === category
 														? "bg-zinc-200 text-zinc-900"
 														: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-												}`}
+													}`}
 											>
 												{category}
 											</button>

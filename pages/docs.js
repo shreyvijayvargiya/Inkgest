@@ -38,7 +38,7 @@ import {
 	Sidebar,
 	BarChart,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import Fuse from "fuse.js";
 
 // Documentation sections configuration
@@ -339,11 +339,10 @@ const CodeBlock = ({ language, children, isDark = false, ...props }) => {
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
 					onClick={handleCopyCode}
-					className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-						copied
+					className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium transition-colors ${copied
 							? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
 							: "bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 text-zinc-700 dark:text-zinc-200"
-					}`}
+						}`}
 				>
 					{copied ? (
 						<>
@@ -362,9 +361,8 @@ const CodeBlock = ({ language, children, isDark = false, ...props }) => {
 				language={language || "javascript"}
 				style={isDark ? darkTheme : lightTheme}
 				PreTag="div"
-				className={`rounded border ${
-					isDark ? "border-zinc-700 !bg-zinc-800" : "border-zinc-200 !bg-white"
-				}`}
+				className={`rounded border ${isDark ? "border-zinc-700 !bg-zinc-800" : "border-zinc-200 !bg-white"
+					}`}
 				customStyle={{
 					background: isDark ? "#27272a" : "#ffffff",
 					padding: "1rem",
@@ -545,9 +543,8 @@ export default function DocsPage() {
 			} catch (error) {
 				console.error("Error loading markdown:", error);
 				setMarkdownContent(
-					`# ${
-						DOC_SECTIONS.find((s) => s.id === activeSection)?.title ||
-						"Documentation"
+					`# ${DOC_SECTIONS.find((s) => s.id === activeSection)?.title ||
+					"Documentation"
 					}\n\nContent not available.`,
 				);
 				toast.error("Failed to load documentation");
@@ -677,11 +674,10 @@ export default function DocsPage() {
 								toast.error("Failed to copy");
 							}
 						}}
-						className={`flex-shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium transition-all ${
-							copied
+						className={`flex-shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-xs font-medium transition-all ${copied
 								? "bg-green-100 text-green-700 opacity-100"
 								: "bg-zinc-100 hover:bg-zinc-200 text-zinc-600 opacity-0 group-hover/item:opacity-100"
-						}`}
+							}`}
 					>
 						{copied ? (
 							<Check className="w-3 h-3" />
@@ -759,11 +755,10 @@ export default function DocsPage() {
 											[category.id]: !prev[category.id],
 										}));
 									}}
-									className={`w-full text-left px-3 py-2 rounded text-xs font-semibold transition-colors font-mono flex items-center gap-2 ${
-										hasActiveSection
+									className={`w-full text-left px-3 py-2 rounded text-xs font-semibold transition-colors font-mono flex items-center gap-2 ${hasActiveSection
 											? "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
 											: "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700"
-									}`}
+										}`}
 								>
 									<CategoryIcon className="w-3.5 h-3.5 flex-shrink-0" />
 									<span className="flex-1">{category.title}</span>
@@ -791,11 +786,10 @@ export default function DocsPage() {
 															setActiveSection(section.id);
 															if (onSectionClick) onSectionClick();
 														}}
-														className={`w-full text-left px-3 py-1.5 rounded text-xs font-medium transition-colors font-mono flex items-center gap-2 ${
-															activeSection === section.id
+														className={`w-full text-left px-3 py-1.5 rounded text-xs font-medium transition-colors font-mono flex items-center gap-2 ${activeSection === section.id
 																? "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
 																: "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100"
-														}`}
+															}`}
 													>
 														<IconComponent className="w-3.5 h-3.5 flex-shrink-0" />
 														<span>{section.title}</span>
@@ -1204,19 +1198,17 @@ export default function DocsPage() {
 													setActiveHeading(heading.id);
 												}
 											}}
-											className={`block text-xs transition-colors hover:text-zinc-900 dark:hover:text-zinc-100 ${
-												heading.level === 1
+											className={`block text-xs transition-colors hover:text-zinc-900 dark:hover:text-zinc-100 ${heading.level === 1
 													? "font-semibold text-zinc-900 dark:text-zinc-100 pl-0"
 													: heading.level === 2
 														? "font-medium text-zinc-700 dark:text-zinc-300 pl-3"
 														: heading.level === 3
 															? "text-zinc-600 dark:text-zinc-400 pl-6"
 															: "text-zinc-500 dark:text-zinc-500 pl-9"
-											} ${
-												activeHeading === heading.id
+												} ${activeHeading === heading.id
 													? "text-zinc-900 dark:text-zinc-100 font-semibold"
 													: ""
-											}`}
+												}`}
 										>
 											{heading.text}
 										</a>
@@ -1236,11 +1228,10 @@ export default function DocsPage() {
 								whileTap={{ scale: 0.98 }}
 								onClick={handlePrevious}
 								disabled={!hasPrevious}
-								className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors text-xs font-medium ${
-									hasPrevious
+								className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors text-xs font-medium ${hasPrevious
 										? "bg-zinc-100/50 dark:bg-zinc-700/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
 										: "bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-								}`}
+									}`}
 							>
 								<ChevronLeft className="w-3.5 h-3.5" />
 								Previous
@@ -1250,11 +1241,10 @@ export default function DocsPage() {
 								whileTap={{ scale: 0.98 }}
 								onClick={handleNext}
 								disabled={!hasNext}
-								className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors text-xs font-medium ${
-									hasNext
+								className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors text-xs font-medium ${hasNext
 										? "bg-zinc-100/50 dark:bg-zinc-700/50 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
 										: "bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-								}`}
+									}`}
 							>
 								Next
 								<ChevronRight className="w-3.5 h-3.5" />

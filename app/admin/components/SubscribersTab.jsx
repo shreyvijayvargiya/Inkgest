@@ -34,7 +34,7 @@ import { getCachedUserRole, getUserRole } from "../../../lib/utils/getUserRole";
 import { getCurrentUserEmail } from "../../../lib/utils/getCurrentUserEmail";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const SubscribersTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -357,11 +357,10 @@ const SubscribersTab = ({ queryClient }) => {
 										</TableCell>
 										<TableCell>
 											<span
-												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-													subscriber.status === "active"
+												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${subscriber.status === "active"
 														? "bg-green-100 text-green-800"
 														: "bg-red-100 text-red-800"
-												}`}
+													}`}
 											>
 												{subscriber.status}
 											</span>

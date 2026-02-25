@@ -37,7 +37,7 @@ import { getCachedUserRole, getUserRole } from "../../../lib/utils/getUserRole";
 import { getCurrentUserEmail } from "../../../lib/utils/getCurrentUserEmail";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { ROLE_LABELS } from "../../../lib/config/roles-config";
 
 const TeamsTab = ({ queryClient }) => {
@@ -417,16 +417,16 @@ const TeamsTab = ({ queryClient }) => {
 				</div>
 				{(hasPermission(effectiveUserRole, "teams", "create") ||
 					canAddSelf) && (
-					<motion.button
-						whileHover={{ scale: 1.02 }}
-						whileTap={{ scale: 0.98 }}
-						onClick={handleCreateTeamMember}
-						className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-xl hover:bg-zinc-800 transition-colors text-sm"
-					>
-						<Plus className="w-3.5 h-3.5" />
-						Add Team Member
-					</motion.button>
-				)}
+						<motion.button
+							whileHover={{ scale: 1.02 }}
+							whileTap={{ scale: 0.98 }}
+							onClick={handleCreateTeamMember}
+							className="flex items-center gap-1.5 bg-zinc-900 text-white px-3 py-1.5 rounded-xl hover:bg-zinc-800 transition-colors text-sm"
+						>
+							<Plus className="w-3.5 h-3.5" />
+							Add Team Member
+						</motion.button>
+					)}
 			</div>
 
 			{/* Warning if user not in teams */}
@@ -526,10 +526,9 @@ const TeamsTab = ({ queryClient }) => {
 										</TableCell>
 										<TableCell>
 											<span
-												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-													ROLE_LABELS[member.role]?.color ||
+												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_LABELS[member.role]?.color ||
 													"bg-zinc-100 text-zinc-800"
-												}`}
+													}`}
 											>
 												{ROLE_LABELS[member.role]?.label || member.role}
 											</span>
@@ -538,53 +537,53 @@ const TeamsTab = ({ queryClient }) => {
 											{formatDate(member.createdAt)}
 										</TableCell>
 										<TableCell>
-										<div className="flex items-center gap-2">
-											{(hasPermission(effectiveUserRole, "teams", "view") ||
-												canAddSelf) && (
-												<motion.button
-													whileHover={{ scale: 1.05 }}
-													whileTap={{ scale: 0.95 }}
-													onClick={(e) => {
-														e.stopPropagation();
-														handleViewTeamMember(member);
-													}}
-													className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
-													title="View"
-												>
-													<Eye className="w-4 h-4" />
-												</motion.button>
-											)}
-											{(hasPermission(effectiveUserRole, "teams", "edit") ||
-												canAddSelf) && (
-												<motion.button
-													whileHover={{ scale: 1.05 }}
-													whileTap={{ scale: 0.95 }}
-													onClick={(e) => {
-														e.stopPropagation();
-														handleEditTeamMember(member);
-													}}
-													className="p-2 text-zinc-400 hover:text-zinc-600 transition-colors"
-													title="Edit"
-												>
-													<Edit2 className="w-4 h-4" />
-												</motion.button>
-											)}
-											{(hasPermission(effectiveUserRole, "teams", "delete") ||
-												canAddSelf) && (
-												<motion.button
-													whileHover={{ scale: 1.05 }}
-													whileTap={{ scale: 0.95 }}
-													onClick={(e) => {
-														e.stopPropagation();
-														handleDeleteTeamMember(member.id);
-													}}
-													className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
-													title="Delete"
-												>
-													<Trash2 className="w-4 h-4" />
-												</motion.button>
-											)}
-										</div>
+											<div className="flex items-center gap-2">
+												{(hasPermission(effectiveUserRole, "teams", "view") ||
+													canAddSelf) && (
+														<motion.button
+															whileHover={{ scale: 1.05 }}
+															whileTap={{ scale: 0.95 }}
+															onClick={(e) => {
+																e.stopPropagation();
+																handleViewTeamMember(member);
+															}}
+															className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
+															title="View"
+														>
+															<Eye className="w-4 h-4" />
+														</motion.button>
+													)}
+												{(hasPermission(effectiveUserRole, "teams", "edit") ||
+													canAddSelf) && (
+														<motion.button
+															whileHover={{ scale: 1.05 }}
+															whileTap={{ scale: 0.95 }}
+															onClick={(e) => {
+																e.stopPropagation();
+																handleEditTeamMember(member);
+															}}
+															className="p-2 text-zinc-400 hover:text-zinc-600 transition-colors"
+															title="Edit"
+														>
+															<Edit2 className="w-4 h-4" />
+														</motion.button>
+													)}
+												{(hasPermission(effectiveUserRole, "teams", "delete") ||
+													canAddSelf) && (
+														<motion.button
+															whileHover={{ scale: 1.05 }}
+															whileTap={{ scale: 0.95 }}
+															onClick={(e) => {
+																e.stopPropagation();
+																handleDeleteTeamMember(member.id);
+															}}
+															className="p-2 text-zinc-400 hover:text-red-600 transition-colors"
+															title="Delete"
+														>
+															<Trash2 className="w-4 h-4" />
+														</motion.button>
+													)}
+											</div>
 										</TableCell>
 									</TableRow>
 								))
@@ -681,8 +680,8 @@ const TeamsTab = ({ queryClient }) => {
 										Role
 									</label>
 									{!editingTeam ||
-									hasPermission(effectiveUserRole, "teams", "edit") ||
-									canAddSelf ? (
+										hasPermission(effectiveUserRole, "teams", "edit") ||
+										canAddSelf ? (
 										<div className="relative z-50">
 											<AnimatedDropdown
 												isOpen={isRoleDropdownOpen}
@@ -714,30 +713,30 @@ const TeamsTab = ({ queryClient }) => {
 								(editingTeam &&
 									(hasPermission(effectiveUserRole, "teams", "edit") ||
 										canAddSelf))) && (
-								<div className="flex items-center justify-end gap-3 p-4 border-t border-zinc-200">
-									<motion.button
-										whileHover={{ scale: 1.02 }}
-										whileTap={{ scale: 0.98 }}
-										onClick={handleCloseModal}
-										className="px-4 py-1.5 text-sm text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-xl font-medium transition-colors"
-									>
-										Cancel
-									</motion.button>
-									<motion.button
-										whileHover={{ scale: 1.02 }}
-										whileTap={{ scale: 0.98 }}
-										onClick={handleSaveTeamMember}
-										disabled={
-											createTeamMemberMutation.isPending ||
-											updateTeamMemberMutation.isPending
-										}
-										className="flex items-center gap-2 px-4 py-1.5 text-sm bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-									>
-										<Save className="w-4 h-4" />
-										{editingTeam ? "Update" : "Create"} Member
-									</motion.button>
-								</div>
-							)}
+									<div className="flex items-center justify-end gap-3 p-4 border-t border-zinc-200">
+										<motion.button
+											whileHover={{ scale: 1.02 }}
+											whileTap={{ scale: 0.98 }}
+											onClick={handleCloseModal}
+											className="px-4 py-1.5 text-sm text-zinc-700 bg-zinc-100 hover:bg-zinc-200 rounded-xl font-medium transition-colors"
+										>
+											Cancel
+										</motion.button>
+										<motion.button
+											whileHover={{ scale: 1.02 }}
+											whileTap={{ scale: 0.98 }}
+											onClick={handleSaveTeamMember}
+											disabled={
+												createTeamMemberMutation.isPending ||
+												updateTeamMemberMutation.isPending
+											}
+											className="flex items-center gap-2 px-4 py-1.5 text-sm bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+										>
+											<Save className="w-4 h-4" />
+											{editingTeam ? "Update" : "Create"} Member
+										</motion.button>
+									</div>
+								)}
 						</motion.div>
 					</motion.div>
 				)}

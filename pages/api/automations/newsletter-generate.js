@@ -1,4 +1,4 @@
-import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 
 const urlRegex = /^https?:\/\/\S+$/i;
@@ -177,7 +177,7 @@ export default async function handler(req, res) {
 		}
 
 		// Credit gate — 5 free AI generations per month; Pro = unlimited
-		const creditCheck = await checkAndIncrementCredit(verifiedUid, "llm");
+		const creditCheck = await checkAndDeductCredit(verifiedUid, 1);
 		if (!creditCheck.allowed) {
 			return res.status(429).json({ error: creditCheck.error });
 		}

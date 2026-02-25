@@ -34,7 +34,7 @@ import {
 } from "../../../lib/api/cronJobs";
 import { getBlogById } from "../../../lib/api/blog";
 import { getEmailById } from "../../../lib/api/emails";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const CronJobsTab = ({ queryClient }) => {
 	const [selectedJob, setSelectedJob] = useState(null);
@@ -326,9 +326,8 @@ const CronJobsTab = ({ queryClient }) => {
 						}
 					>
 						<Play
-							className={`w-4 h-4 ${
-								executeCronMutation.isPending ? "animate-pulse" : ""
-							}`}
+							className={`w-4 h-4 ${executeCronMutation.isPending ? "animate-pulse" : ""
+								}`}
 						/>
 						{executeCronMutation.isPending
 							? "Running..."
@@ -340,9 +339,8 @@ const CronJobsTab = ({ queryClient }) => {
 						className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50"
 					>
 						<RefreshCw
-							className={`w-4 h-4 ${
-								syncMutation.isPending ? "animate-spin" : ""
-							}`}
+							className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""
+								}`}
 						/>
 						Sync Scheduled Items
 					</button>

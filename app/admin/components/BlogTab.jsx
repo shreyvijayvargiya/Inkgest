@@ -41,7 +41,7 @@ import { getCurrentUserEmail } from "../../../lib/utils/getCurrentUserEmail";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const BlogTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -508,10 +508,10 @@ const BlogTab = ({ queryClient }) => {
 										<TableCell>
 											<span
 												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${blog.status === "published"
-														? "bg-green-100 text-green-800"
-														: blog.status === "scheduled"
-															? "bg-blue-100 text-blue-800"
-															: "bg-yellow-100 text-yellow-800"
+													? "bg-green-100 text-green-800"
+													: blog.status === "scheduled"
+														? "bg-blue-100 text-blue-800"
+														: "bg-yellow-100 text-yellow-800"
 													}`}
 											>
 												{blog.status}

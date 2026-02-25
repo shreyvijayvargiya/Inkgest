@@ -30,7 +30,7 @@ import {
 	getVersions,
 } from "../../../lib/api/docs-editor";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import TiptapEditor from "./TiptapEditor";
 
 // Doc Item Component
@@ -48,11 +48,10 @@ const DocItem = ({
 		<div className="flex items-center gap-1 group doc-menu-container relative">
 			<button
 				onClick={() => onSelect(doc)}
-				className={`flex-1 text-left px-2 py-1.5 text-xs rounded transition-colors ${
-					selectedDocPath === doc.path
+				className={`flex-1 text-left px-2 py-1.5 text-xs rounded transition-colors ${selectedDocPath === doc.path
 						? "bg-zinc-50 text-zinc-900"
 						: "text-zinc-600 hover:bg-zinc-100"
-				}`}
+					}`}
 			>
 				<div className="truncate">{doc.title}</div>
 			</button>
@@ -62,11 +61,10 @@ const DocItem = ({
 						e.stopPropagation();
 						onMenuOpen(doc.path);
 					}}
-					className={`p-1 rounded transition-colors ${
-						openMenuId === doc.path
+					className={`p-1 rounded transition-colors ${openMenuId === doc.path
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-400 hover:bg-zinc-100 opacity-0 group-hover:opacity-100"
-					}`}
+						}`}
 				>
 					<MoreVertical className="w-3 h-3" />
 				</button>
@@ -160,11 +158,10 @@ const Category = ({
 								e.stopPropagation();
 								onMenuOpen(category);
 							}}
-							className={`p-1.5 rounded transition-colors ${
-								openMenuId === category
+							className={`p-1.5 rounded transition-colors ${openMenuId === category
 									? "bg-zinc-200 text-zinc-900"
 									: "text-zinc-600 hover:bg-zinc-100"
-							}`}
+								}`}
 						>
 							<MoreVertical className="w-3 h-3" />
 						</button>
@@ -535,14 +532,13 @@ const DocsEditorTab = () => {
 				const oldPath = docToAction.path;
 				const category = docToAction.category || "";
 				const newPath = category
-					? `${category}/${
-							renameFileName.endsWith(".mdx")
-								? renameFileName
-								: renameFileName + ".mdx"
-					  }`
+					? `${category}/${renameFileName.endsWith(".mdx")
+						? renameFileName
+						: renameFileName + ".mdx"
+					}`
 					: renameFileName.endsWith(".mdx")
-					? renameFileName
-					: renameFileName + ".mdx";
+						? renameFileName
+						: renameFileName + ".mdx";
 
 				await renameDoc(oldPath, newPath, selectedVersion);
 				toast.success("File renamed successfully");
@@ -929,13 +925,12 @@ const DocsEditorTab = () => {
 									<a
 										key={index}
 										href={`#${item.id}`}
-										className={`block text-xs text-zinc-600 hover:text-zinc-900 transition-colors ${
-											item.level === 1
+										className={`block text-xs text-zinc-600 hover:text-zinc-900 transition-colors ${item.level === 1
 												? "font-medium pl-0"
 												: item.level === 2
-												? "pl-3"
-												: "pl-6"
-										}`}
+													? "pl-3"
+													: "pl-6"
+											}`}
 									>
 										{item.title}
 									</a>
@@ -1391,11 +1386,10 @@ const DocsEditorTab = () => {
 																				toast.error("Failed to load document");
 																			}
 																		}}
-																		className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${
-																			selectedDoc?.path === doc.path
+																		className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors ${selectedDoc?.path === doc.path
 																				? "bg-zinc-50 text-zinc-900"
 																				: "text-zinc-600 hover:bg-zinc-100"
-																		}`}
+																			}`}
 																	>
 																		<div className="truncate">{doc.title}</div>
 																	</button>
@@ -1600,13 +1594,12 @@ const DocsEditorTab = () => {
 																});
 															}
 														}}
-														className={`block text-xs text-zinc-600 hover:text-zinc-900 transition-colors ${
-															item.level === 1
+														className={`block text-xs text-zinc-600 hover:text-zinc-900 transition-colors ${item.level === 1
 																? "font-medium pl-0"
 																: item.level === 2
-																? "pl-3"
-																: "pl-6"
-														}`}
+																	? "pl-3"
+																	: "pl-6"
+															}`}
 													>
 														{item.title}
 													</a>

@@ -31,7 +31,7 @@ import {
 } from "../../../lib/ui/Table";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const ReportIssuesTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");

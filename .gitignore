@@ -6,3 +6,10 @@ node_modules
 .vercel
 .cursor
 .claude
+
+.DS_Store
+app/.DS_Store?
+/lib/.DS_Store
+/pages/.DS_Store
+/components/.DS_Store
+/pages/api/.DS_Store

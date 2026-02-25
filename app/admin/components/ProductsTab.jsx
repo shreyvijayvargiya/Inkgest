@@ -27,7 +27,7 @@ import {
 import ProductModal from "../../../lib/ui/ProductModal";
 import ProductDetailsModal from "../../../lib/ui/ProductDetailsModal";
 import ConfirmationModal from "../../../lib/ui/ConfirmationModal";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const ProductsTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -371,44 +371,44 @@ const ProductsTab = ({ queryClient }) => {
 								return (
 									<TableRow key={product.id}>
 										<TableCell>
-												{bannerImages.length > 0 ? (
-													<div className="flex items-center gap-1.5">
-														{bannerImages.slice(0, 3).map((imgUrl, idx) => (
-															<div
-																key={idx}
-																className="relative w-12 h-12 rounded-xl overflow-hidden border border-zinc-200 flex-shrink-0 bg-zinc-100 group"
-															>
-																<img
-																	src={imgUrl}
-																	alt={`Banner ${idx + 1}`}
-																	className="w-full h-full object-cover relative z-10"
-																	onError={(e) => {
-																		e.target.style.display = "none";
-																		// Show fallback icon when image fails
-																		const fallback =
-																			e.target.nextElementSibling;
-																		if (fallback) {
-																			fallback.style.display = "flex";
-																		}
-																	}}
-																/>
-																{/* Fallback icon - hidden by default, shown if image fails to load */}
-																<div className="absolute inset-0 hidden items-center justify-center bg-zinc-100 z-0">
-																	<ImageIcon className="w-4 h-4 text-zinc-400" />
-																</div>
+											{bannerImages.length > 0 ? (
+												<div className="flex items-center gap-1.5">
+													{bannerImages.slice(0, 3).map((imgUrl, idx) => (
+														<div
+															key={idx}
+															className="relative w-12 h-12 rounded-xl overflow-hidden border border-zinc-200 flex-shrink-0 bg-zinc-100 group"
+														>
+															<img
+																src={imgUrl}
+																alt={`Banner ${idx + 1}`}
+																className="w-full h-full object-cover relative z-10"
+																onError={(e) => {
+																	e.target.style.display = "none";
+																	// Show fallback icon when image fails
+																	const fallback =
+																		e.target.nextElementSibling;
+																	if (fallback) {
+																		fallback.style.display = "flex";
+																	}
+																}}
+															/>
+															{/* Fallback icon - hidden by default, shown if image fails to load */}
+															<div className="absolute inset-0 hidden items-center justify-center bg-zinc-100 z-0">
+																<ImageIcon className="w-4 h-4 text-zinc-400" />
 															</div>
-														))}
-														{bannerImages.length > 3 && (
-															<div className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-xs font-medium text-zinc-600 flex-shrink-0">
-																+{bannerImages.length - 3}
-															</div>
-														)}
-													</div>
-												) : (
-													<div className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center">
-														<ImageIcon className="w-4 h-4 text-zinc-400" />
-													</div>
-												)}
+														</div>
+													))}
+													{bannerImages.length > 3 && (
+														<div className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-xs font-medium text-zinc-600 flex-shrink-0">
+															+{bannerImages.length - 3}
+														</div>
+													)}
+												</div>
+											) : (
+												<div className="w-12 h-12 rounded-xl bg-zinc-100 border border-zinc-200 flex items-center justify-center">
+													<ImageIcon className="w-4 h-4 text-zinc-400" />
+												</div>
+											)}
 										</TableCell>
 										<TableCell>
 											<button

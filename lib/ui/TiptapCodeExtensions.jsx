@@ -12,7 +12,7 @@ import {
 	Files,
 	TrashIcon,
 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/cjs/styles/prism";
 
@@ -161,9 +161,8 @@ const CodeBlockComponent = ({
 									{LANGUAGES.find((l) => l.value === language)?.label || "Text"}
 								</span>
 								<ChevronDown
-									className={`w-3 h-3 transition-transform ${
-										isDropdownOpen ? "rotate-180" : ""
-									}`}
+									className={`w-3 h-3 transition-transform ${isDropdownOpen ? "rotate-180" : ""
+										}`}
 								/>
 							</button>
 							<AnimatePresence>
@@ -178,11 +177,10 @@ const CodeBlockComponent = ({
 											<button
 												key={lang.value}
 												onClick={() => handleLanguageChange(lang.value)}
-												className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-100 transition-colors ${
-													language === lang.value
+												className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-100 transition-colors ${language === lang.value
 														? "bg-zinc-100 font-medium"
 														: ""
-												}`}
+													}`}
 											>
 												{lang.label}
 											</button>
@@ -286,9 +284,8 @@ const CodeBlockItem = ({
 								{LANGUAGES.find((l) => l.value === language)?.label || "Text"}
 							</span>
 							<ChevronDown
-								className={`w-3 h-3 transition-transform ${
-									isDropdownOpen ? "rotate-180" : ""
-								}`}
+								className={`w-3 h-3 transition-transform ${isDropdownOpen ? "rotate-180" : ""
+									}`}
 							/>
 						</button>
 						<AnimatePresence>
@@ -306,9 +303,8 @@ const CodeBlockItem = ({
 												onLanguageChange(lang.value);
 												setIsDropdownOpen(false);
 											}}
-											className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-100 transition-colors ${
-												language === lang.value ? "bg-zinc-100 font-medium" : ""
-											}`}
+											className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-100 transition-colors ${language === lang.value ? "bg-zinc-100 font-medium" : ""
+												}`}
 										>
 											{lang.label}
 										</button>
@@ -423,12 +419,12 @@ const CodeGroupComponent = ({
 			tabs.map((tab) =>
 				tab.id === tabId
 					? {
-							...tab,
-							codeBlocks: [
-								...tab.codeBlocks,
-								{ id: Date.now(), name: "", code: "", language: "text" },
-							],
-					  }
+						...tab,
+						codeBlocks: [
+							...tab.codeBlocks,
+							{ id: Date.now(), name: "", code: "", language: "text" },
+						],
+					}
 					: tab
 			)
 		);
@@ -439,11 +435,11 @@ const CodeGroupComponent = ({
 			tabs.map((tab) =>
 				tab.id === tabId
 					? {
-							...tab,
-							codeBlocks: tab.codeBlocks.filter(
-								(block) => block.id !== blockId
-							),
-					  }
+						...tab,
+						codeBlocks: tab.codeBlocks.filter(
+							(block) => block.id !== blockId
+						),
+					}
 					: tab
 			)
 		);
@@ -454,11 +450,11 @@ const CodeGroupComponent = ({
 			tabs.map((tab) =>
 				tab.id === tabId
 					? {
-							...tab,
-							codeBlocks: tab.codeBlocks.map((block) =>
-								block.id === blockId ? { ...block, ...updates } : block
-							),
-					  }
+						...tab,
+						codeBlocks: tab.codeBlocks.map((block) =>
+							block.id === blockId ? { ...block, ...updates } : block
+						),
+					}
 					: tab
 			)
 		);
@@ -494,11 +490,10 @@ const CodeGroupComponent = ({
 						{tabs.map((tab, index) => (
 							<div
 								key={tab.id}
-								className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors relative ${
-									activeTab === index
+								className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors relative ${activeTab === index
 										? "text-zinc-900"
 										: "text-zinc-600 hover:text-zinc-900"
-								}`}
+									}`}
 							>
 								{editingTabId === tab.id ? (
 									<input

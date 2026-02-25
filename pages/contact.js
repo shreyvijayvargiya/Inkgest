@@ -4,7 +4,7 @@ import Navbar from "../app/components/Navbar";
 import Footer from "../app/components/Footer";
 import { motion } from "framer-motion";
 import { Mail, MessageSquare, Send } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const ContactPage = () => {
 	const [formData, setFormData] = useState({

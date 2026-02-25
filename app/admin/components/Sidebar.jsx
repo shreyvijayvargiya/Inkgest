@@ -51,7 +51,7 @@ import {
 	useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const ICON_MAP = {
@@ -177,9 +177,8 @@ const SortableNavItem = ({ item, activeTab, onSelect }) => {
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`group relative flex items-center rounded-xl transition-all ${
-				isDragging ? "bg-zinc-50 ring-2 ring-zinc-200 shadow-sm z-50" : ""
-			}`}
+			className={`group relative flex items-center rounded-xl transition-all ${isDragging ? "bg-zinc-50 ring-2 ring-zinc-200 shadow-sm z-50" : ""
+				}`}
 		>
 			<button
 				{...attributes}
@@ -190,11 +189,10 @@ const SortableNavItem = ({ item, activeTab, onSelect }) => {
 			</button>
 			<button
 				onClick={() => onSelect(item.id)}
-				className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors rounded-xl flex items-center gap-2 ${
-					activeTab === item.id
+				className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors rounded-xl flex items-center gap-2 ${activeTab === item.id
 						? "bg-zinc-100 text-zinc-900"
 						: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-				}`}
+					}`}
 			>
 				<Icon className="w-3.5 h-3.5" />
 				{item.label}
@@ -223,11 +221,10 @@ const SortableCategory = ({ category, activeTab, onSelect }) => {
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`pt-2 group/category rounded-xl transition-all ${
-				isDragging
+			className={`pt-2 group/category rounded-xl transition-all ${isDragging
 					? "bg-white ring-2 ring-zinc-100 shadow-lg z-50 px-1 pb-2"
 					: ""
-			}`}
+				}`}
 		>
 			<div className="flex items-center justify-between mb-1">
 				<p className="px-2.5 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
@@ -451,8 +448,8 @@ const Sidebar = ({
 
 	const activeItem = activeId
 		? navStructure
-				.flatMap((cat) => [cat, ...cat.items])
-				.find((item) => item.id === activeId)
+			.flatMap((cat) => [cat, ...cat.items])
+			.find((item) => item.id === activeId)
 		: null;
 
 	const isCategory = (id) => navStructure.some((cat) => cat.id === id);
@@ -474,9 +471,8 @@ const Sidebar = ({
 						<span className="text-xs font-medium">Inkgest Admin</span>
 						{isMobile && (
 							<ChevronDown
-								className={`w-4 h-4 ml-auto text-zinc-400 transition-transform ${
-									isProjectDropdownOpen ? "rotate-180" : ""
-								}`}
+								className={`w-4 h-4 ml-auto text-zinc-400 transition-transform ${isProjectDropdownOpen ? "rotate-180" : ""
+									}`}
 							/>
 						)}
 					</motion.button>

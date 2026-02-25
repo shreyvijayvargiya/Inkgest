@@ -14,7 +14,7 @@ import {
 	setUserCookie,
 } from "../lib/utils/cookies";
 import { signInWithGoogle, onAuthStateChange } from "../lib/api/auth";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -717,8 +717,8 @@ const PricingPage = () => {
 									Start for free →
 								</motion.button>
 							) : subscription.isSubscribed &&
-							  subscription.status === "active" &&
-							  subscription.planId === plan.id ? (
+								subscription.status === "active" &&
+								subscription.planId === plan.id ? (
 								<div
 									style={{ display: "flex", flexDirection: "column", gap: 8 }}
 								>

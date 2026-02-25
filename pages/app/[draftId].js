@@ -47,7 +47,7 @@ const T = {
 	sidebar: "#FDFCF9",
 };
 
-const FREE_LIMIT = 3;
+const FREE_LIMIT = 40;
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;
@@ -120,194 +120,277 @@ const parseCSSProp = (cssStr = "", prop) => {
 /* ─── 12 predefined themes — each is a map of CSS strings ─── */
 const THEMES = {
 	ink: {
-		name: "Ink", label: "Warm editorial · Serif",
+		name: "Ink",
+		label: "Warm editorial · Serif",
 		palette: ["#F7F5F0", "#1A1A1A", "#C17B2F", "#7A7570"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap",
-		bodyFont: "'Outfit', sans-serif", bg: "#F7F5F0", text: "#3A3530",
-		container: "max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Outfit',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap",
+		bodyFont: "'Outfit', sans-serif",
+		bg: "#F7F5F0",
+		text: "#3A3530",
+		container:
+			"max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Outfit',sans-serif;",
 		h1: "font-family:'Instrument Serif',serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
 		h2: "font-family:'Instrument Serif',serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
 		h3: "font-family:'Instrument Serif',serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:16px;line-height:1.85;color:#3A3530;margin:0 0 14px;",
-		blockquote: "border-left:3px solid #C17B2F;padding:4px 0 4px 20px;color:#7A7570;font-style:italic;margin:20px 0;",
+		blockquote:
+			"border-left:3px solid #C17B2F;padding:4px 0 4px 20px;color:#7A7570;font-style:italic;margin:20px 0;",
 		code: "background:#EDE9E2;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;",
-		strong: "color:#1A1A1A;font-weight:700;", a: "color:#C17B2F;",
+		strong: "color:#1A1A1A;font-weight:700;",
+		a: "color:#C17B2F;",
 		li: "font-size:16px;line-height:1.8;color:#3A3530;margin:4px 0;",
 		hr: "border:none;border-top:1px solid #E8E4DC;margin:32px 0;",
 	},
 	midnight: {
-		name: "Midnight", label: "Dark minimal · Sans",
+		name: "Midnight",
+		label: "Dark minimal · Sans",
 		palette: ["#0D0D0D", "#E8E8E8", "#7C7CFF", "#444444"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
-		bodyFont: "'Inter', sans-serif", bg: "#0D0D0D", text: "#A8A8A8",
-		container: "max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Inter',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
+		bodyFont: "'Inter', sans-serif",
+		bg: "#0D0D0D",
+		text: "#A8A8A8",
+		container:
+			"max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Inter',sans-serif;",
 		h1: "font-family:'Inter',sans-serif;font-size:30px;color:#FFFFFF;line-height:1.2;margin:0 0 16px;font-weight:600;",
 		h2: "font-family:'Inter',sans-serif;font-size:20px;color:#D4D4D4;line-height:1.3;margin:32px 0 12px;font-weight:500;border-bottom:1px solid #222222;padding-bottom:8px;",
 		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;",
 		p: "font-size:15px;line-height:1.9;color:#A8A8A8;margin:0 0 14px;",
-		blockquote: "border-left:3px solid #7C7CFF;padding:4px 0 4px 20px;color:#666666;font-style:italic;margin:20px 0;",
+		blockquote:
+			"border-left:3px solid #7C7CFF;padding:4px 0 4px 20px;color:#666666;font-style:italic;margin:20px 0;",
 		code: "background:#1E1E1E;color:#7FDBCA;border-radius:4px;padding:2px 8px;font-family:'Courier New',monospace;font-size:13px;",
-		strong: "color:#FFFFFF;font-weight:600;", a: "color:#7C7CFF;",
+		strong: "color:#FFFFFF;font-weight:600;",
+		a: "color:#7C7CFF;",
 		li: "font-size:15px;line-height:1.8;color:#A8A8A8;margin:4px 0;",
 		hr: "border:none;border-top:1px solid #222222;margin:32px 0;",
 	},
 	paper: {
-		name: "Paper", label: "Classic editorial · Lora",
+		name: "Paper",
+		label: "Classic editorial · Lora",
 		palette: ["#FFFEF9", "#1A1A2E", "#2A5298", "#888888"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;600&display=swap",
-		bodyFont: "'Source Sans 3', sans-serif", bg: "#FFFEF9", text: "#3C3C3C",
-		container: "max-width:680px;margin:0 auto;padding:52px 48px;background:#FFFEF9;font-family:'Source Sans 3',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;600&display=swap",
+		bodyFont: "'Source Sans 3', sans-serif",
+		bg: "#FFFEF9",
+		text: "#3C3C3C",
+		container:
+			"max-width:680px;margin:0 auto;padding:52px 48px;background:#FFFEF9;font-family:'Source Sans 3',sans-serif;",
 		h1: "font-family:'Lora',serif;font-size:36px;color:#1A1A2E;line-height:1.15;margin:0 0 20px;font-weight:600;",
 		h2: "font-family:'Lora',serif;font-size:24px;color:#1A1A2E;line-height:1.3;margin:36px 0 14px;font-weight:400;",
 		h3: "font-family:'Lora',serif;font-size:19px;color:#1A1A2E;margin:24px 0 10px;font-weight:400;",
 		p: "font-size:17px;line-height:1.8;color:#3C3C3C;margin:0 0 16px;",
-		blockquote: "border-left:4px solid #2A5298;padding:8px 0 8px 24px;color:#666666;font-style:italic;margin:24px 0;font-family:'Lora',serif;font-size:18px;",
+		blockquote:
+			"border-left:4px solid #2A5298;padding:8px 0 8px 24px;color:#666666;font-style:italic;margin:24px 0;font-family:'Lora',serif;font-size:18px;",
 		code: "background:#F0F0F0;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:13px;",
-		strong: "color:#1A1A2E;font-weight:600;", a: "color:#2A5298;",
+		strong: "color:#1A1A2E;font-weight:600;",
+		a: "color:#2A5298;",
 		li: "font-size:17px;line-height:1.8;color:#3C3C3C;margin:5px 0;",
 		hr: "border:none;border-top:2px solid #E0DDD5;margin:36px 0;",
 	},
 	forest: {
-		name: "Forest", label: "Earthy & natural · Merriweather",
+		name: "Forest",
+		label: "Earthy & natural · Merriweather",
 		palette: ["#F0F4F0", "#1B2E1B", "#2D6A4F", "#6B8F6B"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap",
-		bodyFont: "'DM Sans', sans-serif", bg: "#F0F4F0", text: "#2C3E2C",
-		container: "max-width:720px;margin:0 auto;padding:48px 52px;background:#F0F4F0;font-family:'DM Sans',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap",
+		bodyFont: "'DM Sans', sans-serif",
+		bg: "#F0F4F0",
+		text: "#2C3E2C",
+		container:
+			"max-width:720px;margin:0 auto;padding:48px 52px;background:#F0F4F0;font-family:'DM Sans',sans-serif;",
 		h1: "font-family:'Merriweather',serif;font-size:32px;color:#1B2E1B;line-height:1.2;margin:0 0 16px;font-weight:700;",
 		h2: "font-family:'Merriweather',serif;font-size:21px;color:#2D6A4F;line-height:1.35;margin:32px 0 12px;font-weight:700;",
 		h3: "font-family:'Merriweather',serif;font-size:17px;color:#1B2E1B;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:16px;line-height:1.85;color:#2C3E2C;margin:0 0 14px;",
-		blockquote: "border-left:4px solid #2D6A4F;background:#E8F0E8;padding:12px 20px;color:#4A6A4A;font-style:italic;margin:24px 0;border-radius:0 8px 8px 0;",
+		blockquote:
+			"border-left:4px solid #2D6A4F;background:#E8F0E8;padding:12px 20px;color:#4A6A4A;font-style:italic;margin:24px 0;border-radius:0 8px 8px 0;",
 		code: "background:#D8E8D8;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;color:#1B2E1B;",
-		strong: "color:#1B2E1B;font-weight:700;", a: "color:#2D6A4F;",
+		strong: "color:#1B2E1B;font-weight:700;",
+		a: "color:#2D6A4F;",
 		li: "font-size:16px;line-height:1.8;color:#2C3E2C;margin:5px 0;",
 		hr: "border:none;border-top:2px solid #C8D8C8;margin:32px 0;",
 	},
 	rose: {
-		name: "Rose", label: "Soft feminine · Cormorant",
+		name: "Rose",
+		label: "Soft feminine · Cormorant",
 		palette: ["#FDF0F3", "#3D1A24", "#D4617A", "#B08090"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Nunito:wght@300;400;500;600&display=swap",
-		bodyFont: "'Nunito', sans-serif", bg: "#FDF0F3", text: "#4A2530",
-		container: "max-width:700px;margin:0 auto;padding:48px 52px;background:#FDF0F3;font-family:'Nunito',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Nunito:wght@300;400;500;600&display=swap",
+		bodyFont: "'Nunito', sans-serif",
+		bg: "#FDF0F3",
+		text: "#4A2530",
+		container:
+			"max-width:700px;margin:0 auto;padding:48px 52px;background:#FDF0F3;font-family:'Nunito',sans-serif;",
 		h1: "font-family:'Cormorant Garamond',serif;font-size:40px;color:#3D1A24;line-height:1.15;margin:0 0 18px;font-weight:600;font-style:italic;",
 		h2: "font-family:'Cormorant Garamond',serif;font-size:26px;color:#D4617A;line-height:1.3;margin:32px 0 12px;font-weight:600;",
 		h3: "font-family:'Cormorant Garamond',serif;font-size:20px;color:#3D1A24;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:16px;line-height:1.9;color:#4A2530;margin:0 0 14px;",
-		blockquote: "border-left:3px solid #D4617A;padding:4px 0 4px 20px;color:#B08090;font-style:italic;margin:20px 0;font-family:'Cormorant Garamond',serif;font-size:18px;",
+		blockquote:
+			"border-left:3px solid #D4617A;padding:4px 0 4px 20px;color:#B08090;font-style:italic;margin:20px 0;font-family:'Cormorant Garamond',serif;font-size:18px;",
 		code: "background:#F5E0E5;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;",
-		strong: "color:#3D1A24;font-weight:700;", a: "color:#D4617A;",
+		strong: "color:#3D1A24;font-weight:700;",
+		a: "color:#D4617A;",
 		li: "font-size:16px;line-height:1.8;color:#4A2530;margin:4px 0;",
 		hr: "border:none;border-top:1px solid #F0C8D0;margin:32px 0;",
 	},
 	slate: {
-		name: "Slate", label: "Corporate clean · IBM Plex",
+		name: "Slate",
+		label: "Corporate clean · IBM Plex",
 		palette: ["#F8F9FA", "#1A1F2E", "#3B82F6", "#6B7280"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap",
-		bodyFont: "'IBM Plex Sans', sans-serif", bg: "#F8F9FA", text: "#374151",
-		container: "max-width:740px;margin:0 auto;padding:48px 56px;background:#F8F9FA;font-family:'IBM Plex Sans',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap",
+		bodyFont: "'IBM Plex Sans', sans-serif",
+		bg: "#F8F9FA",
+		text: "#374151",
+		container:
+			"max-width:740px;margin:0 auto;padding:48px 56px;background:#F8F9FA;font-family:'IBM Plex Sans',sans-serif;",
 		h1: "font-family:'IBM Plex Serif',serif;font-size:32px;color:#1A1F2E;line-height:1.2;margin:0 0 16px;font-weight:600;",
 		h2: "font-family:'IBM Plex Serif',serif;font-size:21px;color:#1A1F2E;line-height:1.35;margin:32px 0 12px;font-weight:600;border-bottom:2px solid #E5E7EB;padding-bottom:8px;",
 		h3: "font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:#1A1F2E;margin:22px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;",
 		p: "font-size:16px;line-height:1.8;color:#374151;margin:0 0 14px;",
-		blockquote: "border-left:4px solid #3B82F6;background:#EFF6FF;padding:12px 20px;color:#1D4ED8;margin:24px 0;font-style:italic;",
+		blockquote:
+			"border-left:4px solid #3B82F6;background:#EFF6FF;padding:12px 20px;color:#1D4ED8;margin:24px 0;font-style:italic;",
 		code: "background:#F3F4F6;border:1px solid #E5E7EB;border-radius:4px;padding:2px 6px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:#1A1F2E;",
-		strong: "color:#1A1F2E;font-weight:600;", a: "color:#3B82F6;",
+		strong: "color:#1A1F2E;font-weight:600;",
+		a: "color:#3B82F6;",
 		li: "font-size:16px;line-height:1.8;color:#374151;margin:4px 0;",
 		hr: "border:none;border-top:1px solid #E5E7EB;margin:32px 0;",
 	},
 	obsidian: {
-		name: "Obsidian", label: "Terminal · JetBrains Mono",
+		name: "Obsidian",
+		label: "Terminal · JetBrains Mono",
 		palette: ["#0F0F0F", "#00FF88", "#CCCCCC", "#444444"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap",
-		bodyFont: "'JetBrains Mono', monospace", bg: "#0F0F0F", text: "#CCCCCC",
-		container: "max-width:740px;margin:0 auto;padding:48px 52px;background:#0F0F0F;font-family:'JetBrains Mono',monospace;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap",
+		bodyFont: "'JetBrains Mono', monospace",
+		bg: "#0F0F0F",
+		text: "#CCCCCC",
+		container:
+			"max-width:740px;margin:0 auto;padding:48px 52px;background:#0F0F0F;font-family:'JetBrains Mono',monospace;",
 		h1: "font-family:'JetBrains Mono',monospace;font-size:24px;color:#00FF88;line-height:1.2;margin:0 0 16px;font-weight:500;",
 		h2: "font-family:'JetBrains Mono',monospace;font-size:18px;color:#00FF88;line-height:1.3;margin:32px 0 12px;font-weight:400;",
 		h3: "font-family:'JetBrains Mono',monospace;font-size:14px;color:#AAAAAA;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:14px;line-height:1.9;color:#CCCCCC;margin:0 0 14px;",
-		blockquote: "border-left:3px solid #00FF88;padding:4px 0 4px 16px;color:#888888;font-style:italic;margin:20px 0;",
+		blockquote:
+			"border-left:3px solid #00FF88;padding:4px 0 4px 16px;color:#888888;font-style:italic;margin:20px 0;",
 		code: "background:#1A1A1A;border:1px solid #333333;color:#00FF88;border-radius:3px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:13px;",
-		strong: "color:#FFFFFF;font-weight:500;", a: "color:#00FF88;",
+		strong: "color:#FFFFFF;font-weight:500;",
+		a: "color:#00FF88;",
 		li: "font-size:14px;line-height:1.8;color:#CCCCCC;margin:4px 0;",
 		hr: "border:none;border-top:1px solid #222222;margin:32px 0;",
 	},
 	cream: {
-		name: "Cream", label: "Newsletter · Georgia",
+		name: "Cream",
+		label: "Newsletter · Georgia",
 		palette: ["#FFF8EE", "#1A1A1A", "#EA580C", "#888888"],
 		fontUrl: "",
-		bodyFont: "Georgia, 'Times New Roman', serif", bg: "#FFF8EE", text: "#3A3A3A",
-		container: "max-width:620px;margin:0 auto;padding:52px 48px;background:#FFF8EE;font-family:Georgia,'Times New Roman',serif;",
+		bodyFont: "Georgia, 'Times New Roman', serif",
+		bg: "#FFF8EE",
+		text: "#3A3A3A",
+		container:
+			"max-width:620px;margin:0 auto;padding:52px 48px;background:#FFF8EE;font-family:Georgia,'Times New Roman',serif;",
 		h1: "font-family:Georgia,'Times New Roman',serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 18px;font-weight:normal;",
 		h2: "font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:normal;",
 		h3: "font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#1A1A1A;margin:22px 0 8px;",
 		p: "font-size:17px;line-height:1.8;color:#3A3A3A;margin:0 0 16px;",
-		blockquote: "border-left:4px solid #EA580C;padding:8px 0 8px 20px;color:#888888;font-style:italic;margin:24px 0;",
+		blockquote:
+			"border-left:4px solid #EA580C;padding:8px 0 8px 20px;color:#888888;font-style:italic;margin:24px 0;",
 		code: "background:#F5EDD8;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:13px;",
-		strong: "color:#1A1A1A;", a: "color:#EA580C;",
+		strong: "color:#1A1A1A;",
+		a: "color:#EA580C;",
 		li: "font-size:17px;line-height:1.8;color:#3A3A3A;margin:5px 0;",
 		hr: "border:none;border-top:2px solid #E8D8C0;margin:36px 0;",
 	},
 	nordic: {
-		name: "Nordic", label: "Minimal white · Playfair",
+		name: "Nordic",
+		label: "Minimal white · Playfair",
 		palette: ["#FFFFFF", "#1D3461", "#1D3461", "#8899AA"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Figtree:wght@300;400;500;600&display=swap",
-		bodyFont: "'Figtree', sans-serif", bg: "#FFFFFF", text: "#444B58",
-		container: "max-width:720px;margin:0 auto;padding:56px 60px;background:#FFFFFF;font-family:'Figtree',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Figtree:wght@300;400;500;600&display=swap",
+		bodyFont: "'Figtree', sans-serif",
+		bg: "#FFFFFF",
+		text: "#444B58",
+		container:
+			"max-width:720px;margin:0 auto;padding:56px 60px;background:#FFFFFF;font-family:'Figtree',sans-serif;",
 		h1: "font-family:'Playfair Display',serif;font-size:38px;color:#1D3461;line-height:1.15;margin:0 0 18px;font-weight:700;",
 		h2: "font-family:'Playfair Display',serif;font-size:24px;color:#1D3461;line-height:1.3;margin:36px 0 14px;font-weight:400;",
 		h3: "font-family:'Figtree',sans-serif;font-size:12px;color:#8899AA;margin:24px 0 8px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;",
 		p: "font-size:16px;line-height:1.9;color:#444B58;margin:0 0 16px;",
-		blockquote: "border-left:4px solid #1D3461;padding:8px 0 8px 24px;color:#8899AA;font-family:'Playfair Display',serif;font-style:italic;font-size:18px;margin:28px 0;",
+		blockquote:
+			"border-left:4px solid #1D3461;padding:8px 0 8px 24px;color:#8899AA;font-family:'Playfair Display',serif;font-style:italic;font-size:18px;margin:28px 0;",
 		code: "background:#F4F5F8;border-radius:4px;padding:2px 8px;font-family:monospace;font-size:13px;color:#1D3461;",
-		strong: "color:#1D3461;font-weight:600;", a: "color:#1D3461;border-bottom:1px solid #1D3461;text-decoration:none;",
+		strong: "color:#1D3461;font-weight:600;",
+		a: "color:#1D3461;border-bottom:1px solid #1D3461;text-decoration:none;",
 		li: "font-size:16px;line-height:1.8;color:#444B58;margin:5px 0;",
 		hr: "border:none;border-top:1px solid #E8ECF0;margin:40px 0;",
 	},
 	dusk: {
-		name: "Dusk", label: "Dark purple · DM Serif",
+		name: "Dusk",
+		label: "Dark purple · DM Serif",
 		palette: ["#1E1B2E", "#F0EEFF", "#C084FC", "#7C6FA0"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap",
-		bodyFont: "'DM Sans', sans-serif", bg: "#1E1B2E", text: "#C5BEDC",
-		container: "max-width:720px;margin:0 auto;padding:48px 56px;background:#1E1B2E;font-family:'DM Sans',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap",
+		bodyFont: "'DM Sans', sans-serif",
+		bg: "#1E1B2E",
+		text: "#C5BEDC",
+		container:
+			"max-width:720px;margin:0 auto;padding:48px 56px;background:#1E1B2E;font-family:'DM Sans',sans-serif;",
 		h1: "font-family:'DM Serif Display',serif;font-size:36px;color:#F0EEFF;line-height:1.2;margin:0 0 16px;font-weight:400;",
 		h2: "font-family:'DM Serif Display',serif;font-size:24px;color:#C084FC;line-height:1.3;margin:32px 0 12px;font-weight:400;",
 		h3: "font-family:'DM Sans',sans-serif;font-size:14px;color:#9B8DC0;margin:22px 0 8px;font-weight:500;",
 		p: "font-size:16px;line-height:1.9;color:#C5BEDC;margin:0 0 14px;",
-		blockquote: "border-left:3px solid #C084FC;padding:4px 0 4px 20px;color:#7C6FA0;font-style:italic;margin:20px 0;",
+		blockquote:
+			"border-left:3px solid #C084FC;padding:4px 0 4px 20px;color:#7C6FA0;font-style:italic;margin:20px 0;",
 		code: "background:#2A2540;color:#C084FC;border-radius:4px;padding:2px 8px;font-family:monospace;font-size:13px;",
-		strong: "color:#F0EEFF;font-weight:500;", a: "color:#C084FC;",
+		strong: "color:#F0EEFF;font-weight:500;",
+		a: "color:#C084FC;",
 		li: "font-size:16px;line-height:1.8;color:#C5BEDC;margin:4px 0;",
 		hr: "border:none;border-top:1px solid #2E2A42;margin:32px 0;",
 	},
 	sand: {
-		name: "Sand", label: "Notion-like · Jakarta Sans",
+		name: "Sand",
+		label: "Notion-like · Jakarta Sans",
 		palette: ["#FAF9F7", "#37352F", "#0078D4", "#9B9B9B"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap",
-		bodyFont: "'Plus Jakarta Sans', sans-serif", bg: "#FAF9F7", text: "#37352F",
-		container: "max-width:740px;margin:0 auto;padding:44px 48px;background:#FAF9F7;font-family:'Plus Jakarta Sans',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap",
+		bodyFont: "'Plus Jakarta Sans', sans-serif",
+		bg: "#FAF9F7",
+		text: "#37352F",
+		container:
+			"max-width:740px;margin:0 auto;padding:44px 48px;background:#FAF9F7;font-family:'Plus Jakarta Sans',sans-serif;",
 		h1: "font-family:'Plus Jakarta Sans',sans-serif;font-size:30px;color:#37352F;line-height:1.2;margin:0 0 16px;font-weight:700;",
 		h2: "font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;color:#37352F;line-height:1.35;margin:28px 0 10px;font-weight:600;",
 		h3: "font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;color:#37352F;margin:20px 0 8px;font-weight:600;",
 		p: "font-size:16px;line-height:1.75;color:#37352F;margin:0 0 8px;",
-		blockquote: "border-left:3px solid #BDBDBD;padding:4px 0 4px 14px;color:#9B9B9B;margin:16px 0;",
+		blockquote:
+			"border-left:3px solid #BDBDBD;padding:4px 0 4px 14px;color:#9B9B9B;margin:16px 0;",
 		code: "background:#F1F0EE;border-radius:4px;padding:2px 6px;font-family:monospace;font-size:13px;color:#EB5757;",
-		strong: "color:#37352F;font-weight:700;", a: "color:#0078D4;text-decoration:underline;",
+		strong: "color:#37352F;font-weight:700;",
+		a: "color:#0078D4;text-decoration:underline;",
 		li: "font-size:16px;line-height:1.75;color:#37352F;margin:2px 0;",
 		hr: "background:#E8E7E4;border:none;height:1px;margin:28px 0;",
 	},
 	bold: {
-		name: "Bold", label: "Magazine editorial · Bebas",
+		name: "Bold",
+		label: "Magazine editorial · Bebas",
 		palette: ["#F5F5F5", "#111111", "#DC2626", "#666666"],
-		fontUrl: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:ital,wght@0,400;0,500;1,400&display=swap",
-		bodyFont: "'Roboto', sans-serif", bg: "#F5F5F5", text: "#333333",
-		container: "max-width:740px;margin:0 auto;padding:48px 56px;background:#F5F5F5;font-family:'Roboto',sans-serif;",
+		fontUrl:
+			"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:ital,wght@0,400;0,500;1,400&display=swap",
+		bodyFont: "'Roboto', sans-serif",
+		bg: "#F5F5F5",
+		text: "#333333",
+		container:
+			"max-width:740px;margin:0 auto;padding:48px 56px;background:#F5F5F5;font-family:'Roboto',sans-serif;",
 		h1: "font-family:'Bebas Neue',sans-serif;font-size:56px;color:#111111;line-height:1.0;margin:0 0 20px;letter-spacing:0.03em;",
 		h2: "font-family:'Bebas Neue',sans-serif;font-size:30px;color:#DC2626;line-height:1.1;margin:32px 0 14px;letter-spacing:0.05em;",
 		h3: "font-family:'Roboto',sans-serif;font-size:12px;color:#111111;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;",
 		p: "font-size:16px;line-height:1.8;color:#333333;margin:0 0 14px;",
-		blockquote: "border-left:6px solid #DC2626;padding:12px 24px;background:#FFFFFF;color:#666666;font-size:20px;font-style:italic;margin:24px 0;",
+		blockquote:
+			"border-left:6px solid #DC2626;padding:12px 24px;background:#FFFFFF;color:#666666;font-size:20px;font-style:italic;margin:24px 0;",
 		code: "background:#EBEBEB;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:13px;",
-		strong: "color:#111111;font-weight:700;", a: "color:#DC2626;",
+		strong: "color:#111111;font-weight:700;",
+		a: "color:#DC2626;",
 		li: "font-size:16px;line-height:1.8;color:#333333;margin:4px 0;",
 		hr: "border:none;border-top:3px solid #111111;margin:32px 0;",
 	},
@@ -343,7 +426,8 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 	if (!currentHTML.trim()) return "";
 
 	/* Get inner content of a node and run inline markdown on it */
-	const getInner = (node) => parseInlineMarkdown(node.innerHTML || node.textContent || "");
+	const getInner = (node) =>
+		parseInlineMarkdown(node.innerHTML || node.textContent || "");
 
 	let body = "";
 	try {
@@ -368,7 +452,10 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 			if (tag === "ul" || tag === "ol") {
 				const items = Array.from(node.children)
 					.filter((n) => n.nodeName?.toLowerCase() === "li")
-					.map((li) => `<li style="${theme.li}">${parseInlineMarkdown(li.innerHTML || "")}</li>`)
+					.map(
+						(li) =>
+							`<li style="${theme.li}">${parseInlineMarkdown(li.innerHTML || "")}</li>`,
+					)
 					.join("\n");
 				return `<${tag} style="padding-left:24px;margin:0 0 14px;">${items}</${tag}>\n`;
 			}
@@ -584,23 +671,61 @@ function TBtn({ icon, label, onClick, active = false }) {
 ═══════════════════════════════════════════ */
 
 const CALLOUT_CONFIGS = {
-	info:    { emoji: "ℹ️",  border: "#3B82F6", bg: "#EFF6FF", textColor: "#1E40AF", label: "Info" },
-	warning: { emoji: "⚠️", border: "#F59E0B", bg: "#FFFBEB", textColor: "#92400E", label: "Warning" },
-	success: { emoji: "✅", border: "#10B981", bg: "#ECFDF5", textColor: "#065F46", label: "Success" },
-	danger:  { emoji: "🚨", border: "#EF4444", bg: "#FEF2F2", textColor: "#991B1B", label: "Danger" },
+	info: {
+		emoji: "ℹ️",
+		border: "#3B82F6",
+		bg: "#EFF6FF",
+		textColor: "#1E40AF",
+		label: "Info",
+	},
+	warning: {
+		emoji: "⚠️",
+		border: "#F59E0B",
+		bg: "#FFFBEB",
+		textColor: "#92400E",
+		label: "Warning",
+	},
+	success: {
+		emoji: "✅",
+		border: "#10B981",
+		bg: "#ECFDF5",
+		textColor: "#065F46",
+		label: "Success",
+	},
+	danger: {
+		emoji: "🚨",
+		border: "#EF4444",
+		bg: "#FEF2F2",
+		textColor: "#991B1B",
+		label: "Danger",
+	},
 };
 
-const LANG_OPTIONS = ["javascript","typescript","python","css","html","bash","json","sql","text"];
+const LANG_OPTIONS = [
+	"javascript",
+	"typescript",
+	"python",
+	"css",
+	"html",
+	"bash",
+	"json",
+	"sql",
+	"text",
+];
 
 function makeCalloutHtml(type, text = "") {
 	const c = CALLOUT_CONFIGS[type] || CALLOUT_CONFIGS.info;
 	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
 }
 
-function makeCodeBlockHtml(language = "javascript", code = "// Your code here") {
+function makeCodeBlockHtml(
+	language = "javascript",
+	code = "// Your code here",
+) {
 	const lang = language.toLowerCase().trim() || "text";
 	const opts = LANG_OPTIONS.map(
-		(l) => `<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).toUpperCase() + l.slice(1)}</option>`,
+		(l) =>
+			`<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).toUpperCase() + l.slice(1)}</option>`,
 	).join("");
 	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
 }
@@ -677,9 +802,12 @@ export default function DraftPage() {
 
 		// Code fences  ```lang\ncode\n```
 		text = text.replace(/```(\w*)\r?\n([\s\S]*?)```/g, (_, lang, code) => {
-			const language = (lang.trim() || "text");
-			const escaped = code.trim()
-				.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+			const language = lang.trim() || "text";
+			const escaped = code
+				.trim()
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;");
 			const tok = `\x01BLK${tokens.length}\x01`;
 			tokens.push(makeCodeBlockHtml(language, escaped));
 			return tok;
@@ -696,14 +824,20 @@ export default function DraftPage() {
 		/* 2. Process line by line */
 		const restore = (s) => s.replace(/\x01BLK(\d+)\x01/g, (_, i) => tokens[+i]);
 
-		return text.split("\n").map((line) => {
-			if (/\x01BLK\d+\x01/.test(line)) return restore(line);
-			if (line.startsWith("### ")) return `<h3 style="font-family:'Instrument Serif',serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
-			if (line.startsWith("## "))  return `<h2 style="font-family:'Instrument Serif',serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
-			if (line.startsWith("# "))   return `<h1 style="font-family:'Instrument Serif',serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
-			if (line.trim() === "")      return "<br/>";
-			return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
-		}).join("");
+		return text
+			.split("\n")
+			.map((line) => {
+				if (/\x01BLK\d+\x01/.test(line)) return restore(line);
+				if (line.startsWith("### "))
+					return `<h3 style="font-family:'Instrument Serif',serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
+				if (line.startsWith("## "))
+					return `<h2 style="font-family:'Instrument Serif',serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
+				if (line.startsWith("# "))
+					return `<h1 style="font-family:'Instrument Serif',serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
+				if (line.trim() === "") return "<br/>";
+				return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
+			})
+			.join("");
 	};
 
 	/* Set editor content when draft loads */
@@ -742,9 +876,14 @@ export default function DraftPage() {
 	const insertBlock = (type) => {
 		editorRef.current?.focus();
 		let html = "";
-		if (type === "code")   html = makeCodeBlockHtml("javascript", "// Your code here");
+		if (type === "code")
+			html = makeCodeBlockHtml("javascript", "// Your code here");
 		else if (type === "button") html = makeButtonBlockHtml();
-		else html = makeCalloutHtml(type, `${CALLOUT_CONFIGS[type]?.label || "Callout"} — edit this text.`);
+		else
+			html = makeCalloutHtml(
+				type,
+				`${CALLOUT_CONFIGS[type]?.label || "Callout"} — edit this text.`,
+			);
 		if (html) {
 			document.execCommand("insertHTML", false, html + "<p><br></p>");
 			countWords();
@@ -760,7 +899,7 @@ export default function DraftPage() {
 		const handleClick = (e) => {
 			if (e.target.dataset?.action === "copy-code") {
 				e.preventDefault();
-				const block = e.target.closest("[data-block=\"code\"]");
+				const block = e.target.closest('[data-block="code"]');
 				const code = block?.querySelector("code");
 				if (code) {
 					navigator.clipboard.writeText(code.innerText).catch(() => {});
@@ -790,7 +929,7 @@ export default function DraftPage() {
 			el.removeEventListener("click", handleClick);
 			el.removeEventListener("change", handleChange);
 		};
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	/* ── Close block-insert menu when clicking outside ── */
@@ -1094,18 +1233,6 @@ export default function DraftPage() {
 									flexShrink: 0,
 								}}
 							>
-								<p
-									style={{
-										fontSize: 11,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.08em",
-										color: T.muted,
-										marginBottom: 10,
-									}}
-								>
-									My Drafts
-								</p>
 								{/* Search */}
 								<div style={{ position: "relative" }}>
 									<div
@@ -1313,175 +1440,377 @@ export default function DraftPage() {
 									label="Bullet list"
 									onClick={() => document.execCommand("insertUnorderedList")}
 								/>
-							<TBtn
-								icon={Icons.link2}
-								label="Link"
-								onClick={() => {
-									const url = window.prompt("URL:");
-									if (url) document.execCommand("createLink", false, url);
-								}}
-							/>
-
-							{/* Divider */}
-							<div style={{ width: 1, height: 18, background: T.border, margin: "0 4px" }} />
-
-							{/* ── Insert block dropdown ── */}
-							<div data-block-menu style={{ position: "relative" }}>
-								<motion.button
-									onClick={() => setBlockMenuOpen(v => !v)}
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.95 }}
-									style={{
-										display: "flex", alignItems: "center", gap: 5,
-										background: blockMenuOpen ? "#F0ECE5" : "transparent",
-										border: "none",
-										borderRadius: 7, padding: "5px 9px",
-										fontSize: 12, fontWeight: 600,
-										color: T.accent, cursor: "pointer",
-										transition: "background 0.15s",
+								<TBtn
+									icon={Icons.link2}
+									label="Link"
+									onClick={() => {
+										const url = window.prompt("URL:");
+										if (url) document.execCommand("createLink", false, url);
 									}}
-								>
-									<Icon d="M12 5v14M5 12h14" size={13} stroke={T.accent} />
-									Insert
-									<Icon d="M6 9l6 6 6-6" size={11} stroke={T.muted} strokeWidth={2} />
-								</motion.button>
+								/>
 
-								<AnimatePresence>
-									{blockMenuOpen && (
-										<motion.div
-											initial={{ opacity: 0, y: 6, scale: 0.96 }}
-											animate={{ opacity: 1, y: 0, scale: 1 }}
-											exit={{ opacity: 0, y: 6, scale: 0.96 }}
-											transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-											style={{
-												position: "absolute",
-												top: "calc(100% + 6px)",
-												left: 0,
-												background: "#FFFFFF",
-												border: `1px solid ${T.border}`,
-												borderRadius: 12,
-												boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
-												zIndex: 60,
-												overflow: "hidden",
-												minWidth: 195,
-												padding: 6,
-											}}
-										>
-											{/* Callouts section */}
-											<p style={{ fontSize: 10, fontWeight: 700, color: "#B0AAA3", textTransform: "uppercase", letterSpacing: "0.1em", padding: "3px 8px 6px", margin: 0 }}>
-												Callout
-											</p>
-											{["info","warning","success","danger"].map(type => {
-												const c = CALLOUT_CONFIGS[type];
-												return (
-													<motion.button
-														key={type}
-														onClick={() => insertBlock(type)}
-														whileHover={{ background: "#F7F5F0" }}
-														style={{
-															width: "100%", display: "flex", alignItems: "center", gap: 8,
-															background: "none", border: "none",
-															borderRadius: 8, padding: "7px 10px",
-															cursor: "pointer", textAlign: "left",
-															transition: "background 0.12s",
-														}}
-													>
-														<span style={{ fontSize: 15, width: 22, textAlign: "center" }}>{c.emoji}</span>
-														<div>
-															<p style={{ fontSize: 12, fontWeight: 600, color: c.textColor, margin: 0, lineHeight: 1.2 }}>{c.label}</p>
-															<p style={{ fontSize: 10.5, color: "#A8A29C", margin: 0 }}>Highlighted callout box</p>
-														</div>
-														<div style={{ flex: 1 }} />
-														<div style={{ width: 10, height: 10, borderRadius: 2, background: c.border, opacity: 0.7 }} />
-													</motion.button>
-												);
-											})}
+								{/* Divider */}
+								<div
+									style={{
+										width: 1,
+										height: 18,
+										background: T.border,
+										margin: "0 4px",
+									}}
+								/>
 
-											{/* Divider */}
-											<div style={{ height: 1, background: T.border, margin: "5px 0" }} />
-											<p style={{ fontSize: 10, fontWeight: 700, color: "#B0AAA3", textTransform: "uppercase", letterSpacing: "0.1em", padding: "3px 8px 6px", margin: 0 }}>
-												More blocks
-											</p>
-
-											{/* Code block */}
-											<motion.button
-												onClick={() => insertBlock("code")}
-												whileHover={{ background: "#F7F5F0" }}
-												style={{
-													width: "100%", display: "flex", alignItems: "center", gap: 8,
-													background: "none", border: "none",
-													borderRadius: 8, padding: "7px 10px",
-													cursor: "pointer", textAlign: "left",
-													transition: "background 0.12s",
-												}}
-											>
-												<span style={{ fontSize: 15, width: 22, textAlign: "center" }}>{"</>"}</span>
-												<div>
-													<p style={{ fontSize: 12, fontWeight: 600, color: T.accent, margin: 0, lineHeight: 1.2 }}>Code block</p>
-													<p style={{ fontSize: 10.5, color: "#A8A29C", margin: 0 }}>Syntax-highlighted code</p>
-												</div>
-											</motion.button>
-
-											{/* Button */}
-											<motion.button
-												onClick={() => insertBlock("button")}
-												whileHover={{ background: "#F7F5F0" }}
-												style={{
-													width: "100%", display: "flex", alignItems: "center", gap: 8,
-													background: "none", border: "none",
-													borderRadius: 8, padding: "7px 10px",
-													cursor: "pointer", textAlign: "left",
-													transition: "background 0.12s",
-												}}
-											>
-												<span style={{ fontSize: 15, width: 22, textAlign: "center" }}>🔗</span>
-												<div>
-													<p style={{ fontSize: 12, fontWeight: 600, color: T.accent, margin: 0, lineHeight: 1.2 }}>CTA Button</p>
-													<p style={{ fontSize: 10.5, color: "#A8A29C", margin: 0 }}>Styled call-to-action link</p>
-												</div>
-											</motion.button>
-										</motion.div>
-									)}
-								</AnimatePresence>
-							</div>
-
-							<div
-								style={{
-									width: 1,
-									height: 18,
-									background: T.border,
-									margin: "0 4px",
-								}}
-							/>
-								{/* Source info */}
-								{sourceUrl && (
-									<div
+								{/* ── Insert block dropdown ── */}
+								<div data-block-menu style={{ position: "relative" }}>
+									<motion.button
+										onClick={() => setBlockMenuOpen((v) => !v)}
+										whileHover={{ background: "#F0ECE5" }}
+										whileTap={{ scale: 0.95 }}
 										style={{
 											display: "flex",
 											alignItems: "center",
-											gap: 6,
-											background: T.base,
-											border: `1px solid ${T.border}`,
+											gap: 5,
+											background: blockMenuOpen ? "#F0ECE5" : "transparent",
+											border: "none",
 											borderRadius: 7,
-											padding: "4px 10px",
-											maxWidth: 240,
-											overflow: "hidden",
+											padding: "5px 9px",
+											fontSize: 12,
+											fontWeight: 600,
+											color: T.accent,
+											cursor: "pointer",
+											transition: "background 0.15s",
 										}}
 									>
-										<Icon d={Icons.link2} size={12} stroke={T.muted} />
-										<span
+										<Icon d="M12 5v14M5 12h14" size={13} stroke={T.accent} />
+										Insert
+										<Icon
+											d="M6 9l6 6 6-6"
+											size={11}
+											stroke={T.muted}
+											strokeWidth={2}
+										/>
+									</motion.button>
+
+									<AnimatePresence>
+										{blockMenuOpen && (
+											<motion.div
+												initial={{ opacity: 0, y: 6, scale: 0.96 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: 6, scale: 0.96 }}
+												transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+												style={{
+													position: "absolute",
+													top: "calc(100% + 6px)",
+													left: 0,
+													background: "#FFFFFF",
+													border: `1px solid ${T.border}`,
+													borderRadius: 12,
+													boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+													zIndex: 60,
+													overflow: "hidden",
+													minWidth: 195,
+													padding: 6,
+												}}
+											>
+												{/* Callouts section */}
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														padding: "3px 8px 6px",
+														margin: 0,
+													}}
+												>
+													Callout
+												</p>
+												{["info", "warning", "success", "danger"].map(
+													(type) => {
+														const c = CALLOUT_CONFIGS[type];
+														return (
+															<motion.button
+																key={type}
+																onClick={() => insertBlock(type)}
+																whileHover={{ background: "#F7F5F0" }}
+																style={{
+																	width: "100%",
+																	display: "flex",
+																	alignItems: "center",
+																	gap: 8,
+																	background: "none",
+																	border: "none",
+																	borderRadius: 8,
+																	padding: "7px 10px",
+																	cursor: "pointer",
+																	textAlign: "left",
+																	transition: "background 0.12s",
+																}}
+															>
+																<span
+																	style={{
+																		fontSize: 15,
+																		width: 22,
+																		textAlign: "center",
+																	}}
+																>
+																	{c.emoji}
+																</span>
+																<div>
+																	<p
+																		style={{
+																			fontSize: 12,
+																			fontWeight: 600,
+																			color: c.textColor,
+																			margin: 0,
+																			lineHeight: 1.2,
+																		}}
+																	>
+																		{c.label}
+																	</p>
+																	<p
+																		style={{
+																			fontSize: 10.5,
+																			color: "#A8A29C",
+																			margin: 0,
+																		}}
+																	>
+																		Highlighted callout box
+																	</p>
+																</div>
+																<div style={{ flex: 1 }} />
+																<div
+																	style={{
+																		width: 10,
+																		height: 10,
+																		borderRadius: 2,
+																		background: c.border,
+																		opacity: 0.7,
+																	}}
+																/>
+															</motion.button>
+														);
+													},
+												)}
+
+												{/* Divider */}
+												<div
+													style={{
+														height: 1,
+														background: T.border,
+														margin: "5px 0",
+													}}
+												/>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														padding: "3px 8px 6px",
+														margin: 0,
+													}}
+												>
+													More blocks
+												</p>
+
+												{/* Code block */}
+												<motion.button
+													onClick={() => insertBlock("code")}
+													whileHover={{ background: "#F7F5F0" }}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 8,
+														background: "none",
+														border: "none",
+														borderRadius: 8,
+														padding: "7px 10px",
+														cursor: "pointer",
+														textAlign: "left",
+														transition: "background 0.12s",
+													}}
+												>
+													<span
+														style={{
+															fontSize: 15,
+															width: 22,
+															textAlign: "center",
+														}}
+													>
+														{"</>"}
+													</span>
+													<div>
+														<p
+															style={{
+																fontSize: 12,
+																fontWeight: 600,
+																color: T.accent,
+																margin: 0,
+																lineHeight: 1.2,
+															}}
+														>
+															Code block
+														</p>
+														<p
+															style={{
+																fontSize: 10.5,
+																color: "#A8A29C",
+																margin: 0,
+															}}
+														>
+															Syntax-highlighted code
+														</p>
+													</div>
+												</motion.button>
+
+												{/* Button */}
+												<motion.button
+													onClick={() => insertBlock("button")}
+													whileHover={{ background: "#F7F5F0" }}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 8,
+														background: "none",
+														border: "none",
+														borderRadius: 8,
+														padding: "7px 10px",
+														cursor: "pointer",
+														textAlign: "left",
+														transition: "background 0.12s",
+													}}
+												>
+													<span
+														style={{
+															fontSize: 15,
+															width: 22,
+															textAlign: "center",
+														}}
+													>
+														🔗
+													</span>
+													<div>
+														<p
+															style={{
+																fontSize: 12,
+																fontWeight: 600,
+																color: T.accent,
+																margin: 0,
+																lineHeight: 1.2,
+															}}
+														>
+															CTA Button
+														</p>
+														<p
+															style={{
+																fontSize: 10.5,
+																color: "#A8A29C",
+																margin: 0,
+															}}
+														>
+															Styled call-to-action link
+														</p>
+													</div>
+												</motion.button>
+											</motion.div>
+										)}
+									</AnimatePresence>
+								</div>
+
+								<div
+									style={{
+										width: 1,
+										height: 18,
+										background: T.border,
+										margin: "0 4px",
+									}}
+								/>
+
+								{/* ── Inline draft meta ── */}
+								{draft?.tag && (
+									<span
+										style={{
+											fontSize: 11,
+											fontWeight: 700,
+											background: "#F0ECE5",
+											color: T.muted,
+											padding: "2px 8px",
+											borderRadius: 100,
+											whiteSpace: "nowrap",
+										}}
+									>
+										{draft.tag}
+									</span>
+								)}
+								{draft?.style && (
+									<span
+										style={{
+											fontSize: 11,
+											fontWeight: 600,
+											background: "#FEF3E2",
+											color: T.warm,
+											padding: "2px 8px",
+											borderRadius: 100,
+											textTransform: "capitalize",
+											whiteSpace: "nowrap",
+										}}
+									>
+										{draft.style}
+									</span>
+								)}
+								{draft?.date && (
+									<span
+										style={{
+											fontSize: 11,
+											color: T.muted,
+											whiteSpace: "nowrap",
+										}}
+									>
+										{draft.date}
+									</span>
+								)}
+								{sourceUrl && (
+									<>
+										<div
+											style={{ width: 1, height: 14, background: T.border }}
+										/>
+										<a
+											href={sourceUrl}
+											target="_blank"
+											rel="noopener noreferrer"
 											style={{
-												fontSize: 12,
-												color: T.muted,
+												display: "inline-flex",
+												alignItems: "center",
+												gap: 4,
+												fontSize: 11,
+												color: T.warm,
+												textDecoration: "none",
+												whiteSpace: "nowrap",
+												maxWidth: 160,
 												overflow: "hidden",
 												textOverflow: "ellipsis",
-												whiteSpace: "nowrap",
 											}}
+											title={sourceUrl}
 										>
-											{sourceUrl}
-										</span>
-									</div>
+											<Icon d={Icons.link2} size={11} stroke={T.warm} />
+											{(() => {
+												try {
+													return new URL(sourceUrl).hostname.replace(
+														/^www\./,
+														"",
+													);
+												} catch {
+													return sourceUrl.slice(0, 30);
+												}
+											})()}
+										</a>
+									</>
 								)}
+
 								<div style={{ flex: 1 }} />
 								<span style={{ fontSize: 12, color: T.muted }}>
 									{wordCount} words
@@ -1553,151 +1882,111 @@ export default function DraftPage() {
 								</motion.button>
 							</div>
 
-							{/* Draft title */}
-							<div
-								style={{
-									padding: "24px 40px 0",
-									background: T.surface,
-									borderBottom: `1px solid ${T.border}`,
-									flexShrink: 0,
-								}}
-							>
+							<div className="overflow-y-auto flex flex-col">
+								{/* Draft title */}
 								<div
 									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 10,
-										marginBottom: 12,
+										padding: "16px 40px 14px",
+										background: T.surface,
+										borderBottom: `1px solid ${T.border}`,
+										flexShrink: 0,
 									}}
 								>
-									<span
+									<div
+										contentEditable
+										suppressContentEditableWarning
+										data-placeholder="Untitled draft"
 										style={{
-											fontSize: 11,
-											fontWeight: 700,
-											background: "#F0ECE5",
-											color: T.muted,
-											padding: "2px 9px",
-											borderRadius: 100,
+											fontSize: "clamp(22px, 3vw, 30px)",
+											color: T.accent,
+											lineHeight: 1.2,
+											letterSpacing: "-0.5px",
+											outline: "none",
+											marginBottom: 8,
+											minHeight: 36,
 										}}
-									>
-										{draft.tag}
-									</span>
-									{draft.style && (
-										<span
-											style={{
-												fontSize: 11,
-												fontWeight: 600,
-												background: "#FEF3E2",
-												color: T.warm,
-												padding: "2px 9px",
-												borderRadius: 100,
-												textTransform: "capitalize",
-											}}
-										>
-											{draft.style}
-										</span>
-									)}
-									<span style={{ fontSize: 12, color: T.muted }}>
-										{draft.date}
-									</span>
+										dangerouslySetInnerHTML={{ __html: draft.title }}
+									/>
+									{/* Source links — hostname only, no full URL repeat */}
+									{(() => {
+										const allUrls = Array.isArray(draft?.urls)
+											? draft.urls.filter(Boolean)
+											: draft?.url
+												? [draft.url]
+												: [];
+										if (allUrls.length === 0) return null;
+										return (
+											<div
+												style={{ display: "flex", flexWrap: "wrap", gap: 5 }}
+											>
+												{allUrls.map((url, i) => {
+													let label = url;
+													try {
+														label = new URL(url).hostname.replace(/^www\./, "");
+													} catch {}
+													return (
+														<a
+															key={i}
+															href={url}
+															target="_blank"
+															rel="noopener noreferrer"
+															title={url}
+															style={{
+																display: "inline-flex",
+																alignItems: "center",
+																gap: 4,
+																fontSize: 11.5,
+																color: T.warm,
+																background: "#FEF3E2",
+																border: `1px solid #F5C97A`,
+																borderRadius: 6,
+																padding: "2px 8px",
+																textDecoration: "none",
+																transition: "opacity 0.15s",
+															}}
+															onMouseEnter={(e) =>
+																(e.currentTarget.style.opacity = "0.7")
+															}
+															onMouseLeave={(e) =>
+																(e.currentTarget.style.opacity = "1")
+															}
+														>
+															<Icon d={Icons.link2} size={10} stroke={T.warm} />
+															{label}
+														</a>
+													);
+												})}
+											</div>
+										);
+									})()}
 								</div>
-								<div
-									contentEditable
-									suppressContentEditableWarning
-									data-placeholder="Untitled draft"
-									style={{
-										fontFamily: "'Instrument Serif',serif",
-										fontSize: "clamp(22px, 3vw, 30px)",
-										color: T.accent,
-										lineHeight: 1.2,
-										letterSpacing: "-0.5px",
-										outline: "none",
-										marginBottom: 12,
-										minHeight: 36,
-									}}
-									dangerouslySetInnerHTML={{ __html: draft.title }}
-								/>
-								{/* Source links */}
-								{(() => {
-									const allUrls = Array.isArray(draft?.urls)
-										? draft.urls.filter(Boolean)
-										: draft?.url
-											? [draft.url]
-											: [];
-									if (allUrls.length === 0) return null;
-									return (
-										<div
-											style={{
-												display: "flex",
-												flexWrap: "wrap",
-												gap: 6,
-												marginBottom: 16,
-											}}
-										>
-											{allUrls.map((url, i) => (
-												<a
-													key={i}
-													href={url}
-													target="_blank"
-													rel="noopener noreferrer"
-													style={{
-														display: "inline-flex",
-														alignItems: "center",
-														gap: 5,
-														fontSize: 12,
-														color: T.warm,
-														background: "#FEF3E2",
-														border: `1px solid #F5C97A`,
-														borderRadius: 7,
-														padding: "3px 10px",
-														textDecoration: "none",
-														maxWidth: 320,
-														overflow: "hidden",
-														textOverflow: "ellipsis",
-														whiteSpace: "nowrap",
-														transition: "opacity 0.15s",
-													}}
-													onMouseEnter={(e) =>
-														(e.currentTarget.style.opacity = "0.75")
-													}
-													onMouseLeave={(e) =>
-														(e.currentTarget.style.opacity = "1")
-													}
-												>
-													<Icon d={Icons.link2} size={11} stroke={T.warm} />
-													{url}
-												</a>
-											))}
-										</div>
-									);
-								})()}
-							</div>
 
-							{/* Editor body */}
-							<div
-								style={{
-									flex: 1,
-									overflowY: "auto",
-									background: T.surface,
-								}}
-							>
+								{/* Editor body */}
 								<div
-									ref={editorRef}
-									contentEditable
-									suppressContentEditableWarning
-									onInput={countWords}
-									data-placeholder="Start writing…"
 									style={{
-										maxWidth: 680,
-										margin: "0 auto",
-										padding: "28px 40px 80px",
-										minHeight: "100%",
-										outline: "none",
-										fontSize: 15,
-										lineHeight: 1.8,
-										color: "#3A3530",
+										flex: 1,
+										overflowY: "auto",
+										background: T.surface,
 									}}
-								/>
+								>
+									<div
+										ref={editorRef}
+										contentEditable
+										suppressContentEditableWarning
+										onInput={countWords}
+										data-placeholder="Start writing…"
+										style={{
+											maxWidth: 680,
+											margin: "0 auto",
+											padding: "28px 40px 80px",
+											minHeight: "100%",
+											outline: "none",
+											fontSize: 15,
+											lineHeight: 1.8,
+											color: "#3A3530",
+										}}
+									/>
+								</div>
 							</div>
 
 							{/* Bottom status bar */}
@@ -1731,410 +2020,541 @@ export default function DraftPage() {
 								<span style={{ fontSize: 12, color: T.muted }}>
 									{wordCount} words · ~{Math.ceil(wordCount / 200)} min read
 								</span>
-							<div style={{ flex: 1 }} />
+								<div style={{ flex: 1 }} />
 
-						{/* Themes button */}
-						<motion.button
-							whileHover={{ background: "#F0ECE5" }}
-							whileTap={{ scale: 0.97 }}
-							onClick={() => setThemeDrawerOpen(true)}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 5,
-								background: T.base,
-								border: `1px solid ${T.border}`,
-								borderRadius: 8,
-								padding: "5px 12px",
-								fontSize: 12,
-								fontWeight: 600,
-								color: T.accent,
-								cursor: "pointer",
-							}}
-						>
-							{/* Palette icon */}
-							<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-								<circle cx="13.5" cy="6.5" r=".5" fill={T.accent}/><circle cx="17.5" cy="10.5" r=".5" fill={T.accent}/><circle cx="8.5" cy="7.5" r=".5" fill={T.accent}/><circle cx="6.5" cy="12.5" r=".5" fill={T.accent}/>
-								<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
-							</svg>
-							Themes
-						</motion.button>
+								{/* Themes button */}
+								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.97 }}
+									onClick={() => setThemeDrawerOpen(true)}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "5px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.accent,
+										cursor: "pointer",
+									}}
+								>
+									{/* Palette icon */}
+									<svg
+										width={12}
+										height={12}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke={T.accent}
+										strokeWidth={2}
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<circle cx="13.5" cy="6.5" r=".5" fill={T.accent} />
+										<circle cx="17.5" cy="10.5" r=".5" fill={T.accent} />
+										<circle cx="8.5" cy="7.5" r=".5" fill={T.accent} />
+										<circle cx="6.5" cy="12.5" r=".5" fill={T.accent} />
+										<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+									</svg>
+									Themes
+								</motion.button>
 
-					{/* Infographics button */}
-					<motion.button
-						whileHover={{ background: "#F0ECE5" }}
-						whileTap={{ scale: 0.97 }}
-						onClick={() => setInfographicsOpen(true)}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 5,
-							background: T.base,
-							border: `1px solid ${T.border}`,
-							borderRadius: 8,
-							padding: "5px 12px",
-							fontSize: 12,
-							fontWeight: 600,
-							color: T.accent,
-							cursor: "pointer",
-						}}
-					>
-						{/* Bar chart icon */}
-						<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-							<line x1="18" y1="20" x2="18" y2="10"/>
-							<line x1="12" y1="20" x2="12" y2="4"/>
-							<line x1="6" y1="20" x2="6" y2="14"/>
-						</svg>
-						Infographics
-					</motion.button>
+								{/* Infographics button */}
+								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.97 }}
+									onClick={() => setInfographicsOpen(true)}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "5px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.accent,
+										cursor: "pointer",
+									}}
+								>
+									{/* Bar chart icon */}
+									<svg
+										width={12}
+										height={12}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke={T.accent}
+										strokeWidth={2}
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<line x1="18" y1="20" x2="18" y2="10" />
+										<line x1="12" y1="20" x2="12" y2="4" />
+										<line x1="6" y1="20" x2="6" y2="14" />
+									</svg>
+									Infographics
+								</motion.button>
 
-					{/* AI Chat button */}
-					<motion.button
-						whileHover={{ background: chatOpen ? "#C17B2F" : "#F0ECE5" }}
-						whileTap={{ scale: 0.97 }}
-						onClick={() => setChatOpen(v => !v)}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 5,
-							background: chatOpen ? T.warm : T.base,
-							border: `1px solid ${chatOpen ? T.warm : T.border}`,
-							borderRadius: 8,
-							padding: "5px 12px",
-							fontSize: 12,
-							fontWeight: 600,
-							color: chatOpen ? "#FFFFFF" : T.accent,
-							cursor: "pointer",
-							transition: "all 0.18s",
-						}}
-					>
-						{/* Chat bubble icon */}
-						<svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={chatOpen ? "#FFFFFF" : T.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-							<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-						</svg>
-						AI Chat
-					</motion.button>
+								{/* AI Chat button */}
+								<motion.button
+									whileHover={{ background: chatOpen ? "#C17B2F" : "#F0ECE5" }}
+									whileTap={{ scale: 0.97 }}
+									onClick={() => setChatOpen((v) => !v)}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										background: chatOpen ? T.warm : T.base,
+										border: `1px solid ${chatOpen ? T.warm : T.border}`,
+										borderRadius: 8,
+										padding: "5px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: chatOpen ? "#FFFFFF" : T.accent,
+										cursor: "pointer",
+										transition: "all 0.18s",
+									}}
+								>
+									{/* Chat bubble icon */}
+									<svg
+										width={12}
+										height={12}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke={chatOpen ? "#FFFFFF" : T.accent}
+										strokeWidth={2}
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+									</svg>
+									AI Chat
+								</motion.button>
 
-							<motion.button
-								whileHover={{ scale: 1.03 }}
-								whileTap={{ scale: 0.97 }}
-								onClick={() => router.push("/app")}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 6,
-									background: T.base,
-									border: `1px solid ${T.border}`,
-									borderRadius: 8,
-									padding: "5px 12px",
-									fontSize: 12,
-									fontWeight: 600,
-									color: T.muted,
-									cursor: "pointer",
-								}}
-							>
-								<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
-								draft
-							</motion.button>
-						</div>
+								<motion.button
+									whileHover={{ scale: 1.03 }}
+									whileTap={{ scale: 0.97 }}
+									onClick={() => router.push("/app")}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 6,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "5px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.muted,
+										cursor: "pointer",
+									}}
+								>
+									<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
+									draft
+								</motion.button>
+							</div>
 						</motion.div>
 					)}
 				</div>
 			</div>
 
 			{/* ── THEMES MODAL ── full-screen two-panel preview */}
-		<AnimatePresence>
-			{themeDrawerOpen && (() => {
-				const activeTheme = THEMES[previewTheme];
-				const currentHTML = editorRef.current?.innerHTML || draft?.body || "";
-				const themedDoc = activeTheme
-					? buildThemedHTML(currentHTML, activeTheme, draft?.title || "")
-					: "";
-				const isCopied = copiedTheme === previewTheme;
-				return (
-					<>
-						{/* Backdrop */}
-						<motion.div
-							key="theme-backdrop"
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							onClick={() => setThemeDrawerOpen(false)}
-							style={{
-								position: "fixed", inset: 0,
-								background: "rgba(0,0,0,0.5)",
-								zIndex: 300,
-								backdropFilter: "blur(4px)",
-							}}
-						/>
-
-					{/* Centering shell — flexbox positions the modal, pointer-events:none lets backdrop work */}
-					<motion.div
-						key="theme-modal"
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
-						transition={{ duration: 0.22 }}
-						style={{
-							position: "fixed", inset: 0,
-							zIndex: 301,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							pointerEvents: "none",
-						}}
-					>
-					{/* Actual modal panel */}
-					<motion.div
-						initial={{ scale: 0.95, y: 24 }}
-						animate={{ scale: 1, y: 0 }}
-						exit={{ scale: 0.95, y: 24 }}
-						transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-						style={{
-							width: "92vw", maxWidth: 1280,
-							height: "90vh",
-							background: T.surface,
-							borderRadius: 16,
-							border: `1px solid ${T.border}`,
-							display: "flex",
-							flexDirection: "column",
-							boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
-							overflow: "hidden",
-							pointerEvents: "all",
-						}}
-					>
-							{/* ─ Top bar ─ */}
-							<div
-								style={{
-									height: 56,
-									borderBottom: `1px solid ${T.border}`,
-									display: "flex",
-									alignItems: "center",
-									padding: "0 20px",
-									gap: 12,
-									flexShrink: 0,
-									background: T.surface,
-								}}
-							>
-								<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, fontFamily: "'Instrument Serif',serif" }}>
-									Export themes
-								</p>
-								<p style={{ fontSize: 12, color: T.muted }}>
-									— pick a theme to preview your content, then copy the HTML
-								</p>
-								<div style={{ flex: 1 }} />
-
-							{/* Download HTML */}
-							<motion.button
-								whileHover={{ background: "#F0ECE5" }}
-								whileTap={{ scale: 0.96 }}
-								onClick={() => {
-									if (!themedDoc) return;
-									const blob = new Blob([themedDoc], { type: "text/html;charset=utf-8" });
-									const a = document.createElement("a");
-									a.href = URL.createObjectURL(blob);
-									a.download = `${(draft?.title || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${activeTheme?.name?.toLowerCase() || "theme"}.html`;
-									a.click();
-									URL.revokeObjectURL(a.href);
-								}}
-								style={{
-									display: "flex", alignItems: "center", gap: 7,
-									background: T.base,
-									color: T.accent,
-									border: `1px solid ${T.border}`,
-									borderRadius: 9,
-									padding: "8px 16px",
-									fontSize: 13,
-									fontWeight: 600,
-									cursor: "pointer",
-								}}
-							>
-								<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-									<polyline points="7 10 12 15 17 10"/>
-									<line x1="12" y1="15" x2="12" y2="3"/>
-								</svg>
-								Download .html
-							</motion.button>
-
-							{/* Copy HTML — primary CTA */}
-							<motion.button
-								whileHover={{ background: isCopied ? "#2D6A4F" : "#333" }}
-								whileTap={{ scale: 0.96 }}
-								onClick={() => handleCopyThemeHTML(previewTheme)}
-								style={{
-									display: "flex", alignItems: "center", gap: 7,
-									background: isCopied ? "#2D6A4F" : T.accent,
-									color: "white",
-									border: "none",
-									borderRadius: 9,
-									padding: "8px 18px",
-									fontSize: 13,
-									fontWeight: 600,
-									cursor: "pointer",
-									transition: "background 0.2s",
-								}}
-							>
-								{isCopied ? (
-									<>
-										<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-											<polyline points="20 6 9 17 4 12"/>
-										</svg>
-										Copied!
-									</>
-								) : (
-									<>
-										<svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-											<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-											<rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-										</svg>
-										Copy HTML — {activeTheme?.name}
-									</>
-								)}
-							</motion.button>
-
-							{/* Close */}
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.93 }}
+			<AnimatePresence>
+				{themeDrawerOpen &&
+					(() => {
+						const activeTheme = THEMES[previewTheme];
+						const currentHTML =
+							editorRef.current?.innerHTML || draft?.body || "";
+						const themedDoc = activeTheme
+							? buildThemedHTML(currentHTML, activeTheme, draft?.title || "")
+							: "";
+						const isCopied = copiedTheme === previewTheme;
+						return (
+							<>
+								{/* Backdrop */}
+								<motion.div
+									key="theme-backdrop"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
 									onClick={() => setThemeDrawerOpen(false)}
 									style={{
-										background: "transparent",
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										width: 34, height: 34,
-										display: "flex", alignItems: "center", justifyContent: "center",
-										cursor: "pointer", flexShrink: 0,
+										position: "fixed",
+										inset: 0,
+										background: "rgba(0,0,0,0.5)",
+										zIndex: 300,
+										backdropFilter: "blur(4px)",
 									}}
-								>
-									<svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth={2} strokeLinecap="round">
-										<path d="M18 6L6 18M6 6l12 12"/>
-									</svg>
-								</motion.button>
-							</div>
+								/>
 
-							{/* ─ Body: sidebar + preview ─ */}
-							<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-
-								{/* Left: theme list */}
-								<div
+								{/* Centering shell — flexbox positions the modal, pointer-events:none lets backdrop work */}
+								<motion.div
+									key="theme-modal"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
+									transition={{ duration: 0.22 }}
 									style={{
-										width: 210,
-										borderRight: `1px solid ${T.border}`,
-										overflowY: "auto",
-										flexShrink: 0,
-										background: T.base,
-										padding: "12px 10px",
+										position: "fixed",
+										inset: 0,
+										zIndex: 301,
 										display: "flex",
-										flexDirection: "column",
-										gap: 3,
+										alignItems: "center",
+										justifyContent: "center",
+										pointerEvents: "none",
 									}}
 								>
-									{Object.entries(THEMES).map(([key, theme]) => {
-										const isActive = previewTheme === key;
-										const hColor = parseCSSProp(theme.h1, "color") || theme.text;
-										return (
-											<motion.button
-												key={key}
-												whileTap={{ scale: 0.97 }}
-												onClick={() => setPreviewTheme(key)}
+									{/* Actual modal panel */}
+									<motion.div
+										initial={{ scale: 0.95, y: 24 }}
+										animate={{ scale: 1, y: 0 }}
+										exit={{ scale: 0.95, y: 24 }}
+										transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+										style={{
+											width: "92vw",
+											maxWidth: 1280,
+											height: "90vh",
+											background: T.surface,
+											borderRadius: 16,
+											border: `1px solid ${T.border}`,
+											display: "flex",
+											flexDirection: "column",
+											boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
+											overflow: "hidden",
+											pointerEvents: "all",
+										}}
+									>
+										{/* ─ Top bar ─ */}
+										<div
+											style={{
+												height: 56,
+												borderBottom: `1px solid ${T.border}`,
+												display: "flex",
+												alignItems: "center",
+												padding: "0 20px",
+												gap: 12,
+												flexShrink: 0,
+												background: T.surface,
+											}}
+										>
+											<p
 												style={{
-													background: isActive ? T.surface : "transparent",
-													border: `1.5px solid ${isActive ? T.border : "transparent"}`,
-													borderRadius: 10,
-													padding: "10px 12px",
-													cursor: "pointer",
-													display: "flex",
-													alignItems: "center",
-													gap: 10,
-													textAlign: "left",
-													boxShadow: isActive ? "0 1px 6px rgba(0,0,0,0.07)" : "none",
+													fontSize: 15,
+													fontWeight: 700,
+													color: T.accent,
+													fontFamily: "'Instrument Serif',serif",
 												}}
 											>
-												{/* Color swatch strip */}
-												<div
-													style={{
-														width: 28, height: 28,
-														borderRadius: 7,
-														background: theme.bg,
-														border: "1px solid rgba(0,0,0,0.1)",
-														flexShrink: 0,
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														overflow: "hidden",
-													}}
+												Export themes
+											</p>
+											<p style={{ fontSize: 12, color: T.muted }}>
+												— pick a theme to preview your content, then copy the
+												HTML
+											</p>
+											<div style={{ flex: 1 }} />
+
+											{/* Download HTML */}
+											<motion.button
+												whileHover={{ background: "#F0ECE5" }}
+												whileTap={{ scale: 0.96 }}
+												onClick={() => {
+													if (!themedDoc) return;
+													const blob = new Blob([themedDoc], {
+														type: "text/html;charset=utf-8",
+													});
+													const a = document.createElement("a");
+													a.href = URL.createObjectURL(blob);
+													a.download = `${(draft?.title || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${activeTheme?.name?.toLowerCase() || "theme"}.html`;
+													a.click();
+													URL.revokeObjectURL(a.href);
+												}}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 7,
+													background: T.base,
+													color: T.accent,
+													border: `1px solid ${T.border}`,
+													borderRadius: 9,
+													padding: "8px 16px",
+													fontSize: 13,
+													fontWeight: 600,
+													cursor: "pointer",
+												}}
+											>
+												<svg
+													width={13}
+													height={13}
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth={2}
+													strokeLinecap="round"
+													strokeLinejoin="round"
 												>
-													<div style={{ width: 10, height: 10, borderRadius: "50%", background: hColor }} />
-												</div>
-												<div style={{ minWidth: 0 }}>
-													<p style={{
-														fontSize: 12, fontWeight: isActive ? 700 : 500,
-														color: isActive ? T.accent : "#555",
-														lineHeight: 1.3,
-													}}>
-														{theme.name}
-													</p>
-													<p style={{
-														fontSize: 10, color: T.muted,
-														overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-														marginTop: 1,
-													}}>
-														{theme.label}
-													</p>
-												</div>
-												{isActive && (
-													<div style={{
-														marginLeft: "auto",
-														width: 6, height: 6,
-														borderRadius: "50%",
-														background: T.warm,
-														flexShrink: 0,
-													}} />
+													<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+													<polyline points="7 10 12 15 17 10" />
+													<line x1="12" y1="15" x2="12" y2="3" />
+												</svg>
+												Download .html
+											</motion.button>
+
+											{/* Copy HTML — primary CTA */}
+											<motion.button
+												whileHover={{
+													background: isCopied ? "#2D6A4F" : "#333",
+												}}
+												whileTap={{ scale: 0.96 }}
+												onClick={() => handleCopyThemeHTML(previewTheme)}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 7,
+													background: isCopied ? "#2D6A4F" : T.accent,
+													color: "white",
+													border: "none",
+													borderRadius: 9,
+													padding: "8px 18px",
+													fontSize: 13,
+													fontWeight: 600,
+													cursor: "pointer",
+													transition: "background 0.2s",
+												}}
+											>
+												{isCopied ? (
+													<>
+														<svg
+															width={13}
+															height={13}
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="white"
+															strokeWidth={2.5}
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<polyline points="20 6 9 17 4 12" />
+														</svg>
+														Copied!
+													</>
+												) : (
+													<>
+														<svg
+															width={13}
+															height={13}
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="white"
+															strokeWidth={2}
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+															<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+															<rect
+																x="8"
+																y="2"
+																width="8"
+																height="4"
+																rx="1"
+																ry="1"
+															/>
+														</svg>
+														Copy HTML — {activeTheme?.name}
+													</>
 												)}
 											</motion.button>
-										);
-									})}
-								</div>
 
-								{/* Right: iframe live preview */}
-								<div style={{ flex: 1, position: "relative", background: "#e5e7eb" }}>
-									{themedDoc ? (
-										<iframe
-											key={previewTheme}
-											srcDoc={themedDoc}
-											title={`Preview — ${activeTheme?.name}`}
-											sandbox="allow-same-origin"
-											style={{
-												width: "100%",
-												height: "100%",
-												border: "none",
-												display: "block",
-											}}
-										/>
-									) : (
-										<div style={{
-											height: "100%",
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											color: T.muted,
-											fontSize: 14,
-										}}>
-											No content yet — write something in the editor first.
+											{/* Close */}
+											<motion.button
+												whileHover={{ background: "#F0ECE5" }}
+												whileTap={{ scale: 0.93 }}
+												onClick={() => setThemeDrawerOpen(false)}
+												style={{
+													background: "transparent",
+													border: `1px solid ${T.border}`,
+													borderRadius: 8,
+													width: 34,
+													height: 34,
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "center",
+													cursor: "pointer",
+													flexShrink: 0,
+												}}
+											>
+												<svg
+													width={14}
+													height={14}
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke={T.muted}
+													strokeWidth={2}
+													strokeLinecap="round"
+												>
+													<path d="M18 6L6 18M6 6l12 12" />
+												</svg>
+											</motion.button>
 										</div>
-									)}
-								</div>
-							</div>
-						</motion.div>
-					{/* end centering shell */}
-					</motion.div>
-				</>
-			);
-		})()}
-		</AnimatePresence>
 
-		{/* ── DELETE CONFIRM MODAL ── */}
+										{/* ─ Body: sidebar + preview ─ */}
+										<div
+											style={{ flex: 1, display: "flex", overflow: "hidden" }}
+										>
+											{/* Left: theme list */}
+											<div
+												style={{
+													width: 210,
+													borderRight: `1px solid ${T.border}`,
+													overflowY: "auto",
+													flexShrink: 0,
+													background: T.base,
+													padding: "12px 10px",
+													display: "flex",
+													flexDirection: "column",
+													gap: 3,
+												}}
+											>
+												{Object.entries(THEMES).map(([key, theme]) => {
+													const isActive = previewTheme === key;
+													const hColor =
+														parseCSSProp(theme.h1, "color") || theme.text;
+													return (
+														<motion.button
+															key={key}
+															whileTap={{ scale: 0.97 }}
+															onClick={() => setPreviewTheme(key)}
+															style={{
+																background: isActive
+																	? T.surface
+																	: "transparent",
+																border: `1.5px solid ${isActive ? T.border : "transparent"}`,
+																borderRadius: 10,
+																padding: "10px 12px",
+																cursor: "pointer",
+																display: "flex",
+																alignItems: "center",
+																gap: 10,
+																textAlign: "left",
+																boxShadow: isActive
+																	? "0 1px 6px rgba(0,0,0,0.07)"
+																	: "none",
+															}}
+														>
+															{/* Color swatch strip */}
+															<div
+																style={{
+																	width: 28,
+																	height: 28,
+																	borderRadius: 7,
+																	background: theme.bg,
+																	border: "1px solid rgba(0,0,0,0.1)",
+																	flexShrink: 0,
+																	display: "flex",
+																	alignItems: "center",
+																	justifyContent: "center",
+																	overflow: "hidden",
+																}}
+															>
+																<div
+																	style={{
+																		width: 10,
+																		height: 10,
+																		borderRadius: "50%",
+																		background: hColor,
+																	}}
+																/>
+															</div>
+															<div style={{ minWidth: 0 }}>
+																<p
+																	style={{
+																		fontSize: 12,
+																		fontWeight: isActive ? 700 : 500,
+																		color: isActive ? T.accent : "#555",
+																		lineHeight: 1.3,
+																	}}
+																>
+																	{theme.name}
+																</p>
+																<p
+																	style={{
+																		fontSize: 10,
+																		color: T.muted,
+																		overflow: "hidden",
+																		whiteSpace: "nowrap",
+																		textOverflow: "ellipsis",
+																		marginTop: 1,
+																	}}
+																>
+																	{theme.label}
+																</p>
+															</div>
+															{isActive && (
+																<div
+																	style={{
+																		marginLeft: "auto",
+																		width: 6,
+																		height: 6,
+																		borderRadius: "50%",
+																		background: T.warm,
+																		flexShrink: 0,
+																	}}
+																/>
+															)}
+														</motion.button>
+													);
+												})}
+											</div>
+
+											{/* Right: iframe live preview */}
+											<div
+												style={{
+													flex: 1,
+													position: "relative",
+													background: "#e5e7eb",
+												}}
+											>
+												{themedDoc ? (
+													<iframe
+														key={previewTheme}
+														srcDoc={themedDoc}
+														title={`Preview — ${activeTheme?.name}`}
+														sandbox="allow-same-origin"
+														style={{
+															width: "100%",
+															height: "100%",
+															border: "none",
+															display: "block",
+														}}
+													/>
+												) : (
+													<div
+														style={{
+															height: "100%",
+															display: "flex",
+															alignItems: "center",
+															justifyContent: "center",
+															color: T.muted,
+															fontSize: 14,
+														}}
+													>
+														No content yet — write something in the editor
+														first.
+													</div>
+												)}
+											</div>
+										</div>
+									</motion.div>
+									{/* end centering shell */}
+								</motion.div>
+							</>
+						);
+					})()}
+			</AnimatePresence>
+
+			{/* ── DELETE CONFIRM MODAL ── */}
 			<AnimatePresence>
 				{deleteConfirm && (
 					<>
@@ -2233,28 +2653,28 @@ export default function DraftPage() {
 						</motion.div>
 					</>
 				)}
-		</AnimatePresence>
+			</AnimatePresence>
 
-	{/* ── INFOGRAPHICS MODAL ── */}
-	<InfographicsModal
-		open={infographicsOpen}
-		onClose={() => setInfographicsOpen(false)}
-		content={editorRef.current?.innerHTML || draft?.body || ""}
-		title={draft?.title || "Draft"}
-		userId={reduxUser?.uid || ""}
-		draftId={draftId}
-		savedInfographics={draft?.infographics || []}
-	/>
+			{/* ── INFOGRAPHICS MODAL ── */}
+			<InfographicsModal
+				open={infographicsOpen}
+				onClose={() => setInfographicsOpen(false)}
+				content={editorRef.current?.innerHTML || draft?.body || ""}
+				title={draft?.title || "Draft"}
+				userId={reduxUser?.uid || ""}
+				draftId={draftId}
+				savedInfographics={draft?.infographics || []}
+			/>
 
-	{/* ── AI CHAT SIDEBAR ── */}
-	<AIChatSidebar
-		open={chatOpen}
-		onClose={() => setChatOpen(false)}
-		editorRef={editorRef}
-		draftContent={editorRef.current?.innerHTML || draft?.body || ""}
-		draftTitle={draft?.title || "Draft"}
-		userId={reduxUser?.uid || ""}
-	/>
-</div>
-);
+			{/* ── AI CHAT SIDEBAR ── */}
+			<AIChatSidebar
+				open={chatOpen}
+				onClose={() => setChatOpen(false)}
+				editorRef={editorRef}
+				draftContent={editorRef.current?.innerHTML || draft?.body || ""}
+				draftTitle={draft?.title || "Draft"}
+				userId={reduxUser?.uid || ""}
+			/>
+		</div>
+	);
 }

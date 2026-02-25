@@ -3,7 +3,7 @@
  * Scrapes a URL via Firecrawl and returns the raw markdown + metadata.
  * No AI — content goes straight into the editor.
  */
-import { checkAndIncrementCredit } from "../../../lib/utils/credits";
+import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 
 const extractImages = (links = []) => {
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 	}
 
 	// Credit gate — 5 free scrapes per month; Pro = unlimited
-	const creditCheck = await checkAndIncrementCredit(verifiedUid, "scrape");
+	const creditCheck = await checkAndDeductCredit(verifiedUid, 1);
 	if (!creditCheck.allowed) {
 		return res.status(429).json({ error: creditCheck.error });
 	}

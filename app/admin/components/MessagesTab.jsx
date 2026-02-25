@@ -30,7 +30,7 @@ import {
 } from "../../../lib/ui/Table";
 import AnimatedDropdown from "../../../lib/ui/AnimatedDropdown";
 import ExportDropdown from "../../../lib/ui/ExportDropdown";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const MessagesTab = ({ queryClient }) => {
 	const [searchQuery, setSearchQuery] = useState("");
@@ -265,8 +265,8 @@ const MessagesTab = ({ queryClient }) => {
 									colSpan={6}
 									message={
 										searchQuery ||
-										readFilter !== "all" ||
-										repliedFilter !== "all"
+											readFilter !== "all" ||
+											repliedFilter !== "all"
 											? "No messages found matching your filters."
 											: "No messages yet. Messages from the contact form will appear here."
 									}
@@ -329,39 +329,39 @@ const MessagesTab = ({ queryClient }) => {
 											</div>
 										</TableCell>
 										<TableCell>
-										<div className="flex items-center gap-2">
-											<button
-												onClick={() => handleReplyClick(message)}
-												className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-xl transition-colors"
-												title="Reply to message"
-											>
-												<Send className="w-4 h-4" />
-											</button>
-											{!message.read && (
+											<div className="flex items-center gap-2">
 												<button
-													onClick={() => markAsReadMutation.mutate(message.id)}
-													className="p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-colors"
-													title="Mark as read"
+													onClick={() => handleReplyClick(message)}
+													className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-xl transition-colors"
+													title="Reply to message"
 												>
-													<Eye className="w-4 h-4" />
+													<Send className="w-4 h-4" />
 												</button>
-											)}
-											<button
-												onClick={() => {
-													if (
-														confirm(
-															"Are you sure you want to delete this message?"
-														)
-													) {
-														deleteMessageMutation.mutate(message.id);
-													}
-												}}
-												className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-xl transition-colors"
-												title="Delete message"
-											>
-												<Trash2 className="w-4 h-4" />
-											</button>
-										</div>
+												{!message.read && (
+													<button
+														onClick={() => markAsReadMutation.mutate(message.id)}
+														className="p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-colors"
+														title="Mark as read"
+													>
+														<Eye className="w-4 h-4" />
+													</button>
+												)}
+												<button
+													onClick={() => {
+														if (
+															confirm(
+																"Are you sure you want to delete this message?"
+															)
+														) {
+															deleteMessageMutation.mutate(message.id);
+														}
+													}}
+													className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-xl transition-colors"
+													title="Delete message"
+												>
+													<Trash2 className="w-4 h-4" />
+												</button>
+											</div>
 										</TableCell>
 									</TableRow>
 								))

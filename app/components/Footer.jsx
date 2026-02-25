@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Mail, Twitter, Github, Linkedin, Send, Sparkles } from "lucide-react";
 import { addSubscriber } from "../../lib/api/subscribers";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 const Footer = () => {
 	const currentYear = new Date().getFullYear();
