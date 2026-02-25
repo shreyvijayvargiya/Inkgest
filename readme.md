@@ -1,6 +1,6 @@
 # Inkgest
 
-AI-powered newsletter drafting tool. Paste URLs, get a structured draft, edit it in the browser, and save it to your account.
+AI-powered content drafting tool from one LINK. Paste URLs, get a structured newsletter, blog, tweets, posts, infographics and more, edit it in the browser, and save it to your account.
 
 ## Stack
 
