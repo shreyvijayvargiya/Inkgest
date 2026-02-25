@@ -13,7 +13,7 @@ import {
 	removeUserCookie,
 	setUserCookie,
 } from "../lib/utils/cookies";
-import { signInWithGoogle, onAuthStateChange } from "../lib/api/auth";
+import { onAuthStateChange } from "../lib/api/auth";
 import { toast } from "sonner";
 
 /* ─── Fonts ─── */
@@ -100,18 +100,6 @@ const PricingPage = () => {
 		refetchOnMount: false,
 	});
 
-	const handleGoogleLogin = async () => {
-		try {
-			await signInWithGoogle();
-			// Invalidate user query to refetch after login
-			queryClient.invalidateQueries({ queryKey: ["currentUser"] });
-			toast.success("Logged in successfully!");
-		} catch (error) {
-			console.error("Google login error:", error);
-			toast.error("Failed to login with Google. Please try again.");
-		}
-	};
-
 	const plans = [
 		{
 			id: "4c4f2fa6-8cdf-4716-b56d-2a86e294bc78",
@@ -120,11 +108,12 @@ const PricingPage = () => {
 			period: "month",
 			description: "Try inkgest with no commitment",
 			features: [
-				"3 drafts per month",
-				"Newsletter, blog & thread formats",
-				"InkgestURL scraping",
-				"AI-powered writing",
-				"Basic editor",
+				"10 credits / month",
+				"AI Draft / Newsletter — 1 credit",
+				"URL Scrape — 1 credit",
+				"AI Chat message — ¼ credit",
+				"Table Creator — 2 credits",
+				"Blank drafts free, always",
 			],
 			popular: false,
 			type: "free",
@@ -132,21 +121,24 @@ const PricingPage = () => {
 		{
 			id: "9c912dd8-9153-48f9-bd30-2b6c97c184c8",
 			name: "Pro",
-			price: "$5",
+			price: "$9",
 			period: "month",
-			description: "Unlimited drafts for serious creators",
+			description: "Unlimited credits for serious creators",
 			features: [
-				"Unlimited drafts",
+				"100 credits every month",
 				"All content formats",
 				"Multiple URL sources per draft",
-				"Priority AI generation",
-				"Full editor with save",
+				"AI Chat with all models",
+				"Themes, Infographics & Table Creator",
 				"Priority support",
 			],
 			popular: true,
 			type: "subscription",
 		},
 	];
+
+	const loggedIn = !!(user || reduxUser);
+	const isFreePlan = loggedIn && !subscription.isSubscribed;
 
 	const handleCheckout = async (planId) => {
 		// Check if user is logged in
@@ -697,28 +689,79 @@ const PricingPage = () => {
 
 							{/* CTA button */}
 							{plan.type === "free" ? (
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => router.push("/app")}
-									style={{
-										width: "100%",
-										padding: "13px",
-										borderRadius: 11,
-										fontSize: 14,
-										fontWeight: 700,
-										cursor: "pointer",
-										background: T.base,
-										border: `1.5px solid ${T.border}`,
-										color: T.accent,
-										transition: "all 0.18s",
-									}}
-								>
-									Start for free →
-								</motion.button>
+								isFreePlan ? (
+									/* Logged-in free user — show active state */
+									<div
+										style={{ display: "flex", flexDirection: "column", gap: 8 }}
+									>
+										<div
+											style={{
+												width: "100%",
+												padding: "13px",
+												borderRadius: 11,
+												fontSize: 14,
+												fontWeight: 700,
+												background: "#F0F7F0",
+												color: "#3D7A35",
+												textAlign: "center",
+												border: "1.5px solid #BBE0BB",
+											}}
+										>
+											✓ Current plan
+										</div>
+										<motion.button
+											whileHover={{
+												scale: 1.02,
+												y: -1,
+												boxShadow: "0 8px 24px rgba(193,123,47,0.3)",
+											}}
+											whileTap={{ scale: 0.97 }}
+											onClick={() =>
+												handleCheckout(
+													plans.find((p) => p.type === "subscription").id,
+												)
+											}
+											style={{
+												width: "100%",
+												padding: "11px",
+												borderRadius: 11,
+												fontSize: 13,
+												fontWeight: 700,
+												cursor: "pointer",
+												background: T.warm,
+												border: "none",
+												color: "white",
+												transition: "all 0.18s",
+											}}
+										>
+											Upgrade to Pro →
+										</motion.button>
+									</div>
+								) : (
+									/* Not logged in */
+									<motion.button
+										whileHover={{ background: "#F0ECE5" }}
+										whileTap={{ scale: 0.97 }}
+										onClick={() => router.push("/app")}
+										style={{
+											width: "100%",
+											padding: "13px",
+											borderRadius: 11,
+											fontSize: 14,
+											fontWeight: 700,
+											cursor: "pointer",
+											background: T.base,
+											border: `1.5px solid ${T.border}`,
+											color: T.accent,
+											transition: "all 0.18s",
+										}}
+									>
+										Start for free →
+									</motion.button>
+								)
 							) : subscription.isSubscribed &&
-								subscription.status === "active" &&
-								subscription.planId === plan.id ? (
+							  subscription.status === "active" &&
+							  subscription.planId === plan.id ? (
 								<div
 									style={{ display: "flex", flexDirection: "column", gap: 8 }}
 								>
@@ -810,6 +853,54 @@ const PricingPage = () => {
 					))}
 				</div>
 
+				{/* ── Trust line: Polar + guarantees ── */}
+				<div
+					style={{
+						display: "flex",
+						flexDirection: "column",
+						alignItems: "center",
+						justifyContent: "center",
+						gap: 12,
+						marginBottom: 48,
+						textAlign: "center",
+					}}
+				>
+					<a
+						href="https://polar.sh"
+						target="_blank"
+						rel="noopener noreferrer"
+						style={{
+							fontSize: 12,
+							fontWeight: 600,
+							color: T.muted,
+							textDecoration: "none",
+							display: "inline-flex",
+							alignItems: "center",
+							gap: 6,
+							transition: "color 0.15s",
+						}}
+						onMouseEnter={(e) => (e.currentTarget.style.color = T.warm)}
+						onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
+					>
+						Powered by polar.sh
+					</a>
+					<div
+						style={{
+							display: "flex",
+							flexWrap: "wrap",
+							alignItems: "center",
+							justifyContent: "center",
+							gap: "8px 20px",
+							fontSize: 13,
+							color: T.muted,
+						}}
+					>
+						<span>Cancel anytime</span>
+						<span style={{ opacity: 0.4 }}>·</span>
+						<span>No credit card for free</span>
+					</div>
+				</div>
+
 				{/* ── FAQ row ── */}
 				<div
 					style={{ maxWidth: 680, margin: "0 auto 80px", padding: "0 24px" }}
@@ -836,12 +927,12 @@ const PricingPage = () => {
 						</p>
 						{[
 							[
-								"What counts as a draft?",
-								"Each time you click 'Generate draft' it uses one of your monthly drafts.",
+								"What counts as a credit?",
+								"AI Draft, Newsletter, Infographics = 1 credit. URL Scrape = 1 credit. Table Creator = 2 credits. AI Chat message = ¼ credit. Blank drafts are free.",
 							],
 							[
 								"Does the free plan renew monthly?",
-								"Yes — your 3 free drafts reset on the 1st of each month.",
+								"Yes — your 10 free credits reset on the 1st of each month.",
 							],
 							[
 								"Can I cancel anytime?",

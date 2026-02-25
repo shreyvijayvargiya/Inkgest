@@ -13,7 +13,7 @@ const SEO = ({ customSEO = null }) => {
 	const seoConfig = customSEO || getSEOConfig(router.pathname);
 	const canonicalUrl = getCanonicalUrl(router.asPath);
 
-	return (
+return (
 		<Head>
 			{/* Basic Meta Tags */}
 			<title>{seoConfig.title}</title>

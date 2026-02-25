@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
 	motion,
 	useInView,
@@ -8,6 +8,10 @@ import {
 } from "framer-motion";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
+import LoginModal from "../lib/ui/LoginModal";
+import { auth, db } from "../lib/config/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -33,6 +37,21 @@ const T = {
 	border: "#E8E4DC",
 };
 
+/* ── Format / Style config (mirrors app) ── */
+const FORMATS = [
+	{ id: "substack", label: "Newsletter", icon: "✉️" },
+	{ id: "linkedin", label: "LinkedIn", icon: "💼" },
+	{ id: "twitter_thread", label: "Thread", icon: "🐦" },
+	{ id: "blog_post", label: "Blog Post", icon: "📝" },
+	{ id: "email_digest", label: "Digest", icon: "📰" },
+];
+const STYLES = [
+	{ id: "casual", label: "Casual" },
+	{ id: "professional", label: "Professional" },
+	{ id: "educational", label: "Educational" },
+	{ id: "persuasive", label: "Persuasive" },
+];
+
 /* ── Reusable fade-up on scroll ── */
 function FadeUp({ children, delay = 0, className = "" }) {
 	const ref = useRef(null);
@@ -49,7 +68,6 @@ function FadeUp({ children, delay = 0, className = "" }) {
 		</motion.div>
 	);
 }
-
 
 /* ── Nav ── */
 function Nav() {
@@ -106,7 +124,7 @@ function Nav() {
 
 					{/* Links */}
 					<div className="hidden md:flex items-center gap-8">
-						{["How it works", "Pricing", "FAQ"].map((l) => (
+						{["Features", "How it works", "Pricing", "FAQ"].map((l) => (
 							<a
 								key={l}
 								href={`#${l.toLowerCase().replace(/ /g, "-")}`}
@@ -159,15 +177,138 @@ function Nav() {
 	);
 }
 
-/* ── Hero ── */
+/* ── Hero with AI draft form ── */
 function Hero() {
+	const router = useRouter();
+	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const heroRef = useRef(null);
+	const pendingGenerateRef = useRef(false);
+
+	const [urls, setUrls] = useState([""]);
+	const [prompt, setPrompt] = useState("");
+	const [format, setFormat] = useState("substack");
+	const [style, setStyle] = useState("casual");
+	const [generating, setGenerating] = useState(false);
+	const [generateError, setGenerateError] = useState(null);
+	const [loginModalOpen, setLoginModalOpen] = useState(false);
+
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
 		offset: ["start start", "end start"],
 	});
 	const y = useTransform(scrollYProgress, [0, 1], [0, 80]);
 	const opacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
+
+	const addUrl = () => setUrls((prev) => [...prev, ""]);
+	const updateUrl = (idx, val) => {
+		setUrls((prev) => {
+			const next = [...prev];
+			next[idx] = val;
+			return next;
+		});
+	};
+	const removeUrl = (idx) =>
+		setUrls((prev) => prev.filter((_, i) => i !== idx));
+
+	const handleGenerate = async () => {
+		if (!prompt.trim() || generating) return;
+		if (!reduxUser) return;
+		// Credits check — redirect to pricing if out
+		const creds = await getUserCredits(reduxUser.uid).catch(() => null);
+		if (creds && creds.plan !== "pro" && (creds.remaining ?? 0) <= 0) {
+			router.push("/pricing");
+			return;
+		}
+		setGenerating(true);
+		setGenerateError(null);
+		try {
+			const idToken = await auth.currentUser?.getIdToken();
+			if (!idToken) {
+				setGenerateError("Session expired. Please sign in again.");
+				setGenerating(false);
+				return;
+			}
+			const validUrls = urls.map((u) => u.trim()).filter(Boolean);
+			const res = await fetch("/api/automations/newsletter-generate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					urls: validUrls,
+					prompt: prompt.trim(),
+					format,
+					style,
+					idToken,
+				}),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Generation failed");
+
+			const lines = (data.content || "").split("\n");
+			const titleLine = lines.find(
+				(l) => l.startsWith("# ") || l.startsWith("## "),
+			);
+			const title = titleLine
+				? titleLine.replace(/^#+\s*/, "").trim()
+				: prompt.slice(0, 60) || "Untitled draft";
+
+			const bodyText = lines
+				.filter((l) => !l.match(/^#{1,6}\s/))
+				.join(" ")
+				.replace(/[*_`]/g, "")
+				.replace(/\s+/g, " ")
+				.trim();
+			const preview =
+				bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : "");
+
+			const words = data.content.trim().split(/\s+/).length;
+			const now = new Date();
+			const date = now.toLocaleDateString("en-US", {
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+			});
+
+			const draft = {
+				userId: reduxUser.uid,
+				title,
+				preview,
+				body: data.content,
+				urls: validUrls,
+				words,
+				date,
+				tag: data.formatLabel || "Newsletter",
+				format: data.format || format,
+				style: data.style || style,
+				createdAt: serverTimestamp(),
+			};
+
+			const docRef = await addDoc(collection(db, "drafts"), draft);
+			setUrls([""]);
+			setPrompt("");
+			router.push(`/app/${docRef.id}`);
+		} catch (e) {
+			setGenerateError(e?.message || "Failed to generate");
+		} finally {
+			setGenerating(false);
+		}
+	};
+
+	const handleGenerateClick = () => {
+		if (!reduxUser) {
+			pendingGenerateRef.current = true;
+			setLoginModalOpen(true);
+			return;
+		}
+		handleGenerate();
+	};
+
+	useEffect(() => {
+		if (reduxUser && pendingGenerateRef.current && prompt.trim()) {
+			pendingGenerateRef.current = false;
+			handleGenerate();
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [reduxUser]);
 
 	return (
 		<section
@@ -196,24 +337,6 @@ function Hero() {
 				style={{ y, opacity }}
 				className="relative max-w-5xl mx-auto px-6 text-center"
 			>
-				{/* Badge */}
-				<motion.div
-					initial={{ opacity: 0, y: 16 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.1, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-					className="inline-flex items-center gap-2 mb-10 px-4 py-1.5 rounded-full text-sm font-medium border"
-					style={{
-						background: T.surface,
-						borderColor: T.border,
-						color: T.muted,
-						fontFamily: "'Outfit', sans-serif",
-						boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-					}}
-				>
-					✦ <span style={{ color: T.warm, fontWeight: 700 }}>New</span> —
-					Inkgest version one is live
-				</motion.div>
-
 				{/* Headline */}
 				<motion.h1
 					initial={{ opacity: 0, y: 24 }}
@@ -231,11 +354,22 @@ function Hero() {
 					Turn any article into
 					<br />
 					<div className="gap-2 flex items-center justify-center">
-						{['newsletter,', 'blog,', 'infographics,', 'linkedin post,', 'tweets,', 'video'].map(item => <em className="text-4xl" style={{ fontStyle: "italic", color: T.warm }}>
-							{item}
-						</em>)}
+						{[
+							"newsletter,",
+							"blog,",
+							"infographics,",
+							"linkedin post,",
+							"tweets",
+						].map((item) => (
+							<em
+								key={item}
+								className="text-4xl"
+								style={{ fontStyle: "italic", color: T.warm }}
+							>
+								{item}
+							</em>
+						))}
 					</div>
-
 				</motion.h1>
 
 				{/* Sub */}
@@ -247,536 +381,577 @@ function Hero() {
 						fontSize: 18,
 						color: T.muted,
 						maxWidth: 440,
-						margin: "0 auto 40px",
+						margin: "0 auto 32px",
 						lineHeight: 1.7,
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
-					Paste a URL, describe your angle. Get a structured newsletter, blog, infographic, linkedin post, tweets, video ready to edit and publish — in under 60 seconds.
+					Paste a URL, describe your angle. Get a structured newsletter, blog,
+					infographic, linkedin post, tweets, video ready to edit and publish —
+					in under 60 seconds.
 				</motion.p>
 
-				{/* CTAs */}
+				{/* AI draft form */}
 				<motion.div
-					initial={{ opacity: 0, y: 18 }}
+					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.48, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-					className="flex flex-wrap items-center justify-center gap-3 mb-4"
+					transition={{ delay: 0.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+					style={{
+						maxWidth: 640,
+						margin: "0 auto",
+						background: T.surface,
+						borderRadius: 16,
+						border: `1px solid ${T.border}`,
+						boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+						padding: "28px 24px",
+						textAlign: "left",
+					}}
 				>
-					<motion.a
-						href="/app"
-						whileHover={{
-							scale: 1.04,
-							y: -2,
-							boxShadow: "0 8px 28px rgba(0,0,0,0.2)",
-						}}
-						whileTap={{ scale: 0.97 }}
+					{/* URLs */}
+					<div style={{ marginBottom: 18 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.08em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Source URLs (optional)
+						</label>
+						{urls.map((urlVal, idx) => (
+							<div
+								key={idx}
+								style={{
+									display: "flex",
+									gap: 8,
+									marginBottom: 8,
+									alignItems: "center",
+								}}
+							>
+								<input
+									value={urlVal}
+									onChange={(e) => updateUrl(idx, e.target.value)}
+									placeholder={`https://example.com/article${idx > 0 ? `-${idx + 1}` : ""}`}
+									style={{
+										flex: 1,
+										background: T.base,
+										border: `1.5px solid ${T.border}`,
+										borderRadius: 10,
+										padding: "11px 14px",
+										fontSize: 14,
+										color: T.accent,
+										outline: "none",
+										transition: "border-color 0.2s",
+										fontFamily: "'Outfit', sans-serif",
+									}}
+									onFocus={(e) => (e.target.style.borderColor = T.warm)}
+									onBlur={(e) => (e.target.style.borderColor = T.border)}
+								/>
+								{urls.length > 1 && (
+									<motion.button
+										whileHover={{ background: "#FEE2E2" }}
+										whileTap={{ scale: 0.95 }}
+										onClick={() => removeUrl(idx)}
+										style={{
+											background: T.base,
+											border: `1.5px solid ${T.border}`,
+											borderRadius: 8,
+											width: 38,
+											height: 38,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											cursor: "pointer",
+											flexShrink: 0,
+											transition: "background 0.15s",
+										}}
+									>
+										<svg
+											width={14}
+											height={14}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="#EF4444"
+											strokeWidth={2}
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
+											<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+										</svg>
+									</motion.button>
+								)}
+							</div>
+						))}
+						<motion.button
+							whileHover={{ background: "#F0ECE5" }}
+							whileTap={{ scale: 0.97 }}
+							onClick={addUrl}
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								background: "transparent",
+								border: `1px dashed ${T.border}`,
+								borderRadius: 8,
+								padding: "6px 12px",
+								fontSize: 12,
+								fontWeight: 600,
+								color: T.muted,
+								cursor: "pointer",
+								transition: "background 0.15s",
+								marginTop: 4,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							+ Add another URL
+						</motion.button>
+					</div>
+
+					{/* Prompt */}
+					<div style={{ marginBottom: 20 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.08em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Your angle / prompt *
+						</label>
+						<textarea
+							value={prompt}
+							onChange={(e) => setPrompt(e.target.value)}
+							placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words."
+							rows={3}
+							style={{
+								width: "100%",
+								background: T.base,
+								border: `1.5px solid ${T.border}`,
+								borderRadius: 10,
+								padding: "11px 14px",
+								fontSize: 14,
+								color: T.accent,
+								resize: "vertical",
+								outline: "none",
+								lineHeight: 1.6,
+								transition: "border-color 0.2s",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+							onFocus={(e) => (e.target.style.borderColor = T.warm)}
+							onBlur={(e) => (e.target.style.borderColor = T.border)}
+						/>
+					</div>
+
+					{/* Format selector */}
+					<div style={{ marginBottom: 14 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.08em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Format
+						</label>
+						<div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+							{FORMATS.map((f) => (
+								<motion.button
+									key={f.id}
+									whileTap={{ scale: 0.96 }}
+									onClick={() => setFormat(f.id)}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 8,
+										padding: "6px 12px",
+										borderRadius: 8,
+										fontSize: 13,
+										fontWeight: 600,
+										cursor: "pointer",
+										border: `1.5px solid ${format === f.id ? T.accent : T.border}`,
+										background: format === f.id ? T.accent : T.base,
+										color: format === f.id ? "white" : T.muted,
+										transition: "all 0.15s",
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									<span>{f.icon}</span>
+									{f.label}
+								</motion.button>
+							))}
+						</div>
+					</div>
+
+					{/* Style selector */}
+					<div style={{ marginBottom: 20 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.08em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Tone
+						</label>
+						<div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+							{STYLES.map((s) => (
+								<motion.button
+									key={s.id}
+									whileTap={{ scale: 0.96 }}
+									onClick={() => setStyle(s.id)}
+									style={{
+										padding: "5px 11px",
+										borderRadius: 8,
+										fontSize: 13,
+										fontWeight: 600,
+										cursor: "pointer",
+										border: `1.5px solid ${style === s.id ? T.warm : T.border}`,
+										background: style === s.id ? "#FEF3E2" : T.base,
+										color: style === s.id ? T.warm : T.muted,
+										transition: "all 0.15s",
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{s.label}
+								</motion.button>
+							))}
+						</div>
+					</div>
+
+					{/* Generate button */}
+					<motion.button
+						onClick={handleGenerateClick}
+						disabled={generating}
+						whileHover={
+							!generating
+								? {
+										scale: 1.02,
+										y: -1,
+										boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+									}
+								: {}
+						}
+						whileTap={!generating ? { scale: 0.97 } : {}}
 						style={{
-							background: T.accent,
-							color: "#fff",
-							fontFamily: "'Outfit', sans-serif",
-							fontWeight: 700,
-							fontSize: 16,
-							padding: "15px 36px",
-							borderRadius: 13,
-							textDecoration: "none",
-							display: "inline-flex",
-							alignItems: "center",
-							gap: 8,
-							transition: "box-shadow 0.2s",
-						}}
-					>
-						Generate your first draft free →
-					</motion.a>
-					<motion.a
-						href="#how-it-works"
-						whileHover={{ scale: 1.03, borderColor: T.accent }}
-						whileTap={{ scale: 0.97 }}
-						style={{
-							color: T.accent,
-							fontFamily: "'Outfit', sans-serif",
-							fontWeight: 600,
+							width: "100%",
+							background: generating ? "#E8E4DC" : T.accent,
+							color: generating ? T.muted : "white",
+							border: "none",
+							padding: "14px",
+							borderRadius: 12,
 							fontSize: 15,
-							padding: "15px 28px",
-							borderRadius: 13,
-							textDecoration: "none",
-							border: `1.5px solid ${T.border}`,
-							background: "transparent",
-							transition: "border-color 0.2s",
+							fontWeight: 700,
+							cursor: generating ? "not-allowed" : "pointer",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							gap: 10,
+							transition: "all 0.2s",
+							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						See how it works
-					</motion.a>
+						{generating ? (
+							<>
+								<motion.span
+									animate={{ rotate: 360 }}
+									transition={{
+										duration: 0.9,
+										repeat: Infinity,
+										ease: "linear",
+									}}
+									style={{ display: "inline-flex" }}
+								>
+									↻
+								</motion.span>
+								Reading URLs and writing draft…
+							</>
+						) : !reduxUser ? (
+							<>Sign in & generate draft →</>
+						) : (
+							<>Generate draft →</>
+						)}
+					</motion.button>
+
+					{generateError && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "10px 14px",
+								background: "#FEF2F2",
+								border: "1px solid #FECACA",
+								borderRadius: 10,
+								fontSize: 13,
+								color: "#DC2626",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{generateError}
+						</motion.div>
+					)}
 				</motion.div>
 
 				<motion.p
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					transition={{ delay: 0.62 }}
+					transition={{ delay: 0.55 }}
 					style={{
 						fontSize: 13,
 						color: T.muted,
 						fontFamily: "'Outfit', sans-serif",
+						marginTop: 20,
 					}}
 				>
-					<strong style={{ color: T.accent }}>20 free credits</strong> · No credit
-					card · Cancel anytime
+					<strong style={{ color: T.accent }}>
+						{FREE_CREDIT_LIMIT} free credits
+					</strong>{" "}
+					· No credit card · Cancel anytime
 				</motion.p>
 
-				{/* Demo card */}
-				<DemoCard />
+				<motion.a
+					href="#how-it-works"
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ delay: 0.6 }}
+					style={{
+						display: "inline-block",
+						marginTop: 12,
+						fontSize: 14,
+						fontWeight: 600,
+						color: T.warm,
+						textDecoration: "none",
+						fontFamily: "'Outfit', sans-serif",
+						transition: "color 0.2s",
+					}}
+					onMouseEnter={(e) => (e.target.style.color = T.accent)}
+					onMouseLeave={(e) => (e.target.style.color = T.warm)}
+				>
+					See how it works ↓
+				</motion.a>
 			</motion.div>
+
+			<LoginModal
+				isOpen={loginModalOpen}
+				onClose={() => setLoginModalOpen(false)}
+			/>
 		</section>
 	);
 }
 
-/* ── Demo card mock ── */
-function DemoCard() {
-	const [generated, setGenerated] = useState(false);
-	const [generating, setGenerating] = useState(false);
-	const [copied, setCopied] = useState(false);
+/* ── Features bento grid ── */
+const FEATURES = [
+	{
+		title: "AI draft generator form",
+		word: "Generate",
+		image: "/features/feature-1.png",
+	},
+	{
+		title: "AI chatbot in right sidebar",
+		word: "Chat",
+		image: "/features/feature-2.png",
+	},
+	{
+		title: "Themes modal to view content into format",
+		word: "Preview",
+		image: "/features/feature-3.png",
+	},
+	{
+		title: "Infographics using AI",
+		word: "Visualize",
+		image: "/features/feature-4.png",
+	},
+	{
+		title: "Advance editor, save/unsaved",
+		word: "Edit",
+		image: "/features/feature-5.png",
+	},
+];
 
-	const handleGenerate = () => {
-		setGenerating(true);
-		setTimeout(() => {
-			setGenerating(false);
-			setGenerated(true);
-		}, 1800);
-	};
-	const handleCopy = () => {
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	};
-
+function Features() {
 	return (
-		<motion.div
-			initial={{ opacity: 0, y: 40 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ delay: 0.72, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+		<section
+			id="features"
 			style={{
-				maxWidth: 860,
-				margin: "56px auto 0",
-				borderRadius: 20,
-				border: `1px solid ${T.border}`,
-				background: T.surface,
-				boxShadow: "0 4px 6px rgba(0,0,0,0.04), 0 24px 64px rgba(0,0,0,0.10)",
-				overflow: "hidden",
+				padding: "96px 24px",
+				background: "white",
+				borderTop: `1px solid ${T.border}`,
+				borderBottom: `1px solid ${T.border}`,
 			}}
 		>
-			{/* Title bar */}
-			<div
-				style={{
-					background: T.base,
-					borderBottom: `1px solid ${T.border}`,
-					padding: "11px 20px",
-					display: "flex",
-					alignItems: "center",
-					gap: 6,
-				}}
-			>
-				<span
-					style={{
-						width: 10,
-						height: 10,
-						borderRadius: "50%",
-						background: "#FF5F57",
-					}}
-				/>
-				<span
-					style={{
-						width: 10,
-						height: 10,
-						borderRadius: "50%",
-						background: "#FEBC2E",
-					}}
-				/>
-				<span
-					style={{
-						width: 10,
-						height: 10,
-						borderRadius: "50%",
-						background: "#28C840",
-					}}
-				/>
-				<span
-					style={{
-						flex: 1,
-						background: "white",
-						border: `1px solid ${T.border}`,
-						borderRadius: 7,
-						padding: "4px 14px",
-						fontSize: 12,
-						color: T.muted,
-						marginLeft: 8,
-						fontFamily: "monospace",
-						textAlign: "left",
-					}}
-				>
-					inkgest.app/generate
-				</span>
-			</div>
-
-			{/* Body */}
-			<div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr" }}>
-				{/* Left — inputs */}
-				<div
-					style={{
-						borderRight: `1px solid ${T.border}`,
-						padding: "26px 22px",
-						background: T.base,
-						textAlign: "left",
-					}}
-				>
+			<div className="max-w-6xl mx-auto">
+				<FadeUp>
 					<p
 						style={{
-							fontSize: 11,
+							fontSize: 12,
 							fontWeight: 700,
 							textTransform: "uppercase",
-							letterSpacing: "0.08em",
-							color: T.muted,
-							marginBottom: 8,
+							letterSpacing: "0.1em",
+							color: T.warm,
+							marginBottom: 10,
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						Source URL
+						Features
 					</p>
-					<div
+					<h2
 						style={{
-							background: "white",
-							border: `1.5px solid ${T.border}`,
-							borderRadius: 10,
-							padding: "10px 13px",
-							fontSize: 13,
+							fontFamily: "'Instrument Serif', serif",
+							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
+							lineHeight: 1.1,
 							marginBottom: 14,
-							fontFamily: "'Outfit', sans-serif",
-							textAlign: "left",
-							lineHeight: 1.4,
+							letterSpacing: "-0.5px",
 						}}
 					>
-						techcrunch.com/2025/02/ai-agents-reshaping-workflows
-					</div>
+						Everything you need
+						<br />
+						to write faster.
+					</h2>
 					<p
 						style={{
-							fontSize: 11,
-							fontWeight: 700,
-							textTransform: "uppercase",
-							letterSpacing: "0.08em",
+							fontSize: 17,
 							color: T.muted,
-							marginBottom: 8,
+							lineHeight: 1.65,
+							maxWidth: 440,
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						Your angle
+						From AI drafts to infographics, themes, and a powerful editor — all in one place.
 					</p>
-					<div
-						style={{
-							background: "white",
-							border: `1.5px solid ${T.border}`,
-							borderRadius: 10,
-							padding: "10px 13px",
-							fontSize: 13,
-							color: T.accent,
-							fontFamily: "'Outfit', sans-serif",
-							lineHeight: 1.55,
-							minHeight: 78,
-						}}
-					>
-						Sunday newsletter for indie founders. Practical, conversational,
-						under 400 words.
-					</div>
+				</FadeUp>
 
-					<motion.button
-						onClick={handleGenerate}
-						whileHover={{ scale: 1.02 }}
-						whileTap={{ scale: 0.97 }}
-						style={{
-							width: "100%",
-							marginTop: 14,
-							background: T.accent,
-							color: "white",
-							border: "none",
-							padding: "11px",
-							borderRadius: 10,
-							fontSize: 14,
-							fontWeight: 600,
-							cursor: "pointer",
-							fontFamily: "'Outfit', sans-serif",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							gap: 7,
-						}}
-					>
-						{generating ? (
-							<motion.span
-								animate={{ rotate: 360 }}
-								transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-								style={{ display: "inline-block" }}
-							>
-								⚙
-							</motion.span>
-						) : (
-							"⚡"
-						)}{" "}
-						{generating ? "Reading & drafting…" : "Generate draft"}
-					</motion.button>
-
-					{/* Usage bar */}
-					<div
-						style={{
-							marginTop: 12,
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-						}}
-					>
-						<span
-							style={{
-								fontSize: 11,
-								color: T.muted,
-								fontFamily: "'Outfit', sans-serif",
-								whiteSpace: "nowrap",
-							}}
-						>
-							2 of 3 used
-						</span>
-						<div
-							style={{
-								flex: 1,
-								height: 4,
-								background: T.border,
-								borderRadius: 100,
-								overflow: "hidden",
-							}}
-						>
-							<motion.div
-								animate={{ width: "66%" }}
-								transition={{ duration: 0.8, delay: 0.5 }}
-								style={{
-									height: "100%",
-									background: T.warm,
-									borderRadius: 100,
-								}}
-							/>
-						</div>
-						<span
-							style={{
-								fontSize: 11,
-								color: T.muted,
-								fontFamily: "'Outfit', sans-serif",
-								whiteSpace: "nowrap",
-							}}
-						>
-							1 left
-						</span>
-					</div>
-				</div>
-
-				{/* Right — output */}
+				{/* Bento grid: 2 cards row 1, 3 cards row 2 ── */}
 				<div
+					className="features-bento"
 					style={{
-						padding: "26px 26px",
-						textAlign: "left",
-						minHeight: 320,
-						position: "relative",
+						display: "grid",
+						gridTemplateColumns: "repeat(6, 1fr)",
+						gap: 20,
+						marginTop: 48,
 					}}
 				>
-					<AnimatePresence mode="wait">
-						{!generated && !generating && (
-							<motion.div
-								key="empty"
-								initial={{ opacity: 1 }}
-								exit={{ opacity: 0 }}
-								style={{
-									display: "flex",
-									flexDirection: "column",
-									alignItems: "center",
-									justifyContent: "center",
-									height: "100%",
-									color: T.muted,
-									gap: 10,
-									paddingTop: 48,
+					<style>{`
+						@media (max-width: 768px) {
+							.features-bento { grid-template-columns: 1fr !important; }
+							.features-bento a { grid-column: span 1 !important; }
+						}
+					`}</style>
+					{FEATURES.map((f, i) => (
+						<FadeUp key={f.title} delay={i * 0.08}>
+							<motion.a
+								href="/app"
+								whileHover={{
+									y: -4,
+									boxShadow: "0 20px 48px rgba(0,0,0,0.12)",
 								}}
-							>
-								<span style={{ fontSize: 32 }}>✍️</span>
-								<p style={{ fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>
-									Your draft will appear here
-								</p>
-							</motion.div>
-						)}
-						{generating && (
-							<motion.div
-								key="loading"
-								initial={{ opacity: 0 }}
-								animate={{ opacity: 1 }}
-								exit={{ opacity: 0 }}
-								style={{ paddingTop: 32 }}
-							>
-								{[80, 60, 90, 50, 70, 40, 85].map((w, i) => (
-									<motion.div
-										key={i}
-										animate={{ opacity: [0.3, 0.7, 0.3] }}
-										transition={{
-											duration: 1.2,
-											delay: i * 0.1,
-											repeat: Infinity,
-										}}
-										style={{
-											height: 12,
-											width: `${w}%`,
-											background: T.border,
-											borderRadius: 6,
-											marginBottom: 10,
-										}}
-									/>
-								))}
-							</motion.div>
-						)}
-						{generated && (
-							<motion.div
-								key="output"
-								initial={{ opacity: 0, y: 12 }}
-								animate={{ opacity: 1, y: 0 }}
-								transition={{ duration: 0.5 }}
+								transition={{ duration: 0.25 }}
+								style={{
+									gridColumn: i < 2 ? "span 3" : "span 2",
+									display: "block",
+									textDecoration: "none",
+									background: T.base,
+									border: `1px solid ${T.border}`,
+									borderRadius: 16,
+									overflow: "hidden",
+									cursor: "pointer",
+								}}
 							>
 								<div
 									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 8,
-										marginBottom: 5,
+										aspectRatio: i < 2 ? "16/10" : "16/9",
+										background: T.border,
+										position: "relative",
+										overflow: "hidden",
 									}}
 								>
+									{/* eslint-disable-next-line @next/next/no-img-element */}
+									<img
+										src={f.image}
+										alt={f.title}
+										style={{
+											width: "100%",
+											height: "100%",
+											objectFit: "cover",
+										}}
+										onError={(e) => {
+											e.target.style.display = "none";
+											const fb = e.target.parentElement?.querySelector("[data-fallback]");
+											if (fb) fb.style.display = "flex";
+										}}
+									/>
+									<div
+										data-fallback
+										style={{
+											display: "none",
+											position: "absolute",
+											inset: 0,
+											alignItems: "center",
+											justifyContent: "center",
+											background: "#F0ECE5",
+											fontSize: 48,
+											color: T.muted,
+										}}
+									>
+										{i === 0 && "⚡"}
+										{i === 1 && "💬"}
+										{i === 2 && "🎨"}
+										{i === 3 && "📊"}
+										{i === 4 && "✏️"}
+									</div>
+								</div>
+								<div style={{ padding: "20px 22px" }}>
 									<span
 										style={{
-											background: "#EFF6EE",
-											color: "#3D7A35",
 											fontSize: 11,
 											fontWeight: 700,
-											padding: "2px 9px",
-											borderRadius: 100,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.warm,
 											fontFamily: "'Outfit', sans-serif",
 										}}
 									>
-										✓ Draft ready
+										{f.word}
 									</span>
-									<span
+									<h3
 										style={{
-											fontSize: 12,
-											color: T.muted,
 											fontFamily: "'Outfit', sans-serif",
+											fontWeight: 700,
+											fontSize: 16,
+											color: T.accent,
+											marginTop: 6,
+											lineHeight: 1.35,
 										}}
 									>
-										387 words
-									</span>
+										{f.title}
+									</h3>
 								</div>
-								<h2
-									style={{
-										fontFamily: "'Instrument Serif', serif",
-										fontSize: 20,
-										color: T.accent,
-										lineHeight: 1.3,
-										marginBottom: 14,
-									}}
-								>
-									The quiet agent revolution nobody's talking about
-								</h2>
-								<p
-									style={{
-										fontSize: 13.5,
-										color: "#4A4540",
-										lineHeight: 1.7,
-										marginBottom: 11,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									If you've been watching the AI space closely, you'll have
-									noticed something subtle shifting. It's not the models getting
-									smarter — it's the way they're being used.
-								</p>
-								<p
-									style={{
-										fontSize: 13.5,
-										color: "#4A4540",
-										lineHeight: 1.7,
-										fontFamily: "'Outfit', sans-serif",
-										fontWeight: 600,
-										marginBottom: 5,
-									}}
-								>
-									What's actually changed
-								</p>
-								<p
-									style={{
-										fontSize: 13.5,
-										color: "#4A4540",
-										lineHeight: 1.7,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									Agents aren't replacing jobs yet. But they're eating the most
-									tedious parts — the research loops, the context-switching, the
-									repetitive drafting. For indie founders running lean, this
-									matters more than any model release…
-								</p>
-							</motion.div>
-						)}
-					</AnimatePresence>
+							</motion.a>
+						</FadeUp>
+					))}
 				</div>
 			</div>
-
-			{/* Toolbar */}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					gap: 8,
-					padding: "13px 24px",
-					borderTop: `1px solid ${T.border}`,
-					background: T.base,
-				}}
-			>
-				{[
-					{ label: copied ? "✓ Copied!" : "📋 Copy all", action: handleCopy },
-					{ label: "💾 Save draft", action: () => { } },
-					{ label: "↺ Regenerate", action: handleGenerate },
-				].map(({ label, action }) => (
-					<motion.button
-						key={label}
-						onClick={action}
-						whileHover={{ scale: 1.03, borderColor: T.accent }}
-						whileTap={{ scale: 0.96 }}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 5,
-							fontSize: 12,
-							fontWeight: 600,
-							color: T.muted,
-							background: "white",
-							border: `1px solid ${T.border}`,
-							padding: "6px 13px",
-							borderRadius: 8,
-							cursor: "pointer",
-							fontFamily: "'Outfit', sans-serif",
-							transition: "all 0.18s",
-						}}
-					>
-						{label}
-					</motion.button>
-				))}
-				<span
-					style={{
-						marginLeft: "auto",
-						fontSize: 12,
-						color: T.muted,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					387 words
-				</span>
-			</div>
-		</motion.div>
+		</section>
 	);
 }
 
@@ -925,7 +1100,7 @@ function StatsStrip() {
 	const stats = [
 		{ num: "60", suffix: "s", label: "Average URL to draft time" },
 		{ num: "3", suffix: "hrs", label: "Saved per newsletter on average" },
-		{ num: "$5", suffix: "/mo", label: "Less than one coffee per week" },
+		{ num: "$9", suffix: "/mo", label: "Less than one coffee per week" },
 	];
 	return (
 		<div style={{ background: T.accent, padding: "56px 24px" }}>
@@ -1140,7 +1315,12 @@ function Pricing() {
 		"Google login",
 	];
 	const pro = [
-		"Unlimited draft generations",
+		"50 credits every month",
+		"All content formats",
+		"Multiple URL sources per draft",
+		"AI Chat with all models",
+		"Themes, Infographics & Table Creator",
+		"Priority support",
 		"Unlimited saved drafts",
 		"Full editor + formatting",
 		"Draft history",
@@ -1167,6 +1347,7 @@ function Pricing() {
 							textTransform: "uppercase",
 							letterSpacing: "0.1em",
 							color: T.warm,
+							textAlign: "center",
 							marginBottom: 10,
 							fontFamily: "'Outfit', sans-serif",
 						}}
@@ -1177,6 +1358,7 @@ function Pricing() {
 						style={{
 							fontFamily: "'Instrument Serif', serif",
 							fontSize: "clamp(36px,4vw,54px)",
+							textAlign: "center",
 							color: T.accent,
 							lineHeight: 1.1,
 							marginBottom: 14,
@@ -1187,6 +1369,7 @@ function Pricing() {
 					</h2>
 					<p
 						style={{
+							textAlign: "center",
 							fontSize: 17,
 							color: T.muted,
 							lineHeight: 1.6,
@@ -1202,6 +1385,7 @@ function Pricing() {
 						display: "grid",
 						gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
 						gap: 20,
+						margin: "auto",
 						marginTop: 52,
 						maxWidth: 680,
 					}}
@@ -1334,7 +1518,7 @@ function Pricing() {
 									lineHeight: 1,
 								}}
 							>
-								$5
+								$9
 								<span
 									style={{
 										fontSize: 18,
@@ -1769,91 +1953,6 @@ function FAQ() {
 	);
 }
 
-/* ── CTA Banner ── */
-function CTABanner() {
-	return (
-		<section
-			style={{
-				padding: "96px 24px",
-				background: "white",
-				borderTop: `1px solid ${T.border}`,
-				textAlign: "center",
-			}}
-		>
-			<FadeUp>
-				<div style={{ maxWidth: 560, margin: "0 auto" }}>
-					<h2
-						style={{
-							fontFamily: "'Instrument Serif', serif",
-							fontSize: "clamp(40px,5.5vw,64px)",
-							color: T.accent,
-							lineHeight: 1.08,
-							marginBottom: 16,
-							letterSpacing: "-1px",
-						}}
-					>
-						Your next draft is
-						<br />
-						<em style={{ color: T.warm }}>60 seconds away.</em>
-					</h2>
-					<p
-						style={{
-							fontSize: 17,
-							color: T.muted,
-							marginBottom: 36,
-							lineHeight: 1.65,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						3 free drafts. No credit card. Used by newsletter writers who
-						publish on a deadline every week.
-					</p>
-					<motion.a
-						href="/app"
-						whileHover={{
-							scale: 1.04,
-							y: -2,
-							boxShadow: "0 10px 32px rgba(0,0,0,0.2)",
-						}}
-						whileTap={{ scale: 0.97 }}
-						style={{
-							display: "inline-flex",
-							alignItems: "center",
-							gap: 8,
-							background: T.accent,
-							color: "white",
-							padding: "15px 36px",
-							borderRadius: 13,
-							fontSize: 16,
-							fontWeight: 700,
-							textDecoration: "none",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Generate your first draft free →
-					</motion.a>
-					<p
-						style={{
-							fontSize: 13,
-							color: T.muted,
-							marginTop: 16,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Already have an account?{" "}
-						<a
-							href="/login"
-							style={{ color: T.accent, textDecoration: "underline" }}
-						>
-							Log in
-						</a>
-					</p>
-				</div>
-			</FadeUp>
-		</section>
-	);
-}
-
 /* ── Footer ── */
 function Footer() {
 	return (
@@ -1901,7 +2000,8 @@ function Footer() {
 								fontFamily: "'Outfit', sans-serif",
 							}}
 						>
-							Turn any URL into a newsletter draft in 60 seconds.
+							Turn any URL into a newsletter, email, or blog post, infographics
+							etc
 						</p>
 					</div>
 					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
@@ -1909,7 +2009,7 @@ function Footer() {
 							{
 								title: "Connect",
 								links: [
-									"https://x.com/@treyvijay",
+									"https://x.com/treyvijay",
 									"mailto:shreyvijayvargiya26@gmail.com",
 								],
 							},
@@ -1999,21 +2099,27 @@ function Footer() {
 /* ── Root ── */
 export default function inkgestLanding() {
 	const { user } = useSelector((state) => state?.user);
-	if (user?.isAuthenticated) {
-		return <Redirect href="/app" />;
+	const router = useRouter();
+	useEffect(() => {
+		if (user) {
+			router.replace("/app");
+		}
+	}, [user, router]);
+	if (user) {
+		return null;
 	}
 	return (
 		<div style={{ fontFamily: "'Outfit', sans-serif", background: T.base }}>
 			<FontLink />
 			<Nav />
 			<Hero />
+			<Features />
 			<HowItWorks />
 			<StatsStrip />
 			{/* /<Testimonials /> */}
 			<Pricing />
 			<OpenSource />
 			<FAQ />
-			<CTABanner />
 			<Footer />
 		</div>
 	);

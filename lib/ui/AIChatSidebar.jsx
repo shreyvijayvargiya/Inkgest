@@ -16,6 +16,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "../config/firebase";
+import { getUserCredits, FREE_CREDIT_LIMIT } from "../utils/credits";
 
 /* ─── Inline CSS for chat prose and cursor animation ─── */
 const ChatStyles = () => (
@@ -224,9 +225,20 @@ export default function AIChatSidebar({
 	const [toast, setToast]          = useState("");
 	const [model, setModel]          = useState(MODELS[0]);
 	const [modelOpen, setModelOpen]  = useState(false);
+	const [credits, setCredits]      = useState(null);
 	const bottomRef = useRef(null);
 	const taRef     = useRef(null);
 	const abortRef  = useRef(null);
+
+	/* Load / refresh credits */
+	const refreshCredits = useCallback(() => {
+		const uid = auth.currentUser?.uid;
+		if (uid) getUserCredits(uid).then(setCredits).catch(() => {});
+	}, []);
+
+	useEffect(() => {
+		if (open) refreshCredits();
+	}, [open, refreshCredits]);
 
 	/* Scroll to latest message */
 	useEffect(() => {
@@ -369,9 +381,10 @@ export default function AIChatSidebar({
 						: m),
 				);
 			}
-		} finally {
-			setStreaming(false);
-		}
+	} finally {
+		setStreaming(false);
+		refreshCredits();
+	}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [input, streaming, messages, draftContent]);
 
@@ -862,6 +875,60 @@ export default function AIChatSidebar({
 									</div>
 								</div>
 							</div>
+
+							{/* ── Credit usage bar ── */}
+							{credits && (
+								<div style={{ padding: "7px 2px 0" }}>
+									{credits.plan === "pro" ? (
+										<p style={{ fontSize: 11, color: "#A8A29C", textAlign: "center" }}>
+											∞ Pro — unlimited credits
+										</p>
+									) : (
+										<>
+											{/* Bar */}
+											<div style={{ height: 3, background: "#E8E4DC", borderRadius: 100, overflow: "hidden", marginBottom: 5 }}>
+												<motion.div
+													initial={{ width: 0 }}
+													animate={{
+														width: `${Math.min(100, (credits.creditsUsed / credits.creditsLimit) * 100)}%`
+													}}
+													transition={{ duration: 0.5, ease: "easeOut" }}
+													style={{
+														height: "100%",
+														borderRadius: 100,
+														background:
+															credits.creditsUsed >= credits.creditsLimit
+																? "#EF4444"
+																: credits.creditsUsed >= credits.creditsLimit * 0.8
+																? "#C17B2F"
+																: "#4A7C59",
+													}}
+												/>
+											</div>
+											{/* Label row */}
+											<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+												<span style={{ fontSize: 10.5, color: "#A8A29C" }}>
+													¼ credit / message
+												</span>
+												<span style={{
+													fontSize: 10.5, fontWeight: 700,
+													color: credits.creditsUsed >= credits.creditsLimit ? "#EF4444" : "#7A7570",
+												}}>
+													{+credits.creditsUsed.toFixed(2)} / {credits.creditsLimit} credits
+												</span>
+											</div>
+											{credits.creditsUsed >= credits.creditsLimit && (
+												<p style={{ fontSize: 10.5, color: "#EF4444", marginTop: 4, textAlign: "center" }}>
+													Out of credits —{" "}
+													<a href="/pricing" style={{ color: "#C17B2F", fontWeight: 700, textDecoration: "none" }}>
+														upgrade to Pro
+													</a>
+												</p>
+											)}
+										</>
+									)}
+								</div>
+							)}
 						</motion.div>
 
 						{/* ── Toast notification ── */}

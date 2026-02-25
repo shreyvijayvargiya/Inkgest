@@ -138,7 +138,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 		? "You've used all your free credits this month"
 		: "Almost out of free credits";
 	const sub = out
-		? `Upgrade to Pro for unlimited access — $5/mo`
+		? `Upgrade to Pro for unlimited access — $9/mo`
 		: `${(creditsLimit - creditsUsed).toFixed(2)} credits left. Upgrade to Pro before you run out.`;
 
 	return (
@@ -178,7 +178,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 						whiteSpace: "nowrap",
 					}}
 				>
-					Upgrade $5/mo →
+					Upgrade $9/mo →
 				</motion.button>
 			</div>
 		</motion.div>
@@ -671,57 +671,63 @@ export default function inkgestApp() {
 
 				<div style={{ width: 1, height: 20, background: T.border }} />
 
-			{/* Credits pill */}
-			{reduxUser && (
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 8,
-						marginLeft: 4,
-						background: T.base,
-						border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
-						borderRadius: 100,
-						padding: "4px 14px",
-					}}
-				>
-					{credits?.plan === "pro" ? (
-						<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
-							∞ Pro
-						</span>
-					) : (
-						<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-							Credits{" "}
-							<span style={{ fontWeight: 700, color: creditRemaining === 0 ? "#EF4444" : T.accent }}>
-								{credits
-									? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
-									: `0/${FREE_CREDIT_LIMIT}`}
-							</span>
-						</span>
-					)}
-					<motion.button
-						whileHover={{ scale: 1.04 }}
-						whileTap={{ scale: 0.97 }}
-						onClick={() => router.push("/pricing")}
+				{/* Credits pill */}
+				{reduxUser && (
+					<div
 						style={{
-							background: T.accent,
-							color: "white",
-							border: "none",
-							padding: "3px 10px",
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							marginLeft: 4,
+							background: T.base,
+							border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
 							borderRadius: 100,
-							fontSize: 11,
-							fontWeight: 700,
-							cursor: "pointer",
+							padding: "4px 14px",
 						}}
 					>
-						{credits?.plan === "pro" ? "Manage" : "Upgrade"}
-					</motion.button>
+						{credits?.plan === "pro" ? (
+							<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
+								∞ Pro
+							</span>
+						) : (
+							<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+								Credits{" "}
+								<span
+									style={{
+										fontWeight: 700,
+										color: creditRemaining === 0 ? "#EF4444" : T.accent,
+									}}
+								>
+									{credits
+										? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
+										: `0/${FREE_CREDIT_LIMIT}`}
+								</span>
+							</span>
+						)}
+						<motion.button
+							whileHover={{ scale: 1.04 }}
+							whileTap={{ scale: 0.97 }}
+							onClick={() => router.push("/pricing")}
+							style={{
+								background: T.accent,
+								color: "white",
+								border: "none",
+								padding: "3px 10px",
+								borderRadius: 100,
+								fontSize: 11,
+								fontWeight: 700,
+								cursor: "pointer",
+							}}
+						>
+							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
+						</motion.button>
 					</div>
 				)}
 				{!reduxUser && (
 					<div
+						className="sm:hidden md:flex"
 						style={{
-							display: "flex",
+							
 							alignItems: "center",
 							gap: 8,
 							marginLeft: 4,
@@ -732,7 +738,7 @@ export default function inkgestApp() {
 						}}
 					>
 						<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
-							{FREE_LLM_LIMIT} AI · {FREE_SCRAPE_LIMIT} scrapes free
+							{FREE_CREDIT_LIMIT} Credits
 						</span>
 					</div>
 				)}
@@ -762,7 +768,8 @@ export default function inkgestApp() {
 						cursor: "pointer",
 					}}
 				>
-					<Icon d={Icons.plus} size={14} stroke="white" /> New draft
+					<Icon d={Icons.plus} size={14} stroke="white" />{" "}
+					<span className="md:block hidden">New draft</span>
 				</motion.button>
 
 				{/* User avatar / login */}
@@ -824,6 +831,7 @@ export default function inkgestApp() {
 							animate={{ width: 280, opacity: 1 }}
 							exit={{ width: 0, opacity: 0 }}
 							transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+							className="fixed top-12 left-0 bottom-0"
 							style={{
 								background: T.sidebar,
 								borderRight: `1px solid ${T.border}`,
@@ -1044,7 +1052,16 @@ export default function inkgestApp() {
 								{
 									id: "ai",
 									icon: (
-										<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<svg
+											width={16}
+											height={16}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth={2}
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
 											<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
 										</svg>
 									),
@@ -1054,7 +1071,16 @@ export default function inkgestApp() {
 								{
 									id: "scrape",
 									icon: (
-										<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<svg
+											width={16}
+											height={16}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth={2}
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
 											<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
 											<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
 										</svg>
@@ -1065,7 +1091,16 @@ export default function inkgestApp() {
 								{
 									id: "blank",
 									icon: (
-										<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+										<svg
+											width={16}
+											height={16}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth={2}
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
 											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
 											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
 										</svg>
@@ -1079,7 +1114,10 @@ export default function inkgestApp() {
 									<motion.button
 										key={m.id}
 										whileTap={{ scale: 0.97 }}
-										onClick={() => { setDraftMode(m.id); setGenerateError(null); }}
+										onClick={() => {
+											setDraftMode(m.id);
+											setGenerateError(null);
+										}}
 										style={{
 											flex: 1,
 											background: active ? T.accent : T.surface,
@@ -1091,22 +1129,37 @@ export default function inkgestApp() {
 											transition: "all 0.15s",
 										}}
 									>
-										<div style={{
-											display: "inline-flex",
-											alignItems: "center",
-											justifyContent: "center",
-											width: 28, height: 28,
-											borderRadius: 7,
-											background: active ? "rgba(255,255,255,0.15)" : T.base,
-											color: active ? "white" : T.warm,
-											marginBottom: 10,
-										}}>
+										<div
+											style={{
+												display: "inline-flex",
+												alignItems: "center",
+												justifyContent: "center",
+												width: 28,
+												height: 28,
+												borderRadius: 7,
+												background: active ? "rgba(255,255,255,0.15)" : T.base,
+												color: active ? "white" : T.warm,
+												marginBottom: 10,
+											}}
+										>
 											{m.icon}
 										</div>
-										<p style={{ fontSize: 13, fontWeight: 700, color: active ? "white" : T.accent, marginBottom: 3 }}>
+										<p
+											style={{
+												fontSize: 13,
+												fontWeight: 700,
+												color: active ? "white" : T.accent,
+												marginBottom: 3,
+											}}
+										>
 											{m.label}
 										</p>
-										<p style={{ fontSize: 11, color: active ? "rgba(255,255,255,0.65)" : T.muted }}>
+										<p
+											style={{
+												fontSize: 11,
+												color: active ? "rgba(255,255,255,0.65)" : T.muted,
+											}}
+										>
 											{m.desc}
 										</p>
 									</motion.button>
@@ -1129,31 +1182,59 @@ export default function inkgestApp() {
 									position: "relative",
 								}}
 							>
-								<div style={{
-									position: "absolute", top: 8, right: 10,
-									fontSize: 9, fontWeight: 700, color: T.warm,
-									background: "#FEF3E2", border: "1px solid #F5C97A",
-									borderRadius: 20, padding: "1px 6px",
-									letterSpacing: "0.05em", textTransform: "uppercase",
-								}}>
+								<div
+									style={{
+										position: "absolute",
+										top: 8,
+										right: 10,
+										fontSize: 9,
+										fontWeight: 700,
+										color: T.warm,
+										background: "#FEF3E2",
+										border: "1px solid #F5C97A",
+										borderRadius: 20,
+										padding: "1px 6px",
+										letterSpacing: "0.05em",
+										textTransform: "uppercase",
+									}}
+								>
 									New
 								</div>
-								<div style={{
-									display: "inline-flex",
-									alignItems: "center",
-									justifyContent: "center",
-									width: 28, height: 28,
-									borderRadius: 7,
-									background: T.base,
-									color: T.warm,
-									marginBottom: 10,
-								}}>
-									<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+								<div
+									style={{
+										display: "inline-flex",
+										alignItems: "center",
+										justifyContent: "center",
+										width: 28,
+										height: 28,
+										borderRadius: 7,
+										background: T.base,
+										color: T.warm,
+										marginBottom: 10,
+									}}
+								>
+									<svg
+										width={16}
+										height={16}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth={2}
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
 										<rect x="3" y="3" width="18" height="18" rx="2" />
 										<path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
 									</svg>
 								</div>
-								<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 3 }}>
+								<p
+									style={{
+										fontSize: 13,
+										fontWeight: 700,
+										color: T.accent,
+										marginBottom: 3,
+									}}
+								>
 									Create Table
 								</p>
 								<p style={{ fontSize: 11, color: T.muted }}>
@@ -1180,7 +1261,14 @@ export default function inkgestApp() {
 								}}
 							>
 								<div>
-									<p style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 2 }}>
+									<p
+										style={{
+											fontSize: 13,
+											fontWeight: 700,
+											color: "#92400E",
+											marginBottom: 2,
+										}}
+									>
 										{FREE_CREDIT_LIMIT} free credits/month · AI, scrape & chat
 									</p>
 									<p style={{ fontSize: 12, color: "#B45309" }}>
@@ -1192,16 +1280,25 @@ export default function inkgestApp() {
 									whileTap={{ scale: 0.97 }}
 									onClick={() => setLoginModalOpen(true)}
 									style={{
-										background: T.accent, color: "white", border: "none",
-										padding: "8px 16px", borderRadius: 8, fontSize: 13,
-										fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+										background: T.accent,
+										color: "white",
+										border: "none",
+										padding: "8px 16px",
+										borderRadius: 8,
+										fontSize: 13,
+										fontWeight: 700,
+										cursor: "pointer",
+										whiteSpace: "nowrap",
 									}}
 								>
 									Sign in →
 								</motion.button>
 							</motion.div>
 						)}
-						<UpgradeBanner credits={credits} onUpgrade={() => router.push("/pricing")} />
+						<UpgradeBanner
+							credits={credits}
+							onUpgrade={() => router.push("/pricing")}
+						/>
 
 						{/* ── SCRAPE MODE ── */}
 						<AnimatePresence mode="wait">
@@ -1214,7 +1311,17 @@ export default function inkgestApp() {
 									transition={{ duration: 0.18 }}
 								>
 									<div style={{ marginBottom: 20 }}>
-										<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+										<label
+											style={{
+												display: "block",
+												fontSize: 12,
+												fontWeight: 700,
+												textTransform: "uppercase",
+												letterSpacing: "0.08em",
+												color: T.muted,
+												marginBottom: 8,
+											}}
+										>
 											URL to scrape
 										</label>
 										<input
@@ -1224,43 +1331,84 @@ export default function inkgestApp() {
 											onKeyDown={(e) => e.key === "Enter" && handleScrape()}
 											placeholder="https://example.com/article"
 											style={{
-												width: "100%", background: T.surface,
-												border: `1.5px solid ${T.border}`, borderRadius: 11,
-												padding: "13px 16px", fontSize: 14, color: T.accent,
-												outline: "none", transition: "border-color 0.2s",
+												width: "100%",
+												background: T.surface,
+												border: `1.5px solid ${T.border}`,
+												borderRadius: 11,
+												padding: "13px 16px",
+												fontSize: 14,
+												color: T.accent,
+												outline: "none",
+												transition: "border-color 0.2s",
 											}}
 											onFocus={(e) => (e.target.style.borderColor = T.warm)}
 											onBlur={(e) => (e.target.style.borderColor = T.border)}
 										/>
 										<p style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>
-											Works with blog posts, news articles, Medium, Substack, docs
+											Works with blog posts, news articles, Medium, Substack,
+											docs
 										</p>
 									</div>
 									<motion.button
 										onClick={handleScrape}
 										disabled={scraping || !scrapeUrl.trim()}
-										whileHover={!scraping && scrapeUrl.trim() ? { scale: 1.02, y: -1, boxShadow: "0 8px 24px rgba(0,0,0,0.18)" } : {}}
+										whileHover={
+											!scraping && scrapeUrl.trim()
+												? {
+														scale: 1.02,
+														y: -1,
+														boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+													}
+												: {}
+										}
 										whileTap={!scraping ? { scale: 0.97 } : {}}
 										style={{
 											width: "100%",
-											background: scraping || !scrapeUrl.trim() ? "#E8E4DC" : T.accent,
+											background:
+												scraping || !scrapeUrl.trim() ? "#E8E4DC" : T.accent,
 											color: scraping || !scrapeUrl.trim() ? T.muted : "white",
-											border: "none", padding: "15px", borderRadius: 12,
-											fontSize: 16, fontWeight: 700,
-											cursor: scraping || !scrapeUrl.trim() ? "not-allowed" : "pointer",
-											display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+											border: "none",
+											padding: "15px",
+											borderRadius: 12,
+											fontSize: 16,
+											fontWeight: 700,
+											cursor:
+												scraping || !scrapeUrl.trim()
+													? "not-allowed"
+													: "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											gap: 10,
 										}}
 									>
 										{scraping ? (
 											<>
-												<motion.span animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }} style={{ display: "inline-flex" }}>
+												<motion.span
+													animate={{ rotate: 360 }}
+													transition={{
+														duration: 0.9,
+														repeat: Infinity,
+														ease: "linear",
+													}}
+													style={{ display: "inline-flex" }}
+												>
 													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
 												</motion.span>
 												Scraping…
 											</>
 										) : (
 											<>
-												<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+												<svg
+													width={18}
+													height={18}
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth={2}
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												>
 													<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
 													<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
 												</svg>
@@ -1281,7 +1429,17 @@ export default function inkgestApp() {
 									transition={{ duration: 0.18 }}
 								>
 									<div style={{ marginBottom: 20 }}>
-										<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+										<label
+											style={{
+												display: "block",
+												fontSize: 12,
+												fontWeight: 700,
+												textTransform: "uppercase",
+												letterSpacing: "0.08em",
+												color: T.muted,
+												marginBottom: 8,
+											}}
+										>
 											Draft title (optional)
 										</label>
 										<input
@@ -1291,70 +1449,7 @@ export default function inkgestApp() {
 											onKeyDown={(e) => e.key === "Enter" && handleBlank()}
 											placeholder="Untitled draft"
 											style={{
-												width: "100%", background: T.surface,
-												border: `1.5px solid ${T.border}`, borderRadius: 11,
-												padding: "13px 16px", fontSize: 14, color: T.accent,
-												outline: "none", transition: "border-color 0.2s",
-											}}
-											onFocus={(e) => (e.target.style.borderColor = T.warm)}
-											onBlur={(e) => (e.target.style.borderColor = T.border)}
-										/>
-									</div>
-									<motion.button
-										onClick={handleBlank}
-										whileHover={{ scale: 1.02, y: -1, boxShadow: "0 8px 24px rgba(0,0,0,0.18)" }}
-										whileTap={{ scale: 0.97 }}
-										style={{
-											width: "100%", background: T.accent, color: "white",
-											border: "none", padding: "15px", borderRadius: 12,
-											fontSize: 16, fontWeight: 700, cursor: "pointer",
-											display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-										}}
-									>
-										<svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-										</svg>
-										Open blank editor →
-									</motion.button>
-								</motion.div>
-							)}
-						</AnimatePresence>
-
-						{/* ── AI MODE — existing form ── */}
-						{draftMode === "ai" && <>
-
-							{/* Multiple URLs input */}
-							<div style={{ marginBottom: 20 }}>
-								<label
-									style={{
-										display: "block",
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.08em",
-										color: T.muted,
-										marginBottom: 8,
-									}}
-								>
-									Source URLs (optional)
-								</label>
-								{urls.map((urlVal, idx) => (
-									<div
-										key={idx}
-										style={{
-											display: "flex",
-											gap: 8,
-											marginBottom: 8,
-											alignItems: "center",
-										}}
-									>
-										<input
-											value={urlVal}
-											onChange={(e) => updateUrl(idx, e.target.value)}
-											placeholder={`https://example.com/article${idx > 0 ? `-${idx + 1}` : ""}`}
-											style={{
-												flex: 1,
+												width: "100%",
 												background: T.surface,
 												border: `1.5px solid ${T.border}`,
 												borderRadius: 11,
@@ -1367,399 +1462,499 @@ export default function inkgestApp() {
 											onFocus={(e) => (e.target.style.borderColor = T.warm)}
 											onBlur={(e) => (e.target.style.borderColor = T.border)}
 										/>
-										{urls.length > 1 && (
-											<motion.button
-												whileHover={{ background: "#FEE2E2" }}
-												whileTap={{ scale: 0.95 }}
-												onClick={() => removeUrl(idx)}
-												style={{
-													background: T.surface,
-													border: `1.5px solid ${T.border}`,
-													borderRadius: 9,
-													width: 42,
-													height: 42,
-													display: "flex",
-													alignItems: "center",
-													justifyContent: "center",
-													cursor: "pointer",
-													flexShrink: 0,
-													transition: "background 0.15s",
-												}}
-											>
-												<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-											</motion.button>
-										)}
 									</div>
-								))}
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.97 }}
-									onClick={addUrl}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 6,
-										background: "transparent",
-										border: `1.5px dashed ${T.border}`,
-										borderRadius: 9,
-										padding: "8px 14px",
-										fontSize: 13,
-										fontWeight: 600,
-										color: T.muted,
-										cursor: "pointer",
-										transition: "background 0.15s",
-										marginTop: 4,
-									}}
-								>
-									<Icon d={Icons.plus} size={13} stroke={T.muted} />
-									Add another URL
-								</motion.button>
-								<p style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>
-									Works with blog posts, news articles, Medium, Substack, research
-									papers
-								</p>
-							</div>
-
-							{/* Prompt input */}
-							<div style={{ marginBottom: 24 }}>
-								<label
-									style={{
-										display: "block",
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.08em",
-										color: T.muted,
-										marginBottom: 8,
-									}}
-								>
-									Your angle / prompt *
-								</label>
-								<textarea
-									value={prompt}
-									onChange={(e) => setPrompt(e.target.value)}
-									placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words. Focus on the actionable takeaways."
-									rows={4}
-									style={{
-										width: "100%",
-										background: T.surface,
-										border: `1.5px solid ${T.border}`,
-										borderRadius: 11,
-										padding: "13px 16px",
-										fontSize: 14,
-										color: T.accent,
-										resize: "vertical",
-										outline: "none",
-										lineHeight: 1.6,
-										transition: "border-color 0.2s",
-									}}
-									onFocus={(e) => (e.target.style.borderColor = T.warm)}
-									onBlur={(e) => (e.target.style.borderColor = T.border)}
-								/>
-							</div>
-
-							{/* Format selector */}
-							<div style={{ marginBottom: 16 }}>
-								<label
-									style={{
-										display: "block",
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.08em",
-										color: T.muted,
-										marginBottom: 8,
-									}}
-								>
-									Format
-								</label>
-								<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-									{FORMATS.map((f) => (
-										<motion.button
-											key={f.id}
-											whileTap={{ scale: 0.96 }}
-											onClick={() => setFormat(f.id)}
-											style={{
-												display: "flex",
-												alignItems: "center",
-												gap: 5,
-												padding: "7px 13px",
-												borderRadius: 9,
-												fontSize: 13,
-												fontWeight: 600,
-												cursor: "pointer",
-												border: `1.5px solid ${format === f.id ? T.accent : T.border}`,
-												background: format === f.id ? T.accent : T.surface,
-												color: format === f.id ? "white" : T.muted,
-												transition: "all 0.15s",
-											}}
-										>
-											<span>{f.icon}</span>
-											{f.label}
-										</motion.button>
-									))}
-								</div>
-							</div>
-
-							{/* Style selector */}
-							<div style={{ marginBottom: 24 }}>
-								<label
-									style={{
-										display: "block",
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.08em",
-										color: T.muted,
-										marginBottom: 8,
-									}}
-								>
-									Tone
-								</label>
-								<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-									{STYLES.map((s) => (
-										<motion.button
-											key={s.id}
-											whileTap={{ scale: 0.96 }}
-											onClick={() => setStyle(s.id)}
-											style={{
-												padding: "6px 12px",
-												borderRadius: 9,
-												fontSize: 13,
-												fontWeight: 600,
-												cursor: "pointer",
-												border: `1.5px solid ${style === s.id ? T.warm : T.border}`,
-												background: style === s.id ? "#FEF3E2" : T.surface,
-												color: style === s.id ? T.warm : T.muted,
-												transition: "all 0.15s",
-											}}
-										>
-											{s.label}
-										</motion.button>
-									))}
-								</div>
-							</div>
-
-							{/* Generate button */}
-							{reduxUser && llmRemaining === 0 ? (
-								<motion.button
-									onClick={() => router.push("/pricing")}
-									whileHover={{
-										scale: 1.02,
-										y: -1,
-										boxShadow: "0 8px 24px rgba(193,123,47,0.25)",
-									}}
-									whileTap={{ scale: 0.97 }}
-									style={{
-										width: "100%",
-										background: T.warm,
-										color: "white",
-										border: "none",
-										padding: "15px",
-										borderRadius: 12,
-										fontSize: 16,
-										fontWeight: 700,
-										cursor: "pointer",
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										gap: 10,
-										transition: "all 0.2s",
-									}}
-								>
-									<Icon d={Icons.zap} size={18} stroke="white" fill="white" />
-									Upgrade to generate more drafts →
-								</motion.button>
-							) : (
-								<motion.button
-									onClick={handleGenerateClick}
-									disabled={generating}
-									whileHover={
-										!generating
-											? {
-												scale: 1.02,
-												y: -1,
-												boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-											}
-											: {}
-									}
-									whileTap={!generating ? { scale: 0.97 } : {}}
-									style={{
-										width: "100%",
-										background: generating ? "#E8E4DC" : T.accent,
-										color: generating ? T.muted : "white",
-										border: "none",
-										padding: "15px",
-										borderRadius: 12,
-										fontSize: 16,
-										fontWeight: 700,
-										cursor: generating ? "not-allowed" : "pointer",
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										gap: 10,
-										transition: "all 0.2s",
-									}}
-								>
-									{generating ? (
-										<>
-											<motion.span
-												animate={{ rotate: 360 }}
-												transition={{
-													duration: 0.9,
-													repeat: Infinity,
-													ease: "linear",
-												}}
-												style={{ display: "inline-flex" }}
-											>
-												<Icon d={Icons.refresh} size={18} stroke={T.muted} />
-											</motion.span>
-											Reading URLs and writing draft…
-										</>
-									) : !reduxUser ? (
-										<>
-											<Icon d={Icons.zap} size={18} stroke="white" fill="white" />
-											Sign in &amp; generate draft
-										</>
-									) : (
-										<>
-											<Icon d={Icons.zap} size={18} stroke="white" fill="white" />
-											Generate draft
-										</>
-									)}
-								</motion.button>
-							)}
-
-							{/* Error message */}
-							{generateError && (
-								<motion.div
-									initial={{ opacity: 0, y: 4 }}
-									animate={{ opacity: 1, y: 0 }}
-									style={{
-										marginTop: 12,
-										padding: "12px 16px",
-										background: "#FEF2F2",
-										border: "1px solid #FECACA",
-										borderRadius: 10,
-										fontSize: 13,
-										color: "#DC2626",
-									}}
-								>
-									{generateError}
-								</motion.div>
-							)}
-
-							{generating && (
-								<motion.div
-									initial={{ opacity: 0, y: 8 }}
-									animate={{ opacity: 1, y: 0 }}
-									style={{ marginTop: 24 }}
-								>
-									<p
-										style={{
-											fontSize: 13,
-											color: T.muted,
-											marginBottom: 14,
-											textAlign: "center",
+									<motion.button
+										onClick={handleBlank}
+										whileHover={{
+											scale: 1.02,
+											y: -1,
+											boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 										}}
-									>
-										Inkgestis reading the page, then drafting your content…
-									</p>
-									<div
+										whileTap={{ scale: 0.97 }}
 										style={{
-											background: T.surface,
-											border: `1px solid ${T.border}`,
+											width: "100%",
+											background: T.accent,
+											color: "white",
+											border: "none",
+											padding: "15px",
 											borderRadius: 12,
-											padding: 20,
+											fontSize: 16,
+											fontWeight: 700,
+											cursor: "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											gap: 10,
 										}}
 									>
-										{[75, 55, 90, 45, 65, 80, 38].map((w, i) => (
-											<motion.div
-												key={i}
-												animate={{ opacity: [0.25, 0.65, 0.25] }}
-												transition={{
-													duration: 1.4,
-													delay: i * 0.12,
-													repeat: Infinity,
-												}}
-												style={{
-													height: 11,
-													width: `${w}%`,
-													background: T.border,
-													borderRadius: 6,
-													marginBottom: 10,
-												}}
-											/>
-										))}
-									</div>
+										<svg
+											width={18}
+											height={18}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="white"
+											strokeWidth={2}
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
+											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+										</svg>
+										Open blank editor →
+									</motion.button>
 								</motion.div>
 							)}
+						</AnimatePresence>
 
-							{/* Tips */}
-							{!generating && (
-								<div
-									style={{
-										marginTop: 28,
-										background: T.surface,
-										border: `1px solid ${T.border}`,
-										borderRadius: 12,
-										padding: "18px 20px",
-									}}
-								>
-									<p
+						{/* ── AI MODE — existing form ── */}
+						{draftMode === "ai" && (
+							<>
+								{/* Multiple URLs input */}
+								<div style={{ marginBottom: 20 }}>
+									<label
 										style={{
+											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
 											textTransform: "uppercase",
 											letterSpacing: "0.08em",
-											color: T.warm,
-											marginBottom: 12,
+											color: T.muted,
+											marginBottom: 8,
 										}}
 									>
-										Tips for better drafts
-									</p>
-									{[
-										'Be specific about your audience — "indie founders" beats "entrepreneurs"',
-										"Mention tone: conversational, professional, direct, warm, opinionated",
-										'Add a word count target: "under 400 words" keeps it tight',
-										"Describe the action you want readers to take at the end",
-									].map((tip) => (
+										Source URLs (optional)
+									</label>
+									{urls.map((urlVal, idx) => (
 										<div
-											key={tip}
+											key={idx}
 											style={{
 												display: "flex",
-												gap: 10,
+												gap: 8,
 												marginBottom: 8,
-												alignItems: "flex-start",
+												alignItems: "center",
 											}}
 										>
-											<span
+											<input
+												value={urlVal}
+												onChange={(e) => updateUrl(idx, e.target.value)}
+												placeholder={`https://example.com/article${idx > 0 ? `-${idx + 1}` : ""}`}
 												style={{
-													color: T.warm,
+													flex: 1,
+													background: T.surface,
+													border: `1.5px solid ${T.border}`,
+													borderRadius: 11,
+													padding: "13px 16px",
 													fontSize: 14,
-													lineHeight: 1.5,
-													flexShrink: 0,
+													color: T.accent,
+													outline: "none",
+													transition: "border-color 0.2s",
 												}}
-											>
-												✦
-											</span>
-											<p
-												style={{
-													fontSize: 13,
-													color: T.muted,
-													lineHeight: 1.6,
-												}}
-											>
-												{tip}
-											</p>
+												onFocus={(e) => (e.target.style.borderColor = T.warm)}
+												onBlur={(e) => (e.target.style.borderColor = T.border)}
+											/>
+											{urls.length > 1 && (
+												<motion.button
+													whileHover={{ background: "#FEE2E2" }}
+													whileTap={{ scale: 0.95 }}
+													onClick={() => removeUrl(idx)}
+													style={{
+														background: T.surface,
+														border: `1.5px solid ${T.border}`,
+														borderRadius: 9,
+														width: 42,
+														height: 42,
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														cursor: "pointer",
+														flexShrink: 0,
+														transition: "background 0.15s",
+													}}
+												>
+													<Icon d={Icons.trash} size={14} stroke="#EF4444" />
+												</motion.button>
+											)}
 										</div>
 									))}
+									<motion.button
+										whileHover={{ background: "#F0ECE5" }}
+										whileTap={{ scale: 0.97 }}
+										onClick={addUrl}
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 6,
+											background: "transparent",
+											border: `1.5px dashed ${T.border}`,
+											borderRadius: 9,
+											padding: "8px 14px",
+											fontSize: 13,
+											fontWeight: 600,
+											color: T.muted,
+											cursor: "pointer",
+											transition: "background 0.15s",
+											marginTop: 4,
+										}}
+									>
+										<Icon d={Icons.plus} size={13} stroke={T.muted} />
+										Add another URL
+									</motion.button>
+									<p style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>
+										Works with blog posts, news articles, Medium, Substack,
+										research papers
+									</p>
 								</div>
-							)}
 
-							{/* close AI mode block */}
-						</>}
+								{/* Prompt input */}
+								<div style={{ marginBottom: 24 }}>
+									<label
+										style={{
+											display: "block",
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
+										Your angle / prompt *
+									</label>
+									<textarea
+										value={prompt}
+										onChange={(e) => setPrompt(e.target.value)}
+										placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words. Focus on the actionable takeaways."
+										rows={4}
+										style={{
+											width: "100%",
+											background: T.surface,
+											border: `1.5px solid ${T.border}`,
+											borderRadius: 11,
+											padding: "13px 16px",
+											fontSize: 14,
+											color: T.accent,
+											resize: "vertical",
+											outline: "none",
+											lineHeight: 1.6,
+											transition: "border-color 0.2s",
+										}}
+										onFocus={(e) => (e.target.style.borderColor = T.warm)}
+										onBlur={(e) => (e.target.style.borderColor = T.border)}
+									/>
+								</div>
 
+								{/* Format selector */}
+								<div style={{ marginBottom: 16 }}>
+									<label
+										style={{
+											display: "block",
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
+										Format
+									</label>
+									<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+										{FORMATS.map((f) => (
+											<motion.button
+												key={f.id}
+												whileTap={{ scale: 0.96 }}
+												onClick={() => setFormat(f.id)}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 5,
+													padding: "7px 13px",
+													borderRadius: 9,
+													fontSize: 13,
+													fontWeight: 600,
+													cursor: "pointer",
+													border: `1.5px solid ${format === f.id ? T.accent : T.border}`,
+													background: format === f.id ? T.accent : T.surface,
+													color: format === f.id ? "white" : T.muted,
+													transition: "all 0.15s",
+												}}
+											>
+												<span>{f.icon}</span>
+												{f.label}
+											</motion.button>
+										))}
+									</div>
+								</div>
+
+								{/* Style selector */}
+								<div style={{ marginBottom: 24 }}>
+									<label
+										style={{
+											display: "block",
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
+										Tone
+									</label>
+									<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+										{STYLES.map((s) => (
+											<motion.button
+												key={s.id}
+												whileTap={{ scale: 0.96 }}
+												onClick={() => setStyle(s.id)}
+												style={{
+													padding: "6px 12px",
+													borderRadius: 9,
+													fontSize: 13,
+													fontWeight: 600,
+													cursor: "pointer",
+													border: `1.5px solid ${style === s.id ? T.warm : T.border}`,
+													background: style === s.id ? "#FEF3E2" : T.surface,
+													color: style === s.id ? T.warm : T.muted,
+													transition: "all 0.15s",
+												}}
+											>
+												{s.label}
+											</motion.button>
+										))}
+									</div>
+								</div>
+
+								{/* Generate button */}
+								{reduxUser && llmRemaining === 0 ? (
+									<motion.button
+										onClick={() => router.push("/pricing")}
+										whileHover={{
+											scale: 1.02,
+											y: -1,
+											boxShadow: "0 8px 24px rgba(193,123,47,0.25)",
+										}}
+										whileTap={{ scale: 0.97 }}
+										style={{
+											width: "100%",
+											background: T.warm,
+											color: "white",
+											border: "none",
+											padding: "15px",
+											borderRadius: 12,
+											fontSize: 16,
+											fontWeight: 700,
+											cursor: "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											gap: 10,
+											transition: "all 0.2s",
+										}}
+									>
+										<Icon d={Icons.zap} size={18} stroke="white" fill="white" />
+										Upgrade to generate more drafts →
+									</motion.button>
+								) : (
+									<motion.button
+										onClick={handleGenerateClick}
+										disabled={generating}
+										whileHover={
+											!generating
+												? {
+														scale: 1.02,
+														y: -1,
+														boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+													}
+												: {}
+										}
+										whileTap={!generating ? { scale: 0.97 } : {}}
+										style={{
+											width: "100%",
+											background: generating ? "#E8E4DC" : T.accent,
+											color: generating ? T.muted : "white",
+											border: "none",
+											padding: "15px",
+											borderRadius: 12,
+											fontSize: 16,
+											fontWeight: 700,
+											cursor: generating ? "not-allowed" : "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											gap: 10,
+											transition: "all 0.2s",
+										}}
+									>
+										{generating ? (
+											<>
+												<motion.span
+													animate={{ rotate: 360 }}
+													transition={{
+														duration: 0.9,
+														repeat: Infinity,
+														ease: "linear",
+													}}
+													style={{ display: "inline-flex" }}
+												>
+													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
+												</motion.span>
+												Reading URLs and writing draft…
+											</>
+										) : !reduxUser ? (
+											<>
+												<Icon
+													d={Icons.zap}
+													size={18}
+													stroke="white"
+													fill="white"
+												/>
+												Sign in &amp; generate draft
+											</>
+										) : (
+											<>
+												<Icon
+													d={Icons.zap}
+													size={18}
+													stroke="white"
+													fill="white"
+												/>
+												Generate draft
+											</>
+										)}
+									</motion.button>
+								)}
+
+								{/* Error message */}
+								{generateError && (
+									<motion.div
+										initial={{ opacity: 0, y: 4 }}
+										animate={{ opacity: 1, y: 0 }}
+										style={{
+											marginTop: 12,
+											padding: "12px 16px",
+											background: "#FEF2F2",
+											border: "1px solid #FECACA",
+											borderRadius: 10,
+											fontSize: 13,
+											color: "#DC2626",
+										}}
+									>
+										{generateError}
+									</motion.div>
+								)}
+
+								{generating && (
+									<motion.div
+										initial={{ opacity: 0, y: 8 }}
+										animate={{ opacity: 1, y: 0 }}
+										style={{ marginTop: 24 }}
+									>
+										<p
+											style={{
+												fontSize: 13,
+												color: T.muted,
+												marginBottom: 14,
+												textAlign: "center",
+											}}
+										>
+											Inkgestis reading the page, then drafting your content…
+										</p>
+										<div
+											style={{
+												background: T.surface,
+												border: `1px solid ${T.border}`,
+												borderRadius: 12,
+												padding: 20,
+											}}
+										>
+											{[75, 55, 90, 45, 65, 80, 38].map((w, i) => (
+												<motion.div
+													key={i}
+													animate={{ opacity: [0.25, 0.65, 0.25] }}
+													transition={{
+														duration: 1.4,
+														delay: i * 0.12,
+														repeat: Infinity,
+													}}
+													style={{
+														height: 11,
+														width: `${w}%`,
+														background: T.border,
+														borderRadius: 6,
+														marginBottom: 10,
+													}}
+												/>
+											))}
+										</div>
+									</motion.div>
+								)}
+
+								{/* Tips */}
+								{!generating && (
+									<div
+										style={{
+											marginTop: 28,
+											background: T.surface,
+											border: `1px solid ${T.border}`,
+											borderRadius: 12,
+											padding: "18px 20px",
+										}}
+									>
+										<p
+											style={{
+												fontSize: 12,
+												fontWeight: 700,
+												textTransform: "uppercase",
+												letterSpacing: "0.08em",
+												color: T.warm,
+												marginBottom: 12,
+											}}
+										>
+											Tips for better drafts
+										</p>
+										{[
+											'Be specific about your audience — "indie founders" beats "entrepreneurs"',
+											"Mention tone: conversational, professional, direct, warm, opinionated",
+											'Add a word count target: "under 400 words" keeps it tight',
+											"Describe the action you want readers to take at the end",
+										].map((tip) => (
+											<div
+												key={tip}
+												style={{
+													display: "flex",
+													gap: 10,
+													marginBottom: 8,
+													alignItems: "flex-start",
+												}}
+											>
+												<span
+													style={{
+														color: T.warm,
+														fontSize: 14,
+														lineHeight: 1.5,
+														flexShrink: 0,
+													}}
+												>
+													✦
+												</span>
+												<p
+													style={{
+														fontSize: 13,
+														color: T.muted,
+														lineHeight: 1.6,
+													}}
+												>
+													{tip}
+												</p>
+											</div>
+										))}
+									</div>
+								)}
+
+								{/* close AI mode block */}
+							</>
+						)}
 					</motion.div>
 				</div>
 			</div>
