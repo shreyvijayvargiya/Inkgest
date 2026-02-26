@@ -17,6 +17,7 @@ import WaitlistTab from "./components/WaitlistTab";
 import ReportIssuesTab from "./components/ReportIssuesTab";
 import ProductsTab from "./components/ProductsTab";
 import TeamsTab from "./components/TeamsTab";
+import CreditsSettingsTab from "./components/CreditsSettingsTab";
 import FormsTab from "./components/FormsTab";
 import ChangelogTab from "./components/ChangelogTab";
 import AssetsTab from "./components/AssetsTab";
@@ -269,6 +270,9 @@ const Admin = () => {
 								<ReportIssuesTab queryClient={queryClient} />
 							)}
 							{activeTab === "teams" && <TeamsTab queryClient={queryClient} />}
+							{activeTab === "credits" && (
+								<CreditsSettingsTab queryClient={queryClient} />
+							)}
 						</div>
 					</div>
 				</main>

@@ -32,6 +32,7 @@ import {
 	Database,
 	Table2,
 	Lock,
+	Coins,
 } from "lucide-react";
 import { getAllCollections } from "../../../lib/api/tables";
 import {
@@ -78,6 +79,7 @@ const ICON_MAP = {
 	Database,
 	Table2,
 	Lock,
+	Coins,
 };
 
 const DEFAULT_NAV_STRUCTURE = [
@@ -151,7 +153,10 @@ const DEFAULT_NAV_STRUCTURE = [
 	{
 		id: "settings",
 		title: "Settings",
-		items: [{ id: "teams", label: "Teams", icon: "Shield" }],
+		items: [
+			{ id: "teams", label: "Teams", icon: "Shield" },
+			{ id: "credits", label: "Credit Limits", icon: "Coins" },
+		],
 	},
 ];
 
