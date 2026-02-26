@@ -119,7 +119,7 @@ const PricingPage = () => {
 			type: "free",
 		},
 		{
-			id: "6bd821f1-d6e6-4f54-be06-e0464c447d89",
+			id: "06d78a3d-29d8-485d-b4bb-c43a9f57ccbb",
 			name: "Pro",
 			price: "$9",
 			period: "month",
