@@ -382,7 +382,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 												<div className="w-full border-t border-zinc-300"></div>
 											</div>
 											<div className="relative flex justify-center text-sm">
-												<span className="px-2 bg-white text-zinc-500">
+												<span className="px-2 text-zinc-500">
 													Or continue with
 												</span>
 											</div>
