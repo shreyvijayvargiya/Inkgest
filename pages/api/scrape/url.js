@@ -1,12 +1,14 @@
 /**
  * POST /api/scrape/url
- * Scrapes a URL via Firecrawl and returns the raw markdown + metadata.
+ * Scrapes URL(s) via api.buildsaas.dev/scrap and returns raw markdown + metadata.
+ * Accepts: url (single) or urls (array). Uses batch endpoint when multiple URLs.
  * No AI — content goes straight into the editor.
  */
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
-import { validateUrl } from "../../../lib/utils/urlAllowlist";
+import { validateUrl, validateUrls } from "../../../lib/utils/urlAllowlist";
+import { scrapeUrls } from "../../../lib/utils/scrapeApi";
 
 export const config = {
 	api: { bodyParser: { sizeLimit: "1mb" } },
@@ -29,7 +31,7 @@ export default async function handler(req, res) {
 		return res.status(405).json({ error: "Method not allowed" });
 	}
 
-	const { url, idToken } = req.body || {};
+	const { url, urls: urlsBody, idToken } = req.body || {};
 
 	// Require a signed Firebase ID token — verified server-side
 	if (!idToken) {
@@ -60,78 +62,65 @@ export default async function handler(req, res) {
 		return res.status(429).json({ error: creditCheck.error });
 	}
 
-	if (!url || !url.trim()) {
-		return res.status(400).json({ error: "URL is required" });
+	const urlList =
+		Array.isArray(urlsBody) && urlsBody.length > 0
+			? urlsBody.map((u) => String(u || "").trim()).filter(Boolean)
+			: url && String(url).trim()
+				? [String(url).trim()]
+				: [];
+
+	if (urlList.length === 0) {
+		return res.status(400).json({ error: "URL or urls array is required" });
+	}
+	if (urlList.length > 10) {
+		return res.status(400).json({ error: "Maximum 10 URLs per request" });
 	}
 
 	const urlRegex = /^https?:\/\/.+/i;
-	if (!urlRegex.test(url.trim())) {
+	if (urlList.some((u) => !urlRegex.test(u))) {
 		return res
 			.status(400)
 			.json({ error: "Invalid URL — must start with http:// or https://" });
 	}
 
 	// SSRF protection — block localhost, private IPs, file://
-	const urlValidation = validateUrl(url.trim());
+	const urlValidation =
+		urlList.length === 1 ? validateUrl(urlList[0]) : validateUrls(urlList);
 	if (!urlValidation.valid) {
 		return res.status(400).json({ error: urlValidation.error });
 	}
 
-	const firecrawlKey = process.env.FIRECRAWL_API_KEY;
-	if (!firecrawlKey) {
-		return res.status(500).json({ error: "Firecrawl API key not configured" });
-	}
-
 	try {
-		const scrapeRes = await fetch(
-			"https://ihatereading-api.vercel.app/scrap-url-puppeteer",
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${firecrawlKey}`,
-				},
-				body: JSON.stringify({
-					url: url.trim(),
-				}),
-			},
-		);
+		const scraped = await scrapeUrls({
+			urls: urlList,
+			apiKey: "apiKey",
+		});
 
-		const scrapeData = await scrapeRes.json().catch(() => ({}));
-
-		if (!scrapeRes.ok) {
-			throw new Error(
-				scrapeData?.error || `Firecrawl scrape failed (${scrapeRes.status})`,
-			);
+		if (scraped.sources.length === 0) {
+			return res.status(422).json({
+				error: "Could not extract content from the URL(s)",
+				details: scraped.scrapeErrors,
+			});
 		}
 
-		const content =
-			scrapeData?.data?.markdown ||
-			scrapeData?.markdown ||
-			scrapeData?.data?.content ||
-			"";
-		const title =
-			scrapeData?.data?.metadata?.title ||
-			scrapeData?.data?.title ||
-			url.trim();
-		const links =
-			scrapeData?.data?.links ||
-			scrapeData?.links ||
-			[];
-		const images = extractImages(links);
-
-		if (!content.trim()) {
-			return res
-				.status(422)
-				.json({ error: "Could not extract content from this URL" });
-		}
+		// Combine content from all sources
+		const content = scraped.sources
+			.map((s, i) => {
+				const titleLine = s.title ? `# ${s.title}\n\n` : "";
+				return `--- Source ${i + 1}: ${s.url} ---\n\n${titleLine}${s.markdown}\n`;
+			})
+			.join("\n\n");
+		const title = scraped.sources[0]?.title || urlList[0] || "Scraped";
+		const allLinks = scraped.sources.flatMap((s) => s.links || []);
+		const images = extractImages(allLinks);
 
 		return res.status(200).json({
 			success: true,
 			content,
 			title,
 			images,
-			url: url.trim(),
+			url: urlList[0],
+			urls: urlList,
 		});
 	} catch (error) {
 		console.error("[scrape/url]", error);

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
@@ -197,6 +197,9 @@ export default function TableCreatorIndex() {
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [tableData, setTableData] = useState(null);
+	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
+	const [loadingLonger, setLoadingLonger] = useState(false);
+	const loadingRef = useRef(null);
 
 	useEffect(() => {
 		if (!reduxUser) {
@@ -242,6 +245,33 @@ export default function TableCreatorIndex() {
 			setTableData(data);
 		},
 	});
+
+	/* Loading messages for table generation */
+	useEffect(() => {
+		if (!mutation.isPending) {
+			setLoadingLonger(false);
+			if (loadingRef.current) {
+				loadingRef.current.iv && clearInterval(loadingRef.current.iv);
+				loadingRef.current.to && clearTimeout(loadingRef.current.to);
+				loadingRef.current = null;
+			}
+			return;
+		}
+		const msgs = ["Reading URL content…", "Extracting data…", "Building table…"];
+		let idx = 0;
+		setLoadingMsg(msgs[0]);
+		setLoadingLonger(false);
+		const iv = setInterval(() => {
+			idx = (idx + 1) % msgs.length;
+			setLoadingMsg(msgs[idx]);
+		}, 4000);
+		const to = setTimeout(() => setLoadingLonger(true), 10000);
+		loadingRef.current = { iv, to };
+		return () => {
+			clearInterval(iv);
+			clearTimeout(to);
+		};
+	}, [mutation.isPending]);
 
 	const displayTableData = tableData ?? mutation.data;
 
@@ -483,7 +513,7 @@ export default function TableCreatorIndex() {
 											<motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} style={{ display: "inline-flex" }}>
 												<Ic d={ICONS.spinner} size={14} stroke="currentColor" />
 											</motion.span>
-											Generating…
+											{loadingMsg}
 										</>
 									) : (
 										<><Ic d={ICONS.zap} size={14} stroke="currentColor" />Generate Table</>
@@ -492,10 +522,18 @@ export default function TableCreatorIndex() {
 							</div>
 						</div>
 						{mutation.isPending && (
-							<p style={{ fontSize: 12, color: T.muted, marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
-								<Ic d={ICONS.info} size={13} stroke={T.muted} />
-								Fetching content from {urls.filter((u) => u.trim()).length} URL(s) and building table — this may take a moment for large pages.
-							</p>
+							<div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+								<p style={{ fontSize: 12, color: T.muted, display: "flex", alignItems: "center", gap: 6 }}>
+									<Ic d={ICONS.info} size={13} stroke={T.muted} />
+									Fetching content from {urls.filter((u) => u.trim()).length} URL(s) and building table — this may take a moment for large pages.
+								</p>
+								{loadingLonger && (
+									<p style={{ fontSize: 12, color: T.warm, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+										<Ic d={ICONS.zap} size={13} stroke={T.warm} />
+										This is taking longer than usual — still working…
+									</p>
+								)}
+							</div>
 						)}
 						<AnimatePresence>
 							{mutation.isError && (

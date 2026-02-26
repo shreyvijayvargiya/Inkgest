@@ -37,6 +37,30 @@ const T = {
 	border: "#E8E4DC",
 };
 
+/* ── Prefill presets (URLs + prompt) ── */
+const PRESETS = [
+	{
+		label: "Y Combinator",
+		urls: ["https://www.ycombinator.com/blog"],
+		prompt: "Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
+	},
+	{
+		label: "Hacker News",
+		urls: ["https://news.ycombinator.com"],
+		prompt: "Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
+	},
+	{
+		label: "TechCrunch",
+		urls: ["https://techcrunch.com"],
+		prompt: "Summarize the main points and add actionable takeaways for startup founders.",
+	},
+	{
+		label: "X / Twitter",
+		urls: ["https://x.com"],
+		prompt: "Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
+	},
+];
+
 /* ── Format / Style config (mirrors app) ── */
 const FORMATS = [
 	{ id: "substack", label: "Newsletter", icon: "✉️" },
@@ -191,6 +215,7 @@ function Hero() {
 	const [generating, setGenerating] = useState(false);
 	const [generateError, setGenerateError] = useState(null);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
+	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
 
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
@@ -221,9 +246,17 @@ function Hero() {
 		}
 		setGenerating(true);
 		setGenerateError(null);
+		const msgs = ["Reading URL content…", "Analysing key points…", "Drafting your newsletter…"];
+		let idx = 0;
+		setLoadingMsg(msgs[0]);
+		const iv = setInterval(() => {
+			idx = (idx + 1) % msgs.length;
+			setLoadingMsg(msgs[idx]);
+		}, 3500);
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) {
+				clearInterval(iv);
 				setGenerateError("Session expired. Please sign in again.");
 				setGenerating(false);
 				return;
@@ -289,8 +322,14 @@ function Hero() {
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
 		} finally {
+			clearInterval(iv);
 			setGenerating(false);
 		}
+	};
+
+	const applyPreset = (p) => {
+		setUrls(p.urls.length ? p.urls : [""]);
+		setPrompt(p.prompt);
 	};
 
 	const handleGenerateClick = () => {
@@ -407,6 +446,48 @@ function Hero() {
 						textAlign: "left",
 					}}
 				>
+					{/* Preset chips */}
+					<div style={{ marginBottom: 14 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.08em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Try with
+						</label>
+						<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+							{PRESETS.map((p) => (
+								<motion.button
+									key={p.label}
+									whileHover={{ scale: 1.03 }}
+									whileTap={{ scale: 0.97 }}
+									onClick={() => applyPreset(p)}
+									style={{
+										padding: "6px 12px",
+										borderRadius: 8,
+										fontSize: 12,
+										fontWeight: 600,
+										cursor: "pointer",
+										border: `1.5px solid ${T.border}`,
+										background: T.base,
+										color: T.accent,
+										fontFamily: "'Outfit', sans-serif",
+										transition: "all 0.15s",
+									}}
+								>
+									{p.label}
+								</motion.button>
+							))}
+						</div>
+					</div>
+
 					{/* URLs */}
 					<div style={{ marginBottom: 18 }}>
 						<label
@@ -683,7 +764,7 @@ function Hero() {
 								>
 									↻
 								</motion.span>
-								Reading URLs and writing draft…
+								{loadingMsg}
 							</>
 						) : !reduxUser ? (
 							<>Sign in & generate draft →</>

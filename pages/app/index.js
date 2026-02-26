@@ -109,6 +109,30 @@ const Icons = {
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
 
+/* ─── Prefill presets (URLs + prompt) ─── */
+const PRESETS = [
+	{
+		label: "Y Combinator",
+		urls: ["https://www.ycombinator.com/blog"],
+		prompt: "Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
+	},
+	{
+		label: "Hacker News",
+		urls: ["https://news.ycombinator.com"],
+		prompt: "Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
+	},
+	{
+		label: "TechCrunch",
+		urls: ["https://techcrunch.com"],
+		prompt: "Summarize the main points and add actionable takeaways for startup founders.",
+	},
+	{
+		label: "X / Twitter",
+		urls: ["https://x.com"],
+		prompt: "Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
+	},
+];
+
 /* ─── Format / Style config (mirrors API) ─── */
 const FORMATS = [
 	{ id: "substack", label: "Newsletter", icon: "✉️" },
@@ -332,6 +356,7 @@ export default function inkgestApp() {
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
+	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
 	const [draftMode, setDraftMode] = useState("ai"); // "ai" | "scrape" | "blank"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
@@ -404,9 +429,17 @@ export default function inkgestApp() {
 		}
 		setGenerating(true);
 		setGenerateError(null);
+		const msgs = ["Reading URL content…", "Analysing key points…", "Drafting your newsletter…"];
+		let idx = 0;
+		setLoadingMsg(msgs[0]);
+		const iv = setInterval(() => {
+			idx = (idx + 1) % msgs.length;
+			setLoadingMsg(msgs[idx]);
+		}, 3500);
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) {
+				clearInterval(iv);
 				setGenerateError("Session expired. Please sign in again.");
 				setGenerating(false);
 				return;
@@ -478,8 +511,14 @@ export default function inkgestApp() {
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
 		} finally {
+			clearInterval(iv);
 			setGenerating(false);
 		}
+	};
+
+	const applyPreset = (p) => {
+		setUrls(p.urls.length ? p.urls : [""]);
+		setPrompt(p.prompt);
 	};
 
 	/* Click handler for the generate button — gates on login */
@@ -527,9 +566,17 @@ export default function inkgestApp() {
 		if (scrapeRemaining <= 0) { router.push("/pricing"); return; }
 		setScraping(true);
 		setGenerateError(null);
+		const scrapeMsgs = ["Reading URL content…", "Extracting text…", "Preparing draft…"];
+		let sIdx = 0;
+		const scrapeIv = setInterval(() => {
+			sIdx = (sIdx + 1) % scrapeMsgs.length;
+			setLoadingMsg(scrapeMsgs[sIdx]);
+		}, 2500);
+		setLoadingMsg(scrapeMsgs[0]);
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) {
+				clearInterval(scrapeIv);
 				setGenerateError("Session expired. Please sign in again.");
 				setScraping(false);
 				return;
@@ -569,6 +616,7 @@ export default function inkgestApp() {
 		} catch (e) {
 			setGenerateError(e?.message || "Scrape failed");
 		} finally {
+			clearInterval(scrapeIv);
 			setScraping(false);
 		}
 	};
@@ -1395,7 +1443,7 @@ export default function inkgestApp() {
 												>
 													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
 												</motion.span>
-												Scraping…
+												{loadingMsg}
 											</>
 										) : (
 											<>
@@ -1509,6 +1557,46 @@ export default function inkgestApp() {
 						{/* ── AI MODE — existing form ── */}
 						{draftMode === "ai" && (
 							<>
+								{/* Preset chips */}
+								<div style={{ marginBottom: 16 }}>
+									<label
+										style={{
+											display: "block",
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
+										Try with
+									</label>
+									<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+										{PRESETS.map((p) => (
+											<motion.button
+												key={p.label}
+												whileHover={{ scale: 1.03 }}
+												whileTap={{ scale: 0.97 }}
+												onClick={() => applyPreset(p)}
+												style={{
+													padding: "6px 12px",
+													borderRadius: 9,
+													fontSize: 12,
+													fontWeight: 600,
+													cursor: "pointer",
+													border: `1.5px solid ${T.border}`,
+													background: T.surface,
+													color: T.accent,
+													transition: "all 0.15s",
+												}}
+											>
+												{p.label}
+											</motion.button>
+										))}
+									</div>
+								</div>
+
 								{/* Multiple URLs input */}
 								<div style={{ marginBottom: 20 }}>
 									<label
@@ -1799,7 +1887,7 @@ export default function inkgestApp() {
 												>
 													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
 												</motion.span>
-												Reading URLs and writing draft…
+												{loadingMsg}
 											</>
 										) : !reduxUser ? (
 											<>

@@ -2,6 +2,7 @@ import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
+import { scrapeUrls } from "../../../lib/utils/scrapeApi";
 
 // No body size limit — tables can be large
 const URL_REGEX = /^https?:\/\/\S+$/i;
@@ -37,29 +38,6 @@ Rules:
 - Prioritise what the user requests in their prompt.
 - Never return empty rows or columns.
 - If you cannot find enough structured data to build a table, return an empty rows array and explain in "description".`;
-
-async function scrapeUrl(url, apiKey) {
-	const res = await fetch(
-		"https://ihatereading-api.vercel.app/scrap-url-puppeteer",
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${apiKey}`,
-			},
-			body: JSON.stringify({
-				url,
-				formats: ["markdown"],
-				onlyMainContent: true,
-			}),
-		},
-	);
-	const data = await res.json().catch(() => ({}));
-	if (!res.ok) {
-		throw new Error(data?.error || `Firecrawl error (${res.status})`);
-	}
-	return (data?.data?.markdown || data?.markdown || "").slice(0, MAX_CONTENT_CHARS);
-}
 
 async function callOpenRouter(apiKey, messages) {
 	const model = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
@@ -128,13 +106,16 @@ export default async function handler(req, res) {
 	}
 
 	// ── Validate input ────────────────────────────────────────────────────────
-	const urlList = Array.isArray(urlsBody) && urlsBody.length > 0
-		? urlsBody.map((u) => String(u || "").trim()).filter(Boolean)
-		: url && String(url).trim()
-			? [String(url).trim()]
-			: [];
+	const urlList =
+		Array.isArray(urlsBody) && urlsBody.length > 0
+			? urlsBody.map((u) => String(u || "").trim()).filter(Boolean)
+			: url && String(url).trim()
+				? [String(url).trim()]
+				: [];
 	if (urlList.length === 0) {
-		return res.status(400).json({ error: "At least one valid URL is required." });
+		return res
+			.status(400)
+			.json({ error: "At least one valid URL is required." });
 	}
 	if (urlList.length > 10) {
 		return res.status(400).json({ error: "Maximum 10 URLs per request." });
@@ -147,14 +128,13 @@ export default async function handler(req, res) {
 		return res.status(400).json({ error: urlValidation.error });
 	}
 	if (!userPrompt?.trim()) {
-		return res
-			.status(400)
-			.json({ error: "A prompt describing what table to generate is required." });
+		return res.status(400).json({
+			error: "A prompt describing what table to generate is required.",
+		});
 	}
 
-	const firecrawlKey = process.env.FIRECRAWL_API_KEY;
 	const openRouterKey = process.env.OPENROUTER_API_KEY;
-	if (!firecrawlKey || !openRouterKey) {
+	if (!openRouterKey) {
 		return res.status(500).json({ error: "Server API keys not configured." });
 	}
 
@@ -164,24 +144,21 @@ export default async function handler(req, res) {
 		return res.status(429).json({ error: creditCheck.error });
 	}
 
-	// ── Scrape all URLs ─────────────────────────────────────────────────────
-	const sources = [];
-	const scrapeErrors = [];
-	for (const u of urlList) {
-		try {
-			const content = await scrapeUrl(u, firecrawlKey);
-			if (content?.trim()) {
-				sources.push({ url: u, content });
-			} else {
-				scrapeErrors.push({ url: u, error: "No content extracted" });
-			}
-		} catch (e) {
-			scrapeErrors.push({ url: u, error: e?.message || "Scrape failed" });
-		}
-	}
+	// ── Scrape all URLs — uses batch endpoint when multiple ───────────────────
+	const scraped = await scrapeUrls({
+		urls: urlList,
+		apiKey: "apiKey",
+	});
+	const sources = scraped.sources.map((s) => ({
+		url: s.url,
+		content: (s.markdown || "").slice(0, MAX_CONTENT_CHARS),
+	}));
+	const scrapeErrors = scraped.scrapeErrors;
+
 	if (sources.length === 0) {
 		return res.status(422).json({
-			error: "Could not extract content from any URL. Please check the URLs and try again.",
+			error:
+				"Could not extract content from any URL. Please check the URLs and try again.",
 			details: scrapeErrors,
 		});
 	}
@@ -202,7 +179,9 @@ export default async function handler(req, res) {
 			},
 		]);
 	} catch (e) {
-		return res.status(502).json({ error: `AI generation failed: ${e.message}` });
+		return res
+			.status(502)
+			.json({ error: `AI generation failed: ${e.message}` });
 	}
 
 	// ── Parse ─────────────────────────────────────────────────────────────────
@@ -216,9 +195,9 @@ export default async function handler(req, res) {
 	}
 
 	if (!tableData.columns?.length) {
-		return res
-			.status(500)
-			.json({ error: "AI did not return valid columns. Try a different prompt." });
+		return res.status(500).json({
+			error: "AI did not return valid columns. Try a different prompt.",
+		});
 	}
 
 	return res.status(200).json({

@@ -2,6 +2,7 @@ import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
+import { scrapeUrls } from "../../../lib/utils/scrapeApi";
 
 export const config = {
 	api: { bodyParser: { sizeLimit: "1mb" } },
@@ -12,36 +13,87 @@ const urlRegex = /^https?:\/\/\S+$/i;
 const MAX_URLS = 10;
 const MAX_CHARS_PER_SOURCE = 15000;
 
+const OUTPUT_RULES = `CRITICAL: Output your response as raw markdown text directly. Do NOT wrap the entire output in markdown code blocks (no \`\`\`markdown, \`\`\`javascript, or \`\`\` at the start/end). The content will be displayed as editorial text in an email/newsletter editor, not as code. Write headings with # or ##, paragraphs as plain text, lists with - or 1.`;
+
 const FORMATS = {
 	substack: {
 		label: "Substack Newsletter",
-		system:
-			"You are a Substack newsletter writer. Create an engaging email newsletter with: catchy subject line, personal intro, 3-5 main sections with subheadings, and a conversational CTA. Use storytelling and keep it scannable.",
-		maxTokens: 2000,
+		system: `You are a Substack newsletter writer. Create an engaging email newsletter that readers receive in their inbox.
+
+Structure:
+- Start with a # H1 title (catchy, clear subject)
+- Brief personal intro (2-3 sentences, conversational)
+- 3-5 main sections, each with ## H2 subheadings
+- Short paragraphs (2-4 sentences each), scannable
+- Bullet points or numbered lists where helpful
+- End with a conversational CTA and sign-off
+
+Links: Always include hyperlinks in the body. When referencing a specific article, study, or source, use markdown links: [anchor text](full URL). Link to the original sources when citing data, quotes, or stats. Add a "Sources" or "Further reading" section at the end with links to each source (e.g. [Article Title](url)). This makes content credible and production-ready.
+
+Style: Use storytelling, direct address ("you"), and a warm tone. No code blocks. Use **bold** and *italic* sparingly.`,
+		maxTokens: 2800,
 	},
 	linkedin: {
 		label: "LinkedIn Post",
-		system:
-			"You are a LinkedIn content expert. Create a professional LinkedIn post (max 3000 chars). Start with a strong single-line hook, use short paragraphs, include 3-5 key takeaways with emojis, end with a question to drive engagement.",
-		maxTokens: 800,
+		system: `You are a LinkedIn content expert. Create a professional LinkedIn post optimized for the feed.
+
+Structure:
+- Opening hook (1-2 lines, grabs attention)
+- 2-4 short paragraphs (2-3 sentences each)
+- 3-5 key takeaways with emojis (✓ or •)
+- End with a question or CTA to drive comments
+
+Links: Include relevant hyperlinks. When referencing a source: [anchor text](url). Add a link to the main source article in the body or at the end. LinkedIn supports links; use them for credibility.
+
+Constraints: Max ~3000 characters. Short paragraphs, line breaks for readability. No code blocks. Use emojis sparingly (1-3 total).`,
+		maxTokens: 1200,
 	},
 	twitter_thread: {
 		label: "Twitter Thread",
-		system:
-			"You are a Twitter/X thread expert. Create a numbered thread of 5-10 tweets. Tweet 1 must hook readers immediately. Each tweet is max 280 chars. Use numbers (1/, 2/, ...), sparse emojis, and end with a CTA tweet. Separate tweets with a blank line.",
-		maxTokens: 1000,
+		system: `You are a Twitter/X thread expert. Create a numbered thread of 5-10 tweets.
+
+Structure:
+- Tweet 1: Hook (must stop the scroll, max 280 chars)
+- Tweets 2-N: Numbered (2/, 3/, ...), one idea per tweet
+- Last tweet: CTA, question, or punchline — include a link to the source article in the final tweet: [Read more](url)
+
+Links: The final tweet must include a link to the source. Format: "Read the full article: [short link text](url)" or similar. Twitter threads that cite sources perform better.
+
+Format: Each tweet on its own line, separated by a blank line. Max 280 chars per tweet. Sparse emojis. No code blocks. Use 1/, 2/, 3/ numbering.`,
+		maxTokens: 1400,
 	},
 	blog_post: {
 		label: "Blog Post",
-		system:
-			"You are an expert blog writer. Create an SEO-friendly blog post with: H1 title, meta description, introduction, 4-6 H2 sections with detailed content, bullet points, and a conclusion with CTA.",
-		maxTokens: 3000,
+		system: `You are an expert blog writer. Create an SEO-friendly blog post.
+
+Structure:
+- # H1 title (include primary keyword)
+- Brief meta-style intro (1-2 sentences, what reader will learn)
+- 4-6 ## H2 sections with detailed content
+- Short paragraphs, bullet points, numbered lists
+- ## Conclusion with key takeaways and CTA
+- ## Sources or Further reading — list each source with a link: [Source Title](url)
+
+Links: Weave hyperlinks throughout the body. When citing stats, studies, or articles, use [anchor text](url). Every source must be linked. Add a "Sources" or "References" section at the end with links to all original articles. Production-ready content is well-sourced.
+
+Style: Clear, informative, scannable. Use **bold** for key terms. No code blocks unless showing actual code snippets.`,
+		maxTokens: 4000,
 	},
 	email_digest: {
 		label: "Email Digest",
-		system:
-			"You are writing a weekly email digest. Create a curated summary with: catchy subject line, brief intro, 3-5 sections (one per source) with key takeaway + why it matters, and brief closing note.",
-		maxTokens: 1500,
+		system: `You are writing a weekly email digest. Create a curated summary of the sources.
+
+Structure:
+- # Catchy subject line
+- Brief intro (1-2 sentences, sets the tone)
+- 3-5 sections, one per source: ## [Source title], key takeaway, why it matters (2-3 sentences)
+- Brief closing note and CTA
+- ## Sources — list each source with link: [Article Title](url)
+
+Links: In each section, link to the source article. Use [Source Title](url) or [Read more](url). Add a "Sources" section at the end with links to every article. Readers expect to click through to originals.
+
+Style: Concise, value-dense. Pull the most actionable insights. No code blocks. Use - for lists.`,
+		maxTokens: 2200,
 	},
 };
 
@@ -106,52 +158,12 @@ async function openRouterChat({
 	return { content, raw: data };
 }
 
-async function firecrawlScrapeMarkdown({ url, apiKey }) {
-	const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
-		},
-		body: JSON.stringify({
-			url,
-			formats: ["markdown", "links"],
-			onlyMainContent: true,
-		}),
-	});
-
-	const data = await response.json().catch(() => ({}));
-	if (!response.ok) {
-		throw new Error(
-			data?.error || `Firecrawl scrape failed (${response.status})`,
-		);
-	}
-
-	const markdown =
-		data?.data?.markdown ||
-		data?.markdown ||
-		data?.data?.content ||
-		data?.data?.text ||
-		"";
-	const title = data?.data?.metadata?.title || data?.data?.title || "";
-	const links = data?.data?.links || data?.links || [];
-
-	return { markdown, title, links, raw: data };
-}
-
 export default async function handler(req, res) {
 	if (req.method !== "POST") {
 		return res.status(405).json({ error: "Method not allowed" });
 	}
 
 	try {
-		const firecrawlKey = process.env.FIRECRAWL_API_KEY;
-		if (!firecrawlKey) {
-			return res
-				.status(500)
-				.json({ error: "FIRECRAWL_API_KEY is not configured" });
-		}
-
 		const openRouterKey = process.env.OPENROUTER_API_KEY;
 		if (!openRouterKey) {
 			return res
@@ -228,26 +240,18 @@ export default async function handler(req, res) {
 			return res.status(400).json({ error: urlValidation.error });
 		}
 
-		// Scrape all URLs — best-effort, collect successes and errors
-		const sources = [];
-		const scrapeErrors = [];
+		// Scrape all URLs — uses batch endpoint when multiple, single when one
+		let sources = [];
+		let scrapeErrors = [];
 
 		if (urlList.length > 0) {
-			for (const url of urlList) {
-				try {
-					const scraped = await firecrawlScrapeMarkdown({
-						url,
-						apiKey: firecrawlKey,
-					});
-					sources.push({
-						url,
-						title: scraped.title || "",
-						markdown: scraped.markdown || "",
-					});
-				} catch (e) {
-					scrapeErrors.push({ url, error: e?.message || "Scrape failed" });
-				}
-			}
+			const scraped = await scrapeUrls({
+				urls: urlList,
+				apiKey: "apiKey",
+				includeImages: true,
+			});
+			sources = scraped.sources;
+			scrapeErrors = scraped.scrapeErrors;
 
 			// All URLs were provided but every one failed
 			if (sources.length === 0) {
