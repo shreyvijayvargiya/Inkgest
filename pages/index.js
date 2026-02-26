@@ -42,22 +42,26 @@ const PRESETS = [
 	{
 		label: "Y Combinator",
 		urls: ["https://www.ycombinator.com/blog"],
-		prompt: "Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
+		prompt:
+			"Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
 	},
 	{
 		label: "Hacker News",
 		urls: ["https://news.ycombinator.com"],
-		prompt: "Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
+		prompt:
+			"Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
 	},
 	{
 		label: "TechCrunch",
 		urls: ["https://techcrunch.com"],
-		prompt: "Summarize the main points and add actionable takeaways for startup founders.",
+		prompt:
+			"Summarize the main points and add actionable takeaways for startup founders.",
 	},
 	{
 		label: "X / Twitter",
 		urls: ["https://x.com"],
-		prompt: "Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
+		prompt:
+			"Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
 	},
 ];
 
@@ -246,7 +250,11 @@ function Hero() {
 		}
 		setGenerating(true);
 		setGenerateError(null);
-		const msgs = ["Reading URL content…", "Analysing key points…", "Drafting your newsletter…"];
+		const msgs = [
+			"Reading URL content…",
+			"Analysing key points…",
+			"Drafting your newsletter…",
+		];
 		let idx = 0;
 		setLoadingMsg(msgs[0]);
 		const iv = setInterval(() => {
@@ -918,7 +926,8 @@ function Features() {
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						From AI drafts to infographics, themes, and a powerful editor — all in one place.
+						From AI drafts to infographics, themes, and a powerful editor — all
+						in one place.
 					</p>
 				</FadeUp>
 
@@ -977,7 +986,10 @@ function Features() {
 										}}
 										onError={(e) => {
 											e.target.style.display = "none";
-											const fb = e.target.parentElement?.querySelector("[data-fallback]");
+											const fb =
+												e.target.parentElement?.querySelector(
+													"[data-fallback]",
+												);
 											if (fb) fb.style.display = "flex";
 										}}
 									/>
@@ -1389,14 +1401,14 @@ function Testimonials() {
 /* ── Pricing ── */
 function Pricing() {
 	const free = [
-		"3 lifetime draft generations",
+		"10 credits every month",
 		"Full editor access",
 		"Copy to clipboard",
 		"Save up to 3 drafts",
 		"Google login",
 	];
 	const pro = [
-		"50 credits every month",
+		"100 credits every month",
 		"All content formats",
 		"Multiple URL sources per draft",
 		"AI Chat with all models",
