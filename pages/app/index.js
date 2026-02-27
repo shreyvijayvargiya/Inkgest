@@ -16,6 +16,7 @@ import {
 	serverTimestamp,
 } from "firebase/firestore";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../../lib/utils/credits";
+import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -415,6 +416,29 @@ export default function inkgestApp() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reduxUser]);
 
+	/* Confirm when leaving during API load (back, close, navigate) */
+	const isLoading = generating || scraping;
+	useEffect(() => {
+		if (!isLoading) return;
+		const onBeforeUnload = (e) => {
+			e.preventDefault();
+			e.returnValue = "";
+		};
+		const onRouteChange = () => {
+			if (!window.confirm("Generation in progress. Leave anyway?")) {
+				router.events.emit("routeChangeError");
+				throw "Route change aborted.";
+			}
+		};
+		window.addEventListener("beforeunload", onBeforeUnload);
+		router.events.on("routeChangeStart", onRouteChange);
+		return () => {
+			window.removeEventListener("beforeunload", onBeforeUnload);
+			router.events.off("routeChangeStart", onRouteChange);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isLoading]);
+
 	const filtered = drafts.filter(
 		(d) =>
 			d.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -426,6 +450,14 @@ export default function inkgestApp() {
 		if (llmRemaining <= 0) {
 			router.push("/pricing");
 			return;
+		}
+		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
+		if (validUrls.length > 0) {
+			const urlCheck = validateUrls(validUrls);
+			if (!urlCheck.valid) {
+				setGenerateError(urlCheck.error || "Invalid URL. Use full URLs with https://");
+				return;
+			}
 		}
 		setGenerating(true);
 		setGenerateError(null);
@@ -444,7 +476,6 @@ export default function inkgestApp() {
 				setGenerating(false);
 				return;
 			}
-			const validUrls = urls.map((u) => u.trim()).filter(Boolean);
 			const res = await fetch("/api/automations/newsletter-generate", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -564,6 +595,11 @@ export default function inkgestApp() {
 		if (!scrapeUrl.trim() || scraping) return;
 		if (!reduxUser) { setLoginModalOpen(true); return; }
 		if (scrapeRemaining <= 0) { router.push("/pricing"); return; }
+		const urlCheck = validateUrl(scrapeUrl.trim());
+		if (!urlCheck.valid) {
+			setGenerateError(urlCheck.error || "Invalid URL. Use full URLs with https://");
+			return;
+		}
 		setScraping(true);
 		setGenerateError(null);
 		const scrapeMsgs = ["Reading URL content…", "Extracting text…", "Preparing draft…"];

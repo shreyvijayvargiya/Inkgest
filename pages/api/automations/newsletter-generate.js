@@ -13,7 +13,6 @@ const urlRegex = /^https?:\/\/\S+$/i;
 const MAX_URLS = 10;
 const MAX_CHARS_PER_SOURCE = 15000;
 
-const OUTPUT_RULES = `CRITICAL: Output your response as raw markdown text directly. Do NOT wrap the entire output in markdown code blocks (no \`\`\`markdown, \`\`\`javascript, or \`\`\` at the start/end). The content will be displayed as editorial text in an email/newsletter editor, not as code. Write headings with # or ##, paragraphs as plain text, lists with - or 1.`;
 
 const FORMATS = {
 	substack: {

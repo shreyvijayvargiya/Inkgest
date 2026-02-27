@@ -12,6 +12,7 @@ import LoginModal from "../lib/ui/LoginModal";
 import { auth, db } from "../lib/config/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
+import { validateUrls } from "../lib/utils/urlAllowlist";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -248,6 +249,14 @@ function Hero() {
 			router.push("/pricing");
 			return;
 		}
+		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
+		if (validUrls.length > 0) {
+			const urlCheck = validateUrls(validUrls);
+			if (!urlCheck.valid) {
+				setGenerateError(urlCheck.error || "Invalid URL. Use full URLs with https://");
+				return;
+			}
+		}
 		setGenerating(true);
 		setGenerateError(null);
 		const msgs = [
@@ -269,7 +278,6 @@ function Hero() {
 				setGenerating(false);
 				return;
 			}
-			const validUrls = urls.map((u) => u.trim()).filter(Boolean);
 			const res = await fetch("/api/automations/newsletter-generate", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -356,6 +364,28 @@ function Hero() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reduxUser]);
+
+	/* Confirm when leaving during API load */
+	useEffect(() => {
+		if (!generating) return;
+		const onBeforeUnload = (e) => {
+			e.preventDefault();
+			e.returnValue = "";
+		};
+		const onRouteChange = () => {
+			if (!window.confirm("Generation in progress. Leave anyway?")) {
+				router.events.emit("routeChangeError");
+				throw "Route change aborted.";
+			}
+		};
+		window.addEventListener("beforeunload", onBeforeUnload);
+		router.events.on("routeChangeStart", onRouteChange);
+		return () => {
+			window.removeEventListener("beforeunload", onBeforeUnload);
+			router.events.off("routeChangeStart", onRouteChange);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [generating]);
 
 	return (
 		<section
