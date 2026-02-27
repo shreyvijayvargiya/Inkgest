@@ -39,16 +39,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ─── Tokens ─── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-};
+w
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;

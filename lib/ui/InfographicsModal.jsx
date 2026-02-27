@@ -503,6 +503,7 @@ export default function InfographicsModal({
 	userId,
 	draftId,
 	savedInfographics = [],
+	onInsertToEditor,
 }) {
 	/**
 	 * batches: array of arrays — each inner array is one generation round.
@@ -643,21 +644,37 @@ export default function InfographicsModal({
 	};
 
 	/* ── Copy Embed snippet ── */
-	const handleCopyEmbed = (bIdx, iIdx) => {
+	const getEmbedSnippet = (bIdx, iIdx) => {
 		const globalIdx = batches.slice(0, bIdx).reduce((s, b) => s + b.length, 0) + iIdx;
 		const el = document.getElementById(`ig-content-${globalIdx}`);
 		const ig = batches[bIdx]?.[iIdx];
-		if (!el || !ig) return;
-		const snippet =
+		if (!el || !ig) return null;
+		return (
 			`<!-- Infographic: ${ig.type} -->\n` +
 			`<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">\n` +
 			`<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}` +
 			`body{font-family:'Outfit',sans-serif;-webkit-font-smoothing:antialiased}</style>\n` +
-			`<div style="max-width:520px;">\n${el.innerHTML}\n</div>`;
+			`<div style="max-width:520px;">\n${el.innerHTML}\n</div>`
+		);
+	};
+
+	const handleCopyEmbed = (bIdx, iIdx) => {
+		const snippet = getEmbedSnippet(bIdx, iIdx);
+		if (!snippet) return;
 		navigator.clipboard.writeText(snippet).catch(() => { });
 		const key = `${bIdx}-${iIdx}`;
 		setCopiedEmbed(key);
 		setTimeout(() => setCopiedEmbed(null), 2200);
+	};
+
+	/* ── Add infographic directly to editor ── */
+	const handleAddToEditor = (bIdx, iIdx) => {
+		const globalIdx = batches.slice(0, bIdx).reduce((s, b) => s + b.length, 0) + iIdx;
+		const el = document.getElementById(`ig-content-${globalIdx}`);
+		if (!el || !onInsertToEditor) return;
+		const html = `<div data-infographic style="max-width:520px;margin:20px 0;">${el.innerHTML}</div>`;
+		onInsertToEditor(html);
+		onClose();
 	};
 
 	/* ── Download PNG (html2canvas) ── */
@@ -1031,6 +1048,28 @@ export default function InfographicsModal({
 																			<span style={{ fontSize: 13 }}>{copiedEmbed === copyKey ? "✓" : "⊞"}</span>
 																			{copiedEmbed === copyKey ? "Copied!" : "Embed"}
 																		</motion.button>
+
+																		{/* Add to editor */}
+																		{onInsertToEditor && (
+																			<motion.button
+																				whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+																				onClick={() => handleAddToEditor(batchIdx, iIdx)}
+																				title="Insert infographic into editor"
+																				style={{
+																					flex: 1,
+																					background: T.warm,
+																					border: `1px solid ${T.warm}`,
+																					borderRadius: 8, padding: "5px 10px",
+																					display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+																					cursor: "pointer", fontSize: 11, fontWeight: 600,
+																					color: "white",
+																					transition: "all 0.15s", whiteSpace: "nowrap",
+																				}}
+																			>
+																				<span style={{ fontSize: 13 }}>+</span>
+																				Add to editor
+																			</motion.button>
+																		)}
 																	</div>
 																</div>
 															</motion.div>

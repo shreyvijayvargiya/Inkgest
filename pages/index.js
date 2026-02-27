@@ -411,7 +411,7 @@ function Hero() {
 			/>
 
 			<motion.div
-				style={{ y, opacity }}
+				style={{ y }}
 				className="relative max-w-5xl mx-auto px-6 text-center"
 			>
 				{/* Headline */}

@@ -28,7 +28,7 @@ import {
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
     body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
@@ -769,8 +769,16 @@ export default function DraftPage() {
 	const [imageDropdownOpen, setImageDropdownOpen] = useState(false);
 	const [imageUrlInput, setImageUrlInput] = useState("");
 	const [imageUploading, setImageUploading] = useState(false);
+	const [selectionDropdown, setSelectionDropdown] = useState(null);
+	const [selectionContext, setSelectionContext] = useState("");
+	const [previewOpen, setPreviewOpen] = useState(false);
+	const [previewData, setPreviewData] = useState({ title: "", content: "" });
+	const [editorFont, setEditorFont] = useState("Outfit");
+	const [editorFontSize, setEditorFontSize] = useState(15);
 	const editorRef = useRef(null);
+	const titleRef = useRef(null);
 	const imageFileInputRef = useRef(null);
+	const editorContainerRef = useRef(null);
 
 	/* All drafts for sidebar */
 	const { data: drafts = [] } = useQuery({
@@ -1063,6 +1071,63 @@ export default function DraftPage() {
 		document.addEventListener("mousedown", close);
 		return () => document.removeEventListener("mousedown", close);
 	}, [imageDropdownOpen]);
+
+	/* ── Text selection dropdown: show on mouseup when selection in editor ── */
+	const isNodeInEditor = (node, editor) => {
+		if (!node || !editor) return false;
+		let n = node;
+		while (n) {
+			if (n === editor) return true;
+			n = n.parentNode;
+		}
+		return false;
+	};
+
+	useEffect(() => {
+		const handleMouseUp = () => {
+			const el = editorRef.current;
+			if (!el) return;
+			const sel = window.getSelection();
+			const text = sel?.toString?.()?.trim();
+			if (!text || sel.rangeCount === 0) {
+				setSelectionDropdown(null);
+				return;
+			}
+			const inEditor =
+				isNodeInEditor(sel.anchorNode, el) || isNodeInEditor(sel.focusNode, el);
+			if (!inEditor) {
+				setSelectionDropdown(null);
+				return;
+			}
+			try {
+				const range = sel.getRangeAt(0);
+				const rect = range.getBoundingClientRect();
+				if (rect.width === 0 && rect.height === 0) return;
+				setSelectionDropdown({
+					text,
+					x: Math.max(8, Math.min(rect.left + rect.width / 2 - 110, window.innerWidth - 228)),
+					top: rect.top - 48,
+				});
+			} catch {
+				setSelectionDropdown(null);
+			}
+		};
+		document.addEventListener("mouseup", handleMouseUp);
+		return () => document.removeEventListener("mouseup", handleMouseUp);
+	}, []);
+
+	/* ── Close selection dropdown when clicking outside (defer to avoid same-stroke close) ── */
+	useEffect(() => {
+		if (!selectionDropdown) return;
+		const close = (e) => {
+			if (!e.target.closest("[data-selection-dropdown]")) setSelectionDropdown(null);
+		};
+		const t = setTimeout(() => document.addEventListener("mousedown", close), 50);
+		return () => {
+			clearTimeout(t);
+			document.removeEventListener("mousedown", close);
+		};
+	}, [selectionDropdown]);
 
 	const handleDelete = (id) => setDeleteConfirm(id);
 
@@ -1527,13 +1592,14 @@ export default function DraftPage() {
 					)}
 				</AnimatePresence>
 
-				{/* ── RIGHT PANEL — Editor ── */}
+				{/* ── CENTER PANEL — Editor ── */}
 				<div
 					style={{
 						flex: 1,
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
+						minWidth: 0,
 					}}
 				>
 					{draft && (
@@ -2113,6 +2179,36 @@ export default function DraftPage() {
 									{copied ? "Copied!" : "Copy"}
 								</motion.button>
 								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.96 }}
+									onClick={() => {
+										const raw = editorRef.current?.innerHTML || draft?.body || "";
+										const content = raw.trim().startsWith("<") ? raw : formatBody(raw);
+										setPreviewData({
+											title: titleRef.current?.innerText?.trim() || draft?.title || "Untitled draft",
+											content,
+										});
+										setPreviewOpen(true);
+									}}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 6,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "6px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.muted,
+										cursor: "pointer",
+										transition: "all 0.18s",
+									}}
+								>
+									<Icon d={Icons.eye} size={13} stroke={T.muted} />
+									Preview
+								</motion.button>
+								<motion.button
 									whileHover={{
 										scale: 1.03,
 										y: -1,
@@ -2155,29 +2251,113 @@ export default function DraftPage() {
 									}}
 								>
 									<div
-										contentEditable
-										suppressContentEditableWarning
-										data-placeholder="Untitled draft"
 										style={{
-											fontSize: "clamp(22px, 3vw, 30px)",
-											color: T.accent,
-											lineHeight: 1.2,
-											letterSpacing: "-0.5px",
-											outline: "none",
-											marginBottom: 8,
-											minHeight: 36,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "space-between",
+											gap: 12,
+											flexWrap: "wrap",
 										}}
-										dangerouslySetInnerHTML={{ __html: draft.title }}
-									/>
-									
+									>
+										<div
+											ref={titleRef}
+											contentEditable
+											suppressContentEditableWarning
+											data-placeholder="Untitled draft"
+											style={{
+												flex: 1,
+												minWidth: 120,
+												fontSize: "clamp(22px, 3vw, 30px)",
+												color: T.accent,
+												lineHeight: 1.2,
+												letterSpacing: "-0.5px",
+												outline: "none",
+												marginBottom: 8,
+												minHeight: 36,
+												fontFamily: editorFont === "Instrument Serif" ? "'Instrument Serif', serif" : editorFont === "Inter" ? "'Inter', sans-serif" : editorFont === "Georgia" ? "Georgia, serif" : editorFont === "system-ui" ? "system-ui, sans-serif" : "'Outfit', sans-serif",
+											}}
+											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
+										/>
+										<div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+											{/* Font family */}
+											<select
+												value={editorFont}
+												onChange={(e) => setEditorFont(e.target.value)}
+												style={{
+													padding: "4px 8px",
+													border: `1px solid ${T.border}`,
+													borderRadius: 6,
+													fontSize: 11,
+													fontWeight: 600,
+													background: T.base,
+													color: T.accent,
+													cursor: "pointer",
+													fontFamily: "inherit",
+												}}
+											>
+												<option value="Outfit">Outfit</option>
+												<option value="Instrument Serif">Instrument Serif</option>
+												<option value="Inter">Inter</option>
+												<option value="Georgia">Georgia</option>
+												<option value="system-ui">System</option>
+											</select>
+											{/* Font size */}
+											<div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.95 }}
+													onClick={() => setEditorFontSize((s) => Math.max(12, s - 2))}
+													style={{
+														width: 26,
+														height: 26,
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														border: `1px solid ${T.border}`,
+														borderRadius: 6,
+														background: T.base,
+														fontSize: 12,
+														fontWeight: 700,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													A-
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.95 }}
+													onClick={() => setEditorFontSize((s) => Math.min(24, s + 2))}
+													style={{
+														width: 26,
+														height: 26,
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														border: `1px solid ${T.border}`,
+														borderRadius: 6,
+														background: T.base,
+														fontSize: 12,
+														fontWeight: 700,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													A+
+												</motion.button>
+											</div>
+										</div>
+									</div>
 								</div>
 
 								{/* Editor body */}
 								<div
+									ref={editorContainerRef}
 									style={{
 										flex: 1,
 										overflowY: "auto",
 										background: T.surface,
+										position: "relative",
 									}}
 								>
 									<div
@@ -2192,11 +2372,111 @@ export default function DraftPage() {
 											padding: "28px 40px 80px",
 											minHeight: "100%",
 											outline: "none",
-											fontSize: 15,
+											fontSize: `${editorFontSize}px`,
 											lineHeight: 1.8,
 											color: "#3A3530",
+											fontFamily: editorFont === "Instrument Serif" ? "'Instrument Serif', serif" : editorFont === "Inter" ? "'Inter', sans-serif" : editorFont === "Georgia" ? "Georgia, serif" : editorFont === "system-ui" ? "system-ui, sans-serif" : "'Outfit', sans-serif",
 										}}
 									/>
+									{/* Text selection dropdown */}
+									<AnimatePresence>
+										{selectionDropdown && (
+											<motion.div
+												data-selection-dropdown
+												initial={{ opacity: 0, y: 4, scale: 0.96 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: 4, scale: 0.96 }}
+												style={{
+													position: "fixed",
+													left: selectionDropdown.x,
+													top: selectionDropdown.top,
+													zIndex: 100,
+													background: T.surface,
+													border: `1px solid ${T.border}`,
+													borderRadius: 10,
+													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+													padding: 6,
+													display: "flex",
+													gap: 4,
+												}}
+											>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onClick={() => {
+														setSelectionContext(selectionDropdown.text);
+														setChatOpen(true);
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 5,
+														padding: "6px 10px",
+														border: "none",
+														borderRadius: 6,
+														background: "#C17B2F15",
+														fontSize: 12,
+														fontWeight: 700,
+														color: "#92400E",
+														cursor: "pointer",
+													}}
+												>
+													<Icon d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z" size={12} stroke="#C17B2F" />
+													Add to AI chat
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onClick={() => {
+														navigator.clipboard.writeText(selectionDropdown.text);
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 5,
+														padding: "6px 10px",
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 12,
+														fontWeight: 600,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													<Icon d={Icons.copy} size={12} stroke={T.muted} />
+													Copy
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "rgba(239,68,68,0.1)" }}
+													whileTap={{ scale: 0.96 }}
+													onClick={() => {
+														document.execCommand("delete");
+														setSelectionDropdown(null);
+														countWords();
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 5,
+														padding: "6px 10px",
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 12,
+														fontWeight: 600,
+														color: "#EF4444",
+														cursor: "pointer",
+													}}
+												>
+													<Icon d={Icons.trash} size={12} stroke="#EF4444" />
+													Delete
+												</motion.button>
+											</motion.div>
+										)}
+									</AnimatePresence>
 								</div>
 							</div>
 
@@ -2370,6 +2650,22 @@ export default function DraftPage() {
 						</motion.div>
 					)}
 				</div>
+
+				{/* ── RIGHT PANEL — AI Chat (inline, not overlay) ── */}
+				<AIChatSidebar
+					open={chatOpen}
+					onClose={() => {
+						setChatOpen(false);
+						setSelectionContext("");
+					}}
+					onClearSelectionContext={() => setSelectionContext("")}
+					editorRef={editorRef}
+					draftContent={editorRef.current?.innerHTML || draft?.body || ""}
+					draftTitle={draft?.title || "Draft"}
+					userId={reduxUser?.uid || ""}
+					selectionContext={selectionContext}
+					asPanel
+				/>
 			</div>
 
 			{/* ── THEMES MODAL ── full-screen two-panel preview */}
@@ -2765,6 +3061,129 @@ export default function DraftPage() {
 					})()}
 			</AnimatePresence>
 
+			{/* ── PREVIEW MODAL (centered overlay) ── */}
+			<AnimatePresence>
+				{previewOpen && (
+					<>
+						<motion.div
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							onClick={() => setPreviewOpen(false)}
+							style={{
+								position: "fixed",
+								inset: 0,
+								background: "rgba(0,0,0,0.5)",
+								zIndex: 200,
+								backdropFilter: "blur(4px)",
+							}}
+						/>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.96 }}
+							animate={{ opacity: 1, scale: 1 }}
+							exit={{ opacity: 0, scale: 0.96 }}
+							transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+							style={{
+								position: "fixed",
+								inset: 0,
+								zIndex: 201,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								pointerEvents: "none",
+							}}
+						>
+							<div
+								onClick={(e) => e.stopPropagation()}
+								style={{
+									pointerEvents: "auto",
+									width: "min(90vw, 720px)",
+									maxHeight: "85vh",
+									background: T.surface,
+									border: `1px solid ${T.border}`,
+									borderRadius: 16,
+									boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
+									display: "flex",
+									flexDirection: "column",
+									overflow: "hidden",
+								}}
+							>
+							<div
+								style={{
+									padding: "16px 24px",
+									borderBottom: `1px solid ${T.border}`,
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+								}}
+							>
+								<span style={{ fontSize: 14, fontWeight: 700, color: T.accent }}>
+									Preview
+								</span>
+								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.95 }}
+									onClick={() => setPreviewOpen(false)}
+									style={{
+										background: "none",
+										border: "none",
+										borderRadius: 8,
+										width: 32,
+										height: 32,
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+										cursor: "pointer",
+										fontSize: 18,
+										color: T.muted,
+									}}
+								>
+									✕
+								</motion.button>
+							</div>
+							<div
+								style={{
+									flex: 1,
+									overflowY: "auto",
+									padding: "32px 48px 48px",
+									background: T.base,
+									fontFamily: editorFont === "Instrument Serif" ? "'Instrument Serif', serif" : editorFont === "Inter" ? "'Inter', sans-serif" : editorFont === "Georgia" ? "Georgia, serif" : editorFont === "system-ui" ? "system-ui, sans-serif" : "'Outfit', sans-serif",
+									fontSize: editorFontSize,
+									lineHeight: 1.8,
+									color: "#3A3530",
+								}}
+							>
+								<h1
+									style={{
+										fontSize: "clamp(22px, 3vw, 30px)",
+										color: T.accent,
+										lineHeight: 1.2,
+										marginBottom: 24,
+										fontWeight: 400,
+									}}
+								>
+									{previewData.title}
+								</h1>
+								<>
+									<style>{`
+										.preview-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; }
+										.preview-content video { max-width: 100%; border-radius: 8px; margin: 12px 0; }
+										.preview-content p { margin: 0 0 14px; }
+										.preview-content h1, .preview-content h2, .preview-content h3 { margin: 20px 0 10px; }
+									`}</style>
+									<div
+										dangerouslySetInnerHTML={{ __html: previewData.content }}
+										style={{ maxWidth: "100%" }}
+										className="preview-content"
+									/>
+								</>
+							</div>
+							</div>
+						</motion.div>
+					</>
+				)}
+			</AnimatePresence>
+
 			{/* ── DELETE CONFIRM MODAL ── */}
 			<AnimatePresence>
 				{deleteConfirm && (
@@ -2875,17 +3294,13 @@ export default function DraftPage() {
 				userId={reduxUser?.uid || ""}
 				draftId={draftId}
 				savedInfographics={draft?.infographics || []}
+				onInsertToEditor={(html) => {
+					editorRef.current?.focus();
+					document.execCommand("insertHTML", false, html + "<p><br></p>");
+					countWords();
+				}}
 			/>
 
-			{/* ── AI CHAT SIDEBAR ── */}
-			<AIChatSidebar
-				open={chatOpen}
-				onClose={() => setChatOpen(false)}
-				editorRef={editorRef}
-				draftContent={editorRef.current?.innerHTML || draft?.body || ""}
-				draftTitle={draft?.title || "Draft"}
-				userId={reduxUser?.uid || ""}
-			/>
 		</div>
 	);
 }
