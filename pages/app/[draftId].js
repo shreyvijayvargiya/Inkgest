@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import InfographicsModal from "../../lib/ui/InfographicsModal";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
+import TableView from "../../lib/ui/TableView";
 import { db } from "../../lib/config/firebase";
 import {
 	collection,
@@ -511,9 +512,14 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 </html>`;
 }
 
-/* ─── Draft card in sidebar ─── */
-function DraftCard({ draft, active, onClick, onDelete }) {
+/* ─── Item card in sidebar (drafts + tables) ─── */
+function ItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
+	const isTable = item.type === "table";
+	const tag = isTable ? "Table" : (item.tag || "Draft");
+	const preview = isTable ? (item.description || "") : (item.preview || "");
+	const meta = isTable ? "" : `${item.words ?? 0}w`;
+	const date = item.date ? (typeof item.date === "string" ? item.date : item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "") : "";
 	return (
 		<motion.div
 			layout
@@ -574,7 +580,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							WebkitBoxOrient: "vertical",
 						}}
 					>
-						{draft.title}
+						{item.title || "Untitled"}
 					</p>
 					<p
 						style={{
@@ -588,7 +594,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							marginBottom: 6,
 						}}
 					>
-						{draft.preview}
+						{preview}
 					</p>
 					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 						<span
@@ -601,13 +607,11 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 								borderRadius: 100,
 							}}
 						>
-							{draft.tag}
+							{tag}
 						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>
-							{draft.words}w
-						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>·</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>{draft.date}</span>
+						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>}
+						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
+						{date && <span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>}
 					</div>
 				</div>
 				<AnimatePresence>
@@ -618,7 +622,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							exit={{ opacity: 0, scale: 0.8 }}
 							onClick={(e) => {
 								e.stopPropagation();
-								onDelete(draft.id);
+								onDelete(item.id);
 							}}
 							style={{
 								background: "none",
@@ -766,27 +770,78 @@ export default function DraftPage() {
 				orderBy("createdAt", "desc"),
 			);
 			const snap = await getDocs(q);
-			return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+			return snap.docs.map((d) => ({ id: d.id, type: "draft", ...d.data() }));
 		},
 		enabled: !!reduxUser,
 		staleTime: 2 * 60 * 1000,
 	});
 
-	/* Single draft by ID */
-	const { data: draft, isLoading: loadingDraft } = useQuery({
-		queryKey: ["draft", draftId],
+	/* All tables for sidebar */
+	const { data: tables = [] } = useQuery({
+		queryKey: ["tables", reduxUser?.uid],
 		queryFn: async () => {
-			const snap = await getDoc(doc(db, "drafts", draftId));
-			if (!snap.exists()) {
-				router.replace("/app");
-				return null;
-			}
-			return { id: snap.id, ...snap.data() };
+			const q = query(
+				collection(db, "tables"),
+				where("userId", "==", reduxUser.uid),
+			);
+			const snap = await getDocs(q);
+			return snap.docs.map((d) => {
+				const data = d.data();
+				const created = data.createdAt;
+				const date = created?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "";
+				return { id: d.id, type: "table", title: data.title, description: data.description, createdAt: created, date };
+			});
 		},
-		enabled: !!draftId,
+		enabled: !!reduxUser,
+		staleTime: 2 * 60 * 1000,
+	});
+
+	/* Merged items (drafts + tables) sorted by date */
+	const items = useMemo(() => {
+		const merged = [...drafts, ...tables];
+		merged.sort((a, b) => {
+			const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
+			const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
+			return bT - aT;
+		});
+		return merged;
+	}, [drafts, tables]);
+
+	/* Single doc by ID — try drafts first, then tables */
+	const { data: docData, isLoading: loadingDraft } = useQuery({
+		queryKey: ["doc", draftId],
+		queryFn: async () => {
+			const draftSnap = await getDoc(doc(db, "drafts", draftId));
+			if (draftSnap.exists()) {
+				return { type: "draft", doc: { id: draftSnap.id, ...draftSnap.data() } };
+			}
+			const tableSnap = await getDoc(doc(db, "tables", draftId));
+			if (tableSnap.exists()) {
+				const data = tableSnap.data();
+				if (data.userId !== reduxUser?.uid) return null;
+				return {
+					type: "table",
+					doc: {
+						id: tableSnap.id,
+						title: data.title,
+						description: data.description,
+						columns: data.columns || [],
+						rows: data.rows || [],
+						sourceUrls: data.sourceUrls || [],
+					},
+				};
+			}
+			router.replace("/app");
+			return null;
+		},
+		enabled: !!draftId && !!reduxUser,
 		staleTime: 5 * 60 * 1000,
 		retry: false,
 	});
+
+	const draft = docData?.type === "draft" ? docData.doc : null;
+	const docType = docData?.type;
+	const tableDoc = docData?.type === "table" ? docData.doc : null;
 
 	/* Dynamic usage for navbar pill */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
@@ -839,6 +894,12 @@ export default function DraftPage() {
 			})
 			.join("");
 	};
+
+	/* Table data state for TableView */
+	const [tableData, setTableData] = useState(null);
+	useEffect(() => {
+		if (tableDoc) setTableData(tableDoc);
+	}, [tableDoc]);
 
 	/* Set editor content when draft loads */
 	useEffect(() => {
@@ -945,14 +1006,15 @@ export default function DraftPage() {
 	const handleDelete = (id) => setDeleteConfirm(id);
 
 	const confirmDelete = async () => {
+		if (!deleteConfirm) return;
+		const item = items.find((i) => i.id === deleteConfirm);
+		const coll = item?.type === "table" ? "tables" : "drafts";
+		const queryKey = item?.type === "table" ? ["tables", reduxUser?.uid] : ["drafts", reduxUser?.uid];
 		try {
-			await deleteDoc(doc(db, "drafts", deleteConfirm));
-			queryClient.setQueryData(["drafts", reduxUser?.uid], (old = []) =>
-				old.filter((d) => d.id !== deleteConfirm),
-			);
-			if (deleteConfirm === draftId) {
-				router.push("/app");
-			}
+			await deleteDoc(doc(db, coll, deleteConfirm));
+			queryClient.setQueryData(queryKey, (old = []) => old.filter((d) => d.id !== deleteConfirm));
+			queryClient.invalidateQueries(["doc", deleteConfirm]);
+			if (deleteConfirm === draftId) router.push("/app");
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
@@ -970,17 +1032,17 @@ export default function DraftPage() {
 		setTimeout(() => setCopiedTheme(null), 2200);
 	};
 
-	const filtered = drafts.filter(
-		(d) =>
-			d.title?.toLowerCase().includes(search.toLowerCase()) ||
-			d.preview?.toLowerCase().includes(search.toLowerCase()),
+	const filtered = items.filter(
+		(i) =>
+			i.title?.toLowerCase().includes(search.toLowerCase()) ||
+			(i.preview || i.description || "").toLowerCase().includes(search.toLowerCase()),
 	);
 
 	const sourceUrl = Array.isArray(draft?.urls)
 		? draft.urls[0] || ""
 		: draft?.url || "";
 
-	if (loadingDraft && !draft) {
+	if (loadingDraft && !docData) {
 		return (
 			<div
 				style={{
@@ -998,7 +1060,7 @@ export default function DraftPage() {
 					transition={{ duration: 1.5, repeat: Infinity }}
 					style={{ fontSize: 15, color: T.muted }}
 				>
-					Loading draft…
+					Loading…
 				</motion.div>
 			</div>
 		);
@@ -1281,15 +1343,15 @@ export default function DraftPage() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts found</p>
+											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
 										</motion.div>
 									) : (
-										filtered.map((d) => (
-											<DraftCard
-												key={d.id}
-												draft={d}
-												active={d.id === draftId}
-												onClick={() => router.push(`/app/${d.id}`)}
+										filtered.map((i) => (
+											<ItemCard
+												key={i.id}
+												item={i}
+												active={i.id === draftId}
+												onClick={() => router.push(`/app/${i.id}`)}
 												onDelete={handleDelete}
 											/>
 										))
@@ -1390,7 +1452,7 @@ export default function DraftPage() {
 					)}
 				</AnimatePresence>
 
-				{/* ── RIGHT PANEL — Editor ── */}
+				{/* ── RIGHT PANEL — Editor or Table ── */}
 				<div
 					style={{
 						flex: 1,
@@ -1399,6 +1461,16 @@ export default function DraftPage() {
 						overflow: "hidden",
 					}}
 				>
+					{docType === "table" && tableData && (
+						<div style={{ flex: 1, overflow: "auto" }}>
+							<TableView
+								tableId={draftId}
+								tableData={tableData}
+								setTableData={setTableData}
+								reduxUser={reduxUser}
+							/>
+						</div>
+					)}
 					{draft && (
 						<motion.div
 							key={`editor-${draftId}`}

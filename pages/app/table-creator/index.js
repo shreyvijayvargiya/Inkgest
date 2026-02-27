@@ -371,7 +371,7 @@ export default function TableCreatorIndex() {
 				{ id: docRef.id, title: displayTableData.title, createdAt: new Date() },
 				...prev,
 			]);
-			router.push(`/app/table-creator/${docRef.id}`);
+			router.push(`/app/${docRef.id}`);
 		} catch (e) {
 			console.error("Save failed", e);
 		} finally {
@@ -380,7 +380,7 @@ export default function TableCreatorIndex() {
 	}, [displayTableData, reduxUser, saving, router]);
 
 	const handleOpenTable = useCallback((id) => {
-		router.push(`/app/table-creator/${id}`);
+		router.push(`/app/${id}`);
 	}, [router]);
 
 	const visibleRowCount = table.getFilteredRowModel().rows.length;

@@ -233,9 +233,14 @@ function UpgradeBanner({ credits, onUpgrade }) {
 	);
 }
 
-/* ─── Draft card in sidebar ─── */
-function DraftCard({ draft, active, onClick, onDelete }) {
+/* ─── Item card in sidebar (drafts + tables) ─── */
+function SidebarItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
+	const isTable = item.type === "table";
+	const tag = isTable ? "Table" : (item.tag || "Draft");
+	const preview = isTable ? (item.description || "") : (item.preview || "");
+	const meta = isTable ? "" : `${item.words ?? 0}w`;
+	const date = item.date ? (typeof item.date === "string" ? item.date : item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "") : "";
 	return (
 		<motion.div
 			layout
@@ -296,7 +301,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							WebkitBoxOrient: "vertical",
 						}}
 					>
-						{draft.title}
+						{item.title || "Untitled"}
 					</p>
 					<p
 						style={{
@@ -310,7 +315,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							marginBottom: 6,
 						}}
 					>
-						{draft.preview}
+						{preview}
 					</p>
 					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 						<span
@@ -323,13 +328,11 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 								borderRadius: 100,
 							}}
 						>
-							{draft.tag}
+							{tag}
 						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>
-							{draft.words}w
-						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>·</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>{draft.date}</span>
+						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>}
+						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
+						{date && <span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>}
 					</div>
 				</div>
 				<AnimatePresence>
@@ -340,7 +343,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							exit={{ opacity: 0, scale: 0.8 }}
 							onClick={(e) => {
 								e.stopPropagation();
-								onDelete(draft.id);
+								onDelete(item.id);
 							}}
 							style={{
 								background: "none",
@@ -381,7 +384,7 @@ export default function inkgestApp() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
-	const [draftMode, setDraftMode] = useState("ai"); // "ai" | "scrape" | "blank" | "agent"
+	const [draftMode, setDraftMode] = useState("agent"); // "ai" | "scrape" | "blank" | "agent"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
@@ -419,27 +422,39 @@ export default function inkgestApp() {
 		return () => clearInterval(iv);
 	}, [agentLoading]);
 
-	/* Load drafts per user from Firestore */
+	/* Load drafts and tables per user from Firestore */
+	const [tables, setTables] = useState([]);
 	useEffect(() => {
 		if (!reduxUser) {
 			setDrafts([]);
+			setTables([]);
 			return;
 		}
-		const loadDrafts = async () => {
+		const load = async () => {
 			try {
-				const q = query(
-					collection(db, "drafts"),
-					where("userId", "==", reduxUser.uid),
-					orderBy("createdAt", "desc"),
-				);
-				const snap = await getDocs(q);
-				setDrafts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+				const [draftsSnap, tablesSnap] = await Promise.all([
+					getDocs(query(collection(db, "drafts"), where("userId", "==", reduxUser.uid), orderBy("createdAt", "desc"))),
+					getDocs(query(collection(db, "tables"), where("userId", "==", reduxUser.uid))),
+				]);
+				setDrafts(draftsSnap.docs.map((d) => ({ id: d.id, type: "draft", ...d.data() })));
+				setTables(tablesSnap.docs.map((d) => {
+					const data = d.data();
+					const created = data.createdAt;
+					const date = created?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "";
+					return { id: d.id, type: "table", title: data.title, description: data.description, createdAt: created, date };
+				}));
 			} catch (e) {
-				console.error("Failed to load drafts", e);
+				console.error("Failed to load drafts/tables", e);
 			}
 		};
-		loadDrafts();
+		load();
 	}, [reduxUser]);
+
+	const sidebarItems = [...drafts, ...tables].sort((a, b) => {
+		const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
+		const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
+		return bT - aT;
+	});
 
 	/* Load real credit state from Firestore */
 	useEffect(() => {
@@ -461,10 +476,10 @@ export default function inkgestApp() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reduxUser]);
 
-	const filtered = drafts.filter(
-		(d) =>
-			d.title?.toLowerCase().includes(search.toLowerCase()) ||
-			d.preview?.toLowerCase().includes(search.toLowerCase()),
+	const filtered = sidebarItems.filter(
+		(i) =>
+			i.title?.toLowerCase().includes(search.toLowerCase()) ||
+			(i.preview || i.description || "").toLowerCase().includes(search.toLowerCase()),
 	);
 
 	const handleGenerate = async () => {
@@ -582,9 +597,16 @@ export default function inkgestApp() {
 	};
 
 	const confirmDelete = async () => {
+		if (!deleteConfirm) return;
+		const item = sidebarItems.find((i) => i.id === deleteConfirm);
+		const coll = item?.type === "table" ? "tables" : "drafts";
 		try {
-			await deleteDoc(doc(db, "drafts", deleteConfirm));
-			setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			await deleteDoc(doc(db, coll, deleteConfirm));
+			if (item?.type === "table") {
+				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			} else {
+				setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			}
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
@@ -760,7 +782,7 @@ export default function inkgestApp() {
 					sourceUrls: task.sourceUrls || [],
 					createdAt: serverTimestamp(),
 				});
-				newTasks.push({ type: "table", label: task.label, id: docRef.id, path: `/app/table-creator/${docRef.id}` });
+				newTasks.push({ type: "table", label: task.label, id: docRef.id, path: `/app/${docRef.id}` });
 			}
 		}
 		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
@@ -1089,15 +1111,15 @@ export default function inkgestApp() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts found</p>
+											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
 										</motion.div>
 									) : (
-										filtered.map((draft) => (
-											<DraftCard
-												key={draft.id}
-												draft={draft}
+										filtered.map((item) => (
+											<SidebarItemCard
+												key={item.id}
+												item={item}
 												active={false}
-												onClick={() => router.push(`/app/${draft.id}`)}
+												onClick={() => router.push(`/app/${item.id}`)}
 												onDelete={handleDelete}
 											/>
 										))
@@ -1237,215 +1259,6 @@ export default function inkgestApp() {
 							<p style={{ fontSize: 15, color: T.muted, lineHeight: 1.6 }}>
 								Choose how you want to start writing.
 							</p>
-						</div>
-
-						{/* ── Mode selector cards ── */}
-						<div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 28 }}>
-							{[
-								{
-									id: "ai",
-									icon: (
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-										</svg>
-									),
-									label: "AI Draft",
-									desc: "URLs + prompt → full draft",
-								},
-								{
-									id: "scrape",
-									icon: (
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-											<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-										</svg>
-									),
-									label: "Scrape URL",
-									desc: "Raw content into editor",
-								},
-								{
-									id: "blank",
-									icon: (
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-										</svg>
-									),
-									label: "Blank editor",
-									desc: "Start from scratch",
-								},
-								{
-									id: "agent",
-									icon: (
-										<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-											<circle cx="12" cy="12" r="3" />
-											<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-										</svg>
-									),
-									label: "AI Agent",
-									desc: "Prompt → tasks done",
-								},
-							].map((m) => {
-								const active = draftMode === m.id;
-								return (
-									<motion.button
-										key={m.id}
-										whileTap={{ scale: 0.97 }}
-										onClick={() => {
-											setDraftMode(m.id);
-											setGenerateError(null);
-											setAgentError(null);
-										}}
-										style={{
-											flex: 1,
-											background: active ? T.accent : T.surface,
-											border: `1.5px solid ${active ? T.accent : T.border}`,
-											borderRadius: 12,
-											padding: "14px 16px",
-											cursor: "pointer",
-											textAlign: "left",
-											transition: "all 0.15s",
-										}}
-									>
-										<div
-											style={{
-												display: "inline-flex",
-												alignItems: "center",
-												justifyContent: "center",
-												width: 28,
-												height: 28,
-												borderRadius: 7,
-												background: active ? "rgba(255,255,255,0.15)" : T.base,
-												color: active ? "white" : T.warm,
-												marginBottom: 10,
-											}}
-										>
-											{m.icon}
-										</div>
-										<p
-											style={{
-												fontSize: 13,
-												fontWeight: 700,
-												color: active ? "white" : T.accent,
-												marginBottom: 3,
-											}}
-										>
-											{m.label}
-										</p>
-										<p
-											style={{
-												fontSize: 11,
-												color: active ? "rgba(255,255,255,0.65)" : T.muted,
-											}}
-										>
-											{m.desc}
-										</p>
-									</motion.button>
-								);
-							})}
-
-							{/* ── Table Creator — navigates to its own page ── */}
-							<motion.button
-								whileTap={{ scale: 0.97 }}
-								onClick={() => router.push("/app/table-creator")}
-								style={{
-									flex: 1,
-									background: T.surface,
-									border: `1.5px solid ${T.border}`,
-									borderRadius: 12,
-									padding: "14px 16px",
-									cursor: "pointer",
-									textAlign: "left",
-									transition: "all 0.15s",
-									position: "relative",
-								}}
-							>
-								<div
-									style={{
-										position: "absolute",
-										top: 8,
-										right: 10,
-										fontSize: 9,
-										fontWeight: 700,
-										color: T.warm,
-										background: "#FEF3E2",
-										border: "1px solid #F5C97A",
-										borderRadius: 20,
-										padding: "1px 6px",
-										letterSpacing: "0.05em",
-										textTransform: "uppercase",
-									}}
-								>
-									New
-								</div>
-								<div
-									style={{
-										display: "inline-flex",
-										alignItems: "center",
-										justifyContent: "center",
-										width: 28,
-										height: 28,
-										borderRadius: 7,
-										background: T.base,
-										color: T.warm,
-										marginBottom: 10,
-									}}
-								>
-									<svg
-										width={16}
-										height={16}
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth={2}
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<rect x="3" y="3" width="18" height="18" rx="2" />
-										<path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-									</svg>
-								</div>
-								<p
-									style={{
-										fontSize: 13,
-										fontWeight: 700,
-										color: T.accent,
-										marginBottom: 3,
-									}}
-								>
-									Create Table
-								</p>
-								<p style={{ fontSize: 11, color: T.muted }}>
-									URL → AI-structured table
-								</p>
-							</motion.button>
 						</div>
 
 						{/* Not logged in info banner */}
