@@ -17,7 +17,11 @@ import { setUser, clearUser } from "../store/slices/userSlice";
 import { toast } from "sonner";
 import SignupModal from "./SignupModal";
 import { useRouter } from "next/router";
-import { getUserCredits, FREE_CREDIT_LIMIT } from "../utils/credits";
+import {
+	getUserCredits,
+	FREE_CREDIT_LIMIT,
+	formatRenewalDate,
+} from "../utils/credits";
 
 /* ── Design tokens ── */
 const T = {
@@ -265,7 +269,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 														{credits
 															? credits.creditsUsed >= credits.creditsLimit
 																? "No credits left this month."
-																: `${+(credits.creditsLimit - credits.creditsUsed).toFixed(2)} credits remaining · resets on the 1st`
+																: `${+(credits.creditsLimit - credits.creditsUsed).toFixed(2)} credits remaining · renews ${credits.renewsAt ? formatRenewalDate(credits.renewsAt) : "monthly"}`
 															: "Loading…"}
 													</p>
 

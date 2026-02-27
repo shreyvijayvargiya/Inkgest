@@ -19,6 +19,11 @@ import {
 	updateDoc,
 } from "firebase/firestore";
 import { uploadFile } from "../../lib/api/upload";
+import {
+	getUserCredits,
+	FREE_CREDIT_LIMIT,
+	formatRenewalDate,
+} from "../../lib/utils/credits";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -465,10 +470,14 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 			if (tag === "pre")
 				return `<pre style="background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;">${node.textContent || ""}</pre>\n`;
 			if (tag === "hr") return `<hr style="${theme.hr}"/>\n`;
-			if (tag === "br" || !text) return `<br/>\n`;
 			if (tag === "img")
 				return `<img src="${node.getAttribute("src") || ""}" alt="${node.getAttribute("alt") || ""}" style="max-width:100%;height:auto;border-radius:6px;margin:12px 0;display:block;"/>\n`;
-			/* p, div, section, article → paragraph */
+			if (tag === "video") {
+				const src = node.getAttribute("src") || "";
+				return `<p style="margin:16px 0"><video src="${src}" controls style="max-width:100%;border-radius:8px;display:block;"></video></p>\n`;
+			}
+			if (tag === "br" || !text) return `<br/>\n`;
+			/* p, div, section, article → paragraph (preserve inner HTML including img/video) */
 			return `<p style="${theme.p}">${inner}</p>\n`;
 		};
 
@@ -497,7 +506,7 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
     strong,b{${theme.strong}}
     em,i{font-style:italic;}
     code{${theme.code}}
-    img{max-width:100%;height:auto;border-radius:6px;}
+    img,video{max-width:100%;height:auto;border-radius:6px;}
     ul,ol{padding-left:24px;margin:0 0 14px;}
     li{${theme.li}}
     hr{${theme.hr}}
@@ -795,9 +804,26 @@ export default function DraftPage() {
 		retry: false,
 	});
 
-	/* Dynamic usage for navbar pill */
+	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
 	const remaining = Math.max(0, FREE_LIMIT - used);
+
+	/* Credits for free users (10/month) */
+	const [credits, setCredits] = useState(null);
+	useEffect(() => {
+		if (!reduxUser) {
+			setCredits(null);
+			return;
+		}
+		getUserCredits(reduxUser.uid)
+			.then(setCredits)
+			.catch((e) => console.error("Failed to load credits", e));
+	}, [reduxUser]);
+	const creditRemaining = credits
+		? credits.plan === "pro"
+			? Infinity
+			: Math.max(0, credits.remaining ?? FREE_CREDIT_LIMIT)
+		: FREE_CREDIT_LIMIT;
 
 	/* Format markdown body → editor HTML, handling rich blocks */
 	const formatBody = (body = "") => {
@@ -1175,57 +1201,72 @@ export default function DraftPage() {
 
 				<div style={{ width: 1, height: 20, background: T.border }} />
 
-				{/* Usage pill */}
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 8,
-						marginLeft: 4,
-						background: remaining === 0 ? "#FEF3E2" : T.base,
-						border: `1px solid ${remaining === 0 ? "#F5C97A" : T.border}`,
-						borderRadius: 100,
-						padding: "4px 12px",
-					}}
-				>
+				{/* Credits pill — 10 free/month, renews monthly from account creation */}
+				{reduxUser && (
 					<div
 						style={{
-							width: 52,
-							height: 3,
-							background: T.border,
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							marginLeft: 4,
+							background: creditRemaining === 0 ? "#FEF3E2" : T.base,
+							border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
 							borderRadius: 100,
-							overflow: "hidden",
+							padding: "4px 14px",
 						}}
 					>
-						<motion.div
-							animate={{
-								width: `${((FREE_LIMIT - remaining) / FREE_LIMIT) * 100}%`,
+						{credits?.plan === "pro" ? (
+							<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
+								∞ Pro
+							</span>
+						) : (
+							<>
+								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+									Credits{" "}
+									<span
+										style={{
+											fontWeight: 700,
+											color: creditRemaining === 0 ? "#EF4444" : T.accent,
+										}}
+									>
+										{credits
+											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
+											: `0/${FREE_CREDIT_LIMIT}`}
+									</span>
+								</span>
+								{credits?.renewsAt && (
+									<span
+										style={{
+											fontSize: 11,
+											color: T.muted,
+											fontWeight: 500,
+											whiteSpace: "nowrap",
+										}}
+									>
+										Renew at {formatRenewalDate(credits.renewsAt)}
+									</span>
+								)}
+							</>
+						)}
+						<motion.button
+							whileHover={{ scale: 1.04 }}
+							whileTap={{ scale: 0.97 }}
+							onClick={() => router.push("/pricing")}
+							style={{
+								background: T.accent,
+								color: "white",
+								border: "none",
+								padding: "3px 10px",
+								borderRadius: 100,
+								fontSize: 11,
+								fontWeight: 700,
+								cursor: "pointer",
 							}}
-							transition={{ duration: 0.6 }}
-							style={{ height: "100%", background: T.warm, borderRadius: 100 }}
-						/>
+						>
+							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
+						</motion.button>
 					</div>
-					<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
-						{remaining}/{FREE_LIMIT} left
-					</span>
-					<motion.button
-						whileHover={{ scale: 1.04 }}
-						whileTap={{ scale: 0.97 }}
-						onClick={() => router.push("/pricing")}
-						style={{
-							background: T.accent,
-							color: "white",
-							border: "none",
-							padding: "3px 10px",
-							borderRadius: 100,
-							fontSize: 11,
-							fontWeight: 700,
-							cursor: "pointer",
-						}}
-					>
-						Upgrade
-					</motion.button>
-				</div>
+				)}
 
 				<div style={{ flex: 1 }} />
 				{/* New draft button */}
@@ -2128,58 +2169,7 @@ export default function DraftPage() {
 										}}
 										dangerouslySetInnerHTML={{ __html: draft.title }}
 									/>
-									{/* Source links — hostname only, no full URL repeat */}
-									{(() => {
-										const allUrls = Array.isArray(draft?.urls)
-											? draft.urls.filter(Boolean)
-											: draft?.url
-												? [draft.url]
-												: [];
-										if (allUrls.length === 0) return null;
-										return (
-											<div
-												style={{ display: "flex", flexWrap: "wrap", gap: 5 }}
-											>
-												{allUrls.map((url, i) => {
-													let label = url;
-													try {
-														label = new URL(url).hostname.replace(/^www\./, "");
-													} catch {}
-													return (
-														<a
-															key={i}
-															href={url}
-															target="_blank"
-															rel="noopener noreferrer"
-															title={url}
-															style={{
-																display: "inline-flex",
-																alignItems: "center",
-																gap: 4,
-																fontSize: 11.5,
-																color: T.warm,
-																background: "#FEF3E2",
-																border: `1px solid #F5C97A`,
-																borderRadius: 6,
-																padding: "2px 8px",
-																textDecoration: "none",
-																transition: "opacity 0.15s",
-															}}
-															onMouseEnter={(e) =>
-																(e.currentTarget.style.opacity = "0.7")
-															}
-															onMouseLeave={(e) =>
-																(e.currentTarget.style.opacity = "1")
-															}
-														>
-															<Icon d={Icons.link2} size={10} stroke={T.warm} />
-															{label}
-														</a>
-													);
-												})}
-											</div>
-										);
-									})()}
+									
 								</div>
 
 								{/* Editor body */}

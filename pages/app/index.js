@@ -15,7 +15,11 @@ import {
 	where,
 	serverTimestamp,
 } from "firebase/firestore";
-import { getUserCredits, FREE_CREDIT_LIMIT } from "../../lib/utils/credits";
+import {
+	getUserCredits,
+	FREE_CREDIT_LIMIT,
+	formatRenewalDate,
+} from "../../lib/utils/credits";
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 
 /* ─── Fonts ─── */
@@ -774,19 +778,33 @@ export default function inkgestApp() {
 								∞ Pro
 							</span>
 						) : (
-							<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-								Credits{" "}
-								<span
-									style={{
-										fontWeight: 700,
-										color: creditRemaining === 0 ? "#EF4444" : T.accent,
-									}}
-								>
-									{credits
-										? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
-										: `0/${FREE_CREDIT_LIMIT}`}
+							<>
+								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+									Credits{" "}
+									<span
+										style={{
+											fontWeight: 700,
+											color: creditRemaining === 0 ? "#EF4444" : T.accent,
+										}}
+									>
+										{credits
+											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
+											: `0/${FREE_CREDIT_LIMIT}`}
+									</span>
 								</span>
-							</span>
+								{credits?.renewsAt && (
+									<span
+										style={{
+											fontSize: 11,
+											color: T.muted,
+											fontWeight: 500,
+											whiteSpace: "nowrap",
+										}}
+									>
+										Renew at {formatRenewalDate(credits.renewsAt)}
+									</span>
+								)}
+							</>
 						)}
 						<motion.button
 							whileHover={{ scale: 1.04 }}
