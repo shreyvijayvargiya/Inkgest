@@ -18,6 +18,7 @@ import {
 	where,
 	updateDoc,
 } from "firebase/firestore";
+import { uploadFile } from "../../lib/api/upload";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -107,6 +108,8 @@ const Icons = {
 	list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
 	link2:
 		"M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3 M8 12h8",
+	image:
+		"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-8a2 2 0 11-4 0 2 2 0 014 0zM4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z",
 	settings:
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
@@ -754,7 +757,11 @@ export default function DraftPage() {
 	const [infographicsOpen, setInfographicsOpen] = useState(false);
 	const [chatOpen, setChatOpen] = useState(false);
 	const [blockMenuOpen, setBlockMenuOpen] = useState(false);
+	const [imageDropdownOpen, setImageDropdownOpen] = useState(false);
+	const [imageUrlInput, setImageUrlInput] = useState("");
+	const [imageUploading, setImageUploading] = useState(false);
 	const editorRef = useRef(null);
+	const imageFileInputRef = useRef(null);
 
 	/* All drafts for sidebar */
 	const { data: drafts = [] } = useQuery({
@@ -872,6 +879,85 @@ export default function DraftPage() {
 		setTimeout(() => setSaved(false), 2000);
 	};
 
+	/* ── Insert image or video at cursor ── */
+	const insertImageOrVideo = (url, isVideo = false) => {
+		if (!url?.trim()) return;
+		editorRef.current?.focus();
+		if (isVideo) {
+			const html = `<p style="margin:16px 0"><video src="${url}" controls style="max-width:100%;border-radius:8px;display:block"></video></p>`;
+			document.execCommand("insertHTML", false, html);
+		} else {
+			document.execCommand("insertImage", false, url);
+		}
+		countWords();
+		setImageUrlInput("");
+		setImageDropdownOpen(false);
+	};
+
+	const handleImageFileSelect = (e) => {
+		const file = e.target?.files?.[0];
+		if (!file) return;
+		const isVideo = file.type.startsWith("video/");
+		const isImage = file.type.startsWith("image/");
+		if (!isImage && !isVideo) {
+			alert("Please select an image or video file.");
+			return;
+		}
+
+		/* Images: insert base64 immediately, then upload to Firebase in background */
+		if (isImage) {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const dataUrl = reader.result;
+				insertImageOrVideo(dataUrl, false);
+				/* Upload in background and replace base64 with Firebase URL */
+				if (reduxUser?.uid) {
+					uploadFile(file, `users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${file.name.split(".").pop() || "png"}`)
+						.then((firebaseUrl) => {
+							const html = editorRef.current?.innerHTML || "";
+							if (html.includes(dataUrl)) {
+								editorRef.current.innerHTML = html.split(dataUrl).join(firebaseUrl);
+							}
+						})
+						.catch((err) => {
+							console.error("Background upload failed:", err);
+						});
+				}
+			};
+			reader.readAsDataURL(file);
+		} else {
+			/* Videos: upload first (too large for base64), then insert */
+			if (!reduxUser?.uid) {
+				alert("Please sign in to upload videos.");
+				return;
+			}
+			setImageUploading(true);
+			const ext = file.name.split(".").pop() || "mp4";
+			const path = `users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${ext}`;
+			uploadFile(file, path)
+				.then((downloadUrl) => insertImageOrVideo(downloadUrl, true))
+				.catch((err) => {
+					console.error("Upload failed:", err);
+					alert("Upload failed. Please try again.");
+				})
+				.finally(() => {
+					setImageUploading(false);
+					e.target.value = "";
+				});
+		}
+		e.target.value = "";
+	};
+
+	const isVideoUrl = (url) => {
+		try {
+			const u = new URL(url);
+			const path = u.pathname.toLowerCase();
+			return /\.(mp4|webm|ogg|mov)(\?|$)/.test(path) || path.includes("video");
+		} catch {
+			return false;
+		}
+	};
+
 	/* ── Insert a rich block at the cursor ── */
 	const insertBlock = (type) => {
 		editorRef.current?.focus();
@@ -941,6 +1027,16 @@ export default function DraftPage() {
 		document.addEventListener("mousedown", close);
 		return () => document.removeEventListener("mousedown", close);
 	}, [blockMenuOpen]);
+
+	/* ── Close image dropdown when clicking outside ── */
+	useEffect(() => {
+		if (!imageDropdownOpen) return;
+		const close = (e) => {
+			if (!e.target.closest("[data-image-dropdown]")) setImageDropdownOpen(false);
+		};
+		document.addEventListener("mousedown", close);
+		return () => document.removeEventListener("mousedown", close);
+	}, [imageDropdownOpen]);
 
 	const handleDelete = (id) => setDeleteConfirm(id);
 
@@ -1448,6 +1544,131 @@ export default function DraftPage() {
 										if (url) document.execCommand("createLink", false, url);
 									}}
 								/>
+								<div data-image-dropdown style={{ position: "relative" }}>
+									<TBtn
+										icon={Icons.image}
+										label="Image / Video"
+										onClick={() => setImageDropdownOpen((v) => !v)}
+									/>
+									<input
+										ref={imageFileInputRef}
+										type="file"
+										accept="image/*,video/*"
+										style={{ display: "none" }}
+										onChange={handleImageFileSelect}
+									/>
+									<AnimatePresence>
+										{imageDropdownOpen && (
+											<motion.div
+												initial={{ opacity: 0, y: 6, scale: 0.96 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: 6, scale: 0.96 }}
+												transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+												style={{
+													position: "absolute",
+													top: "calc(100% + 6px)",
+													left: 0,
+													background: "#FFFFFF",
+													border: `1px solid ${T.border}`,
+													borderRadius: 12,
+													boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+													zIndex: 60,
+													padding: 12,
+													minWidth: 260,
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "0 0 8px",
+													}}
+												>
+													Upload from computer
+												</p>
+												<motion.button
+													whileHover={{ background: "#F7F5F0" }}
+													whileTap={{ scale: 0.98 }}
+													onClick={() => imageFileInputRef.current?.click()}
+													disabled={imageUploading || !reduxUser}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														gap: 8,
+														background: "#F7F5F0",
+														border: `1px dashed ${T.border}`,
+														borderRadius: 8,
+														padding: "10px 14px",
+														fontSize: 12,
+														fontWeight: 600,
+														color: T.accent,
+														cursor: imageUploading || !reduxUser ? "not-allowed" : "pointer",
+														opacity: imageUploading || !reduxUser ? 0.6 : 1,
+													}}
+												>
+													{imageUploading ? "Uploading…" : "Choose image or video"}
+												</motion.button>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "12px 0 8px",
+													}}
+												>
+													Or add from URL
+												</p>
+												<div style={{ display: "flex", gap: 6 }}>
+													<input
+														type="url"
+														placeholder="https://…"
+														value={imageUrlInput}
+														onChange={(e) => setImageUrlInput(e.target.value)}
+														onKeyDown={(e) => {
+															if (e.key === "Enter")
+																insertImageOrVideo(imageUrlInput.trim(), isVideoUrl(imageUrlInput.trim()));
+														}}
+														style={{
+															flex: 1,
+															padding: "8px 12px",
+															border: `1px solid ${T.border}`,
+															borderRadius: 8,
+															fontSize: 12,
+															outline: "none",
+															fontFamily: "inherit",
+														}}
+													/>
+													<motion.button
+														whileHover={{ background: T.warm }}
+														whileTap={{ scale: 0.96 }}
+														onClick={() =>
+															insertImageOrVideo(imageUrlInput.trim(), isVideoUrl(imageUrlInput.trim()))
+														}
+														style={{
+															background: T.warm,
+															color: "white",
+															border: "none",
+															borderRadius: 8,
+															padding: "8px 14px",
+															fontSize: 12,
+															fontWeight: 600,
+															cursor: "pointer",
+														}}
+													>
+														Insert
+													</motion.button>
+												</div>
+											</motion.div>
+										)}
+									</AnimatePresence>
+								</div>
 
 								{/* Divider */}
 								<div
