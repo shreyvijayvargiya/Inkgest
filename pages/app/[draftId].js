@@ -87,6 +87,7 @@ const Icon = ({
 
 const Icons = {
 	plus: "M12 5v14M5 12h14",
+	close: "M18 6L6 18M6 6l12 12",
 	search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
 	trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
 	copy: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-4-4H8z M14 2v6h6 M8 12h8 M8 16h5",
@@ -738,11 +739,55 @@ function makeButtonBlockHtml(text = "Click here →", href = "#") {
 	return `<p style="margin:16px 0"><a href="${href}" style="display:inline-block;background:#C17B2F;color:#FFFFFF;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;font-family:'Outfit',sans-serif;letter-spacing:0.01em">${text}</a></p>`;
 }
 
+const MAX_TABS = 5;
+
 /* ─── Draft Page ─── */
 export default function DraftPage() {
 	const router = useRouter();
-	const { draftId } = router.query;
+	const { draftId, tabs: tabsQuery } = router.query;
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
+
+	/* Open tabs from URL query (?tabs=id1,id2,id3) — active tab = draftId from path */
+	const openTabs = (() => {
+		if (!draftId) return [];
+		const fromQuery = typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
+		if (fromQuery.length === 0) return [draftId];
+		if (!fromQuery.includes(draftId)) return [draftId, ...fromQuery].slice(0, MAX_TABS);
+		return fromQuery;
+	})();
+
+	const navigateWithTabs = (targetDraftId, newTabIds) => {
+		const ids = newTabIds.length > 0 ? newTabIds : [targetDraftId];
+		router.push(`/app/${targetDraftId}?tabs=${ids.join(",")}`, undefined, { shallow: false });
+	};
+
+	const openDraftInTab = (id) => {
+		if (id === draftId) return;
+		const current = openTabs.includes(draftId) ? openTabs : [draftId, ...openTabs];
+		let next = current.includes(id) ? current : [id, ...current.filter((x) => x !== id)].slice(0, MAX_TABS);
+		navigateWithTabs(id, next);
+	};
+
+	const closeTab = (id, e) => {
+		e?.stopPropagation();
+		const next = openTabs.filter((t) => t !== id);
+		if (next.length === 0) {
+			router.push("/app");
+			return;
+		}
+		const target = id === draftId ? next[0] : draftId;
+		navigateWithTabs(target, next);
+	};
+
+	/* Lookup draft title by id (from drafts list or current draft) */
+	const getTabTitle = (id) => {
+		if (draft?.id === id) return draft?.title || "Untitled";
+		const d = drafts.find((x) => x.id === id);
+		return d?.title || "Untitled";
+	};
+
+	const truncate = (s, len = 18) =>
+		!s ? "Untitled" : s.length <= len ? s : s.slice(0, len - 1) + "…";
 
 	const queryClient = useQueryClient();
 	const [search, setSearch] = useState("");
@@ -872,6 +917,15 @@ export default function DraftPage() {
 			})
 			.join("");
 	};
+
+	/* Sync tabs to URL when we have draftId but no tabs query (e.g. direct link) */
+	useEffect(() => {
+		if (!draftId || !router.isReady) return;
+		const fromQuery = typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
+		if (fromQuery.length === 0 && openTabs.length > 0) {
+			router.replace(`/app/${draftId}?tabs=${openTabs.join(",")}`, undefined, { shallow: true });
+		}
+	}, [draftId, router.isReady, tabsQuery]);
 
 	/* Set editor content when draft loads */
 	useEffect(() => {
@@ -1159,30 +1213,6 @@ export default function DraftPage() {
 		? draft.urls[0] || ""
 		: draft?.url || "";
 
-	if (loadingDraft && !draft) {
-		return (
-			<div
-				style={{
-					height: "100vh",
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "center",
-					background: T.base,
-					fontFamily: "'Outfit', sans-serif",
-				}}
-			>
-				<FontLink />
-				<motion.div
-					animate={{ opacity: [0.4, 1, 0.4] }}
-					transition={{ duration: 1.5, repeat: Infinity }}
-					style={{ fontSize: 15, color: T.muted }}
-				>
-					Loading draft…
-				</motion.div>
-			</div>
-		);
-	}
-
 	return (
 		<div
 			style={{
@@ -1199,14 +1229,15 @@ export default function DraftPage() {
 			{/* ── TOP BAR ── */}
 			<div
 				style={{
-					height: 56,
 					background: T.surface,
 					borderBottom: `1px solid ${T.border}`,
 					display: "flex",
 					alignItems: "center",
-					padding: "0 20px",
 					gap: 12,
 					flexShrink: 0,
+					paddingLeft: 20,
+					paddingRight: 20,
+					paddingTop: 4,
 					zIndex: 50,
 				}}
 			>
@@ -1258,28 +1289,124 @@ export default function DraftPage() {
 
 				<div style={{ width: 1, height: 20, background: T.border }} />
 
-				{/* Credits pill — 10 free/month, renews monthly from account creation */}
-				{reduxUser && (
+				{/* Tabs — inline in navbar */}
+				{draftId && openTabs.length > 0 && (
 					<div
 						style={{
 							display: "flex",
 							alignItems: "center",
-							gap: 8,
-							marginLeft: 4,
-							background: creditRemaining === 0 ? "#FEF3E2" : T.base,
-							border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
-							borderRadius: 100,
-							padding: "4px 14px",
+							gap: 2,
+							flex: 1,
+							minWidth: 0,
+							overflowX: "auto",
+							paddingRight: 8,
+							marginLeft: 120,
 						}}
 					>
-						{credits?.plan === "pro" ? (
-							<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
-								∞ Pro
-							</span>
-						) : (
-							<>
+						{openTabs.map((tabId) => {
+							const isActive = tabId === draftId;
+							return (
+								<motion.div
+									key={tabId}
+									layout
+									initial={{ opacity: 0, scale: 0.95 }}
+									animate={{ opacity: 1, scale: 1 }}
+									onClick={() =>
+										tabId !== draftId && navigateWithTabs(tabId, openTabs)
+									}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 6,
+										padding: "6px 10px 6px 12px",
+										borderTopLeftRadius: 8,
+										borderTopRightRadius: 8,
+										borderBottomRightRadius: 0,
+										borderBottomLeftRadius: 0,
+										background: isActive ? T.warmBg : "transparent",
+										borderTop: `1px solid ${isActive ? T.border : "transparent"}`,
+										borderLeft: `1px solid ${isActive ? T.border : "transparent"}`,
+										borderRight: `1px solid ${isActive ? T.border : "transparent"}`,
+										cursor: isActive ? "default" : "pointer",
+										flexShrink: 0,
+										maxWidth: 160,
+										boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.05)" : "none",
+										transition: "background 0.15s, border-color 0.15s",
+									}}
+									whileHover={!isActive ? { background: "#F7F5F0" } : {}}
+								>
+									<span
+										style={{
+											fontSize: 12,
+											fontWeight: isActive ? 600 : 500,
+											color: isActive ? T.accent : T.muted,
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											whiteSpace: "nowrap",
+											flex: 1,
+											minWidth: 0,
+										}}
+										title={getTabTitle(tabId)}
+									>
+										{truncate(getTabTitle(tabId), 18)}
+									</span>
+									<motion.button
+										onClick={(e) => closeTab(tabId, e)}
+										whileHover={{ background: "rgba(0,0,0,0.06)" }}
+										whileTap={{ scale: 0.9 }}
+										style={{
+											background: "none",
+											border: "none",
+											borderRadius: 4,
+											padding: 2,
+											cursor: "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											flexShrink: 0,
+											color: T.muted,
+										}}
+										title="Close tab"
+									>
+										<Icon
+											d={Icons.close}
+											size={12}
+											stroke={T.muted}
+											strokeWidth={2}
+										/>
+									</motion.button>
+								</motion.div>
+							);
+						})}
+					</div>
+				)}
+
+				{/* Right side: Credits | Upgrade | New draft | User */}
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 10,
+						flexShrink: 0,
+					}}
+				>
+					{reduxUser && (
+						<div
+							style={{
+								display: "flex",
+								alignItems: "center",
+								background: creditRemaining === 0 ? "#FEF3E2" : T.base,
+								border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
+								borderRadius: 100,
+								padding: "4px 12px",
+							}}
+						>
+							{credits?.plan === "pro" ? (
+								<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
+									∞ Pro
+								</span>
+							) : (
 								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-									Credits{" "}
 									<span
 										style={{
 											fontWeight: 700,
@@ -1291,20 +1418,10 @@ export default function DraftPage() {
 											: `0/${FREE_CREDIT_LIMIT}`}
 									</span>
 								</span>
-								{credits?.renewsAt && (
-									<span
-										style={{
-											fontSize: 11,
-											color: T.muted,
-											fontWeight: 500,
-											whiteSpace: "nowrap",
-										}}
-									>
-										Renew at {formatRenewalDate(credits.renewsAt)}
-									</span>
-								)}
-							</>
-						)}
+							)}
+						</div>
+					)}
+					{reduxUser && (
 						<motion.button
 							whileHover={{ scale: 1.04 }}
 							whileTap={{ scale: 0.97 }}
@@ -1313,92 +1430,90 @@ export default function DraftPage() {
 								background: T.accent,
 								color: "white",
 								border: "none",
-								padding: "3px 10px",
-								borderRadius: 100,
-								fontSize: 11,
-								fontWeight: 700,
+								padding: "6px 12px",
+								borderRadius: 8,
+								fontSize: 12,
+								fontWeight: 600,
 								cursor: "pointer",
 							}}
 						>
 							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
 						</motion.button>
-					</div>
-				)}
-
-				<div style={{ flex: 1 }} />
-				{/* New draft button */}
-				<motion.button
-					whileHover={{
-						scale: 1.03,
-						y: -1,
-						boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-					}}
-					whileTap={{ scale: 0.97 }}
-					onClick={() => router.push("/app")}
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 6,
-						background: T.accent,
-						color: "white",
-						border: "none",
-						padding: "7px 16px",
-						borderRadius: 9,
-						fontSize: 13,
-						fontWeight: 600,
-						cursor: "pointer",
-					}}
-				>
-					<Icon d={Icons.plus} size={14} stroke="white" /> New draft
-				</motion.button>
-
-				{/* User avatar / login */}
-				<motion.button
-					whileHover={{ scale: 1.08 }}
-					whileTap={{ scale: 0.95 }}
-					onClick={() => setLoginModalOpen(true)}
-					style={{
-						background: "none",
-						border: "none",
-						padding: 0,
-						cursor: "pointer",
-						borderRadius: "50%",
-					}}
-				>
-					{reduxUser?.photoURL ? (
-						<img
-							src={reduxUser.photoURL}
-							alt={reduxUser.displayName || "User"}
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								objectFit: "cover",
-								border: `2px solid ${T.border}`,
-								display: "block",
-							}}
-						/>
-					) : (
-						<div
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								background: T.border,
-								border: `2px solid ${T.border}`,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<Icon d={Icons.settings} size={16} stroke={T.muted} />
-						</div>
 					)}
-				</motion.button>
-				<LoginModal
-					isOpen={loginModalOpen}
-					onClose={() => setLoginModalOpen(false)}
-				/>
+					{/* New draft button */}
+					<motion.button
+						whileHover={{
+							scale: 1.03,
+							y: -1,
+							boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+						}}
+						whileTap={{ scale: 0.97 }}
+						onClick={() => router.push("/app")}
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 6,
+							background: T.accent,
+							color: "white",
+							border: "none",
+							padding: "6px 12px",
+							borderRadius: 9,
+							fontSize: 12,
+							fontWeight: 600,
+							cursor: "pointer",
+						}}
+					>
+						<Icon d={Icons.plus} size={14} stroke="white" /> New draft
+					</motion.button>
+
+					{/* User avatar / login */}
+					<motion.button
+						whileHover={{ scale: 1.08 }}
+						whileTap={{ scale: 0.95 }}
+						onClick={() => setLoginModalOpen(true)}
+						style={{
+							background: "none",
+							border: "none",
+							padding: 0,
+							cursor: "pointer",
+							borderRadius: "50%",
+						}}
+					>
+						{reduxUser?.photoURL ? (
+							<img
+								src={reduxUser.photoURL}
+								alt={reduxUser.displayName || "User"}
+								style={{
+									width: 34,
+									height: 34,
+									borderRadius: "50%",
+									objectFit: "cover",
+									border: `2px solid ${T.border}`,
+									display: "block",
+								}}
+							/>
+						) : (
+							<div
+								style={{
+									width: 34,
+									height: 34,
+									borderRadius: "50%",
+									background: T.border,
+									border: `2px solid ${T.border}`,
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+								}}
+							>
+								<Icon d={Icons.settings} size={16} stroke={T.muted} />
+							</div>
+						)}
+					</motion.button>
+					<LoginModal
+						isOpen={loginModalOpen}
+						onClose={() => setLoginModalOpen(false)}
+					/>
+				</div>
 			</div>
 
 			{/* ── MAIN BODY ── */}
@@ -1483,7 +1598,7 @@ export default function DraftPage() {
 												key={d.id}
 												draft={d}
 												active={d.id === draftId}
-												onClick={() => router.push(`/app/${d.id}`)}
+												onClick={() => openDraftInTab(d.id)}
 												onDelete={handleDelete}
 											/>
 										))
@@ -1594,12 +1709,31 @@ export default function DraftPage() {
 						minWidth: 0,
 					}}
 				>
+					{loadingDraft && !draft && draftId && (
+						<div
+							style={{
+								flex: 1,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								background: T.surface,
+							}}
+						>
+							<motion.div
+								animate={{ opacity: [0.4, 1, 0.4] }}
+								transition={{ duration: 1.2, repeat: Infinity }}
+								style={{ fontSize: 13, color: T.muted }}
+							>
+								Loading…
+							</motion.div>
+						</div>
+					)}
 					{draft && (
 						<motion.div
 							key={`editor-${draftId}`}
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
-							transition={{ duration: 0.25 }}
+							transition={{ duration: 0.2 }}
 							style={{
 								flex: 1,
 								display: "flex",
@@ -1706,11 +1840,16 @@ export default function DraftPage() {
 														fontSize: 12,
 														fontWeight: 600,
 														color: T.accent,
-														cursor: imageUploading || !reduxUser ? "not-allowed" : "pointer",
+														cursor:
+															imageUploading || !reduxUser
+																? "not-allowed"
+																: "pointer",
 														opacity: imageUploading || !reduxUser ? 0.6 : 1,
 													}}
 												>
-													{imageUploading ? "Uploading…" : "Choose image or video"}
+													{imageUploading
+														? "Uploading…"
+														: "Choose image or video"}
 												</motion.button>
 												<p
 													style={{
@@ -1732,7 +1871,10 @@ export default function DraftPage() {
 														onChange={(e) => setImageUrlInput(e.target.value)}
 														onKeyDown={(e) => {
 															if (e.key === "Enter")
-																insertImageOrVideo(imageUrlInput.trim(), isVideoUrl(imageUrlInput.trim()));
+																insertImageOrVideo(
+																	imageUrlInput.trim(),
+																	isVideoUrl(imageUrlInput.trim()),
+																);
 														}}
 														style={{
 															flex: 1,
@@ -1748,7 +1890,10 @@ export default function DraftPage() {
 														whileHover={{ background: T.warm }}
 														whileTap={{ scale: 0.96 }}
 														onClick={() =>
-															insertImageOrVideo(imageUrlInput.trim(), isVideoUrl(imageUrlInput.trim()))
+															insertImageOrVideo(
+																imageUrlInput.trim(),
+																isVideoUrl(imageUrlInput.trim()),
+															)
 														}
 														style={{
 															background: T.warm,
@@ -2174,10 +2319,16 @@ export default function DraftPage() {
 									whileHover={{ background: "#F0ECE5" }}
 									whileTap={{ scale: 0.96 }}
 									onClick={() => {
-										const raw = editorRef.current?.innerHTML || draft?.body || "";
-										const content = raw.trim().startsWith("<") ? raw : formatBody(raw);
+										const raw =
+											editorRef.current?.innerHTML || draft?.body || "";
+										const content = raw.trim().startsWith("<")
+											? raw
+											: formatBody(raw);
 										setPreviewData({
-											title: titleRef.current?.innerText?.trim() || draft?.title || "Untitled draft",
+											title:
+												titleRef.current?.innerText?.trim() ||
+												draft?.title ||
+												"Untitled draft",
 											content,
 										});
 										setPreviewOpen(true);
@@ -2232,7 +2383,7 @@ export default function DraftPage() {
 								</motion.button>
 							</div>
 
-							<div className="overflow-y-auto flex flex-col">
+							<div className="overflow-y-auto flex flex-col h-full">
 								{/* Draft title */}
 								<div
 									style={{
@@ -2266,11 +2417,27 @@ export default function DraftPage() {
 												outline: "none",
 												marginBottom: 8,
 												minHeight: 36,
-												fontFamily: editorFont === "Instrument Serif" ? "'Instrument Serif', serif" : editorFont === "Inter" ? "'Inter', sans-serif" : editorFont === "Georgia" ? "Georgia, serif" : editorFont === "system-ui" ? "system-ui, sans-serif" : "'Outfit', sans-serif",
+												fontFamily:
+													editorFont === "Instrument Serif"
+														? "'Instrument Serif', serif"
+														: editorFont === "Inter"
+															? "'Inter', sans-serif"
+															: editorFont === "Georgia"
+																? "Georgia, serif"
+																: editorFont === "system-ui"
+																	? "system-ui, sans-serif"
+																	: "'Outfit', sans-serif",
 											}}
 											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
 										/>
-										<div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+										<div
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 6,
+												marginBottom: 8,
+											}}
+										>
 											{/* Font family */}
 											<select
 												value={editorFont}
@@ -2288,17 +2455,27 @@ export default function DraftPage() {
 												}}
 											>
 												<option value="Outfit">Outfit</option>
-												<option value="Instrument Serif">Instrument Serif</option>
+												<option value="Instrument Serif">
+													Instrument Serif
+												</option>
 												<option value="Inter">Inter</option>
 												<option value="Georgia">Georgia</option>
 												<option value="system-ui">System</option>
 											</select>
 											{/* Font size */}
-											<div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+											<div
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 2,
+												}}
+											>
 												<motion.button
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.95 }}
-													onClick={() => setEditorFontSize((s) => Math.max(12, s - 2))}
+													onClick={() =>
+														setEditorFontSize((s) => Math.max(12, s - 2))
+													}
 													style={{
 														width: 26,
 														height: 26,
@@ -2319,7 +2496,9 @@ export default function DraftPage() {
 												<motion.button
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.95 }}
-													onClick={() => setEditorFontSize((s) => Math.min(24, s + 2))}
+													onClick={() =>
+														setEditorFontSize((s) => Math.min(24, s + 2))
+													}
 													style={{
 														width: 26,
 														height: 26,
@@ -2380,7 +2559,16 @@ export default function DraftPage() {
 											fontSize: `${editorFontSize}px`,
 											lineHeight: 1.8,
 											color: "#3A3530",
-											fontFamily: editorFont === "Instrument Serif" ? "'Instrument Serif', serif" : editorFont === "Inter" ? "'Inter', sans-serif" : editorFont === "Georgia" ? "Georgia, serif" : editorFont === "system-ui" ? "system-ui, sans-serif" : "'Outfit', sans-serif",
+											fontFamily:
+												editorFont === "Instrument Serif"
+													? "'Instrument Serif', serif"
+													: editorFont === "Inter"
+														? "'Inter', sans-serif"
+														: editorFont === "Georgia"
+															? "Georgia, serif"
+															: editorFont === "system-ui"
+																? "system-ui, sans-serif"
+																: "'Outfit', sans-serif",
 										}}
 									/>
 									{/* Text selection dropdown */}
@@ -2427,14 +2615,20 @@ export default function DraftPage() {
 														cursor: "pointer",
 													}}
 												>
-													<Icon d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z" size={12} stroke="#C17B2F" />
+													<Icon
+														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+														size={12}
+														stroke="#C17B2F"
+													/>
 													Add to AI chat
 												</motion.button>
 												<motion.button
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.96 }}
 													onClick={() => {
-														navigator.clipboard.writeText(selectionDropdown.text);
+														navigator.clipboard.writeText(
+															selectionDropdown.text,
+														);
 														setSelectionDropdown(null);
 													}}
 													style={{
@@ -3113,76 +3307,87 @@ export default function DraftPage() {
 									overflow: "hidden",
 								}}
 							>
-							<div
-								style={{
-									padding: "16px 24px",
-									borderBottom: `1px solid ${T.border}`,
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "space-between",
-								}}
-							>
-								<span style={{ fontSize: 14, fontWeight: 700, color: T.accent }}>
-									Preview
-								</span>
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.95 }}
-									onClick={() => setPreviewOpen(false)}
+								<div
 									style={{
-										background: "none",
-										border: "none",
-										borderRadius: 8,
-										width: 32,
-										height: 32,
+										padding: "16px 24px",
+										borderBottom: `1px solid ${T.border}`,
 										display: "flex",
 										alignItems: "center",
-										justifyContent: "center",
-										cursor: "pointer",
-										fontSize: 18,
-										color: T.muted,
+										justifyContent: "space-between",
 									}}
 								>
-									✕
-								</motion.button>
-							</div>
-							<div
-								style={{
-									flex: 1,
-									overflowY: "auto",
-									padding: "32px 48px 48px",
-									background: T.base,
-									fontFamily: editorFont === "Instrument Serif" ? "'Instrument Serif', serif" : editorFont === "Inter" ? "'Inter', sans-serif" : editorFont === "Georgia" ? "Georgia, serif" : editorFont === "system-ui" ? "system-ui, sans-serif" : "'Outfit', sans-serif",
-									fontSize: editorFontSize,
-									lineHeight: 1.8,
-									color: "#3A3530",
-								}}
-							>
-								<h1
+									<span
+										style={{ fontSize: 14, fontWeight: 700, color: T.accent }}
+									>
+										Preview
+									</span>
+									<motion.button
+										whileHover={{ background: "#F0ECE5" }}
+										whileTap={{ scale: 0.95 }}
+										onClick={() => setPreviewOpen(false)}
+										style={{
+											background: "none",
+											border: "none",
+											borderRadius: 8,
+											width: 32,
+											height: 32,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											cursor: "pointer",
+											fontSize: 18,
+											color: T.muted,
+										}}
+									>
+										✕
+									</motion.button>
+								</div>
+								<div
 									style={{
-										fontSize: "clamp(22px, 3vw, 30px)",
-										color: T.accent,
-										lineHeight: 1.2,
-										marginBottom: 24,
-										fontWeight: 400,
+										flex: 1,
+										overflowY: "auto",
+										padding: "32px 48px 48px",
+										background: T.base,
+										fontFamily:
+											editorFont === "Instrument Serif"
+												? "'Instrument Serif', serif"
+												: editorFont === "Inter"
+													? "'Inter', sans-serif"
+													: editorFont === "Georgia"
+														? "Georgia, serif"
+														: editorFont === "system-ui"
+															? "system-ui, sans-serif"
+															: "'Outfit', sans-serif",
+										fontSize: editorFontSize,
+										lineHeight: 1.8,
+										color: "#3A3530",
 									}}
 								>
-									{previewData.title}
-								</h1>
-								<>
-									<style>{`
+									<h1
+										style={{
+											fontSize: "clamp(22px, 3vw, 30px)",
+											color: T.accent,
+											lineHeight: 1.2,
+											marginBottom: 24,
+											fontWeight: 400,
+										}}
+									>
+										{previewData.title}
+									</h1>
+									<>
+										<style>{`
 										.preview-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; }
 										.preview-content video { max-width: 100%; border-radius: 8px; margin: 12px 0; }
 										.preview-content p { margin: 0 0 14px; }
 										.preview-content h1, .preview-content h2, .preview-content h3 { margin: 20px 0 10px; }
 									`}</style>
-									<div
-										dangerouslySetInnerHTML={{ __html: previewData.content }}
-										style={{ maxWidth: "100%" }}
-										className="preview-content"
-									/>
-								</>
-							</div>
+										<div
+											dangerouslySetInnerHTML={{ __html: previewData.content }}
+											style={{ maxWidth: "100%" }}
+											className="preview-content"
+										/>
+									</>
+								</div>
 							</div>
 						</motion.div>
 					</>
@@ -3305,7 +3510,6 @@ export default function DraftPage() {
 					countWords();
 				}}
 			/>
-
 		</div>
 	);
 }
