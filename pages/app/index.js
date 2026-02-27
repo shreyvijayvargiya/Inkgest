@@ -21,6 +21,7 @@ import {
 	formatRenewalDate,
 } from "../../lib/utils/credits";
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
+import { getTheme } from "../../lib/utils/theme";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -39,7 +40,7 @@ const FontLink = () => (
   `}</style>
 );
 
-w
+const T = getTheme();
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;

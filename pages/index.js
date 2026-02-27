@@ -13,6 +13,7 @@ import { auth, db } from "../lib/config/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { validateUrls } from "../lib/utils/urlAllowlist";
+import { getTheme } from "../lib/utils/theme";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -28,15 +29,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ── Design tokens ── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-};
+const T = getTheme();
 
 /* ── Prefill presets (URLs + prompt) ── */
 const PRESETS = [

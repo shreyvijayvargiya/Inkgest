@@ -21,6 +21,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/config/firebase";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
+import { getTheme } from "../../../lib/utils/theme";
 
 /* ─── Fonts & global styles ────────────────────────────────────────────────── */
 const FontLink = () => (
@@ -37,19 +38,7 @@ const FontLink = () => (
   `}</style>
 );
 
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-	green: "#166534",
-	greenBg: "#DCFCE7",
-	red: "#991B1B",
-	redBg: "#FEE2E2",
-};
+const T = getTheme();
 
 const Ic = ({ d, d2, size = 16, stroke = T.muted, sw = 1.75 }) => (
 	<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">

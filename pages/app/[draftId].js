@@ -24,6 +24,7 @@ import {
 	FREE_CREDIT_LIMIT,
 	formatRenewalDate,
 } from "../../lib/utils/credits";
+import { getTheme } from "../../lib/utils/theme";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -42,16 +43,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ─── Tokens ─── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-};
+const T = getTheme();
 
 const FREE_LIMIT = 40;
 
@@ -2353,6 +2345,7 @@ export default function DraftPage() {
 								{/* Editor body */}
 								<div
 									ref={editorContainerRef}
+									data-editor-root
 									style={{
 										flex: 1,
 										overflowY: "auto",
@@ -2360,6 +2353,18 @@ export default function DraftPage() {
 										position: "relative",
 									}}
 								>
+									<style>{`
+										[data-editor-root] [contenteditable="true"] { font-size: ${editorFontSize}px; }
+										[data-editor-root] [contenteditable="true"] p,
+										[data-editor-root] [contenteditable="true"] li { font-size: ${editorFontSize}px !important; }
+										[data-editor-root] [contenteditable="true"] h1 { font-size: ${Math.round(editorFontSize * 1.73)}px !important; }
+										[data-editor-root] [contenteditable="true"] h2 { font-size: ${Math.round(editorFontSize * 1.33)}px !important; }
+										[data-editor-root] [contenteditable="true"] h3 { font-size: ${Math.round(editorFontSize * 1.13)}px !important; }
+										[data-editor-root] [contenteditable="true"] blockquote,
+										[data-editor-root] [contenteditable="true"] blockquote *,
+										[data-editor-root] [contenteditable="true"] [data-block],
+										[data-editor-root] [contenteditable="true"] [data-block] * { font-size: inherit !important; }
+									`}</style>
 									<div
 										ref={editorRef}
 										contentEditable

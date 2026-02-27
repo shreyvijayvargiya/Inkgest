@@ -28,16 +28,9 @@ import {
 	TableHead,
 	TableCell,
 } from "../../../lib/ui/Table";
+import { getTheme } from "../../../lib/utils/theme";
 
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-};
+const T = getTheme();
 
 const FontLink = () => (
 	<style>{`
