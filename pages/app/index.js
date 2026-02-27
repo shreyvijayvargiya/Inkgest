@@ -133,6 +133,30 @@ const PRESETS = [
 	},
 ];
 
+/* ─── InkAgent loader messages (rotate while loading) ─── */
+const AGENT_LOADING_MSGS = [
+	"InkAgent thinking…",
+	"InkAgent analysing your request…",
+	"InkAgent scraping URLs…",
+	"InkAgent creating newsletter…",
+	"InkAgent building table…",
+	"InkAgent preparing content…",
+];
+
+/* ─── InkAgent prompt suggestions (content writers, indie hackers, Product Hunt, Medium, X) ─── */
+const AGENT_PROMPT_SUGGESTIONS = [
+	"Scrape https://www.producthunt.com and turn today's top launches into a newsletter for indie hackers. Focus on SaaS and dev tools.",
+	"Turn https://www.ycombinator.com/blog into a LinkedIn post for founders. Practical takeaways, under 300 words.",
+	"Create a newsletter from https://news.ycombinator.com — summarize the most interesting discussions for entrepreneurs.",
+	"Scrape https://medium.com and create a digest of top startup/tech articles. Casual tone for indie hackers.",
+	"Turn https://techcrunch.com into a Twitter thread. 5–7 tweets, punchy, with key stats and links.",
+	"Scrape https://www.producthunt.com and create a table comparing the top 5 products of the week with name, tagline, and category.",
+	"Write a Substack newsletter from https://www.indiehackers.com — pull insights from recent interviews for founders.",
+	"Summarize trending topics from https://x.com into a newsletter for content writers. Include viral threads and product launches.",
+	"Create a table from this product comparison: https://www.producthunt.com — extract product name, maker, upvotes, and one-liner.",
+	"Scrape https://medium.com and turn the best startup article into a LinkedIn post. Professional tone, actionable takeaways.",
+];
+
 /* ─── Format / Style config (mirrors API) ─── */
 const FORMATS = [
 	{ id: "substack", label: "Newsletter", icon: "✉️" },
@@ -357,11 +381,21 @@ export default function inkgestApp() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
-	const [draftMode, setDraftMode] = useState("ai"); // "ai" | "scrape" | "blank"
+	const [draftMode, setDraftMode] = useState("ai"); // "ai" | "scrape" | "blank" | "agent"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
 	const [credits, setCredits] = useState(null); // { plan, creditsUsed, creditsLimit, remaining }
+
+	// InkAgent state
+	const [agentPrompt, setAgentPrompt] = useState("");
+	const [agentMessages, setAgentMessages] = useState([]);
+	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
+	const [agentSuggestedTasks, setAgentSuggestedTasks] = useState([]);
+	const [agentLoading, setAgentLoading] = useState(false);
+	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
+	const [agentError, setAgentError] = useState(null);
+	const [agentSuggestionOffset, setAgentSuggestionOffset] = useState(0);
 
 	/* Derived helpers — single unified credit pool */
 	const creditRemaining = credits
@@ -372,6 +406,18 @@ export default function inkgestApp() {
 	// Legacy aliases kept so all existing checks below compile unchanged
 	const llmRemaining = creditRemaining;
 	const scrapeRemaining = creditRemaining;
+
+	/* Cycle InkAgent loading messages */
+	useEffect(() => {
+		if (!agentLoading) return;
+		setAgentLoadingMsg(AGENT_LOADING_MSGS[0]);
+		let idx = 0;
+		const iv = setInterval(() => {
+			idx = (idx + 1) % AGENT_LOADING_MSGS.length;
+			setAgentLoadingMsg(AGENT_LOADING_MSGS[idx]);
+		}, 2500);
+		return () => clearInterval(iv);
+	}, [agentLoading]);
 
 	/* Load drafts per user from Firestore */
 	useEffect(() => {
@@ -619,6 +665,105 @@ export default function inkgestApp() {
 			clearInterval(scrapeIv);
 			setScraping(false);
 		}
+	};
+
+	/* InkAgent: call backend API, get full response, store to DB, show to user */
+	const handleAgentSend = async () => {
+		const promptText = agentPrompt.trim();
+		if (!promptText || agentLoading) return;
+		if (!reduxUser) { setLoginModalOpen(true); return; }
+		if (creditRemaining <= 0) { router.push("/pricing"); return; }
+		setAgentLoading(true);
+		setAgentError(null);
+		setAgentMessages((prev) => [...prev, { role: "user", content: promptText }]);
+		setAgentPrompt("");
+		try {
+			const idToken = await auth.currentUser?.getIdToken();
+			if (!idToken) throw new Error("Session expired. Please sign in again.");
+			const res = await fetch("/api/agent/inkagent", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ prompt: promptText, idToken }),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Agent failed");
+			setAgentSuggestedTasks(data.suggestedTasks || []);
+			setAgentMessages((prev) => [
+				...prev,
+				{
+					role: "assistant",
+					content: data.message || "Done.",
+					thinking: data.thinking,
+					suggestedTasks: data.suggestedTasks,
+					creditsUsed: data.creditsUsed,
+					creditsDistribution: data.creditsDistribution,
+					tokenUsage: data.tokenUsage,
+				},
+			]);
+			if (data.executed?.length > 0) {
+				await processAgentExecuted(data.executed);
+			}
+			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => {});
+		} catch (e) {
+			setAgentError(e?.message || "Agent failed");
+		} finally {
+			setAgentLoading(false);
+		}
+	};
+
+	const processAgentExecuted = async (executed) => {
+		const newTasks = [];
+		for (const task of executed) {
+			if (task.type === "newsletter" && task.content) {
+				const lines = (task.content || "").split("\n");
+				const titleLine = lines.find((l) => l.startsWith("# ") || l.startsWith("## "));
+				const title = titleLine ? titleLine.replace(/^#+\s*/, "").trim() : task.label || "Draft";
+				const bodyText = lines.filter((l) => !l.match(/^#{1,6}\s/)).join(" ").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+				const draft = {
+					userId: reduxUser.uid,
+					title,
+					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
+					body: task.content,
+					urls: task.params?.urls || [],
+					words: task.content.trim().split(/\s+/).length,
+					date: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+					tag: task.formatLabel || "Newsletter",
+					format: task.params?.format || "substack",
+					createdAt: serverTimestamp(),
+				};
+				const docRef = await addDoc(collection(db, "drafts"), draft);
+				setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+				newTasks.push({ type: "newsletter", label: task.label, id: docRef.id, path: `/app/${docRef.id}` });
+			} else if (task.type === "scrape" && task.content) {
+				const draft = {
+					userId: reduxUser.uid,
+					title: task.title || "Scraped",
+					preview: (task.content || "").slice(0, 180),
+					body: task.content || "",
+					urls: task.urls || [],
+					images: task.images || [],
+					words: (task.content || "").trim().split(/\s+/).length,
+					date: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+					tag: "Scraped",
+					createdAt: serverTimestamp(),
+				};
+				const docRef = await addDoc(collection(db, "drafts"), draft);
+				setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+				newTasks.push({ type: "scrape", label: task.label, id: docRef.id, path: `/app/${docRef.id}` });
+			} else if (task.type === "table" && task.columns) {
+				const docRef = await addDoc(collection(db, "tables"), {
+					userId: reduxUser.uid,
+					title: task.title || "Generated Table",
+					description: task.description || "",
+					columns: task.columns || [],
+					rows: task.rows || [],
+					sourceUrls: task.sourceUrls || [],
+					createdAt: serverTimestamp(),
+				});
+				newTasks.push({ type: "table", label: task.label, id: docRef.id, path: `/app/table-creator/${docRef.id}` });
+			}
+		}
+		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
 	};
 
 	/* Create a blank draft and open it */
@@ -1095,7 +1240,7 @@ export default function inkgestApp() {
 						</div>
 
 						{/* ── Mode selector cards ── */}
-						<div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+						<div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 28 }}>
 							{[
 								{
 									id: "ai",
@@ -1156,6 +1301,17 @@ export default function inkgestApp() {
 									label: "Blank editor",
 									desc: "Start from scratch",
 								},
+								{
+									id: "agent",
+									icon: (
+										<svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+											<circle cx="12" cy="12" r="3" />
+											<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+										</svg>
+									),
+									label: "AI Agent",
+									desc: "Prompt → tasks done",
+								},
 							].map((m) => {
 								const active = draftMode === m.id;
 								return (
@@ -1165,6 +1321,7 @@ export default function inkgestApp() {
 										onClick={() => {
 											setDraftMode(m.id);
 											setGenerateError(null);
+											setAgentError(null);
 										}}
 										style={{
 											flex: 1,
@@ -1347,6 +1504,301 @@ export default function inkgestApp() {
 							credits={credits}
 							onUpgrade={() => router.push("/pricing")}
 						/>
+
+						{/* ── INKAGENT MODE ── */}
+						{draftMode === "agent" && (
+							<motion.div
+								key="agent-form"
+								initial={{ opacity: 0, y: 8 }}
+								animate={{ opacity: 1, y: 0 }}
+								style={{ marginBottom: 24 }}
+							>
+								<p style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}>
+									AI message: 0.25 credits · Newsletter/scrape: 1 credit · Table: 2 credits
+								</p>
+								<div style={{ marginBottom: 16 }}>
+									<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+										Try a suggestion
+									</label>
+									<div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+										{AGENT_PROMPT_SUGGESTIONS.slice(
+											agentSuggestionOffset * 5,
+											agentSuggestionOffset * 5 + 5
+										).map((s, i) => (
+											<motion.button
+												key={agentSuggestionOffset * 5 + i}
+												whileHover={{ scale: 1.02 }}
+												whileTap={{ scale: 0.97 }}
+												onClick={() => setAgentPrompt(s)}
+												style={{
+													padding: "8px 12px",
+													borderRadius: 9,
+													fontSize: 12,
+													fontWeight: 600,
+													cursor: "pointer",
+													border: `1.5px solid ${T.border}`,
+													background: T.surface,
+													color: T.accent,
+													textAlign: "left",
+													flex: "1 1 200px",
+													minWidth: 0,
+													lineHeight: 1.4,
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+													display: "-webkit-box",
+													WebkitLineClamp: 2,
+													WebkitBoxOrient: "vertical",
+												}}
+											>
+												{s}
+											</motion.button>
+										))}
+										<motion.button
+											whileHover={{ scale: 1.03 }}
+											whileTap={{ scale: 0.97 }}
+											onClick={() => setAgentSuggestionOffset((o) => (o + 1) % 2)}
+											style={{
+												padding: "8px 14px",
+												borderRadius: 9,
+												fontSize: 12,
+												fontWeight: 700,
+												cursor: "pointer",
+												border: `1.5px dashed ${T.border}`,
+												background: T.base,
+												color: T.muted,
+											}}
+										>
+											{agentSuggestionOffset === 0 ? "More →" : "← Back"}
+										</motion.button>
+									</div>
+								</div>
+								<div style={{ marginBottom: 16 }}>
+									<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+										Describe what you want
+									</label>
+									<textarea
+										value={agentPrompt}
+										onChange={(e) => setAgentPrompt(e.target.value)}
+										onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleAgentSend())}
+										placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
+										rows={3}
+										disabled={!reduxUser || agentLoading}
+										style={{
+											width: "100%",
+											background: T.surface,
+											border: `1.5px solid ${T.border}`,
+											borderRadius: 11,
+											padding: "13px 16px",
+											fontSize: 14,
+											color: T.accent,
+											resize: "vertical",
+											outline: "none",
+											lineHeight: 1.6,
+										}}
+									/>
+								</div>
+								<motion.button
+									onClick={handleAgentSend}
+									disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
+									whileHover={!agentLoading && agentPrompt.trim() ? { scale: 1.02, y: -1 } : {}}
+									whileTap={!agentLoading ? { scale: 0.97 } : {}}
+									style={{
+										width: "100%",
+										background: agentLoading || !agentPrompt.trim() || !reduxUser ? "#E8E4DC" : T.accent,
+										color: agentLoading || !agentPrompt.trim() || !reduxUser ? T.muted : "white",
+										border: "none",
+										padding: "15px",
+										borderRadius: 12,
+										fontSize: 16,
+										fontWeight: 700,
+										cursor: agentLoading || !reduxUser ? "not-allowed" : "pointer",
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+										gap: 10,
+									}}
+								>
+									{agentLoading ? (
+										<>
+											<motion.span animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}>
+												<Icon d={Icons.refresh} size={18} stroke={T.muted} />
+											</motion.span>
+											{agentLoadingMsg}
+										</>
+									) : !reduxUser ? (
+										"Sign in to use AI Agent"
+									) : (
+										<>
+											<Icon d={Icons.zap} size={18} stroke="white" fill="white" />
+											Send to InkAgent
+										</>
+									)}
+								</motion.button>
+
+								{/* Suggested tasks — clear, actionable cards */}
+								{agentSuggestedTasks.length > 0 && (
+									<motion.div
+										initial={{ opacity: 0, y: 8 }}
+										animate={{ opacity: 1, y: 0 }}
+										style={{
+											marginTop: 24,
+											background: "#FDFCF9",
+											border: `1px solid ${T.border}`,
+											borderRadius: 14,
+											padding: 20,
+											boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+										}}
+									>
+										<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 4 }}>
+											What would you like to do?
+										</p>
+										<p style={{ fontSize: 12, color: T.muted, marginBottom: 14 }}>
+											Tasks created by the agent — open below when ready.
+										</p>
+										<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+											{agentSuggestedTasks.map((t, i) => (
+												<div
+													key={i}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 12,
+														padding: "14px 16px",
+														background: T.surface,
+														borderRadius: 10,
+														border: `1px solid ${T.border}`,
+														boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+													}}
+												>
+													<span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: T.warm }}>
+														{t.type === "newsletter" ? "Newsletter" : t.type === "table" ? "Table" : "Scrape"}
+													</span>
+													<span style={{ fontSize: 14, fontWeight: 600, color: T.accent, lineHeight: 1.4 }}>{t.label}</span>
+												</div>
+											))}
+										</div>
+									</motion.div>
+								)}
+
+								{/* Chat / messages — light backgrounds, clear labels */}
+								{agentMessages.length > 0 && (
+									<div style={{ marginTop: 24 }}>
+										<p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 12 }}>
+											Chat
+										</p>
+										<div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: 300, overflowY: "auto" }}>
+											{agentMessages.map((m, i) => (
+												<div
+													key={i}
+													style={{
+														display: "flex",
+														flexDirection: "column",
+														alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+														maxWidth: "92%",
+													}}
+												>
+													<span
+														style={{
+															fontSize: 10,
+															fontWeight: 700,
+															textTransform: "uppercase",
+															letterSpacing: "0.06em",
+															color: T.muted,
+															marginBottom: 4,
+														}}
+													>
+														{m.role === "user" ? "You" : "InkAgent"}
+													</span>
+													<div
+														style={{
+															padding: "12px 16px",
+															background: m.role === "user" ? "#F0EDE8" : "#FDFCF9",
+															color: T.accent,
+															borderRadius: 12,
+															border: `1px solid ${m.role === "user" ? "#E8E4DC" : T.border}`,
+															boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+														}}
+													>
+														<p style={{ fontSize: 13, lineHeight: 1.6 }}>{m.content}</p>
+														{m.thinking && (
+															<p style={{ fontSize: 11, color: T.muted, marginTop: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+																{m.thinking}
+															</p>
+														)}
+														{m.creditsUsed != null && (
+															<p style={{ fontSize: 11, color: T.warm, marginTop: 8, fontWeight: 600 }}>
+																Credits used: {m.creditsUsed}
+															</p>
+														)}
+													</div>
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+
+								{/* Completed tasks — links to open drafts/tables */}
+								{agentCompletedTasks.length > 0 && (
+									<div style={{ marginTop: 24 }}>
+										<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 4 }}>
+											Ready to open
+										</p>
+										<p style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}>
+											Click to open your draft or table.
+										</p>
+										<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+											{agentCompletedTasks.map((t, i) => (
+												<motion.a
+													key={i}
+													href={t.path}
+													onClick={(e) => { e.preventDefault(); router.push(t.path); }}
+													whileHover={{ x: 2, scale: 1.01 }}
+													whileTap={{ scale: 0.99 }}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "space-between",
+														padding: "12px 16px",
+														background: T.surface,
+														border: `1px solid ${T.border}`,
+														borderRadius: 10,
+														textDecoration: "none",
+														color: T.accent,
+														fontSize: 13,
+														fontWeight: 600,
+														boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+													}}
+												>
+													<span style={{ fontSize: 11, fontWeight: 700, color: T.warm, marginRight: 8 }}>
+														{t.type === "newsletter" ? "Newsletter" : t.type === "table" ? "Table" : "Scrape"}
+													</span>
+													<span style={{ flex: 1 }}>{t.label}</span>
+													<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>Open →</span>
+												</motion.a>
+											))}
+										</div>
+									</div>
+								)}
+
+								{agentError && (
+									<motion.div
+										initial={{ opacity: 0, y: 4 }}
+										animate={{ opacity: 1, y: 0 }}
+										style={{
+											marginTop: 12,
+											padding: "12px 16px",
+											background: "#FEF2F2",
+											border: "1px solid #FECACA",
+											borderRadius: 10,
+											fontSize: 13,
+											color: "#DC2626",
+										}}
+									>
+										{agentError}
+									</motion.div>
+								)}
+							</motion.div>
+						)}
 
 						{/* ── SCRAPE MODE ── */}
 						<AnimatePresence mode="wait">
