@@ -808,6 +808,7 @@ export default function DraftPage() {
 	const [imageUploading, setImageUploading] = useState(false);
 	const [selectionDropdown, setSelectionDropdown] = useState(null);
 	const [selectionContext, setSelectionContext] = useState("");
+	const [slashCommand, setSlashCommand] = useState(null);
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewData, setPreviewData] = useState({ title: "", htmlDoc: "" });
 	const [editorFont, setEditorFont] = useState("Outfit");
@@ -1151,7 +1152,7 @@ export default function DraftPage() {
 				if (rect.width === 0 && rect.height === 0) return;
 				setSelectionDropdown({
 					text,
-					x: Math.max(8, Math.min(rect.left + rect.width / 2 - 110, window.innerWidth - 228)),
+					x: Math.max(8, Math.min(rect.left + rect.width / 2 - 200, window.innerWidth - 420)),
 					top: rect.top - 48,
 				});
 			} catch {
@@ -1174,6 +1175,64 @@ export default function DraftPage() {
 			document.removeEventListener("mousedown", close);
 		};
 	}, [selectionDropdown]);
+
+	/* ── Slash command: close on Escape, click outside ── */
+	useEffect(() => {
+		if (!slashCommand) return;
+		const onKey = (e) => {
+			if (e.key === "Escape") setSlashCommand(null);
+		};
+		const close = (e) => {
+			if (!e.target.closest("[data-slash-command]")) setSlashCommand(null);
+		};
+		document.addEventListener("keydown", onKey);
+		const t = setTimeout(() => document.addEventListener("mousedown", close), 50);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			clearTimeout(t);
+			document.removeEventListener("mousedown", close);
+		};
+	}, [slashCommand]);
+
+	const handleSlashCommand = (action) => {
+		if (!editorRef.current) return;
+		editorRef.current.focus();
+		if (action === "continue-writing" || action === "ask-ai") {
+			const sel = window.getSelection();
+			const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+			let ctx = "";
+			if (range) {
+				const el = range.commonAncestorContainer;
+				const block = el?.nodeType === 3 ? el.parentElement : el;
+				if (block?.closest) {
+					const p = block.closest("p, h1, h2, h3, li");
+					ctx = p?.innerText?.trim?.() || "";
+				}
+			}
+			setSelectionContext(ctx);
+			setChatOpen(true);
+		} else if (action === "text") {
+			document.execCommand("formatBlock", false, "p");
+		} else if (action === "h1") {
+			document.execCommand("formatBlock", false, "h1");
+		} else if (action === "h2") {
+			document.execCommand("formatBlock", false, "h2");
+		} else if (action === "h3") {
+			document.execCommand("formatBlock", false, "h3");
+		} else if (action === "bullet") {
+			document.execCommand("insertUnorderedList");
+		} else if (action === "numbered") {
+			document.execCommand("insertOrderedList");
+		} else if (action === "todo") {
+			document.execCommand(
+				"insertHTML",
+				false,
+				'<ul data-todo="true" style="list-style:none;padding-left:0;"><li><input type="checkbox" style="margin-right:8px;vertical-align:middle"> </li></ul><p><br></p>',
+			);
+		}
+		countWords();
+		setSlashCommand(null);
+	};
 
 	const handleDelete = (id) => setDeleteConfirm(id);
 
@@ -2548,6 +2607,20 @@ export default function DraftPage() {
 										contentEditable
 										suppressContentEditableWarning
 										onInput={countWords}
+										onKeyDown={(e) => {
+											if (e.key === "/" && !slashCommand) {
+												e.preventDefault();
+												const sel = window.getSelection();
+												if (!sel?.rangeCount) return;
+												const range = sel.getRangeAt(0);
+												const rect = range.getBoundingClientRect();
+												if (rect.width === 0 && rect.height === 0) return;
+												setSlashCommand({
+													x: Math.max(12, Math.min(rect.left, window.innerWidth - 280)),
+													y: rect.bottom + 4,
+												});
+											}
+										}}
 										data-placeholder="Start writing…"
 										style={{
 											maxWidth: 680,
@@ -2570,7 +2643,157 @@ export default function DraftPage() {
 																: "'Outfit', sans-serif",
 										}}
 									/>
-									{/* Text selection dropdown */}
+									{/* Slash command dropdown */}
+									<AnimatePresence>
+										{slashCommand && (
+											<motion.div
+												data-slash-command
+												initial={{ opacity: 0, y: -4, scale: 0.98 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: -4, scale: 0.98 }}
+												transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+												style={{
+													position: "fixed",
+													left: slashCommand.x,
+													top: slashCommand.y,
+													zIndex: 100,
+													background: T.surface,
+													border: `1px solid ${T.border}`,
+													borderRadius: 12,
+													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+													padding: 8,
+													minWidth: 240,
+													maxHeight: 320,
+													overflowY: "auto",
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "0 0 6px 4px",
+													}}
+												>
+													AI
+												</p>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.98 }}
+													onClick={() => handleSlashCommand("continue-writing")}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 10,
+														padding: "8px 10px",
+														border: "none",
+														borderRadius: 8,
+														background: "none",
+														fontSize: 14,
+														fontWeight: 500,
+														color: T.accent,
+														cursor: "pointer",
+														textAlign: "left",
+													}}
+												>
+													<Icon
+														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+														size={18}
+														stroke="#C17B2F"
+													/>
+													Continue Writing
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.98 }}
+													onClick={() => handleSlashCommand("ask-ai")}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 10,
+														padding: "8px 10px",
+														border: "none",
+														borderRadius: 8,
+														background: "none",
+														fontSize: 14,
+														fontWeight: 500,
+														color: T.accent,
+														cursor: "pointer",
+														textAlign: "left",
+													}}
+												>
+													<Icon
+														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+														size={14}
+														stroke="#C17B2F"
+													/>
+													Ask AI
+												</motion.button>
+												<div
+													style={{
+														height: 1,
+														background: T.border,
+														margin: "8px 0",
+													}}
+												/>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "0 0 6px 4px",
+													}}
+												>
+													Style
+												</p>
+												{[
+													{ id: "text", label: "Text", icon: "T" },
+													{ id: "h1", label: "Heading 1", icon: "H₁" },
+													{ id: "h2", label: "Heading 2", icon: "H₂" },
+													{ id: "h3", label: "Heading 3", icon: "H₃" },
+													{ id: "bullet", label: "Bullet List", icon: Icons.list },
+													{ id: "numbered", label: "Numbered List", icon: Icons.list },
+													{ id: "todo", label: "To-do list", icon: "☐" },
+												].map(({ id, label, icon }) => (
+													<motion.button
+														key={id}
+														whileHover={{ background: "#F0ECE5" }}
+														whileTap={{ scale: 0.98 }}
+														onClick={() => handleSlashCommand(id)}
+														style={{
+															width: "100%",
+															display: "flex",
+															alignItems: "center",
+															gap: 10,
+															padding: "8px 10px",
+															border: "none",
+															borderRadius: 8,
+															background: "none",
+															fontSize: 14,
+															fontWeight: 500,
+															color: T.accent,
+															cursor: "pointer",
+															textAlign: "left",
+														}}
+													>
+														{typeof icon === "string" && !icon.startsWith("M") ? (
+															<span style={{ fontSize: 14, fontWeight: 600, width: 20, textAlign: "center" }}>{icon}</span>
+														) : (
+															<Icon d={icon} size={16} stroke={T.muted} />
+														)}
+														{label}
+													</motion.button>
+												))}
+											</motion.div>
+										)}
+									</AnimatePresence>
+									{/* Text selection dropdown (Notion-style) */}
 									<AnimatePresence>
 										{selectionDropdown && (
 											<motion.div
@@ -2589,7 +2812,9 @@ export default function DraftPage() {
 													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
 													padding: 6,
 													display: "flex",
+													alignItems: "center",
 													gap: 4,
+													flexWrap: "wrap",
 												}}
 											>
 												<motion.button
@@ -2621,6 +2846,106 @@ export default function DraftPage() {
 													/>
 													Add to AI chat
 												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => {
+														document.execCommand("bold");
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														width: 28,
+														height: 28,
+														padding: 0,
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 13,
+														fontWeight: 700,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													B
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => {
+														document.execCommand("italic");
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														width: 28,
+														height: 28,
+														padding: 0,
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 13,
+														fontStyle: "italic",
+														fontWeight: 600,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													I
+												</motion.button>
+												<div
+													style={{
+														width: 1,
+														height: 20,
+														background: T.border,
+														margin: "0 2px",
+													}}
+												/>
+												{[{ cmd: "p", label: "Text" }, { cmd: "h1", label: "H1" }, { cmd: "h2", label: "H2" }, { cmd: "h3", label: "H3" }, { cmd: "ul", label: "• List" }, { cmd: "ol", label: "1. List" }].map(
+													({ cmd, label }) => (
+														<motion.button
+															key={cmd}
+															whileHover={{ background: "#F0ECE5" }}
+															whileTap={{ scale: 0.96 }}
+															onMouseDown={(e) => e.preventDefault()}
+															onClick={() => {
+																if (cmd === "ul") document.execCommand("insertUnorderedList");
+																else if (cmd === "ol") document.execCommand("insertOrderedList");
+																else document.execCommand("formatBlock", false, cmd);
+																setSelectionDropdown(null);
+																countWords();
+															}}
+															style={{
+																display: "flex",
+																alignItems: "center",
+																padding: "6px 8px",
+																border: "none",
+																borderRadius: 6,
+																background: "none",
+																fontSize: 12,
+																fontWeight: 600,
+																color: T.accent,
+																cursor: "pointer",
+															}}
+														>
+															{label}
+														</motion.button>
+													),
+												)}
+												<div
+													style={{
+														width: 1,
+														height: 20,
+														background: T.border,
+														margin: "0 2px",
+													}}
+												/>
 												<motion.button
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.96 }}
