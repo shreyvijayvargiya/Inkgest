@@ -12,6 +12,9 @@ import LoginModal from "../lib/ui/LoginModal";
 import { auth, db } from "../lib/config/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
+import { validateUrls } from "../lib/utils/urlAllowlist";
+import { getTheme } from "../lib/utils/theme";
+import { SparkleIcon } from "lucide-react";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -27,15 +30,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ── Design tokens ── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-};
+const T = getTheme();
 
 /* ── Prefill presets (URLs + prompt) ── */
 const PRESETS = [
@@ -248,6 +243,16 @@ function Hero() {
 			router.push("/pricing");
 			return;
 		}
+		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
+		if (validUrls.length > 0) {
+			const urlCheck = validateUrls(validUrls);
+			if (!urlCheck.valid) {
+				setGenerateError(
+					urlCheck.error || "Invalid URL. Use full URLs with https://",
+				);
+				return;
+			}
+		}
 		setGenerating(true);
 		setGenerateError(null);
 		const msgs = [
@@ -269,7 +274,6 @@ function Hero() {
 				setGenerating(false);
 				return;
 			}
-			const validUrls = urls.map((u) => u.trim()).filter(Boolean);
 			const res = await fetch("/api/automations/newsletter-generate", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -357,6 +361,59 @@ function Hero() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reduxUser]);
 
+	/* Confirm when leaving during API load */
+	useEffect(() => {
+		if (!generating) return;
+		const onBeforeUnload = (e) => {
+			e.preventDefault();
+			e.returnValue = "";
+		};
+		const onRouteChange = () => {
+			if (!window.confirm("Generation in progress. Leave anyway?")) {
+				router.events.emit("routeChangeError");
+				throw "Route change aborted.";
+			}
+		};
+		window.addEventListener("beforeunload", onBeforeUnload);
+		router.events.on("routeChangeStart", onRouteChange);
+		return () => {
+			window.removeEventListener("beforeunload", onBeforeUnload);
+			router.events.off("routeChangeStart", onRouteChange);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [generating]);
+
+	const texts = [
+		"Scrape content from URL turn into newsletter",
+		"Turn multiple links into good SEO blog",
+		"Extensive research for your next academic paper",
+		"Create detailed comparison table for SaaS product",
+	];
+
+	function AnimatedText() {
+		const [index, setIndex] = useState(0);
+
+		return (
+			<motion.h1
+				key={index}
+				initial={{ opacity: 0, y: 40 }}
+				animate={{ opacity: [0, 1, 1, 0], y: [40, 0, 0, -40] }}
+				transition={{
+					duration: 5.5,
+					times: [0, 0.2, 0.8, 1],
+					ease: "easeInOut",
+				}}
+				onAnimationComplete={() => {
+					setIndex((prev) => (prev + 1) % texts.length);
+				}}
+				className="text-2xl text-center my-4"
+				style={{ color: T.accent }}
+			>
+				{texts[index]}
+			</motion.h1>
+		);
+	}
+
 	return (
 		<section
 			ref={heroRef}
@@ -381,42 +438,33 @@ function Hero() {
 			/>
 
 			<motion.div
-				style={{ y, opacity }}
+				style={{ y }}
 				className="relative max-w-5xl mx-auto px-6 text-center"
 			>
+				<a
+					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto p-2 mb-4 border border-amber-200 rounded-full flex gap-2 items-center"
+					href="https://www.producthunt.com/products/inkgest-link-to-gest"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<SparkleIcon className="w-3 h-3" />
+					We are live on Product Hunt
+				</a>
 				{/* Headline */}
 				<motion.h1
 					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
 					style={{
-						fontFamily: "'Instrument Serif', serif",
-						fontSize: "clamp(52px,7.5vw,88px)",
-						lineHeight: 1.06,
+						lineHeight: 1,
 						letterSpacing: "-1.5px",
 						color: T.accent,
 						marginBottom: 24,
 					}}
+					className="text-6xl font-bold text-center"
 				>
-					Turn any article into
-					<br />
-					<div className="gap-2 flex items-center justify-center">
-						{[
-							"newsletter,",
-							"blog,",
-							"infographics,",
-							"linkedin post,",
-							"tweets",
-						].map((item) => (
-							<em
-								key={item}
-								className="text-4xl"
-								style={{ fontStyle: "italic", color: T.warm }}
-							>
-								{item}
-							</em>
-						))}
-					</div>
+					Read a LINK, get a <span style={{ color: T.warm }}>GEST</span>
+					<AnimatedText />
 				</motion.h1>
 
 				{/* Sub */}
@@ -427,15 +475,15 @@ function Hero() {
 					style={{
 						fontSize: 18,
 						color: T.muted,
-						maxWidth: 440,
 						margin: "0 auto 32px",
 						lineHeight: 1.7,
 						fontFamily: "'Outfit', sans-serif",
 					}}
+					className="max-w-2xl mx-auto"
 				>
 					Paste a URL, describe your angle. Get a structured newsletter, blog,
-					infographic, linkedin post, tweets, video ready to edit and publish —
-					in under 60 seconds.
+					infographic, linkedin post, tweets ready to edit and publish — in
+					under 60 seconds.
 				</motion.p>
 
 				{/* AI draft form */}

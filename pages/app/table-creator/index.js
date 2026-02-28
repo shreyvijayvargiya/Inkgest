@@ -20,6 +20,8 @@ import {
 	serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/config/firebase";
+import { validateUrls } from "../../../lib/utils/urlAllowlist";
+import { getTheme } from "../../../lib/utils/theme";
 
 /* ─── Fonts & global styles ────────────────────────────────────────────────── */
 const FontLink = () => (
@@ -36,19 +38,7 @@ const FontLink = () => (
   `}</style>
 );
 
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-	green: "#166534",
-	greenBg: "#DCFCE7",
-	red: "#991B1B",
-	redBg: "#FEE2E2",
-};
+const T = getTheme();
 
 const Ic = ({ d, d2, size = 16, stroke = T.muted, sw = 1.75 }) => (
 	<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
@@ -199,6 +189,7 @@ export default function TableCreatorIndex() {
 	const [tableData, setTableData] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
 	const [loadingLonger, setLoadingLonger] = useState(false);
+	const [generateError, setGenerateError] = useState(null);
 	const loadingRef = useRef(null);
 
 	useEffect(() => {
@@ -245,6 +236,28 @@ export default function TableCreatorIndex() {
 			setTableData(data);
 		},
 	});
+
+	/* Confirm when leaving during table generation */
+	useEffect(() => {
+		if (!mutation.isPending) return;
+		const onBeforeUnload = (e) => {
+			e.preventDefault();
+			e.returnValue = "";
+		};
+		const onRouteChange = () => {
+			if (!window.confirm("Table generation in progress. Leave anyway?")) {
+				router.events.emit("routeChangeError");
+				throw "Route change aborted.";
+			}
+		};
+		window.addEventListener("beforeunload", onBeforeUnload);
+		router.events.on("routeChangeStart", onRouteChange);
+		return () => {
+			window.removeEventListener("beforeunload", onBeforeUnload);
+			router.events.off("routeChangeStart", onRouteChange);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [mutation.isPending]);
 
 	/* Loading messages for table generation */
 	useEffect(() => {
@@ -320,6 +333,12 @@ export default function TableCreatorIndex() {
 	const handleGenerate = useCallback(() => {
 		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
 		if (validUrls.length === 0 || !prompt.trim() || mutation.isPending) return;
+		const urlCheck = validateUrls(validUrls);
+		if (!urlCheck.valid) {
+			setGenerateError(urlCheck.error || "Invalid URL. Use full URLs with https://");
+			return;
+		}
+		setGenerateError(null);
 		setSorting([]);
 		setGlobalFilter("");
 		setTableData(null);
@@ -536,10 +555,10 @@ export default function TableCreatorIndex() {
 							</div>
 						)}
 						<AnimatePresence>
-							{mutation.isError && (
+							{(mutation.isError || generateError) && (
 								<motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ marginTop: 14, background: T.redBg, border: `1px solid #FCA5A5`, borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
 									<Ic d={ICONS.info} size={14} stroke={T.red} />
-									<span style={{ fontSize: 13, color: T.red }}>{mutation.error?.message}</span>
+									<span style={{ fontSize: 13, color: T.red }}>{generateError || mutation.error?.message}</span>
 								</motion.div>
 							)}
 						</AnimatePresence>

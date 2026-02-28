@@ -1069,7 +1069,7 @@ const PricingPage = () => {
 							],
 							[
 								"Does the free plan renew monthly?",
-								"Yes — your 10 free credits reset on the 1st of each month.",
+								"Yes — your 10 free credits renew every month from your account creation date.",
 							],
 							[
 								"Can I cancel anytime?",

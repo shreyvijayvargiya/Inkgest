@@ -15,7 +15,13 @@ import {
 	where,
 	serverTimestamp,
 } from "firebase/firestore";
-import { getUserCredits, FREE_CREDIT_LIMIT } from "../../lib/utils/credits";
+import {
+	getUserCredits,
+	FREE_CREDIT_LIMIT,
+	formatRenewalDate,
+} from "../../lib/utils/credits";
+import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
+import { getTheme } from "../../lib/utils/theme";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -34,16 +40,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ─── Tokens ─── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-};
+const T = getTheme();
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;
@@ -114,22 +111,26 @@ const PRESETS = [
 	{
 		label: "Y Combinator",
 		urls: ["https://www.ycombinator.com/blog"],
-		prompt: "Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
+		prompt:
+			"Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
 	},
 	{
 		label: "Hacker News",
 		urls: ["https://news.ycombinator.com"],
-		prompt: "Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
+		prompt:
+			"Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
 	},
 	{
 		label: "TechCrunch",
 		urls: ["https://techcrunch.com"],
-		prompt: "Summarize the main points and add actionable takeaways for startup founders.",
+		prompt:
+			"Summarize the main points and add actionable takeaways for startup founders.",
 	},
 	{
 		label: "X / Twitter",
 		urls: ["https://x.com"],
-		prompt: "Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
+		prompt:
+			"Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
 	},
 ];
 
@@ -201,21 +202,40 @@ function UpgradeBanner({ credits, onUpgrade }) {
 				marginBottom: 16,
 			}}
 		>
-			<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-				<div>
-				<p style={{ fontSize: 13, fontWeight: 700, color: out ? "white" : "#92400E", marginBottom: 2 }}>
-					{heading}
-				</p>
-				<p style={{ fontSize: 12, color: out ? "rgba(255,255,255,0.65)" : "#B45309" }}>
-					{sub}
-				</p>
-			</div>
-			<motion.button
-				whileHover={{ scale: 1.04 }}
-				whileTap={{ scale: 0.97 }}
-				onClick={onUpgrade}
+			<div
 				style={{
-					background: out ? T.warm : T.accent,
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					gap: 12,
+				}}
+			>
+				<div>
+					<p
+						style={{
+							fontSize: 13,
+							fontWeight: 700,
+							color: out ? "white" : "#92400E",
+							marginBottom: 2,
+						}}
+					>
+						{heading}
+					</p>
+					<p
+						style={{
+							fontSize: 12,
+							color: out ? "rgba(255,255,255,0.65)" : "#B45309",
+						}}
+					>
+						{sub}
+					</p>
+				</div>
+				<motion.button
+					whileHover={{ scale: 1.04 }}
+					whileTap={{ scale: 0.97 }}
+					onClick={onUpgrade}
+					style={{
+						background: out ? T.warm : T.accent,
 						color: "white",
 						border: "none",
 						padding: "8px 16px",
@@ -237,10 +257,20 @@ function UpgradeBanner({ credits, onUpgrade }) {
 function SidebarItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
 	const isTable = item.type === "table";
-	const tag = isTable ? "Table" : (item.tag || "Draft");
-	const preview = isTable ? (item.description || "") : (item.preview || "");
+	const tag = isTable ? "Table" : item.tag || "Draft";
+	const preview = isTable ? item.description || "" : item.preview || "";
 	const meta = isTable ? "" : `${item.words ?? 0}w`;
-	const date = item.date ? (typeof item.date === "string" ? item.date : item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "") : "";
+	const date = item.date
+		? typeof item.date === "string"
+			? item.date
+			: (item.createdAt
+					?.toDate?.()
+					?.toLocaleDateString?.("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}) ?? "")
+		: "";
 	return (
 		<motion.div
 			layout
@@ -330,9 +360,13 @@ function SidebarItemCard({ item, active, onClick, onDelete }) {
 						>
 							{tag}
 						</span>
-						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>}
+						{meta && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
+						)}
 						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
-						{date && <span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>}
+						{date && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
+						)}
 					</div>
 				</div>
 				<AnimatePresence>
@@ -433,16 +467,49 @@ export default function inkgestApp() {
 		const load = async () => {
 			try {
 				const [draftsSnap, tablesSnap] = await Promise.all([
-					getDocs(query(collection(db, "drafts"), where("userId", "==", reduxUser.uid), orderBy("createdAt", "desc"))),
-					getDocs(query(collection(db, "tables"), where("userId", "==", reduxUser.uid))),
+					getDocs(
+						query(
+							collection(db, "drafts"),
+							where("userId", "==", reduxUser.uid),
+							orderBy("createdAt", "desc"),
+						),
+					),
+					getDocs(
+						query(
+							collection(db, "tables"),
+							where("userId", "==", reduxUser.uid),
+						),
+					),
 				]);
-				setDrafts(draftsSnap.docs.map((d) => ({ id: d.id, type: "draft", ...d.data() })));
-				setTables(tablesSnap.docs.map((d) => {
-					const data = d.data();
-					const created = data.createdAt;
-					const date = created?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "";
-					return { id: d.id, type: "table", title: data.title, description: data.description, createdAt: created, date };
-				}));
+				setDrafts(
+					draftsSnap.docs.map((d) => ({
+						id: d.id,
+						type: "draft",
+						...d.data(),
+					})),
+				);
+				setTables(
+					tablesSnap.docs.map((d) => {
+						const data = d.data();
+						const created = data.createdAt;
+						const date =
+							created
+								?.toDate?.()
+								?.toLocaleDateString?.("en-US", {
+									weekday: "short",
+									month: "short",
+									day: "numeric",
+								}) ?? "";
+						return {
+							id: d.id,
+							type: "table",
+							title: data.title,
+							description: data.description,
+							createdAt: created,
+							date,
+						};
+					}),
+				);
 			} catch (e) {
 				console.error("Failed to load drafts/tables", e);
 			}
@@ -476,10 +543,33 @@ export default function inkgestApp() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reduxUser]);
 
-	const filtered = sidebarItems.filter(
-		(i) =>
-			i.title?.toLowerCase().includes(search.toLowerCase()) ||
-			(i.preview || i.description || "").toLowerCase().includes(search.toLowerCase()),
+	/* Confirm when leaving during API load (back, close, navigate) */
+	const isLoading = generating || scraping;
+	useEffect(() => {
+		if (!isLoading) return;
+		const onBeforeUnload = (e) => {
+			e.preventDefault();
+			e.returnValue = "";
+		};
+		const onRouteChange = () => {
+			if (!window.confirm("Generation in progress. Leave anyway?")) {
+				router.events.emit("routeChangeError");
+				throw "Route change aborted.";
+			}
+		};
+		window.addEventListener("beforeunload", onBeforeUnload);
+		router.events.on("routeChangeStart", onRouteChange);
+		return () => {
+			window.removeEventListener("beforeunload", onBeforeUnload);
+			router.events.off("routeChangeStart", onRouteChange);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isLoading]);
+
+	const filtered = drafts.filter(
+		(d) =>
+			d.title?.toLowerCase().includes(search.toLowerCase()) ||
+			d.preview?.toLowerCase().includes(search.toLowerCase()),
 	);
 
 	const handleGenerate = async () => {
@@ -488,9 +578,23 @@ export default function inkgestApp() {
 			router.push("/pricing");
 			return;
 		}
+		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
+		if (validUrls.length > 0) {
+			const urlCheck = validateUrls(validUrls);
+			if (!urlCheck.valid) {
+				setGenerateError(
+					urlCheck.error || "Invalid URL. Use full URLs with https://",
+				);
+				return;
+			}
+		}
 		setGenerating(true);
 		setGenerateError(null);
-		const msgs = ["Reading URL content…", "Analysing key points…", "Drafting your newsletter…"];
+		const msgs = [
+			"Reading URL content…",
+			"Analysing key points…",
+			"Drafting your newsletter…",
+		];
 		let idx = 0;
 		setLoadingMsg(msgs[0]);
 		const iv = setInterval(() => {
@@ -505,7 +609,6 @@ export default function inkgestApp() {
 				setGenerating(false);
 				return;
 			}
-			const validUrls = urls.map((u) => u.trim()).filter(Boolean);
 			const res = await fetch("/api/automations/newsletter-generate", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -567,7 +670,10 @@ export default function inkgestApp() {
 			setUrls([""]);
 			setPrompt("");
 			// Refresh credits counter
-			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => { });
+			if (reduxUser)
+				getUserCredits(reduxUser.uid)
+					.then(setCredits)
+					.catch(() => {});
 			router.push(`/app/${docRef.id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
@@ -630,11 +736,28 @@ export default function inkgestApp() {
 	/* Scrape a URL and open raw content in the editor */
 	const handleScrape = async () => {
 		if (!scrapeUrl.trim() || scraping) return;
-		if (!reduxUser) { setLoginModalOpen(true); return; }
-		if (scrapeRemaining <= 0) { router.push("/pricing"); return; }
+		if (!reduxUser) {
+			setLoginModalOpen(true);
+			return;
+		}
+		if (scrapeRemaining <= 0) {
+			router.push("/pricing");
+			return;
+		}
+		const urlCheck = validateUrl(scrapeUrl.trim());
+		if (!urlCheck.valid) {
+			setGenerateError(
+				urlCheck.error || "Invalid URL. Use full URLs with https://",
+			);
+			return;
+		}
 		setScraping(true);
 		setGenerateError(null);
-		const scrapeMsgs = ["Reading URL content…", "Extracting text…", "Preparing draft…"];
+		const scrapeMsgs = [
+			"Reading URL content…",
+			"Extracting text…",
+			"Preparing draft…",
+		];
 		let sIdx = 0;
 		const scrapeIv = setInterval(() => {
 			sIdx = (sIdx + 1) % scrapeMsgs.length;
@@ -660,7 +783,11 @@ export default function inkgestApp() {
 			const title = data.title || scrapeUrl.trim();
 			const words = (data.content || "").trim().split(/\s+/).length;
 			const now = new Date();
-			const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+			const date = now.toLocaleDateString("en-US", {
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+			});
 			const preview = (data.content || "").slice(0, 180);
 
 			const draft = {
@@ -676,10 +803,16 @@ export default function inkgestApp() {
 				createdAt: serverTimestamp(),
 			};
 			const docRef = await addDoc(collection(db, "drafts"), draft);
-			setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+			setDrafts((prev) => [
+				{ id: docRef.id, ...draft, createdAt: new Date() },
+				...prev,
+			]);
 			setScrapeUrl("");
 			// Refresh credits counter
-			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => { });
+			if (reduxUser)
+				getUserCredits(reduxUser.uid)
+					.then(setCredits)
+					.catch(() => {});
 			router.push(`/app/${docRef.id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Scrape failed");
@@ -693,11 +826,20 @@ export default function inkgestApp() {
 	const handleAgentSend = async () => {
 		const promptText = agentPrompt.trim();
 		if (!promptText || agentLoading) return;
-		if (!reduxUser) { setLoginModalOpen(true); return; }
-		if (creditRemaining <= 0) { router.push("/pricing"); return; }
+		if (!reduxUser) {
+			setLoginModalOpen(true);
+			return;
+		}
+		if (creditRemaining <= 0) {
+			router.push("/pricing");
+			return;
+		}
 		setAgentLoading(true);
 		setAgentError(null);
-		setAgentMessages((prev) => [...prev, { role: "user", content: promptText }]);
+		setAgentMessages((prev) => [
+			...prev,
+			{ role: "user", content: promptText },
+		]);
 		setAgentPrompt("");
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
@@ -725,7 +867,10 @@ export default function inkgestApp() {
 			if (data.executed?.length > 0) {
 				await processAgentExecuted(data.executed);
 			}
-			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => {});
+			if (reduxUser)
+				getUserCredits(reduxUser.uid)
+					.then(setCredits)
+					.catch(() => {});
 		} catch (e) {
 			setAgentError(e?.message || "Agent failed");
 		} finally {
@@ -738,9 +883,18 @@ export default function inkgestApp() {
 		for (const task of executed) {
 			if (task.type === "newsletter" && task.content) {
 				const lines = (task.content || "").split("\n");
-				const titleLine = lines.find((l) => l.startsWith("# ") || l.startsWith("## "));
-				const title = titleLine ? titleLine.replace(/^#+\s*/, "").trim() : task.label || "Draft";
-				const bodyText = lines.filter((l) => !l.match(/^#{1,6}\s/)).join(" ").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+				const titleLine = lines.find(
+					(l) => l.startsWith("# ") || l.startsWith("## "),
+				);
+				const title = titleLine
+					? titleLine.replace(/^#+\s*/, "").trim()
+					: task.label || "Draft";
+				const bodyText = lines
+					.filter((l) => !l.match(/^#{1,6}\s/))
+					.join(" ")
+					.replace(/[*_`]/g, "")
+					.replace(/\s+/g, " ")
+					.trim();
 				const draft = {
 					userId: reduxUser.uid,
 					title,
@@ -748,14 +902,26 @@ export default function inkgestApp() {
 					body: task.content,
 					urls: task.params?.urls || [],
 					words: task.content.trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
 					tag: task.formatLabel || "Newsletter",
 					format: task.params?.format || "substack",
 					createdAt: serverTimestamp(),
 				};
 				const docRef = await addDoc(collection(db, "drafts"), draft);
-				setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
-				newTasks.push({ type: "newsletter", label: task.label, id: docRef.id, path: `/app/${docRef.id}` });
+				setDrafts((prev) => [
+					{ id: docRef.id, ...draft, createdAt: new Date() },
+					...prev,
+				]);
+				newTasks.push({
+					type: "newsletter",
+					label: task.label,
+					id: docRef.id,
+					path: `/app/${docRef.id}`,
+				});
 			} else if (task.type === "scrape" && task.content) {
 				const draft = {
 					userId: reduxUser.uid,
@@ -765,13 +931,25 @@ export default function inkgestApp() {
 					urls: task.urls || [],
 					images: task.images || [],
 					words: (task.content || "").trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
 					tag: "Scraped",
 					createdAt: serverTimestamp(),
 				};
 				const docRef = await addDoc(collection(db, "drafts"), draft);
-				setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
-				newTasks.push({ type: "scrape", label: task.label, id: docRef.id, path: `/app/${docRef.id}` });
+				setDrafts((prev) => [
+					{ id: docRef.id, ...draft, createdAt: new Date() },
+					...prev,
+				]);
+				newTasks.push({
+					type: "scrape",
+					label: task.label,
+					id: docRef.id,
+					path: `/app/${docRef.id}`,
+				});
 			} else if (task.type === "table" && task.columns) {
 				const docRef = await addDoc(collection(db, "tables"), {
 					userId: reduxUser.uid,
@@ -782,7 +960,12 @@ export default function inkgestApp() {
 					sourceUrls: task.sourceUrls || [],
 					createdAt: serverTimestamp(),
 				});
-				newTasks.push({ type: "table", label: task.label, id: docRef.id, path: `/app/${docRef.id}` });
+				newTasks.push({
+					type: "table",
+					label: task.label,
+					id: docRef.id,
+					path: `/app/${docRef.id}`,
+				});
 			}
 		}
 		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
@@ -790,10 +973,17 @@ export default function inkgestApp() {
 
 	/* Create a blank draft and open it */
 	const handleBlank = async () => {
-		if (!reduxUser) { setLoginModalOpen(true); return; }
+		if (!reduxUser) {
+			setLoginModalOpen(true);
+			return;
+		}
 		const title = blankTitle.trim() || "Untitled draft";
 		const now = new Date();
-		const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+		const date = now.toLocaleDateString("en-US", {
+			weekday: "short",
+			month: "short",
+			day: "numeric",
+		});
 		const draft = {
 			userId: reduxUser.uid,
 			title,
@@ -806,7 +996,10 @@ export default function inkgestApp() {
 			createdAt: serverTimestamp(),
 		};
 		const docRef = await addDoc(collection(db, "drafts"), draft);
-		setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+		setDrafts((prev) => [
+			{ id: docRef.id, ...draft, createdAt: new Date() },
+			...prev,
+		]);
 		setBlankTitle("");
 		router.push(`/app/${docRef.id}`);
 	};
@@ -905,19 +1098,33 @@ export default function inkgestApp() {
 								∞ Pro
 							</span>
 						) : (
-							<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-								Credits{" "}
-								<span
-									style={{
-										fontWeight: 700,
-										color: creditRemaining === 0 ? "#EF4444" : T.accent,
-									}}
-								>
-									{credits
-										? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
-										: `0/${FREE_CREDIT_LIMIT}`}
+							<>
+								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+									Credits{" "}
+									<span
+										style={{
+											fontWeight: 700,
+											color: creditRemaining === 0 ? "#EF4444" : T.accent,
+										}}
+									>
+										{credits
+											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
+											: `0/${FREE_CREDIT_LIMIT}`}
+									</span>
 								</span>
-							</span>
+								{credits?.renewsAt && (
+									<span
+										style={{
+											fontSize: 11,
+											color: T.muted,
+											fontWeight: 500,
+											whiteSpace: "nowrap",
+										}}
+									>
+										Renew at {formatRenewalDate(credits.renewsAt)}
+									</span>
+								)}
+							</>
 						)}
 						<motion.button
 							whileHover={{ scale: 1.04 }}
@@ -942,7 +1149,6 @@ export default function inkgestApp() {
 					<div
 						className="sm:hidden md:flex"
 						style={{
-							
 							alignItems: "center",
 							gap: 8,
 							marginLeft: 4,
@@ -1327,16 +1533,34 @@ export default function inkgestApp() {
 								style={{ marginBottom: 24 }}
 							>
 								<p style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}>
-									AI message: 0.25 credits · Newsletter/scrape: 1 credit · Table: 2 credits
+									AI message: 0.25 credits · Newsletter/scrape: 1 credit ·
+									Table: 2 credits
 								</p>
 								<div style={{ marginBottom: 16 }}>
-									<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+									<label
+										style={{
+											display: "block",
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
 										Try a suggestion
 									</label>
-									<div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+									<div
+										style={{
+											display: "flex",
+											flexWrap: "wrap",
+											gap: 8,
+											marginBottom: 12,
+										}}
+									>
 										{AGENT_PROMPT_SUGGESTIONS.slice(
 											agentSuggestionOffset * 5,
-											agentSuggestionOffset * 5 + 5
+											agentSuggestionOffset * 5 + 5,
 										).map((s, i) => (
 											<motion.button
 												key={agentSuggestionOffset * 5 + i}
@@ -1369,7 +1593,9 @@ export default function inkgestApp() {
 										<motion.button
 											whileHover={{ scale: 1.03 }}
 											whileTap={{ scale: 0.97 }}
-											onClick={() => setAgentSuggestionOffset((o) => (o + 1) % 2)}
+											onClick={() =>
+												setAgentSuggestionOffset((o) => (o + 1) % 2)
+											}
 											style={{
 												padding: "8px 14px",
 												borderRadius: 9,
@@ -1386,13 +1612,27 @@ export default function inkgestApp() {
 									</div>
 								</div>
 								<div style={{ marginBottom: 16 }}>
-									<label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 8 }}>
+									<label
+										style={{
+											display: "block",
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
 										Describe what you want
 									</label>
 									<textarea
 										value={agentPrompt}
 										onChange={(e) => setAgentPrompt(e.target.value)}
-										onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleAgentSend())}
+										onKeyDown={(e) =>
+											e.key === "Enter" &&
+											!e.shiftKey &&
+											(e.preventDefault(), handleAgentSend())
+										}
 										placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
 										rows={3}
 										disabled={!reduxUser || agentLoading}
@@ -1413,18 +1653,29 @@ export default function inkgestApp() {
 								<motion.button
 									onClick={handleAgentSend}
 									disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
-									whileHover={!agentLoading && agentPrompt.trim() ? { scale: 1.02, y: -1 } : {}}
+									whileHover={
+										!agentLoading && agentPrompt.trim()
+											? { scale: 1.02, y: -1 }
+											: {}
+									}
 									whileTap={!agentLoading ? { scale: 0.97 } : {}}
 									style={{
 										width: "100%",
-										background: agentLoading || !agentPrompt.trim() || !reduxUser ? "#E8E4DC" : T.accent,
-										color: agentLoading || !agentPrompt.trim() || !reduxUser ? T.muted : "white",
+										background:
+											agentLoading || !agentPrompt.trim() || !reduxUser
+												? "#E8E4DC"
+												: T.accent,
+										color:
+											agentLoading || !agentPrompt.trim() || !reduxUser
+												? T.muted
+												: "white",
 										border: "none",
 										padding: "15px",
 										borderRadius: 12,
 										fontSize: 16,
 										fontWeight: 700,
-										cursor: agentLoading || !reduxUser ? "not-allowed" : "pointer",
+										cursor:
+											agentLoading || !reduxUser ? "not-allowed" : "pointer",
 										display: "flex",
 										alignItems: "center",
 										justifyContent: "center",
@@ -1433,7 +1684,14 @@ export default function inkgestApp() {
 								>
 									{agentLoading ? (
 										<>
-											<motion.span animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}>
+											<motion.span
+												animate={{ rotate: 360 }}
+												transition={{
+													duration: 0.9,
+													repeat: Infinity,
+													ease: "linear",
+												}}
+											>
 												<Icon d={Icons.refresh} size={18} stroke={T.muted} />
 											</motion.span>
 											{agentLoadingMsg}
@@ -1442,7 +1700,12 @@ export default function inkgestApp() {
 										"Sign in to use AI Agent"
 									) : (
 										<>
-											<Icon d={Icons.zap} size={18} stroke="white" fill="white" />
+											<Icon
+												d={Icons.zap}
+												size={18}
+												stroke="white"
+												fill="white"
+											/>
 											Send to InkAgent
 										</>
 									)}
@@ -1462,13 +1725,28 @@ export default function inkgestApp() {
 											boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
 										}}
 									>
-										<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 4 }}>
+										<p
+											style={{
+												fontSize: 13,
+												fontWeight: 700,
+												color: T.accent,
+												marginBottom: 4,
+											}}
+										>
 											What would you like to do?
 										</p>
-										<p style={{ fontSize: 12, color: T.muted, marginBottom: 14 }}>
+										<p
+											style={{ fontSize: 12, color: T.muted, marginBottom: 14 }}
+										>
 											Tasks created by the agent — open below when ready.
 										</p>
-										<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+										<div
+											style={{
+												display: "flex",
+												flexDirection: "column",
+												gap: 10,
+											}}
+										>
 											{agentSuggestedTasks.map((t, i) => (
 												<div
 													key={i}
@@ -1483,10 +1761,31 @@ export default function inkgestApp() {
 														boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
 													}}
 												>
-													<span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: T.warm }}>
-														{t.type === "newsletter" ? "Newsletter" : t.type === "table" ? "Table" : "Scrape"}
+													<span
+														style={{
+															fontSize: 11,
+															fontWeight: 700,
+															textTransform: "uppercase",
+															letterSpacing: "0.05em",
+															color: T.warm,
+														}}
+													>
+														{t.type === "newsletter"
+															? "Newsletter"
+															: t.type === "table"
+																? "Table"
+																: "Scrape"}
 													</span>
-													<span style={{ fontSize: 14, fontWeight: 600, color: T.accent, lineHeight: 1.4 }}>{t.label}</span>
+													<span
+														style={{
+															fontSize: 14,
+															fontWeight: 600,
+															color: T.accent,
+															lineHeight: 1.4,
+														}}
+													>
+														{t.label}
+													</span>
 												</div>
 											))}
 										</div>
@@ -1496,17 +1795,35 @@ export default function inkgestApp() {
 								{/* Chat / messages — light backgrounds, clear labels */}
 								{agentMessages.length > 0 && (
 									<div style={{ marginTop: 24 }}>
-										<p style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: T.muted, marginBottom: 12 }}>
+										<p
+											style={{
+												fontSize: 12,
+												fontWeight: 700,
+												textTransform: "uppercase",
+												letterSpacing: "0.08em",
+												color: T.muted,
+												marginBottom: 12,
+											}}
+										>
 											Chat
 										</p>
-										<div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: 300, overflowY: "auto" }}>
+										<div
+											style={{
+												display: "flex",
+												flexDirection: "column",
+												gap: 14,
+												maxHeight: 300,
+												overflowY: "auto",
+											}}
+										>
 											{agentMessages.map((m, i) => (
 												<div
 													key={i}
 													style={{
 														display: "flex",
 														flexDirection: "column",
-														alignSelf: m.role === "user" ? "flex-end" : "flex-start",
+														alignSelf:
+															m.role === "user" ? "flex-end" : "flex-start",
 														maxWidth: "92%",
 													}}
 												>
@@ -1525,21 +1842,39 @@ export default function inkgestApp() {
 													<div
 														style={{
 															padding: "12px 16px",
-															background: m.role === "user" ? "#F0EDE8" : "#FDFCF9",
+															background:
+																m.role === "user" ? "#F0EDE8" : "#FDFCF9",
 															color: T.accent,
 															borderRadius: 12,
 															border: `1px solid ${m.role === "user" ? "#E8E4DC" : T.border}`,
 															boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
 														}}
 													>
-														<p style={{ fontSize: 13, lineHeight: 1.6 }}>{m.content}</p>
+														<p style={{ fontSize: 13, lineHeight: 1.6 }}>
+															{m.content}
+														</p>
 														{m.thinking && (
-															<p style={{ fontSize: 11, color: T.muted, marginTop: 10, fontStyle: "italic", lineHeight: 1.5 }}>
+															<p
+																style={{
+																	fontSize: 11,
+																	color: T.muted,
+																	marginTop: 10,
+																	fontStyle: "italic",
+																	lineHeight: 1.5,
+																}}
+															>
 																{m.thinking}
 															</p>
 														)}
 														{m.creditsUsed != null && (
-															<p style={{ fontSize: 11, color: T.warm, marginTop: 8, fontWeight: 600 }}>
+															<p
+																style={{
+																	fontSize: 11,
+																	color: T.warm,
+																	marginTop: 8,
+																	fontWeight: 600,
+																}}
+															>
 																Credits used: {m.creditsUsed}
 															</p>
 														)}
@@ -1553,18 +1888,36 @@ export default function inkgestApp() {
 								{/* Completed tasks — links to open drafts/tables */}
 								{agentCompletedTasks.length > 0 && (
 									<div style={{ marginTop: 24 }}>
-										<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 4 }}>
+										<p
+											style={{
+												fontSize: 13,
+												fontWeight: 700,
+												color: T.accent,
+												marginBottom: 4,
+											}}
+										>
 											Ready to open
 										</p>
-										<p style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}>
+										<p
+											style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}
+										>
 											Click to open your draft or table.
 										</p>
-										<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+										<div
+											style={{
+												display: "flex",
+												flexDirection: "column",
+												gap: 8,
+											}}
+										>
 											{agentCompletedTasks.map((t, i) => (
 												<motion.a
 													key={i}
 													href={t.path}
-													onClick={(e) => { e.preventDefault(); router.push(t.path); }}
+													onClick={(e) => {
+														e.preventDefault();
+														router.push(t.path);
+													}}
 													whileHover={{ x: 2, scale: 1.01 }}
 													whileTap={{ scale: 0.99 }}
 													style={{
@@ -1582,11 +1935,30 @@ export default function inkgestApp() {
 														boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
 													}}
 												>
-													<span style={{ fontSize: 11, fontWeight: 700, color: T.warm, marginRight: 8 }}>
-														{t.type === "newsletter" ? "Newsletter" : t.type === "table" ? "Table" : "Scrape"}
+													<span
+														style={{
+															fontSize: 11,
+															fontWeight: 700,
+															color: T.warm,
+															marginRight: 8,
+														}}
+													>
+														{t.type === "newsletter"
+															? "Newsletter"
+															: t.type === "table"
+																? "Table"
+																: "Scrape"}
 													</span>
 													<span style={{ flex: 1 }}>{t.label}</span>
-													<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>Open →</span>
+													<span
+														style={{
+															fontSize: 12,
+															color: T.warm,
+															fontWeight: 700,
+														}}
+													>
+														Open →
+													</span>
 												</motion.a>
 											))}
 										</div>

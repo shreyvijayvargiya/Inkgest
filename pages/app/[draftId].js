@@ -19,11 +19,18 @@ import {
 	where,
 	updateDoc,
 } from "firebase/firestore";
+import { uploadFile } from "../../lib/api/upload";
+import {
+	getUserCredits,
+	FREE_CREDIT_LIMIT,
+	formatRenewalDate,
+} from "../../lib/utils/credits";
+import { getTheme } from "../../lib/utils/theme";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
     body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
@@ -37,16 +44,7 @@ const FontLink = () => (
   `}</style>
 );
 
-/* ─── Tokens ─── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
-};
+const T = getTheme();
 
 const FREE_LIMIT = 40;
 
@@ -90,6 +88,7 @@ const Icon = ({
 
 const Icons = {
 	plus: "M12 5v14M5 12h14",
+	close: "M18 6L6 18M6 6l12 12",
 	search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
 	trash: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
 	copy: "M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-4-4H8z M14 2v6h6 M8 12h8 M8 16h5",
@@ -108,6 +107,8 @@ const Icons = {
 	list: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
 	link2:
 		"M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3 M8 12h8",
+	image:
+		"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-8a2 2 0 11-4 0 2 2 0 014 0zM4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z",
 	settings:
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
@@ -463,10 +464,14 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 			if (tag === "pre")
 				return `<pre style="background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;">${node.textContent || ""}</pre>\n`;
 			if (tag === "hr") return `<hr style="${theme.hr}"/>\n`;
-			if (tag === "br" || !text) return `<br/>\n`;
 			if (tag === "img")
 				return `<img src="${node.getAttribute("src") || ""}" alt="${node.getAttribute("alt") || ""}" style="max-width:100%;height:auto;border-radius:6px;margin:12px 0;display:block;"/>\n`;
-			/* p, div, section, article → paragraph */
+			if (tag === "video") {
+				const src = node.getAttribute("src") || "";
+				return `<p style="margin:16px 0"><video src="${src}" controls style="max-width:100%;border-radius:8px;display:block;"></video></p>\n`;
+			}
+			if (tag === "br" || !text) return `<br/>\n`;
+			/* p, div, section, article → paragraph (preserve inner HTML including img/video) */
 			return `<p style="${theme.p}">${inner}</p>\n`;
 		};
 
@@ -495,7 +500,7 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
     strong,b{${theme.strong}}
     em,i{font-style:italic;}
     code{${theme.code}}
-    img{max-width:100%;height:auto;border-radius:6px;}
+    img,video{max-width:100%;height:auto;border-radius:6px;}
     ul,ol{padding-left:24px;margin:0 0 14px;}
     li{${theme.li}}
     hr{${theme.hr}}
@@ -516,10 +521,20 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 function ItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
 	const isTable = item.type === "table";
-	const tag = isTable ? "Table" : (item.tag || "Draft");
-	const preview = isTable ? (item.description || "") : (item.preview || "");
+	const tag = isTable ? "Table" : item.tag || "Draft";
+	const preview = isTable ? item.description || "" : item.preview || "";
 	const meta = isTable ? "" : `${item.words ?? 0}w`;
-	const date = item.date ? (typeof item.date === "string" ? item.date : item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "") : "";
+	const date = item.date
+		? typeof item.date === "string"
+			? item.date
+			: (item.createdAt
+					?.toDate?.()
+					?.toLocaleDateString?.("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}) ?? "")
+		: "";
 	return (
 		<motion.div
 			layout
@@ -609,9 +624,13 @@ function ItemCard({ item, active, onClick, onDelete }) {
 						>
 							{tag}
 						</span>
-						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>}
+						{meta && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
+						)}
 						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
-						{date && <span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>}
+						{date && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
+						)}
 					</div>
 				</div>
 				<AnimatePresence>
@@ -738,11 +757,63 @@ function makeButtonBlockHtml(text = "Click here →", href = "#") {
 	return `<p style="margin:16px 0"><a href="${href}" style="display:inline-block;background:#C17B2F;color:#FFFFFF;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;font-family:'Outfit',sans-serif;letter-spacing:0.01em">${text}</a></p>`;
 }
 
+const MAX_TABS = 5;
+
 /* ─── Draft Page ─── */
 export default function DraftPage() {
 	const router = useRouter();
-	const { draftId } = router.query;
+	const { draftId, tabs: tabsQuery } = router.query;
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
+
+	/* Open tabs from URL query (?tabs=id1,id2,id3) — active tab = draftId from path */
+	const openTabs = (() => {
+		if (!draftId) return [];
+		const fromQuery =
+			typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
+		if (fromQuery.length === 0) return [draftId];
+		if (!fromQuery.includes(draftId))
+			return [draftId, ...fromQuery].slice(0, MAX_TABS);
+		return fromQuery;
+	})();
+
+	const navigateWithTabs = (targetDraftId, newTabIds) => {
+		const ids = newTabIds.length > 0 ? newTabIds : [targetDraftId];
+		router.push(`/app/${targetDraftId}?tabs=${ids.join(",")}`, undefined, {
+			shallow: false,
+		});
+	};
+
+	const openDraftInTab = (id) => {
+		if (id === draftId) return;
+		const current = openTabs.includes(draftId)
+			? openTabs
+			: [draftId, ...openTabs];
+		let next = current.includes(id)
+			? current
+			: [id, ...current.filter((x) => x !== id)].slice(0, MAX_TABS);
+		navigateWithTabs(id, next);
+	};
+
+	const closeTab = (id, e) => {
+		e?.stopPropagation();
+		const next = openTabs.filter((t) => t !== id);
+		if (next.length === 0) {
+			router.push("/app");
+			return;
+		}
+		const target = id === draftId ? next[0] : draftId;
+		navigateWithTabs(target, next);
+	};
+
+	/* Lookup draft title by id (from drafts list or current draft) */
+	const getTabTitle = (id) => {
+		if (draft?.id === id) return draft?.title || "Untitled";
+		const d = drafts.find((x) => x.id === id);
+		return d?.title || "Untitled";
+	};
+
+	const truncate = (s, len = 18) =>
+		!s ? "Untitled" : s.length <= len ? s : s.slice(0, len - 1) + "…";
 
 	const queryClient = useQueryClient();
 	const [search, setSearch] = useState("");
@@ -758,7 +829,20 @@ export default function DraftPage() {
 	const [infographicsOpen, setInfographicsOpen] = useState(false);
 	const [chatOpen, setChatOpen] = useState(false);
 	const [blockMenuOpen, setBlockMenuOpen] = useState(false);
+	const [imageDropdownOpen, setImageDropdownOpen] = useState(false);
+	const [imageUrlInput, setImageUrlInput] = useState("");
+	const [imageUploading, setImageUploading] = useState(false);
+	const [selectionDropdown, setSelectionDropdown] = useState(null);
+	const [selectionContext, setSelectionContext] = useState("");
+	const [slashCommand, setSlashCommand] = useState(null);
+	const [previewOpen, setPreviewOpen] = useState(false);
+	const [previewData, setPreviewData] = useState({ title: "", htmlDoc: "" });
+	const [editorFont, setEditorFont] = useState("Outfit");
+	const [editorFontSize, setEditorFontSize] = useState(15);
 	const editorRef = useRef(null);
+	const titleRef = useRef(null);
+	const imageFileInputRef = useRef(null);
+	const editorContainerRef = useRef(null);
 
 	/* All drafts for sidebar */
 	const { data: drafts = [] } = useQuery({
@@ -788,8 +872,22 @@ export default function DraftPage() {
 			return snap.docs.map((d) => {
 				const data = d.data();
 				const created = data.createdAt;
-				const date = created?.toDate?.()?.toLocaleDateString?.("en-US", { weekday: "short", month: "short", day: "numeric" }) ?? "";
-				return { id: d.id, type: "table", title: data.title, description: data.description, createdAt: created, date };
+				const date =
+					created
+						?.toDate?.()
+						?.toLocaleDateString?.("en-US", {
+							weekday: "short",
+							month: "short",
+							day: "numeric",
+						}) ?? "";
+				return {
+					id: d.id,
+					type: "table",
+					title: data.title,
+					description: data.description,
+					createdAt: created,
+					date,
+				};
 			});
 		},
 		enabled: !!reduxUser,
@@ -813,7 +911,10 @@ export default function DraftPage() {
 		queryFn: async () => {
 			const draftSnap = await getDoc(doc(db, "drafts", draftId));
 			if (draftSnap.exists()) {
-				return { type: "draft", doc: { id: draftSnap.id, ...draftSnap.data() } };
+				return {
+					type: "draft",
+					doc: { id: draftSnap.id, ...draftSnap.data() },
+				};
 			}
 			const tableSnap = await getDoc(doc(db, "tables", draftId));
 			if (tableSnap.exists()) {
@@ -839,13 +940,26 @@ export default function DraftPage() {
 		retry: false,
 	});
 
-	const draft = docData?.type === "draft" ? docData.doc : null;
-	const docType = docData?.type;
-	const tableDoc = docData?.type === "table" ? docData.doc : null;
-
-	/* Dynamic usage for navbar pill */
+	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
 	const remaining = Math.max(0, FREE_LIMIT - used);
+
+	/* Credits for free users (10/month) */
+	const [credits, setCredits] = useState(null);
+	useEffect(() => {
+		if (!reduxUser) {
+			setCredits(null);
+			return;
+		}
+		getUserCredits(reduxUser.uid)
+			.then(setCredits)
+			.catch((e) => console.error("Failed to load credits", e));
+	}, [reduxUser]);
+	const creditRemaining = credits
+		? credits.plan === "pro"
+			? Infinity
+			: Math.max(0, credits.remaining ?? FREE_CREDIT_LIMIT)
+		: FREE_CREDIT_LIMIT;
 
 	/* Format markdown body → editor HTML, handling rich blocks */
 	const formatBody = (body = "") => {
@@ -895,11 +1009,17 @@ export default function DraftPage() {
 			.join("");
 	};
 
-	/* Table data state for TableView */
-	const [tableData, setTableData] = useState(null);
+	/* Sync tabs to URL when we have draftId but no tabs query (e.g. direct link) */
 	useEffect(() => {
-		if (tableDoc) setTableData(tableDoc);
-	}, [tableDoc]);
+		if (!draftId || !router.isReady) return;
+		const fromQuery =
+			typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
+		if (fromQuery.length === 0 && openTabs.length > 0) {
+			router.replace(`/app/${draftId}?tabs=${openTabs.join(",")}`, undefined, {
+				shallow: true,
+			});
+		}
+	}, [draftId, router.isReady, tabsQuery]);
 
 	/* Set editor content when draft loads */
 	useEffect(() => {
@@ -931,6 +1051,90 @@ export default function DraftPage() {
 		}
 		setSaved(true);
 		setTimeout(() => setSaved(false), 2000);
+	};
+
+	/* ── Insert image or video at cursor ── */
+	const insertImageOrVideo = (url, isVideo = false) => {
+		if (!url?.trim()) return;
+		editorRef.current?.focus();
+		if (isVideo) {
+			const html = `<p style="margin:16px 0"><video src="${url}" controls style="max-width:100%;border-radius:8px;display:block"></video></p>`;
+			document.execCommand("insertHTML", false, html);
+		} else {
+			document.execCommand("insertImage", false, url);
+		}
+		countWords();
+		setImageUrlInput("");
+		setImageDropdownOpen(false);
+	};
+
+	const handleImageFileSelect = (e) => {
+		const file = e.target?.files?.[0];
+		if (!file) return;
+		const isVideo = file.type.startsWith("video/");
+		const isImage = file.type.startsWith("image/");
+		if (!isImage && !isVideo) {
+			alert("Please select an image or video file.");
+			return;
+		}
+
+		/* Images: insert base64 immediately, then upload to Firebase in background */
+		if (isImage) {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const dataUrl = reader.result;
+				insertImageOrVideo(dataUrl, false);
+				/* Upload in background and replace base64 with Firebase URL */
+				if (reduxUser?.uid) {
+					uploadFile(
+						file,
+						`users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${file.name.split(".").pop() || "png"}`,
+					)
+						.then((firebaseUrl) => {
+							const html = editorRef.current?.innerHTML || "";
+							if (html.includes(dataUrl)) {
+								editorRef.current.innerHTML = html
+									.split(dataUrl)
+									.join(firebaseUrl);
+							}
+						})
+						.catch((err) => {
+							console.error("Background upload failed:", err);
+						});
+				}
+			};
+			reader.readAsDataURL(file);
+		} else {
+			/* Videos: upload first (too large for base64), then insert */
+			if (!reduxUser?.uid) {
+				alert("Please sign in to upload videos.");
+				return;
+			}
+			setImageUploading(true);
+			const ext = file.name.split(".").pop() || "mp4";
+			const path = `users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${ext}`;
+			uploadFile(file, path)
+				.then((downloadUrl) => insertImageOrVideo(downloadUrl, true))
+				.catch((err) => {
+					console.error("Upload failed:", err);
+					alert("Upload failed. Please try again.");
+				})
+				.finally(() => {
+					setImageUploading(false);
+					e.target.value = "";
+				});
+		}
+		e.target.value = "";
+	};
+
+	const isVideoUrl = (url) => {
+		try {
+			const u = new URL(url);
+			const path = u.pathname.toLowerCase();
+			return /\.(mp4|webm|ogg|mov)(\?|$)/.test(path) || path.includes("video");
+		} catch {
+			return false;
+		}
 	};
 
 	/* ── Insert a rich block at the cursor ── */
@@ -1003,18 +1207,153 @@ export default function DraftPage() {
 		return () => document.removeEventListener("mousedown", close);
 	}, [blockMenuOpen]);
 
+	/* ── Close image dropdown when clicking outside ── */
+	useEffect(() => {
+		if (!imageDropdownOpen) return;
+		const close = (e) => {
+			if (!e.target.closest("[data-image-dropdown]"))
+				setImageDropdownOpen(false);
+		};
+		document.addEventListener("mousedown", close);
+		return () => document.removeEventListener("mousedown", close);
+	}, [imageDropdownOpen]);
+
+	/* ── Text selection dropdown: show on mouseup when selection in editor ── */
+	const isNodeInEditor = (node, editor) => {
+		if (!node || !editor) return false;
+		let n = node;
+		while (n) {
+			if (n === editor) return true;
+			n = n.parentNode;
+		}
+		return false;
+	};
+
+	useEffect(() => {
+		const handleMouseUp = () => {
+			const el = editorRef.current;
+			if (!el) return;
+			const sel = window.getSelection();
+			const text = sel?.toString?.()?.trim();
+			if (!text || sel.rangeCount === 0) {
+				setSelectionDropdown(null);
+				return;
+			}
+			const inEditor =
+				isNodeInEditor(sel.anchorNode, el) || isNodeInEditor(sel.focusNode, el);
+			if (!inEditor) {
+				setSelectionDropdown(null);
+				return;
+			}
+			try {
+				const range = sel.getRangeAt(0);
+				const rect = range.getBoundingClientRect();
+				if (rect.width === 0 && rect.height === 0) return;
+				setSelectionDropdown({
+					text,
+					x: Math.max(
+						8,
+						Math.min(rect.left + rect.width / 2 - 200, window.innerWidth - 420),
+					),
+					top: rect.top - 48,
+				});
+			} catch {
+				setSelectionDropdown(null);
+			}
+		};
+		document.addEventListener("mouseup", handleMouseUp);
+		return () => document.removeEventListener("mouseup", handleMouseUp);
+	}, []);
+
+	/* ── Close selection dropdown when clicking outside (defer to avoid same-stroke close) ── */
+	useEffect(() => {
+		if (!selectionDropdown) return;
+		const close = (e) => {
+			if (!e.target.closest("[data-selection-dropdown]"))
+				setSelectionDropdown(null);
+		};
+		const t = setTimeout(
+			() => document.addEventListener("mousedown", close),
+			50,
+		);
+		return () => {
+			clearTimeout(t);
+			document.removeEventListener("mousedown", close);
+		};
+	}, [selectionDropdown]);
+
+	/* ── Slash command: close on Escape, click outside ── */
+	useEffect(() => {
+		if (!slashCommand) return;
+		const onKey = (e) => {
+			if (e.key === "Escape") setSlashCommand(null);
+		};
+		const close = (e) => {
+			if (!e.target.closest("[data-slash-command]")) setSlashCommand(null);
+		};
+		document.addEventListener("keydown", onKey);
+		const t = setTimeout(
+			() => document.addEventListener("mousedown", close),
+			50,
+		);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			clearTimeout(t);
+			document.removeEventListener("mousedown", close);
+		};
+	}, [slashCommand]);
+
+	const handleSlashCommand = (action) => {
+		if (!editorRef.current) return;
+		editorRef.current.focus();
+		if (action === "continue-writing" || action === "ask-ai") {
+			const sel = window.getSelection();
+			const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+			let ctx = "";
+			if (range) {
+				const el = range.commonAncestorContainer;
+				const block = el?.nodeType === 3 ? el.parentElement : el;
+				if (block?.closest) {
+					const p = block.closest("p, h1, h2, h3, li");
+					ctx = p?.innerText?.trim?.() || "";
+				}
+			}
+			setSelectionContext(ctx);
+			setChatOpen(true);
+		} else if (action === "text") {
+			document.execCommand("formatBlock", false, "p");
+		} else if (action === "h1") {
+			document.execCommand("formatBlock", false, "h1");
+		} else if (action === "h2") {
+			document.execCommand("formatBlock", false, "h2");
+		} else if (action === "h3") {
+			document.execCommand("formatBlock", false, "h3");
+		} else if (action === "bullet") {
+			document.execCommand("insertUnorderedList");
+		} else if (action === "numbered") {
+			document.execCommand("insertOrderedList");
+		} else if (action === "todo") {
+			document.execCommand(
+				"insertHTML",
+				false,
+				'<ul data-todo="true" style="list-style:none;padding-left:0;"><li><input type="checkbox" style="margin-right:8px;vertical-align:middle"> </li></ul><p><br></p>',
+			);
+		}
+		countWords();
+		setSlashCommand(null);
+	};
+
 	const handleDelete = (id) => setDeleteConfirm(id);
 
 	const confirmDelete = async () => {
-		if (!deleteConfirm) return;
-		const item = items.find((i) => i.id === deleteConfirm);
-		const coll = item?.type === "table" ? "tables" : "drafts";
-		const queryKey = item?.type === "table" ? ["tables", reduxUser?.uid] : ["drafts", reduxUser?.uid];
 		try {
-			await deleteDoc(doc(db, coll, deleteConfirm));
-			queryClient.setQueryData(queryKey, (old = []) => old.filter((d) => d.id !== deleteConfirm));
-			queryClient.invalidateQueries(["doc", deleteConfirm]);
-			if (deleteConfirm === draftId) router.push("/app");
+			await deleteDoc(doc(db, "drafts", deleteConfirm));
+			queryClient.setQueryData(["drafts", reduxUser?.uid], (old = []) =>
+				old.filter((d) => d.id !== deleteConfirm),
+			);
+			if (deleteConfirm === draftId) {
+				router.push("/app");
+			}
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
@@ -1035,36 +1374,14 @@ export default function DraftPage() {
 	const filtered = items.filter(
 		(i) =>
 			i.title?.toLowerCase().includes(search.toLowerCase()) ||
-			(i.preview || i.description || "").toLowerCase().includes(search.toLowerCase()),
+			(i.preview || i.description || "")
+				.toLowerCase()
+				.includes(search.toLowerCase()),
 	);
 
 	const sourceUrl = Array.isArray(draft?.urls)
 		? draft.urls[0] || ""
 		: draft?.url || "";
-
-	if (loadingDraft && !docData) {
-		return (
-			<div
-				style={{
-					height: "100vh",
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "center",
-					background: T.base,
-					fontFamily: "'Outfit', sans-serif",
-				}}
-			>
-				<FontLink />
-				<motion.div
-					animate={{ opacity: [0.4, 1, 0.4] }}
-					transition={{ duration: 1.5, repeat: Infinity }}
-					style={{ fontSize: 15, color: T.muted }}
-				>
-					Loading…
-				</motion.div>
-			</div>
-		);
-	}
 
 	return (
 		<div
@@ -1082,14 +1399,15 @@ export default function DraftPage() {
 			{/* ── TOP BAR ── */}
 			<div
 				style={{
-					height: 56,
 					background: T.surface,
 					borderBottom: `1px solid ${T.border}`,
 					display: "flex",
 					alignItems: "center",
-					padding: "0 20px",
 					gap: 12,
 					flexShrink: 0,
+					paddingLeft: 20,
+					paddingRight: 20,
+					paddingTop: 4,
 					zIndex: 50,
 				}}
 			>
@@ -1141,132 +1459,231 @@ export default function DraftPage() {
 
 				<div style={{ width: 1, height: 20, background: T.border }} />
 
-				{/* Usage pill */}
+				{/* Tabs — inline in navbar */}
+				{draftId && openTabs.length > 0 && (
+					<div
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 2,
+							flex: 1,
+							minWidth: 0,
+							overflowX: "auto",
+							paddingRight: 8,
+							marginLeft: 120,
+						}}
+					>
+						{openTabs.map((tabId) => {
+							const isActive = tabId === draftId;
+							return (
+								<motion.div
+									key={tabId}
+									layout
+									initial={{ opacity: 0, scale: 0.95 }}
+									animate={{ opacity: 1, scale: 1 }}
+									onClick={() =>
+										tabId !== draftId && navigateWithTabs(tabId, openTabs)
+									}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 6,
+										padding: "6px 10px 6px 12px",
+										borderTopLeftRadius: 8,
+										borderTopRightRadius: 8,
+										borderBottomRightRadius: 0,
+										borderBottomLeftRadius: 0,
+										background: isActive ? T.warmBg : "transparent",
+										borderTop: `1px solid ${isActive ? T.border : "transparent"}`,
+										borderLeft: `1px solid ${isActive ? T.border : "transparent"}`,
+										borderRight: `1px solid ${isActive ? T.border : "transparent"}`,
+										cursor: isActive ? "default" : "pointer",
+										flexShrink: 0,
+										maxWidth: 160,
+										boxShadow: isActive ? "0 1px 4px rgba(0,0,0,0.05)" : "none",
+										transition: "background 0.15s, border-color 0.15s",
+									}}
+									whileHover={!isActive ? { background: "#F7F5F0" } : {}}
+								>
+									<span
+										style={{
+											fontSize: 12,
+											fontWeight: isActive ? 600 : 500,
+											color: isActive ? T.accent : T.muted,
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											whiteSpace: "nowrap",
+											flex: 1,
+											minWidth: 0,
+										}}
+										title={getTabTitle(tabId)}
+									>
+										{truncate(getTabTitle(tabId), 18)}
+									</span>
+									<motion.button
+										onClick={(e) => closeTab(tabId, e)}
+										whileHover={{ background: "rgba(0,0,0,0.06)" }}
+										whileTap={{ scale: 0.9 }}
+										style={{
+											background: "none",
+											border: "none",
+											borderRadius: 4,
+											padding: 2,
+											cursor: "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											flexShrink: 0,
+											color: T.muted,
+										}}
+										title="Close tab"
+									>
+										<Icon
+											d={Icons.close}
+											size={12}
+											stroke={T.muted}
+											strokeWidth={2}
+										/>
+									</motion.button>
+								</motion.div>
+							);
+						})}
+					</div>
+				)}
+
+				{/* Right side: Credits | Upgrade | New draft | User */}
 				<div
 					style={{
 						display: "flex",
 						alignItems: "center",
-						gap: 8,
-						marginLeft: 4,
-						background: remaining === 0 ? "#FEF3E2" : T.base,
-						border: `1px solid ${remaining === 0 ? "#F5C97A" : T.border}`,
-						borderRadius: 100,
-						padding: "4px 12px",
+						gap: 10,
+						flexShrink: 0,
 					}}
 				>
-					<div
-						style={{
-							width: 52,
-							height: 3,
-							background: T.border,
-							borderRadius: 100,
-							overflow: "hidden",
-						}}
-					>
-						<motion.div
-							animate={{
-								width: `${((FREE_LIMIT - remaining) / FREE_LIMIT) * 100}%`,
+					{reduxUser && (
+						<div
+							style={{
+								display: "flex",
+								alignItems: "center",
+								background: creditRemaining === 0 ? "#FEF3E2" : T.base,
+								border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
+								borderRadius: 100,
+								padding: "4px 12px",
 							}}
-							transition={{ duration: 0.6 }}
-							style={{ height: "100%", background: T.warm, borderRadius: 100 }}
-						/>
-					</div>
-					<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
-						{remaining}/{FREE_LIMIT} left
-					</span>
+						>
+							{credits?.plan === "pro" ? (
+								<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
+									∞ Pro
+								</span>
+							) : (
+								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
+									<span
+										style={{
+											fontWeight: 700,
+											color: creditRemaining === 0 ? "#EF4444" : T.accent,
+										}}
+									>
+										{credits
+											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
+											: `0/${FREE_CREDIT_LIMIT}`}
+									</span>
+								</span>
+							)}
+						</div>
+					)}
+					{reduxUser && (
+						<motion.button
+							whileHover={{ scale: 1.04 }}
+							whileTap={{ scale: 0.97 }}
+							onClick={() => router.push("/pricing")}
+							style={{
+								background: T.accent,
+								color: "white",
+								border: "none",
+								padding: "6px 12px",
+								borderRadius: 8,
+								fontSize: 12,
+								fontWeight: 600,
+								cursor: "pointer",
+							}}
+						>
+							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
+						</motion.button>
+					)}
+					{/* New draft button */}
 					<motion.button
-						whileHover={{ scale: 1.04 }}
+						whileHover={{
+							scale: 1.03,
+							y: -1,
+							boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+						}}
 						whileTap={{ scale: 0.97 }}
-						onClick={() => router.push("/pricing")}
+						onClick={() => router.push("/app")}
 						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 6,
 							background: T.accent,
 							color: "white",
 							border: "none",
-							padding: "3px 10px",
-							borderRadius: 100,
-							fontSize: 11,
-							fontWeight: 700,
+							padding: "6px 12px",
+							borderRadius: 9,
+							fontSize: 12,
+							fontWeight: 600,
 							cursor: "pointer",
 						}}
 					>
-						Upgrade
+						<Icon d={Icons.plus} size={14} stroke="white" /> New draft
 					</motion.button>
+
+					{/* User avatar / login */}
+					<motion.button
+						whileHover={{ scale: 1.08 }}
+						whileTap={{ scale: 0.95 }}
+						onClick={() => setLoginModalOpen(true)}
+						style={{
+							background: "none",
+							border: "none",
+							padding: 0,
+							cursor: "pointer",
+							borderRadius: "50%",
+						}}
+					>
+						{reduxUser?.photoURL ? (
+							<img
+								src={reduxUser.photoURL}
+								alt={reduxUser.displayName || "User"}
+								style={{
+									width: 34,
+									height: 34,
+									borderRadius: "50%",
+									objectFit: "cover",
+									border: `2px solid ${T.border}`,
+									display: "block",
+								}}
+							/>
+						) : (
+							<div
+								style={{
+									width: 34,
+									height: 34,
+									borderRadius: "50%",
+									background: T.border,
+									border: `2px solid ${T.border}`,
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+								}}
+							>
+								<Icon d={Icons.settings} size={16} stroke={T.muted} />
+							</div>
+						)}
+					</motion.button>
+					<LoginModal
+						isOpen={loginModalOpen}
+						onClose={() => setLoginModalOpen(false)}
+					/>
 				</div>
-
-				<div style={{ flex: 1 }} />
-				{/* New draft button */}
-				<motion.button
-					whileHover={{
-						scale: 1.03,
-						y: -1,
-						boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-					}}
-					whileTap={{ scale: 0.97 }}
-					onClick={() => router.push("/app")}
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 6,
-						background: T.accent,
-						color: "white",
-						border: "none",
-						padding: "7px 16px",
-						borderRadius: 9,
-						fontSize: 13,
-						fontWeight: 600,
-						cursor: "pointer",
-					}}
-				>
-					<Icon d={Icons.plus} size={14} stroke="white" /> New draft
-				</motion.button>
-
-				{/* User avatar / login */}
-				<motion.button
-					whileHover={{ scale: 1.08 }}
-					whileTap={{ scale: 0.95 }}
-					onClick={() => setLoginModalOpen(true)}
-					style={{
-						background: "none",
-						border: "none",
-						padding: 0,
-						cursor: "pointer",
-						borderRadius: "50%",
-					}}
-				>
-					{reduxUser?.photoURL ? (
-						<img
-							src={reduxUser.photoURL}
-							alt={reduxUser.displayName || "User"}
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								objectFit: "cover",
-								border: `2px solid ${T.border}`,
-								display: "block",
-							}}
-						/>
-					) : (
-						<div
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								background: T.border,
-								border: `2px solid ${T.border}`,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<Icon d={Icons.settings} size={16} stroke={T.muted} />
-						</div>
-					)}
-				</motion.button>
-				<LoginModal
-					isOpen={loginModalOpen}
-					onClose={() => setLoginModalOpen(false)}
-				/>
 			</div>
 
 			{/* ── MAIN BODY ── */}
@@ -1346,12 +1763,12 @@ export default function DraftPage() {
 											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
 										</motion.div>
 									) : (
-										filtered.map((i) => (
-											<ItemCard
-												key={i.id}
-												item={i}
-												active={i.id === draftId}
-												onClick={() => router.push(`/app/${i.id}`)}
+										filtered.map((d) => (
+											<DraftCard
+												key={d.id}
+												draft={d}
+												active={d.id === draftId}
+												onClick={() => openDraftInTab(d.id)}
 												onDelete={handleDelete}
 											/>
 										))
@@ -1452,23 +1869,33 @@ export default function DraftPage() {
 					)}
 				</AnimatePresence>
 
-				{/* ── RIGHT PANEL — Editor or Table ── */}
+				{/* ── CENTER PANEL — Editor ── */}
 				<div
 					style={{
 						flex: 1,
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
+						minWidth: 0,
 					}}
 				>
-					{docType === "table" && tableData && (
-						<div style={{ flex: 1, overflow: "auto" }}>
-							<TableView
-								tableId={draftId}
-								tableData={tableData}
-								setTableData={setTableData}
-								reduxUser={reduxUser}
-							/>
+					{loadingDraft && !draft && draftId && (
+						<div
+							style={{
+								flex: 1,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								background: T.surface,
+							}}
+						>
+							<motion.div
+								animate={{ opacity: [0.4, 1, 0.4] }}
+								transition={{ duration: 1.2, repeat: Infinity }}
+								style={{ fontSize: 13, color: T.muted }}
+							>
+								Loading…
+							</motion.div>
 						</div>
 					)}
 					{draft && (
@@ -1476,7 +1903,7 @@ export default function DraftPage() {
 							key={`editor-${draftId}`}
 							initial={{ opacity: 0 }}
 							animate={{ opacity: 1 }}
-							transition={{ duration: 0.25 }}
+							transition={{ duration: 0.2 }}
 							style={{
 								flex: 1,
 								display: "flex",
@@ -1520,6 +1947,142 @@ export default function DraftPage() {
 										if (url) document.execCommand("createLink", false, url);
 									}}
 								/>
+								<div data-image-dropdown style={{ position: "relative" }}>
+									<TBtn
+										icon={Icons.image}
+										label="Image / Video"
+										onClick={() => setImageDropdownOpen((v) => !v)}
+									/>
+									<input
+										ref={imageFileInputRef}
+										type="file"
+										accept="image/*,video/*"
+										style={{ display: "none" }}
+										onChange={handleImageFileSelect}
+									/>
+									<AnimatePresence>
+										{imageDropdownOpen && (
+											<motion.div
+												initial={{ opacity: 0, y: 6, scale: 0.96 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: 6, scale: 0.96 }}
+												transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+												style={{
+													position: "absolute",
+													top: "calc(100% + 6px)",
+													left: 0,
+													background: "#FFFFFF",
+													border: `1px solid ${T.border}`,
+													borderRadius: 12,
+													boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
+													zIndex: 60,
+													padding: 12,
+													minWidth: 260,
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "0 0 8px",
+													}}
+												>
+													Upload from computer
+												</p>
+												<motion.button
+													whileHover={{ background: "#F7F5F0" }}
+													whileTap={{ scale: 0.98 }}
+													onClick={() => imageFileInputRef.current?.click()}
+													disabled={imageUploading || !reduxUser}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														gap: 8,
+														background: "#F7F5F0",
+														border: `1px dashed ${T.border}`,
+														borderRadius: 8,
+														padding: "10px 14px",
+														fontSize: 12,
+														fontWeight: 600,
+														color: T.accent,
+														cursor:
+															imageUploading || !reduxUser
+																? "not-allowed"
+																: "pointer",
+														opacity: imageUploading || !reduxUser ? 0.6 : 1,
+													}}
+												>
+													{imageUploading
+														? "Uploading…"
+														: "Choose image or video"}
+												</motion.button>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "12px 0 8px",
+													}}
+												>
+													Or add from URL
+												</p>
+												<div style={{ display: "flex", gap: 6 }}>
+													<input
+														type="url"
+														placeholder="https://…"
+														value={imageUrlInput}
+														onChange={(e) => setImageUrlInput(e.target.value)}
+														onKeyDown={(e) => {
+															if (e.key === "Enter")
+																insertImageOrVideo(
+																	imageUrlInput.trim(),
+																	isVideoUrl(imageUrlInput.trim()),
+																);
+														}}
+														style={{
+															flex: 1,
+															padding: "8px 12px",
+															border: `1px solid ${T.border}`,
+															borderRadius: 8,
+															fontSize: 12,
+															outline: "none",
+															fontFamily: "inherit",
+														}}
+													/>
+													<motion.button
+														whileHover={{ background: T.warm }}
+														whileTap={{ scale: 0.96 }}
+														onClick={() =>
+															insertImageOrVideo(
+																imageUrlInput.trim(),
+																isVideoUrl(imageUrlInput.trim()),
+															)
+														}
+														style={{
+															background: T.warm,
+															color: "white",
+															border: "none",
+															borderRadius: 8,
+															padding: "8px 14px",
+															fontSize: 12,
+															fontWeight: 600,
+															cursor: "pointer",
+														}}
+													>
+														Insert
+													</motion.button>
+												</div>
+											</motion.div>
+										)}
+									</AnimatePresence>
+								</div>
 
 								{/* Divider */}
 								<div
@@ -1923,6 +2486,41 @@ export default function DraftPage() {
 									{copied ? "Copied!" : "Copy"}
 								</motion.button>
 								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.96 }}
+									onClick={() => {
+										const raw =
+											editorRef.current?.innerHTML || draft?.body || "";
+										const content = raw.trim().startsWith("<")
+											? raw
+											: formatBody(raw);
+										const title =
+											titleRef.current?.innerText?.trim() ||
+											draft?.title ||
+											"Untitled draft";
+										const htmlDoc = buildThemedHTML(content, THEMES.ink, title);
+										setPreviewData({ title, htmlDoc });
+										setPreviewOpen(true);
+									}}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 6,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "6px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.muted,
+										cursor: "pointer",
+										transition: "all 0.18s",
+									}}
+								>
+									<Icon d={Icons.eye} size={13} stroke={T.muted} />
+									Preview
+								</motion.button>
+								<motion.button
 									whileHover={{
 										scale: 1.03,
 										y: -1,
@@ -1954,7 +2552,7 @@ export default function DraftPage() {
 								</motion.button>
 							</div>
 
-							<div className="overflow-y-auto flex flex-col">
+							<div className="overflow-y-auto flex flex-col h-full">
 								{/* Draft title */}
 								<div
 									style={{
@@ -1965,87 +2563,178 @@ export default function DraftPage() {
 									}}
 								>
 									<div
-										contentEditable
-										suppressContentEditableWarning
-										data-placeholder="Untitled draft"
 										style={{
-											fontSize: "clamp(22px, 3vw, 30px)",
-											color: T.accent,
-											lineHeight: 1.2,
-											letterSpacing: "-0.5px",
-											outline: "none",
-											marginBottom: 8,
-											minHeight: 36,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "space-between",
+											gap: 12,
+											flexWrap: "wrap",
 										}}
-										dangerouslySetInnerHTML={{ __html: draft.title }}
-									/>
-									{/* Source links — hostname only, no full URL repeat */}
-									{(() => {
-										const allUrls = Array.isArray(draft?.urls)
-											? draft.urls.filter(Boolean)
-											: draft?.url
-												? [draft.url]
-												: [];
-										if (allUrls.length === 0) return null;
-										return (
-											<div
-												style={{ display: "flex", flexWrap: "wrap", gap: 5 }}
+									>
+										<div
+											ref={titleRef}
+											contentEditable
+											suppressContentEditableWarning
+											data-placeholder="Untitled draft"
+											style={{
+												flex: 1,
+												minWidth: 120,
+												fontSize: "clamp(22px, 3vw, 30px)",
+												color: T.accent,
+												lineHeight: 1.2,
+												letterSpacing: "-0.5px",
+												outline: "none",
+												marginBottom: 8,
+												minHeight: 36,
+												fontFamily:
+													editorFont === "Instrument Serif"
+														? "'Instrument Serif', serif"
+														: editorFont === "Inter"
+															? "'Inter', sans-serif"
+															: editorFont === "Georgia"
+																? "Georgia, serif"
+																: editorFont === "system-ui"
+																	? "system-ui, sans-serif"
+																	: "'Outfit', sans-serif",
+											}}
+											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
+										/>
+										<div
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 6,
+												marginBottom: 8,
+											}}
+										>
+											{/* Font family */}
+											<select
+												value={editorFont}
+												onChange={(e) => setEditorFont(e.target.value)}
+												style={{
+													padding: "4px 8px",
+													border: `1px solid ${T.border}`,
+													borderRadius: 6,
+													fontSize: 11,
+													fontWeight: 600,
+													background: T.base,
+													color: T.accent,
+													cursor: "pointer",
+													fontFamily: "inherit",
+												}}
 											>
-												{allUrls.map((url, i) => {
-													let label = url;
-													try {
-														label = new URL(url).hostname.replace(/^www\./, "");
-													} catch {}
-													return (
-														<a
-															key={i}
-															href={url}
-															target="_blank"
-															rel="noopener noreferrer"
-															title={url}
-															style={{
-																display: "inline-flex",
-																alignItems: "center",
-																gap: 4,
-																fontSize: 11.5,
-																color: T.warm,
-																background: "#FEF3E2",
-																border: `1px solid #F5C97A`,
-																borderRadius: 6,
-																padding: "2px 8px",
-																textDecoration: "none",
-																transition: "opacity 0.15s",
-															}}
-															onMouseEnter={(e) =>
-																(e.currentTarget.style.opacity = "0.7")
-															}
-															onMouseLeave={(e) =>
-																(e.currentTarget.style.opacity = "1")
-															}
-														>
-															<Icon d={Icons.link2} size={10} stroke={T.warm} />
-															{label}
-														</a>
-													);
-												})}
+												<option value="Outfit">Outfit</option>
+												<option value="Instrument Serif">
+													Instrument Serif
+												</option>
+												<option value="Inter">Inter</option>
+												<option value="Georgia">Georgia</option>
+												<option value="system-ui">System</option>
+											</select>
+											{/* Font size */}
+											<div
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 2,
+												}}
+											>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.95 }}
+													onClick={() =>
+														setEditorFontSize((s) => Math.max(12, s - 2))
+													}
+													style={{
+														width: 26,
+														height: 26,
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														border: `1px solid ${T.border}`,
+														borderRadius: 6,
+														background: T.base,
+														fontSize: 12,
+														fontWeight: 700,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													A-
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.95 }}
+													onClick={() =>
+														setEditorFontSize((s) => Math.min(24, s + 2))
+													}
+													style={{
+														width: 26,
+														height: 26,
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														border: `1px solid ${T.border}`,
+														borderRadius: 6,
+														background: T.base,
+														fontSize: 12,
+														fontWeight: 700,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													A+
+												</motion.button>
 											</div>
-										);
-									})()}
+										</div>
+									</div>
 								</div>
 
 								{/* Editor body */}
 								<div
+									ref={editorContainerRef}
+									data-editor-root
 									style={{
 										flex: 1,
 										overflowY: "auto",
 										background: T.surface,
+										position: "relative",
 									}}
 								>
+									<style>{`
+										[data-editor-root] [contenteditable="true"] { font-size: ${editorFontSize}px; }
+										[data-editor-root] [contenteditable="true"] p,
+										[data-editor-root] [contenteditable="true"] li { font-size: ${editorFontSize}px !important; }
+										[data-editor-root] [contenteditable="true"] h1 { font-size: ${Math.round(editorFontSize * 1.73)}px !important; }
+										[data-editor-root] [contenteditable="true"] h2 { font-size: ${Math.round(editorFontSize * 1.33)}px !important; }
+										[data-editor-root] [contenteditable="true"] h3 { font-size: ${Math.round(editorFontSize * 1.13)}px !important; }
+										[data-editor-root] [contenteditable="true"] blockquote,
+										[data-editor-root] [contenteditable="true"] blockquote *,
+										[data-editor-root] [contenteditable="true"] [data-block],
+										[data-editor-root] [contenteditable="true"] [data-block] * { font-size: inherit !important; }
+									`}</style>
 									<div
 										ref={editorRef}
 										contentEditable
 										suppressContentEditableWarning
 										onInput={countWords}
+										onKeyDown={(e) => {
+											if (e.key === "/" && !slashCommand) {
+												e.preventDefault();
+												const sel = window.getSelection();
+												if (!sel?.rangeCount) return;
+												const range = sel.getRangeAt(0);
+												const rect = range.getBoundingClientRect();
+												if (rect.width === 0 && rect.height === 0) return;
+												setSlashCommand({
+													x: Math.max(
+														12,
+														Math.min(rect.left, window.innerWidth - 280),
+													),
+													y: rect.bottom + 4,
+												});
+											}
+										}}
 										data-placeholder="Start writing…"
 										style={{
 											maxWidth: 680,
@@ -2053,11 +2742,404 @@ export default function DraftPage() {
 											padding: "28px 40px 80px",
 											minHeight: "100%",
 											outline: "none",
-											fontSize: 15,
+											fontSize: `${editorFontSize}px`,
 											lineHeight: 1.8,
 											color: "#3A3530",
+											fontFamily:
+												editorFont === "Instrument Serif"
+													? "'Instrument Serif', serif"
+													: editorFont === "Inter"
+														? "'Inter', sans-serif"
+														: editorFont === "Georgia"
+															? "Georgia, serif"
+															: editorFont === "system-ui"
+																? "system-ui, sans-serif"
+																: "'Outfit', sans-serif",
 										}}
 									/>
+									{/* Slash command dropdown */}
+									<AnimatePresence>
+										{slashCommand && (
+											<motion.div
+												data-slash-command
+												initial={{ opacity: 0, y: -4, scale: 0.98 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: -4, scale: 0.98 }}
+												transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+												style={{
+													position: "fixed",
+													left: slashCommand.x,
+													top: slashCommand.y,
+													zIndex: 100,
+													background: T.surface,
+													border: `1px solid ${T.border}`,
+													borderRadius: 12,
+													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+													padding: 8,
+													minWidth: 240,
+													maxHeight: 320,
+													overflowY: "auto",
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "0 0 6px 4px",
+													}}
+												>
+													AI
+												</p>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.98 }}
+													onClick={() => handleSlashCommand("continue-writing")}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 10,
+														padding: "8px 10px",
+														border: "none",
+														borderRadius: 8,
+														background: "none",
+														fontSize: 14,
+														fontWeight: 500,
+														color: T.accent,
+														cursor: "pointer",
+														textAlign: "left",
+													}}
+												>
+													<Icon
+														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+														size={18}
+														stroke="#C17B2F"
+													/>
+													Continue Writing
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.98 }}
+													onClick={() => handleSlashCommand("ask-ai")}
+													style={{
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 10,
+														padding: "8px 10px",
+														border: "none",
+														borderRadius: 8,
+														background: "none",
+														fontSize: 14,
+														fontWeight: 500,
+														color: T.accent,
+														cursor: "pointer",
+														textAlign: "left",
+													}}
+												>
+													<Icon
+														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+														size={14}
+														stroke="#C17B2F"
+													/>
+													Ask AI
+												</motion.button>
+												<div
+													style={{
+														height: 1,
+														background: T.border,
+														margin: "8px 0",
+													}}
+												/>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "uppercase",
+														letterSpacing: "0.1em",
+														margin: "0 0 6px 4px",
+													}}
+												>
+													Style
+												</p>
+												{[
+													{ id: "text", label: "Text", icon: "T" },
+													{ id: "h1", label: "Heading 1", icon: "H₁" },
+													{ id: "h2", label: "Heading 2", icon: "H₂" },
+													{ id: "h3", label: "Heading 3", icon: "H₃" },
+													{
+														id: "bullet",
+														label: "Bullet List",
+														icon: Icons.list,
+													},
+													{
+														id: "numbered",
+														label: "Numbered List",
+														icon: Icons.list,
+													},
+													{ id: "todo", label: "To-do list", icon: "☐" },
+												].map(({ id, label, icon }) => (
+													<motion.button
+														key={id}
+														whileHover={{ background: "#F0ECE5" }}
+														whileTap={{ scale: 0.98 }}
+														onClick={() => handleSlashCommand(id)}
+														style={{
+															width: "100%",
+															display: "flex",
+															alignItems: "center",
+															gap: 10,
+															padding: "8px 10px",
+															border: "none",
+															borderRadius: 8,
+															background: "none",
+															fontSize: 14,
+															fontWeight: 500,
+															color: T.accent,
+															cursor: "pointer",
+															textAlign: "left",
+														}}
+													>
+														{typeof icon === "string" &&
+														!icon.startsWith("M") ? (
+															<span
+																style={{
+																	fontSize: 14,
+																	fontWeight: 600,
+																	width: 20,
+																	textAlign: "center",
+																}}
+															>
+																{icon}
+															</span>
+														) : (
+															<Icon d={icon} size={16} stroke={T.muted} />
+														)}
+														{label}
+													</motion.button>
+												))}
+											</motion.div>
+										)}
+									</AnimatePresence>
+									{/* Text selection dropdown (Notion-style) */}
+									<AnimatePresence>
+										{selectionDropdown && (
+											<motion.div
+												data-selection-dropdown
+												initial={{ opacity: 0, y: 4, scale: 0.96 }}
+												animate={{ opacity: 1, y: 0, scale: 1 }}
+												exit={{ opacity: 0, y: 4, scale: 0.96 }}
+												style={{
+													position: "fixed",
+													left: selectionDropdown.x,
+													top: selectionDropdown.top,
+													zIndex: 100,
+													background: T.surface,
+													border: `1px solid ${T.border}`,
+													borderRadius: 10,
+													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+													padding: 6,
+													display: "flex",
+													alignItems: "center",
+													gap: 4,
+													flexWrap: "wrap",
+												}}
+											>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onClick={() => {
+														setSelectionContext(selectionDropdown.text);
+														setChatOpen(true);
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 5,
+														padding: "6px 10px",
+														border: "none",
+														borderRadius: 6,
+														background: "#C17B2F15",
+														fontSize: 12,
+														fontWeight: 700,
+														color: "#92400E",
+														cursor: "pointer",
+													}}
+												>
+													<Icon
+														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+														size={12}
+														stroke="#C17B2F"
+													/>
+													Add to AI chat
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => {
+														document.execCommand("bold");
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														width: 28,
+														height: 28,
+														padding: 0,
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 13,
+														fontWeight: 700,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													B
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => {
+														document.execCommand("italic");
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														width: 28,
+														height: 28,
+														padding: 0,
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 13,
+														fontStyle: "italic",
+														fontWeight: 600,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													I
+												</motion.button>
+												<div
+													style={{
+														width: 1,
+														height: 20,
+														background: T.border,
+														margin: "0 2px",
+													}}
+												/>
+												{[
+													{ cmd: "p", label: "Text" },
+													{ cmd: "h1", label: "H1" },
+													{ cmd: "h2", label: "H2" },
+													{ cmd: "h3", label: "H3" },
+													{ cmd: "ul", label: "• List" },
+													{ cmd: "ol", label: "1. List" },
+												].map(({ cmd, label }) => (
+													<motion.button
+														key={cmd}
+														whileHover={{ background: "#F0ECE5" }}
+														whileTap={{ scale: 0.96 }}
+														onMouseDown={(e) => e.preventDefault()}
+														onClick={() => {
+															if (cmd === "ul")
+																document.execCommand("insertUnorderedList");
+															else if (cmd === "ol")
+																document.execCommand("insertOrderedList");
+															else
+																document.execCommand("formatBlock", false, cmd);
+															setSelectionDropdown(null);
+															countWords();
+														}}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															padding: "6px 8px",
+															border: "none",
+															borderRadius: 6,
+															background: "none",
+															fontSize: 12,
+															fontWeight: 600,
+															color: T.accent,
+															cursor: "pointer",
+														}}
+													>
+														{label}
+													</motion.button>
+												))}
+												<div
+													style={{
+														width: 1,
+														height: 20,
+														background: T.border,
+														margin: "0 2px",
+													}}
+												/>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													onClick={() => {
+														navigator.clipboard.writeText(
+															selectionDropdown.text,
+														);
+														setSelectionDropdown(null);
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 5,
+														padding: "6px 10px",
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 12,
+														fontWeight: 600,
+														color: T.accent,
+														cursor: "pointer",
+													}}
+												>
+													<Icon d={Icons.copy} size={12} stroke={T.muted} />
+													Copy
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "rgba(239,68,68,0.1)" }}
+													whileTap={{ scale: 0.96 }}
+													onClick={() => {
+														document.execCommand("delete");
+														setSelectionDropdown(null);
+														countWords();
+													}}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 5,
+														padding: "6px 10px",
+														border: "none",
+														borderRadius: 6,
+														background: "none",
+														fontSize: 12,
+														fontWeight: 600,
+														color: "#EF4444",
+														cursor: "pointer",
+													}}
+												>
+													<Icon d={Icons.trash} size={12} stroke="#EF4444" />
+													Delete
+												</motion.button>
+											</motion.div>
+										)}
+									</AnimatePresence>
 								</div>
 							</div>
 
@@ -2231,6 +3313,22 @@ export default function DraftPage() {
 						</motion.div>
 					)}
 				</div>
+
+				{/* ── RIGHT PANEL — AI Chat (inline, not overlay) ── */}
+				<AIChatSidebar
+					open={chatOpen}
+					onClose={() => {
+						setChatOpen(false);
+						setSelectionContext("");
+					}}
+					onClearSelectionContext={() => setSelectionContext("")}
+					editorRef={editorRef}
+					draftContent={editorRef.current?.innerHTML || draft?.body || ""}
+					draftTitle={draft?.title || "Draft"}
+					userId={reduxUser?.uid || ""}
+					selectionContext={selectionContext}
+					asPanel
+				/>
 			</div>
 
 			{/* ── THEMES MODAL ── full-screen two-panel preview */}
@@ -2626,6 +3724,129 @@ export default function DraftPage() {
 					})()}
 			</AnimatePresence>
 
+			{/* ── PREVIEW MODAL (centered overlay) ── */}
+			<AnimatePresence>
+				{previewOpen && (
+					<>
+						<motion.div
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							onClick={() => setPreviewOpen(false)}
+							style={{
+								position: "fixed",
+								inset: 0,
+								background: "rgba(0,0,0,0.5)",
+								zIndex: 200,
+								backdropFilter: "blur(4px)",
+							}}
+						/>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.96 }}
+							animate={{ opacity: 1, scale: 1 }}
+							exit={{ opacity: 0, scale: 0.96 }}
+							transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+							style={{
+								position: "fixed",
+								inset: 0,
+								zIndex: 201,
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								pointerEvents: "none",
+							}}
+						>
+							<div
+								onClick={(e) => e.stopPropagation()}
+								style={{
+									pointerEvents: "auto",
+									width: "min(92vw, 900px)",
+									height: "min(88vh, 700px)",
+									background: T.surface,
+									border: `1px solid ${T.border}`,
+									borderRadius: 16,
+									boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
+									display: "flex",
+									flexDirection: "column",
+									overflow: "hidden",
+								}}
+							>
+								<div
+									style={{
+										padding: "14px 20px",
+										borderBottom: `1px solid ${T.border}`,
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "space-between",
+										flexShrink: 0,
+									}}
+								>
+									<span
+										style={{ fontSize: 14, fontWeight: 700, color: T.accent }}
+									>
+										Preview — {previewData.title || "Untitled"}
+									</span>
+									<motion.button
+										whileHover={{ background: "#F0ECE5" }}
+										whileTap={{ scale: 0.95 }}
+										onClick={() => setPreviewOpen(false)}
+										style={{
+											background: "none",
+											border: "none",
+											borderRadius: 8,
+											width: 32,
+											height: 32,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											cursor: "pointer",
+											fontSize: 18,
+											color: T.muted,
+										}}
+									>
+										✕
+									</motion.button>
+								</div>
+								<div
+									style={{
+										flex: 1,
+										minHeight: 0,
+										background: "#e5e7eb",
+									}}
+								>
+									{previewData.htmlDoc ? (
+										<iframe
+											srcDoc={previewData.htmlDoc}
+											title={`Preview — ${previewData.title}`}
+											sandbox="allow-same-origin"
+											style={{
+												width: "100%",
+												height: "100%",
+												border: "none",
+												display: "block",
+											}}
+										/>
+									) : (
+										<div
+											style={{
+												height: "100%",
+												display: "flex",
+												alignItems: "center",
+												justifyContent: "center",
+												color: T.muted,
+												fontSize: 14,
+											}}
+										>
+											No content to preview
+										</div>
+									)}
+								</div>
+							</div>
+						</motion.div>
+					</>
+				)}
+			</AnimatePresence>
+
 			{/* ── DELETE CONFIRM MODAL ── */}
 			<AnimatePresence>
 				{deleteConfirm && (
@@ -2736,16 +3957,11 @@ export default function DraftPage() {
 				userId={reduxUser?.uid || ""}
 				draftId={draftId}
 				savedInfographics={draft?.infographics || []}
-			/>
-
-			{/* ── AI CHAT SIDEBAR ── */}
-			<AIChatSidebar
-				open={chatOpen}
-				onClose={() => setChatOpen(false)}
-				editorRef={editorRef}
-				draftContent={editorRef.current?.innerHTML || draft?.body || ""}
-				draftTitle={draft?.title || "Draft"}
-				userId={reduxUser?.uid || ""}
+				onInsertToEditor={(html) => {
+					editorRef.current?.focus();
+					document.execCommand("insertHTML", false, html + "<p><br></p>");
+					countWords();
+				}}
 			/>
 		</div>
 	);

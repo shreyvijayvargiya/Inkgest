@@ -214,6 +214,9 @@ export default function AIChatSidebar({
 	editorRef,
 	draftContent = "",
 	draftTitle = "",
+	selectionContext = "",
+	onClearSelectionContext,
+	asPanel = false,
 }) {
 	const [messages, setMessages] = useState([{
 		id: "w0", role: "assistant", done: true,
@@ -297,14 +300,17 @@ export default function AIChatSidebar({
 		setInput("");
 		setStreaming(true);
 
-		/* Build history — inject draft context only on the first message */
+		/* Build history — inject draft + selection context */
 		const recentHistory = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
 		const plainContext = draftContent
 			? draftContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500)
 			: "";
-		const contextPrefix = plainContext
-			? `[Editor context — current draft: "${plainContext}"]\n\n`
+		const selectionPlain = selectionContext
+			? selectionContext.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800)
 			: "";
+		let contextPrefix = "";
+		if (plainContext) contextPrefix += `[Editor context — current draft: "${plainContext}"]\n\n`;
+		if (selectionPlain) contextPrefix += `[User-selected text for focus: "${selectionPlain}"]\n\n`;
 
 		const history = [
 			...recentHistory,
@@ -391,46 +397,72 @@ export default function AIChatSidebar({
 	const stop  = () => abortRef.current?.abort();
 	const onKey = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
 
-	return (
+	const panelStyle = asPanel
+		? {
+				width: 380,
+				flexShrink: 0,
+				background: "#FFFFFF",
+				borderLeft: "1px solid #E8E4DC",
+				display: "flex",
+				flexDirection: "column",
+				overflow: "hidden",
+				fontFamily: "'Outfit', sans-serif",
+			}
+		: {
+				position: "fixed",
+				right: 0,
+				top: 0,
+				bottom: 0,
+				width: 390,
+				background: "#FFFFFF",
+				borderLeft: "1px solid #E8E4DC",
+				display: "flex",
+				flexDirection: "column",
+				zIndex: 150,
+				overflow: "hidden",
+				boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
+				fontFamily: "'Outfit', sans-serif",
+			};
+
+	const sidebarContent = (
 		<>
 			<ChatStyles />
-			<AnimatePresence>
+			<AnimatePresence initial={false}>
 				{open && (
 					<>
-						{/* Subtle backdrop — clicking closes the panel and model dropdown */}
-						<motion.div
-							key="chat-backdrop"
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							onClick={() => { setModelOpen(false); onClose(); }}
-							style={{
-								position: "fixed", inset: 0,
-								background: "rgba(0,0,0,0.10)",
-								zIndex: 149,
-							}}
-						/>
+						{!asPanel && (
+							<motion.div
+								key="chat-backdrop"
+								initial={{ opacity: 0 }}
+								animate={{ opacity: 1 }}
+								exit={{ opacity: 0 }}
+								onClick={() => {
+									setModelOpen(false);
+									onClose();
+								}}
+								style={{
+									position: "fixed",
+									inset: 0,
+									background: "rgba(0,0,0,0.10)",
+									zIndex: 149,
+								}}
+							/>
+						)}
 
-						{/* ── SIDEBAR PANEL ── */}
 						<motion.div
 							key="chat-sidebar"
-							initial={{ x: "100%" }}
-							animate={{ x: 0 }}
-							exit={{ x: "100%" }}
-							transition={{ type: "spring", damping: 28, stiffness: 300 }}
+							initial={asPanel ? { width: 0, opacity: 0 } : { x: "100%" }}
+							animate={asPanel ? { width: 380, opacity: 1 } : { x: 0 }}
+							exit={asPanel ? { width: 0, opacity: 0 } : { x: "100%" }}
+							transition={
+								asPanel
+									? { duration: 0.28, ease: [0.16, 1, 0.3, 1] }
+									: { type: "spring", damping: 28, stiffness: 300 }
+							}
 							onClick={() => modelOpen && setModelOpen(false)}
 							style={{
-								position: "fixed",
-								right: 0, top: 0, bottom: 0,
-								width: 390,
-								background: "#FFFFFF",
-								borderLeft: "1px solid #E8E4DC",
-								display: "flex",
-								flexDirection: "column",
-								zIndex: 150,
-								overflow: "hidden",
-								boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
-								fontFamily: "'Outfit', sans-serif",
+								...panelStyle,
+								...(asPanel ? { minWidth: 0, overflow: "hidden" } : {}),
 							}}
 						>
 							{/* ── Header ── */}
@@ -692,6 +724,61 @@ export default function AIChatSidebar({
 								background: "#FDFCF9",
 								flexShrink: 0,
 							}}>
+								{/* Selection context chip — visible when user added text from editor */}
+								{selectionContext && (
+									<div
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 8,
+											marginBottom: 10,
+											padding: "10px 14px",
+											background: "#F5EDE0",
+											border: "1.5px solid #C17B2F60",
+											borderRadius: 10,
+										}}
+									>
+										<span style={{ fontSize: 11, fontWeight: 700, color: "#78350F", flexShrink: 0 }}>
+											Selection context:
+										</span>
+										<span
+											style={{
+												fontSize: 13,
+												fontWeight: 500,
+												color: "#1A1A1A",
+												flex: 1,
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+											}}
+											title={selectionContext.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+										>
+											{(() => {
+												const plain = selectionContext.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+												return plain.length > 60 ? plain.slice(0, 60) + "…" : plain;
+											})()}
+										</span>
+										{onClearSelectionContext && (
+											<motion.button
+												whileHover={{ background: "rgba(0,0,0,0.06)" }}
+												whileTap={{ scale: 0.95 }}
+												onClick={onClearSelectionContext}
+												style={{
+													background: "none",
+													border: "none",
+													borderRadius: 6,
+													padding: "4px 8px",
+													fontSize: 11,
+													fontWeight: 600,
+													color: "#92400E",
+													cursor: "pointer",
+												}}
+											>
+												Clear
+											</motion.button>
+										)}
+									</div>
+								)}
 								<div
 									style={{
 										background: "#FFFFFF",
@@ -961,4 +1048,6 @@ export default function AIChatSidebar({
 			</AnimatePresence>
 		</>
 	);
+
+	return sidebarContent;
 }
