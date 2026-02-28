@@ -809,7 +809,7 @@ export default function DraftPage() {
 	const [selectionDropdown, setSelectionDropdown] = useState(null);
 	const [selectionContext, setSelectionContext] = useState("");
 	const [previewOpen, setPreviewOpen] = useState(false);
-	const [previewData, setPreviewData] = useState({ title: "", content: "" });
+	const [previewData, setPreviewData] = useState({ title: "", htmlDoc: "" });
 	const [editorFont, setEditorFont] = useState("Outfit");
 	const [editorFontSize, setEditorFontSize] = useState(15);
 	const editorRef = useRef(null);
@@ -2324,13 +2324,12 @@ export default function DraftPage() {
 										const content = raw.trim().startsWith("<")
 											? raw
 											: formatBody(raw);
-										setPreviewData({
-											title:
-												titleRef.current?.innerText?.trim() ||
-												draft?.title ||
-												"Untitled draft",
-											content,
-										});
+										const title =
+											titleRef.current?.innerText?.trim() ||
+											draft?.title ||
+											"Untitled draft";
+										const htmlDoc = buildThemedHTML(content, THEMES.ink, title);
+										setPreviewData({ title, htmlDoc });
 										setPreviewOpen(true);
 									}}
 									style={{
@@ -3296,8 +3295,8 @@ export default function DraftPage() {
 								onClick={(e) => e.stopPropagation()}
 								style={{
 									pointerEvents: "auto",
-									width: "min(90vw, 720px)",
-									maxHeight: "85vh",
+									width: "min(92vw, 900px)",
+									height: "min(88vh, 700px)",
 									background: T.surface,
 									border: `1px solid ${T.border}`,
 									borderRadius: 16,
@@ -3309,17 +3308,18 @@ export default function DraftPage() {
 							>
 								<div
 									style={{
-										padding: "16px 24px",
+										padding: "14px 20px",
 										borderBottom: `1px solid ${T.border}`,
 										display: "flex",
 										alignItems: "center",
 										justifyContent: "space-between",
+										flexShrink: 0,
 									}}
 								>
 									<span
 										style={{ fontSize: 14, fontWeight: 700, color: T.accent }}
 									>
-										Preview
+										Preview — {previewData.title || "Untitled"}
 									</span>
 									<motion.button
 										whileHover={{ background: "#F0ECE5" }}
@@ -3345,48 +3345,36 @@ export default function DraftPage() {
 								<div
 									style={{
 										flex: 1,
-										overflowY: "auto",
-										padding: "32px 48px 48px",
-										background: T.base,
-										fontFamily:
-											editorFont === "Instrument Serif"
-												? "'Instrument Serif', serif"
-												: editorFont === "Inter"
-													? "'Inter', sans-serif"
-													: editorFont === "Georgia"
-														? "Georgia, serif"
-														: editorFont === "system-ui"
-															? "system-ui, sans-serif"
-															: "'Outfit', sans-serif",
-										fontSize: editorFontSize,
-										lineHeight: 1.8,
-										color: "#3A3530",
+										minHeight: 0,
+										background: "#e5e7eb",
 									}}
 								>
-									<h1
-										style={{
-											fontSize: "clamp(22px, 3vw, 30px)",
-											color: T.accent,
-											lineHeight: 1.2,
-											marginBottom: 24,
-											fontWeight: 400,
-										}}
-									>
-										{previewData.title}
-									</h1>
-									<>
-										<style>{`
-										.preview-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 12px 0; }
-										.preview-content video { max-width: 100%; border-radius: 8px; margin: 12px 0; }
-										.preview-content p { margin: 0 0 14px; }
-										.preview-content h1, .preview-content h2, .preview-content h3 { margin: 20px 0 10px; }
-									`}</style>
-										<div
-											dangerouslySetInnerHTML={{ __html: previewData.content }}
-											style={{ maxWidth: "100%" }}
-											className="preview-content"
+									{previewData.htmlDoc ? (
+										<iframe
+											srcDoc={previewData.htmlDoc}
+											title={`Preview — ${previewData.title}`}
+											sandbox="allow-same-origin"
+											style={{
+												width: "100%",
+												height: "100%",
+												border: "none",
+												display: "block",
+											}}
 										/>
-									</>
+									) : (
+										<div
+											style={{
+												height: "100%",
+												display: "flex",
+												alignItems: "center",
+												justifyContent: "center",
+												color: T.muted,
+												fontSize: 14,
+											}}
+										>
+											No content to preview
+										</div>
+									)}
 								</div>
 							</div>
 						</motion.div>
