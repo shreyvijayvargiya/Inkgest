@@ -27,10 +27,10 @@ const ChatStyles = () => (
     .ai-chat-prose em { color:#C17B2F; }
     .ai-chat-prose ul { padding-left:16px;margin:4px 0 8px; }
     .ai-chat-prose li { font-size:13px;line-height:1.75;color:#5A5550;margin-bottom:3px; }
-    .ai-chat-prose h1,.ai-chat-prose h2 { font-family:'Instrument Serif',serif;color:#1A1A1A;margin:10px 0 5px; }
+    .ai-chat-prose h1,.ai-chat-prose h2 { color:#1A1A1A;margin:10px 0 5px; }
     .ai-chat-prose h1 { font-size:16px; }
     .ai-chat-prose h2 { font-size:15px; }
-    .ai-chat-prose h3 { font-family:'Instrument Serif',serif;font-size:13.5px;font-weight:600;color:#1A1A1A;margin:8px 0 3px; }
+    .ai-chat-prose h3 { font-size:13.5px;font-weight:600;color:#1A1A1A;margin:8px 0 3px; }
     .ai-chat-prose code { background:#F0ECE5;border:1px solid #E8E4DC;border-radius:4px;padding:1px 5px;font-size:11.5px;color:#C17B2F;font-family:monospace; }
     .ai-chat-prose blockquote { border-left:2px solid #C17B2F;padding:2px 0 2px 12px;margin:8px 0; }
     .ai-chat-prose blockquote p { color:#7A7570;font-style:italic; }
@@ -94,13 +94,13 @@ function mdEditor(text = "") {
 			);
 		if (/^# /.test(raw)) {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<h1 style="font-family:'Instrument Serif',serif;font-size:28px;color:#1A1A1A;line-height:1.25;margin:0 0 14px;font-weight:400">${l.slice(2)}</h1>`);
+			out.push(`<h1 style="font-size:28px;color:#1A1A1A;line-height:1.25;margin:0 0 14px;font-weight:400">${l.slice(2)}</h1>`);
 		} else if (/^## /.test(raw)) {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<h2 style="font-family:'Instrument Serif',serif;font-size:22px;color:#1A1A1A;line-height:1.3;margin:20px 0 10px;font-weight:400">${l.slice(3)}</h2>`);
+			out.push(`<h2 style="font-size:22px;color:#1A1A1A;line-height:1.3;margin:20px 0 10px;font-weight:400">${l.slice(3)}</h2>`);
 		} else if (/^### /.test(raw)) {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<h3 style="font-family:'Instrument Serif',serif;font-size:18px;color:#1A1A1A;margin:16px 0 8px;font-weight:600">${l.slice(4)}</h3>`);
+			out.push(`<h3 style="font-size:18px;color:#1A1A1A;margin:16px 0 8px;font-weight:600">${l.slice(4)}</h3>`);
 		} else if (/^> /.test(raw)) {
 			if (ul) { out.push("</ul>"); ul = false; }
 			out.push(`<blockquote style="border-left:2px solid #C17B2F;padding:4px 0 4px 16px;margin:14px 0"><p style="color:#7A7570;font-style:italic;margin:0">${l.slice(2)}</p></blockquote>`);

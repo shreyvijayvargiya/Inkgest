@@ -26,7 +26,7 @@ import { getTheme } from "../../lib/utils/theme";
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
     body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
@@ -263,13 +263,11 @@ function SidebarItemCard({ item, active, onClick, onDelete }) {
 	const date = item.date
 		? typeof item.date === "string"
 			? item.date
-			: (item.createdAt
-					?.toDate?.()
-					?.toLocaleDateString?.("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}) ?? "")
+			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+				}) ?? "")
 		: "";
 	return (
 		<motion.div
@@ -409,6 +407,7 @@ export default function inkgestApp() {
 	const [drafts, setDrafts] = useState([]);
 	const [search, setSearch] = useState("");
 	const [urls, setUrls] = useState([""]);
+	const [newUrlInput, setNewUrlInput] = useState("");
 	const [prompt, setPrompt] = useState("");
 	const [format, setFormat] = useState("substack");
 	const [style, setStyle] = useState("casual");
@@ -426,13 +425,11 @@ export default function inkgestApp() {
 
 	// InkAgent state
 	const [agentPrompt, setAgentPrompt] = useState("");
-	const [agentMessages, setAgentMessages] = useState([]);
+	const [agentRunSteps, setAgentRunSteps] = useState([]); // [{ label, status: 'loading'|'done'|'error' }]
 	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
-	const [agentSuggestedTasks, setAgentSuggestedTasks] = useState([]);
 	const [agentLoading, setAgentLoading] = useState(false);
 	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
 	const [agentError, setAgentError] = useState(null);
-	const [agentSuggestionOffset, setAgentSuggestionOffset] = useState(0);
 
 	/* Derived helpers — single unified credit pool */
 	const creditRemaining = credits
@@ -444,14 +441,20 @@ export default function inkgestApp() {
 	const llmRemaining = creditRemaining;
 	const scrapeRemaining = creditRemaining;
 
-	/* Cycle InkAgent loading messages */
+	/* Cycle InkAgent loading messages and update run step label */
 	useEffect(() => {
 		if (!agentLoading) return;
 		setAgentLoadingMsg(AGENT_LOADING_MSGS[0]);
 		let idx = 0;
 		const iv = setInterval(() => {
 			idx = (idx + 1) % AGENT_LOADING_MSGS.length;
-			setAgentLoadingMsg(AGENT_LOADING_MSGS[idx]);
+			const msg = AGENT_LOADING_MSGS[idx];
+			setAgentLoadingMsg(msg);
+			setAgentRunSteps((prev) =>
+				prev.length > 0 && prev[0]?.status === "loading"
+					? [{ label: msg, status: "loading" }]
+					: prev,
+			);
 		}, 2500);
 		return () => clearInterval(iv);
 	}, [agentLoading]);
@@ -493,13 +496,11 @@ export default function inkgestApp() {
 						const data = d.data();
 						const created = data.createdAt;
 						const date =
-							created
-								?.toDate?.()
-								?.toLocaleDateString?.("en-US", {
-									weekday: "short",
-									month: "short",
-									day: "numeric",
-								}) ?? "";
+							created?.toDate?.()?.toLocaleDateString?.("en-US", {
+								weekday: "short",
+								month: "short",
+								day: "numeric",
+							}) ?? "";
 						return {
 							id: d.id,
 							type: "table",
@@ -566,11 +567,24 @@ export default function inkgestApp() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isLoading]);
 
-	const filtered = drafts.filter(
-		(d) =>
-			d.title?.toLowerCase().includes(search.toLowerCase()) ||
-			d.preview?.toLowerCase().includes(search.toLowerCase()),
-	);
+	const filtered = sidebarItems.filter((item) => {
+		const q = search.toLowerCase().trim();
+		if (!q) return true;
+		const title = (item.title || "").toLowerCase();
+		const preview = (item.preview || item.description || "").toLowerCase();
+		const type = (item.type || "").toLowerCase();
+		const tag = (
+			item.tag || (item.type === "table" ? "Table" : "Draft")
+		).toLowerCase();
+		const format = (item.format || "").toLowerCase();
+		return (
+			title.includes(q) ||
+			preview.includes(q) ||
+			type.includes(q) ||
+			tag.includes(q) ||
+			format.includes(q)
+		);
+	});
 
 	const handleGenerate = async () => {
 		if (!prompt.trim() || generating) return;
@@ -822,6 +836,27 @@ export default function inkgestApp() {
 		}
 	};
 
+	/* Get step label from executed task */
+	const getAgentStepLabel = (task) => {
+		if (task.type === "scrape") {
+			const url = task.urls?.[0] || task.sourceUrls?.[0];
+			const host = url
+				? (() => {
+						try {
+							return new URL(url).hostname;
+						} catch {
+							return url.slice(0, 30);
+						}
+					})()
+				: "";
+			return host ? `Scraping ${host}…` : task.label || "Scraping…";
+		}
+		if (task.type === "newsletter")
+			return task.label || "Writing newsletter draft…";
+		if (task.type === "table") return task.label || "Creating table…";
+		return task.label || "Processing…";
+	};
+
 	/* InkAgent: call backend API, get full response, store to DB, show to user */
 	const handleAgentSend = async () => {
 		const promptText = agentPrompt.trim();
@@ -836,10 +871,8 @@ export default function inkgestApp() {
 		}
 		setAgentLoading(true);
 		setAgentError(null);
-		setAgentMessages((prev) => [
-			...prev,
-			{ role: "user", content: promptText },
-		]);
+		setAgentCompletedTasks([]); // Clear previous run's assets
+		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
 		setAgentPrompt("");
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
@@ -851,28 +884,25 @@ export default function inkgestApp() {
 			});
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Agent failed");
-			setAgentSuggestedTasks(data.suggestedTasks || []);
-			setAgentMessages((prev) => [
-				...prev,
-				{
-					role: "assistant",
-					content: data.message || "Done.",
-					thinking: data.thinking,
-					suggestedTasks: data.suggestedTasks,
-					creditsUsed: data.creditsUsed,
-					creditsDistribution: data.creditsDistribution,
-					tokenUsage: data.tokenUsage,
-				},
-			]);
 			if (data.executed?.length > 0) {
+				setAgentRunSteps(
+					data.executed.map((t) => ({
+						label: getAgentStepLabel(t),
+						status: "done",
+					})),
+				);
 				await processAgentExecuted(data.executed);
+			} else {
+				setAgentRunSteps([{ label: data.message || "Done.", status: "done" }]);
 			}
 			if (reduxUser)
 				getUserCredits(reduxUser.uid)
 					.then(setCredits)
 					.catch(() => {});
 		} catch (e) {
-			setAgentError(e?.message || "Agent failed");
+			const errMsg = e?.message || "Agent failed";
+			setAgentError(errMsg);
+			setAgentRunSteps([{ label: errMsg, status: "error" }]);
 		} finally {
 			setAgentLoading(false);
 		}
@@ -1035,7 +1065,7 @@ export default function inkgestApp() {
 				<a
 					href="/"
 					style={{
-						fontFamily: "'Instrument Serif',serif",
+						fontFamily: "",
 						fontSize: 20,
 						color: T.accent,
 						textDecoration: "none",
@@ -1285,7 +1315,7 @@ export default function inkgestApp() {
 									<input
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
-										placeholder="Search drafts…"
+										placeholder="Search drafts, tables, blog, scrape…"
 										style={{
 											width: "100%",
 											background: T.surface,
@@ -1453,18 +1483,14 @@ export default function inkgestApp() {
 						<div style={{ marginBottom: 24 }}>
 							<h1
 								style={{
-									fontFamily: "'Instrument Serif',serif",
+									fontFamily: "",
 									fontSize: 32,
 									color: T.accent,
-									marginBottom: 6,
 									letterSpacing: "-0.5px",
 								}}
 							>
 								New draft
 							</h1>
-							<p style={{ fontSize: 15, color: T.muted, lineHeight: 1.6 }}>
-								Choose how you want to start writing.
-							</p>
 						</div>
 
 						{/* Not logged in info banner */}
@@ -1477,7 +1503,6 @@ export default function inkgestApp() {
 									border: "1px solid #F5C97A",
 									borderRadius: 10,
 									padding: "12px 16px",
-									marginBottom: 16,
 									display: "flex",
 									alignItems: "center",
 									justifyContent: "space-between",
@@ -1530,101 +1555,294 @@ export default function inkgestApp() {
 								key="agent-form"
 								initial={{ opacity: 0, y: 8 }}
 								animate={{ opacity: 1, y: 0 }}
-								style={{ marginBottom: 24 }}
+								style={{
+									display: "flex",
+									flexDirection: "column",
+									gap: 24,
+									marginBottom: 24,
+									width: "100%",
+								}}
 							>
-								<p style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}>
-									AI message: 0.25 credits · Newsletter/scrape: 1 credit ·
-									Table: 2 credits
-								</p>
-								<div style={{ marginBottom: 16 }}>
-									<label
+								{/* Output card — top: steps + created assets */}
+								{(agentRunSteps.length > 0 ||
+									agentCompletedTasks.length > 0) && (
+									<motion.div
+										initial={{ opacity: 0, y: -8 }}
+										animate={{ opacity: 1, y: 0 }}
 										style={{
-											display: "block",
-											fontSize: 12,
-											fontWeight: 700,
-											textTransform: "uppercase",
-											letterSpacing: "0.08em",
-											color: T.muted,
-											marginBottom: 8,
+											background: T.surface,
+											border: `1px solid ${T.border}`,
+											borderRadius: 14,
+											padding: 20,
+											boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
 										}}
 									>
-										Try a suggestion
-									</label>
-									<div
-										style={{
-											display: "flex",
-											flexWrap: "wrap",
-											gap: 8,
-											marginBottom: 12,
-										}}
-									>
-										{AGENT_PROMPT_SUGGESTIONS.slice(
-											agentSuggestionOffset * 5,
-											agentSuggestionOffset * 5 + 5,
-										).map((s, i) => (
-											<motion.button
-												key={agentSuggestionOffset * 5 + i}
-												whileHover={{ scale: 1.02 }}
-												whileTap={{ scale: 0.97 }}
-												onClick={() => setAgentPrompt(s)}
-												style={{
-													padding: "8px 12px",
-													borderRadius: 9,
-													fontSize: 12,
-													fontWeight: 600,
-													cursor: "pointer",
-													border: `1.5px solid ${T.border}`,
-													background: T.surface,
-													color: T.accent,
-													textAlign: "left",
-													flex: "1 1 200px",
-													minWidth: 0,
-													lineHeight: 1.4,
-													overflow: "hidden",
-													textOverflow: "ellipsis",
-													display: "-webkit-box",
-													WebkitLineClamp: 2,
-													WebkitBoxOrient: "vertical",
-												}}
-											>
-												{s}
-											</motion.button>
-										))}
-										<motion.button
-											whileHover={{ scale: 1.03 }}
-											whileTap={{ scale: 0.97 }}
-											onClick={() =>
-												setAgentSuggestionOffset((o) => (o + 1) % 2)
-											}
+										<p
 											style={{
-												padding: "8px 14px",
-												borderRadius: 9,
-												fontSize: 12,
+												fontSize: 15,
 												fontWeight: 700,
-												cursor: "pointer",
-												border: `1.5px dashed ${T.border}`,
-												background: T.base,
-												color: T.muted,
+												color: T.accent,
+												marginBottom: 16,
+												display: "flex",
+												alignItems: "center",
+												gap: 8,
 											}}
 										>
-											{agentSuggestionOffset === 0 ? "More →" : "← Back"}
-										</motion.button>
-									</div>
-								</div>
-								<div style={{ marginBottom: 16 }}>
-									<label
-										style={{
-											display: "block",
-											fontSize: 12,
-											fontWeight: 700,
-											textTransform: "uppercase",
-											letterSpacing: "0.08em",
-											color: T.muted,
-											marginBottom: 8,
-										}}
-									>
-										Describe what you want
-									</label>
+											<span style={{ color: T.warm }}>✦</span> InkAgent
+										</p>
+										{agentRunSteps.length > 0 && (
+											<div
+												style={{
+													display: "flex",
+													flexDirection: "column",
+													gap: 10,
+													marginBottom: agentCompletedTasks.length > 0 ? 16 : 0,
+												}}
+											>
+												{agentRunSteps.map((step, i) => (
+													<div
+														key={i}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															justifyContent: "space-between",
+															gap: 12,
+														}}
+													>
+														<span
+															style={{
+																fontSize: 13,
+																color: T.accent,
+																fontWeight: 500,
+															}}
+														>
+															{step.label}
+														</span>
+														{step.status === "loading" && (
+															<motion.span
+																animate={{ rotate: 360 }}
+																transition={{
+																	duration: 0.9,
+																	repeat: Infinity,
+																	ease: "linear",
+																}}
+															>
+																<Icon
+																	d={Icons.refresh}
+																	size={14}
+																	stroke={T.warm}
+																/>
+															</motion.span>
+														)}
+														{step.status === "done" && (
+															<span
+																style={{
+																	fontSize: 14,
+																	color: "#16A34A",
+																	fontWeight: 700,
+																}}
+															>
+																✓
+															</span>
+														)}
+														{step.status === "error" && (
+															<span
+																style={{
+																	fontSize: 14,
+																	color: "#DC2626",
+																	fontWeight: 700,
+																}}
+															>
+																✗
+															</span>
+														)}
+													</div>
+												))}
+											</div>
+										)}
+										{agentCompletedTasks.length > 0 && (
+											<>
+												<p
+													style={{
+														fontSize: 12,
+														color: T.muted,
+														marginBottom: 12,
+														fontWeight: 600,
+													}}
+												>
+													Created {agentCompletedTasks.length} asset
+													{agentCompletedTasks.length !== 1 ? "s" : ""}
+												</p>
+												<div
+													style={{
+														display: "flex",
+														flexDirection: "column",
+														gap: 8,
+													}}
+												>
+													{agentCompletedTasks.map((t, i) => (
+														<motion.a
+															key={i}
+															href={t.path}
+															onClick={(e) => {
+																e.preventDefault();
+																router.push(t.path);
+															}}
+															whileHover={{ x: 2, scale: 1.01 }}
+															whileTap={{ scale: 0.99 }}
+															style={{
+																display: "flex",
+																alignItems: "center",
+																justifyContent: "space-between",
+																padding: "12px 14px",
+																background: T.base,
+																border: `1px solid ${T.border}`,
+																borderRadius: 10,
+																textDecoration: "none",
+																color: T.accent,
+																fontSize: 13,
+																fontWeight: 600,
+															}}
+														>
+															<span
+																style={{
+																	display: "flex",
+																	alignItems: "center",
+																	gap: 8,
+																}}
+															>
+																<span style={{ fontSize: 14 }}>
+																	{t.type === "newsletter"
+																		? "📧"
+																		: t.type === "table"
+																			? "📊"
+																			: "📄"}
+																</span>
+																<span>
+																	{t.type === "newsletter"
+																		? "Newsletter"
+																		: t.type === "table"
+																			? "Table"
+																			: "Scrape"}
+																	: {t.label}
+																</span>
+															</span>
+															<span
+																style={{
+																	fontSize: 12,
+																	color: T.warm,
+																	fontWeight: 700,
+																}}
+															>
+																Open →
+															</span>
+														</motion.a>
+													))}
+												</div>
+											</>
+										)}
+									</motion.div>
+								)}
+
+								{/* Input section — URL chips + textarea attached */}
+								<div
+									className="flex flex-col gap-0 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50"
+								>
+									{/* URL chips parsed from prompt — above textarea */}
+									{(() => {
+										const urlRegex = /https?:\/\/[^\s]+/g;
+										const extracted = (agentPrompt.match(urlRegex) || [])
+											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
+											.filter(Boolean);
+										const unique = [...new Set(extracted)];
+										if (unique.length === 0) return null;
+										return (
+											<div
+												style={{
+													display: "flex",
+													flexWrap: "wrap",
+													gap: 8,
+													padding: "12px 16px",
+													borderBottom: `1px solid ${T.border}`,
+													background: T.base,
+												}}
+											>
+												{unique.map((url, i) => (
+													<motion.div
+														key={`${url}-${i}`}
+														initial={{ opacity: 0, scale: 0.9 }}
+														animate={{ opacity: 1, scale: 1 }}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															gap: 6,
+															padding: "6px 10px",
+															background: T.surface,
+															border: `1px solid ${T.border}`,
+															borderRadius: 8,
+															fontSize: 12,
+															color: T.accent,
+															maxWidth: 220,
+															overflow: "hidden",
+															textOverflow: "ellipsis",
+															whiteSpace: "nowrap",
+														}}
+													>
+														<span
+															style={{
+																flex: 1,
+																overflow: "hidden",
+																textOverflow: "ellipsis",
+															}}
+														>
+															{url}
+														</span>
+														<motion.button
+															whileHover={{ scale: 1.1 }}
+															whileTap={{ scale: 0.9 }}
+															onClick={() => {
+																setAgentPrompt((p) =>
+																	p
+																		.replace(
+																			new RegExp(
+																				url.replace(
+																					/[.*+?^${}()|[\]\\]/g,
+																					"\\$&",
+																				),
+																				"g",
+																			),
+																			"",
+																		)
+																		.replace(/\s+/g, " ")
+																		.trim(),
+																);
+															}}
+															style={{
+																background: "none",
+																border: "none",
+																cursor: "pointer",
+																padding: 0,
+																display: "flex",
+																color: T.muted,
+																flexShrink: 0,
+															}}
+														>
+															<svg
+																width={12}
+																height={12}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2}
+															>
+																<path d="M18 6L6 18M6 6l12 12" />
+															</svg>
+														</motion.button>
+													</motion.div>
+												))}
+											</div>
+										);
+									})()}
 									<textarea
 										value={agentPrompt}
 										onChange={(e) => setAgentPrompt(e.target.value)}
@@ -1634,343 +1852,162 @@ export default function inkgestApp() {
 											(e.preventDefault(), handleAgentSend())
 										}
 										placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
-										rows={3}
+										rows={4}
 										disabled={!reduxUser || agentLoading}
-										style={{
-											width: "100%",
-											background: T.surface,
-											border: `1.5px solid ${T.border}`,
-											borderRadius: 11,
-											padding: "13px 16px",
-											fontSize: 14,
-											color: T.accent,
-											resize: "vertical",
-											outline: "none",
-											lineHeight: 1.6,
-										}}
+										className="w-full bg-zinc-50 border border-zinc-200 rounded-xl bg-transparent px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
 									/>
-								</div>
-								<motion.button
-									onClick={handleAgentSend}
-									disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
-									whileHover={
-										!agentLoading && agentPrompt.trim()
-											? { scale: 1.02, y: -1 }
-											: {}
-									}
-									whileTap={!agentLoading ? { scale: 0.97 } : {}}
-									style={{
-										width: "100%",
-										background:
-											agentLoading || !agentPrompt.trim() || !reduxUser
-												? "#E8E4DC"
-												: T.accent,
-										color:
-											agentLoading || !agentPrompt.trim() || !reduxUser
-												? T.muted
-												: "white",
-										border: "none",
-										padding: "15px",
-										borderRadius: 12,
-										fontSize: 16,
-										fontWeight: 700,
-										cursor:
-											agentLoading || !reduxUser ? "not-allowed" : "pointer",
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										gap: 10,
-									}}
-								>
-									{agentLoading ? (
-										<>
-											<motion.span
-												animate={{ rotate: 360 }}
-												transition={{
-													duration: 0.9,
-													repeat: Infinity,
-													ease: "linear",
-												}}
-											>
-												<Icon d={Icons.refresh} size={18} stroke={T.muted} />
-											</motion.span>
-											{agentLoadingMsg}
-										</>
-									) : !reduxUser ? (
-										"Sign in to use AI Agent"
-									) : (
-										<>
-											<Icon
-												d={Icons.zap}
-												size={18}
-												stroke="white"
-												fill="white"
-											/>
-											Send to InkAgent
-										</>
-									)}
-								</motion.button>
-
-								{/* Suggested tasks — clear, actionable cards */}
-								{agentSuggestedTasks.length > 0 && (
-									<motion.div
-										initial={{ opacity: 0, y: 8 }}
-										animate={{ opacity: 1, y: 0 }}
-										style={{
-											marginTop: 24,
-											background: "#FDFCF9",
-											border: `1px solid ${T.border}`,
-											borderRadius: 14,
-											padding: 20,
-											boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-										}}
-									>
-										<p
-											style={{
-												fontSize: 13,
-												fontWeight: 700,
-												color: T.accent,
-												marginBottom: 4,
-											}}
-										>
-											What would you like to do?
-										</p>
-										<p
-											style={{ fontSize: 12, color: T.muted, marginBottom: 14 }}
-										>
-											Tasks created by the agent — open below when ready.
-										</p>
-										<div
-											style={{
-												display: "flex",
-												flexDirection: "column",
-												gap: 10,
-											}}
-										>
-											{agentSuggestedTasks.map((t, i) => (
-												<div
-													key={i}
-													style={{
-														display: "flex",
-														alignItems: "center",
-														gap: 12,
-														padding: "14px 16px",
-														background: T.surface,
-														borderRadius: 10,
-														border: `1px solid ${T.border}`,
-														boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-													}}
-												>
-													<span
-														style={{
-															fontSize: 11,
-															fontWeight: 700,
-															textTransform: "uppercase",
-															letterSpacing: "0.05em",
-															color: T.warm,
-														}}
-													>
-														{t.type === "newsletter"
-															? "Newsletter"
-															: t.type === "table"
-																? "Table"
-																: "Scrape"}
-													</span>
-													<span
-														style={{
-															fontSize: 14,
-															fontWeight: 600,
-															color: T.accent,
-															lineHeight: 1.4,
-														}}
-													>
-														{t.label}
-													</span>
-												</div>
-											))}
+									<div className="flex gap-2 items-center justify-between px-2 py-1  bg-amber-50/20">
+										<div className="text-xs text-zinc-700">
+											Create tables, newsletter, infographics and models
 										</div>
-									</motion.div>
-								)}
-
-								{/* Chat / messages — light backgrounds, clear labels */}
-								{agentMessages.length > 0 && (
-									<div style={{ marginTop: 24 }}>
-										<p
-											style={{
-												fontSize: 12,
-												fontWeight: 700,
-												textTransform: "uppercase",
-												letterSpacing: "0.08em",
-												color: T.muted,
-												marginBottom: 12,
-											}}
-										>
-											Chat
-										</p>
+										{/* Circular credits progress — justify-end */}
 										<div
-											style={{
-												display: "flex",
-												flexDirection: "column",
-												gap: 14,
-												maxHeight: 300,
-												overflowY: "auto",
-											}}
+											style={{ display: "flex", justifyContent: "flex-end" }}
 										>
-											{agentMessages.map((m, i) => (
-												<div
-													key={i}
-													style={{
-														display: "flex",
-														flexDirection: "column",
-														alignSelf:
-															m.role === "user" ? "flex-end" : "flex-start",
-														maxWidth: "92%",
-													}}
-												>
-													<span
-														style={{
-															fontSize: 10,
-															fontWeight: 700,
-															textTransform: "uppercase",
-															letterSpacing: "0.06em",
-															color: T.muted,
-															marginBottom: 4,
-														}}
-													>
-														{m.role === "user" ? "You" : "InkAgent"}
-													</span>
+											{(() => {
+												const limit =
+													credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
+												const remaining =
+													credits?.plan === "pro"
+														? limit
+														: Math.max(0, credits?.remaining ?? limit);
+												const pct = limit > 0 ? remaining / limit : 0;
+												const r = 14;
+												const circ = 2 * Math.PI * r;
+												const dash = pct * circ;
+												const strokeCol =
+													pct > 0.3
+														? T.warm
+														: pct > 0.1
+															? "#D97706"
+															: "#DC2626";
+												return (
 													<div
 														style={{
-															padding: "12px 16px",
-															background:
-																m.role === "user" ? "#F0EDE8" : "#FDFCF9",
-															color: T.accent,
-															borderRadius: 12,
-															border: `1px solid ${m.role === "user" ? "#E8E4DC" : T.border}`,
-															boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+															display: "flex",
+															alignItems: "center",
+															gap: 4,
 														}}
 													>
-														<p style={{ fontSize: 13, lineHeight: 1.6 }}>
-															{m.content}
-														</p>
-														{m.thinking && (
-															<p
+														<svg
+															width={24}
+															height={24}
+															viewBox="0 0 36 36"
+															style={{ transform: "rotate(-90deg)" }}
+														>
+															<circle
+																cx={18}
+																cy={18}
+																r={r}
+																fill="none"
+																stroke={T.border}
+																strokeWidth={4}
+															/>
+															<circle
+																cx={18}
+																cy={18}
+																r={r}
+																fill="none"
+																stroke={strokeCol}
+																strokeWidth={4}
+																strokeDasharray={`${dash} ${circ}`}
+																strokeLinecap="round"
 																style={{
-																	fontSize: 11,
-																	color: T.muted,
-																	marginTop: 10,
-																	fontStyle: "italic",
-																	lineHeight: 1.5,
+																	transition: "stroke-dasharray 0.3s ease",
 																}}
-															>
-																{m.thinking}
-															</p>
-														)}
-														{m.creditsUsed != null && (
-															<p
-																style={{
-																	fontSize: 11,
-																	color: T.warm,
-																	marginTop: 8,
-																	fontWeight: 600,
-																}}
-															>
-																Credits used: {m.creditsUsed}
-															</p>
-														)}
+															/>
+														</svg>
+														<span
+															style={{
+																fontSize: 12,
+																fontWeight: 600,
+																color: T.muted,
+															}}
+														>
+															{credits?.plan === "pro"
+																? "Pro"
+																: `${remaining.toFixed(1)}/${limit}`}
+														</span>
 													</div>
-												</div>
-											))}
+												);
+											})()}
 										</div>
-									</div>
-								)}
-
-								{/* Completed tasks — links to open drafts/tables */}
-								{agentCompletedTasks.length > 0 && (
-									<div style={{ marginTop: 24 }}>
-										<p
-											style={{
-												fontSize: 13,
-												fontWeight: 700,
-												color: T.accent,
-												marginBottom: 4,
-											}}
-										>
-											Ready to open
-										</p>
-										<p
-											style={{ fontSize: 12, color: T.muted, marginBottom: 12 }}
-										>
-											Click to open your draft or table.
-										</p>
-										<div
-											style={{
-												display: "flex",
-												flexDirection: "column",
-												gap: 8,
-											}}
-										>
-											{agentCompletedTasks.map((t, i) => (
-												<motion.a
-													key={i}
-													href={t.path}
-													onClick={(e) => {
-														e.preventDefault();
-														router.push(t.path);
-													}}
-													whileHover={{ x: 2, scale: 1.01 }}
-													whileTap={{ scale: 0.99 }}
-													style={{
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "space-between",
-														padding: "12px 16px",
-														background: T.surface,
-														border: `1px solid ${T.border}`,
-														borderRadius: 10,
-														textDecoration: "none",
-														color: T.accent,
-														fontSize: 13,
-														fontWeight: 600,
-														boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+									</div> 
+								</div>
+								<div
+									style={{
+										display: "flex",
+										flexDirection: "column",
+										gap: 12,
+									}}
+								>
+									<motion.button
+										onClick={handleAgentSend}
+										disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
+										whileHover={
+											!agentLoading && agentPrompt.trim()
+												? { scale: 1.02, y: -1 }
+												: {}
+										}
+										whileTap={!agentLoading ? { scale: 0.97 } : {}}
+										style={{
+											width: "100%",
+											background:
+												agentLoading || !agentPrompt.trim() || !reduxUser
+													? "#E8E4DC"
+													: T.accent,
+											color:
+												agentLoading || !agentPrompt.trim() || !reduxUser
+													? T.muted
+													: "white",
+											border: "none",
+											padding: "15px",
+											borderRadius: 12,
+											fontSize: 16,
+											fontWeight: 700,
+											cursor:
+												agentLoading || !reduxUser ? "not-allowed" : "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											gap: 10,
+										}}
+									>
+										{agentLoading ? (
+											<>
+												<motion.span
+													animate={{ rotate: 360 }}
+													transition={{
+														duration: 0.9,
+														repeat: Infinity,
+														ease: "linear",
 													}}
 												>
-													<span
-														style={{
-															fontSize: 11,
-															fontWeight: 700,
-															color: T.warm,
-															marginRight: 8,
-														}}
-													>
-														{t.type === "newsletter"
-															? "Newsletter"
-															: t.type === "table"
-																? "Table"
-																: "Scrape"}
-													</span>
-													<span style={{ flex: 1 }}>{t.label}</span>
-													<span
-														style={{
-															fontSize: 12,
-															color: T.warm,
-															fontWeight: 700,
-														}}
-													>
-														Open →
-													</span>
-												</motion.a>
-											))}
-										</div>
-									</div>
-								)}
+													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
+												</motion.span>
+												{agentLoadingMsg}
+											</>
+										) : !reduxUser ? (
+											"Sign in to use AI Agent"
+										) : (
+											<>
+												<Icon
+													d={Icons.zap}
+													size={18}
+													stroke="white"
+													fill="white"
+												/>
+												Send to InkAgent
+											</>
+										)}
+									</motion.button>
+								</div>
 
 								{agentError && (
 									<motion.div
 										initial={{ opacity: 0, y: 4 }}
 										animate={{ opacity: 1, y: 0 }}
 										style={{
-											marginTop: 12,
 											padding: "12px 16px",
 											background: "#FEF2F2",
 											border: "1px solid #FECACA",
@@ -1982,6 +2019,59 @@ export default function inkgestApp() {
 										{agentError}
 									</motion.div>
 								)}
+
+								{/* Prompt suggestions — full-width flex-col below input */}
+								<div
+									style={{
+										display: "flex",
+										flexDirection: "column",
+										gap: 12,
+										width: "100%",
+									}}
+								>
+									<label
+										style={{
+											fontSize: 12,
+											fontWeight: 700,
+											textTransform: "uppercase",
+											letterSpacing: "0.08em",
+											color: T.muted,
+										}}
+									>
+										Try a suggestion
+									</label>
+									<div
+										style={{
+											display: "flex",
+											flexDirection: "column",
+											gap: 8,
+										}}
+									>
+										{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
+											<motion.button
+												key={i}
+												whileHover={{ scale: 1.005, x: 4 }}
+												whileTap={{ scale: 0.995 }}
+												onClick={() => setAgentPrompt(s)}
+												style={{
+													width: "100%",
+													padding: "12px 16px",
+													borderRadius: 10,
+													fontSize: 13,
+													fontWeight: 500,
+													cursor: "pointer",
+													border: `1.5px solid ${T.border}`,
+													background: T.surface,
+													color: T.accent,
+													textAlign: "left",
+													lineHeight: 1.5,
+												}}
+											>
+												{s}
+											</motion.button>
+										))}
+									</div>
+								</div>
 							</motion.div>
 						)}
 
@@ -2234,8 +2324,8 @@ export default function inkgestApp() {
 									</div>
 								</div>
 
-								{/* Multiple URLs input */}
-								<div style={{ marginBottom: 20 }}>
+								{/* Add URL input */}
+								<div style={{ marginBottom: 12 }}>
 									<label
 										style={{
 											display: "block",
@@ -2249,89 +2339,68 @@ export default function inkgestApp() {
 									>
 										Source URLs (optional)
 									</label>
-									{urls.map((urlVal, idx) => (
-										<div
-											key={idx}
+									<div style={{ display: "flex", gap: 8 }}>
+										<input
+											type="url"
+											value={newUrlInput}
+											onChange={(e) => setNewUrlInput(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													const val = newUrlInput.trim();
+													if (val) {
+														setUrls((prev) =>
+															prev[0] === "" ? [val] : [...prev, val],
+														);
+														setNewUrlInput("");
+													}
+												}
+											}}
+											placeholder="Paste URL and press Enter"
 											style={{
-												display: "flex",
-												gap: 8,
-												marginBottom: 8,
-												alignItems: "center",
+												flex: 1,
+												background: T.surface,
+												border: `1.5px solid ${T.border}`,
+												borderRadius: 11,
+												padding: "13px 16px",
+												fontSize: 14,
+												color: T.accent,
+												outline: "none",
+												transition: "border-color 0.2s",
+											}}
+											onFocus={(e) => (e.target.style.borderColor = T.warm)}
+											onBlur={(e) => (e.target.style.borderColor = T.border)}
+										/>
+										<motion.button
+											whileHover={{ background: "#F0ECE5" }}
+											whileTap={{ scale: 0.97 }}
+											onClick={() => {
+												const val = newUrlInput.trim();
+												if (val) {
+													setUrls((prev) =>
+														prev[0] === "" ? [val] : [...prev, val],
+													);
+													setNewUrlInput("");
+												}
+											}}
+											style={{
+												padding: "12px 16px",
+												background: T.base,
+												border: `1.5px solid ${T.border}`,
+												borderRadius: 11,
+												fontSize: 13,
+												fontWeight: 600,
+												color: T.accent,
+												cursor: "pointer",
+												whiteSpace: "nowrap",
 											}}
 										>
-											<input
-												value={urlVal}
-												onChange={(e) => updateUrl(idx, e.target.value)}
-												placeholder={`https://example.com/article${idx > 0 ? `-${idx + 1}` : ""}`}
-												style={{
-													flex: 1,
-													background: T.surface,
-													border: `1.5px solid ${T.border}`,
-													borderRadius: 11,
-													padding: "13px 16px",
-													fontSize: 14,
-													color: T.accent,
-													outline: "none",
-													transition: "border-color 0.2s",
-												}}
-												onFocus={(e) => (e.target.style.borderColor = T.warm)}
-												onBlur={(e) => (e.target.style.borderColor = T.border)}
-											/>
-											{urls.length > 1 && (
-												<motion.button
-													whileHover={{ background: "#FEE2E2" }}
-													whileTap={{ scale: 0.95 }}
-													onClick={() => removeUrl(idx)}
-													style={{
-														background: T.surface,
-														border: `1.5px solid ${T.border}`,
-														borderRadius: 9,
-														width: 42,
-														height: 42,
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														cursor: "pointer",
-														flexShrink: 0,
-														transition: "background 0.15s",
-													}}
-												>
-													<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-												</motion.button>
-											)}
-										</div>
-									))}
-									<motion.button
-										whileHover={{ background: "#F0ECE5" }}
-										whileTap={{ scale: 0.97 }}
-										onClick={addUrl}
-										style={{
-											display: "flex",
-											alignItems: "center",
-											gap: 6,
-											background: "transparent",
-											border: `1.5px dashed ${T.border}`,
-											borderRadius: 9,
-											padding: "8px 14px",
-											fontSize: 13,
-											fontWeight: 600,
-											color: T.muted,
-											cursor: "pointer",
-											transition: "background 0.15s",
-											marginTop: 4,
-										}}
-									>
-										<Icon d={Icons.plus} size={13} stroke={T.muted} />
-										Add another URL
-									</motion.button>
-									<p style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>
-										Works with blog posts, news articles, Medium, Substack,
-										research papers
-									</p>
+											<Icon d={Icons.plus} size={14} stroke={T.muted} /> Add
+										</motion.button>
+									</div>
 								</div>
-
-								{/* Prompt input */}
-								<div style={{ marginBottom: 24 }}>
+								{/* URL chips + prompt — attached in one container */}
+								<div style={{ marginBottom: 12 }}>
 									<label
 										style={{
 											display: "block",
@@ -2345,27 +2414,83 @@ export default function inkgestApp() {
 									>
 										Your angle / prompt *
 									</label>
-									<textarea
-										value={prompt}
-										onChange={(e) => setPrompt(e.target.value)}
-										placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words. Focus on the actionable takeaways."
-										rows={4}
-										style={{
-											width: "100%",
-											background: T.surface,
-											border: `1.5px solid ${T.border}`,
-											borderRadius: 11,
-											padding: "13px 16px",
-											fontSize: 14,
-											color: T.accent,
-											resize: "vertical",
-											outline: "none",
-											lineHeight: 1.6,
-											transition: "border-color 0.2s",
-										}}
-										onFocus={(e) => (e.target.style.borderColor = T.warm)}
-										onBlur={(e) => (e.target.style.borderColor = T.border)}
-									/>
+									<div
+										className="flex flex-col gap-0 bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden"
+									>
+										{/* URL chips above prompt */}
+										{urls.filter(Boolean).length > 0 && (
+											<div
+												className="flex flex-wrap gap-2 px-2 py-1 "
+											>
+												{urls.map((urlVal, idx) =>
+													urlVal.trim() ? (
+														<motion.div
+															key={`${urlVal}-${idx}`}
+															initial={{ opacity: 0, scale: 0.9 }}
+															animate={{ opacity: 1, scale: 1 }}
+															style={{
+																display: "flex",
+																alignItems: "center",
+																gap: 6,
+																padding: "6px 10px",
+																background: T.surface,
+																border: `1px solid ${T.border}`,
+																borderRadius: 8,
+																fontSize: 12,
+																color: T.accent,
+																maxWidth: 220,
+																overflow: "hidden",
+																textOverflow: "ellipsis",
+																whiteSpace: "nowrap",
+															}}
+														>
+															<span
+																style={{
+																	flex: 1,
+																	overflow: "hidden",
+																	textOverflow: "ellipsis",
+																}}
+															>
+																{urlVal.trim()}
+															</span>
+															<motion.button
+																whileHover={{ scale: 1.1 }}
+																whileTap={{ scale: 0.9 }}
+																onClick={() => removeUrl(idx)}
+																style={{
+																	background: "none",
+																	border: "none",
+																	cursor: "pointer",
+																	padding: 0,
+																	display: "flex",
+																	color: T.muted,
+																	flexShrink: 0,
+																}}
+															>
+																<svg
+																	width={12}
+																	height={12}
+																	viewBox="0 0 24 24"
+																	fill="none"
+																	stroke="currentColor"
+																	strokeWidth={2}
+																>
+																	<path d="M18 6L6 18M6 6l12 12" />
+																</svg>
+															</motion.button>
+														</motion.div>
+													) : null,
+												)}
+											</div>
+										)}
+										<textarea
+											value={prompt}
+											onChange={(e) => setPrompt(e.target.value)}
+											placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words. Focus on the actionable takeaways."
+											rows={4}
+											className="w-full bg-transparent border-none px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
+										/>
+									</div>
 								</div>
 
 								{/* Format selector */}
@@ -2549,6 +2674,69 @@ export default function inkgestApp() {
 										)}
 									</motion.button>
 								)}
+								{/* Circular credits progress — justify-end below generate */}
+								<div style={{ display: "flex", justifyContent: "flex-end" }}>
+									{(() => {
+										const limit = credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
+										const remaining =
+											credits?.plan === "pro"
+												? limit
+												: Math.max(0, credits?.remaining ?? limit);
+										const pct = limit > 0 ? remaining / limit : 0;
+										const r = 14;
+										const circ = 2 * Math.PI * r;
+										const dash = pct * circ;
+										const strokeCol =
+											pct > 0.3 ? T.warm : pct > 0.1 ? "#D97706" : "#DC2626";
+										return (
+											<div
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 8,
+												}}
+											>
+												<svg
+													width={24}
+													height={24}
+													viewBox="0 0 36 36"
+													style={{ transform: "rotate(-90deg)" }}
+												>
+													<circle
+														cx={18}
+														cy={18}
+														r={r}
+														fill="none"
+														stroke={T.border}
+														strokeWidth={4}
+													/>
+													<circle
+														cx={18}
+														cy={18}
+														r={r}
+														fill="none"
+														stroke={strokeCol}
+														strokeWidth={4}
+														strokeDasharray={`${dash} ${circ}`}
+														strokeLinecap="round"
+														style={{ transition: "stroke-dasharray 0.3s ease" }}
+													/>
+												</svg>
+												<span
+													style={{
+														fontSize: 12,
+														fontWeight: 600,
+														color: T.muted,
+													}}
+												>
+													{credits?.plan === "pro"
+														? "Pro"
+														: `${remaining.toFixed(1)}/${limit}`}
+												</span>
+											</div>
+										);
+									})()}
+								</div>
 
 								{/* Error message */}
 								{generateError && (
@@ -2726,7 +2914,6 @@ export default function inkgestApp() {
 									fontWeight: 700,
 									color: T.accent,
 									marginBottom: 8,
-									fontFamily: "'Instrument Serif',serif",
 								}}
 							>
 								Delete this draft?

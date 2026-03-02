@@ -30,7 +30,7 @@ import { getTheme } from "../../lib/utils/theme";
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
     body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
@@ -123,18 +123,18 @@ const parseCSSProp = (cssStr = "", prop) => {
 const THEMES = {
 	ink: {
 		name: "Ink",
-		label: "Warm editorial · Serif",
+		label: "Warm editorial · Sans",
 		palette: ["#F7F5F0", "#1A1A1A", "#C17B2F", "#7A7570"],
 		fontUrl:
-			"https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap",
+			"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
 		bodyFont: "'Outfit', sans-serif",
 		bg: "#F7F5F0",
 		text: "#3A3530",
 		container:
 			"max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Outfit',sans-serif;",
-		h1: "font-family:'Instrument Serif',serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
-		h2: "font-family:'Instrument Serif',serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
-		h3: "font-family:'Instrument Serif',serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
+		h1: "font-family:'Outfit',sans-serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
+		h2: "font-family:'Outfit',sans-serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
+		h3: "font-family:'Outfit',sans-serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:16px;line-height:1.85;color:#3A3530;margin:0 0 14px;",
 		blockquote:
 			"border-left:3px solid #C17B2F;padding:4px 0 4px 20px;color:#7A7570;font-style:italic;margin:20px 0;",
@@ -527,13 +527,11 @@ function ItemCard({ item, active, onClick, onDelete }) {
 	const date = item.date
 		? typeof item.date === "string"
 			? item.date
-			: (item.createdAt
-					?.toDate?.()
-					?.toLocaleDateString?.("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}) ?? "")
+			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+				}) ?? "")
 		: "";
 	return (
 		<motion.div
@@ -873,13 +871,11 @@ export default function DraftPage() {
 				const data = d.data();
 				const created = data.createdAt;
 				const date =
-					created
-						?.toDate?.()
-						?.toLocaleDateString?.("en-US", {
-							weekday: "short",
-							month: "short",
-							day: "numeric",
-						}) ?? "";
+					created?.toDate?.()?.toLocaleDateString?.("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}) ?? "";
 				return {
 					id: d.id,
 					type: "table",
@@ -940,6 +936,8 @@ export default function DraftPage() {
 		retry: false,
 	});
 
+	const draft = docData?.type === "draft" ? docData.doc : null;
+
 	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
 	const remaining = Math.max(0, FREE_LIMIT - used);
@@ -998,11 +996,11 @@ export default function DraftPage() {
 			.map((line) => {
 				if (/\x01BLK\d+\x01/.test(line)) return restore(line);
 				if (line.startsWith("### "))
-					return `<h3 style="font-family:'Instrument Serif',serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
+					return `<h3 style="font-family:'Outfit',sans-serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
 				if (line.startsWith("## "))
-					return `<h2 style="font-family:'Instrument Serif',serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
+					return `<h2 style="font-family:'Outfit',sans-serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
 				if (line.startsWith("# "))
-					return `<h1 style="font-family:'Instrument Serif',serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
+					return `<h1 style="font-family:'Outfit',sans-serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
 				if (line.trim() === "") return "<br/>";
 				return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
 			})
@@ -1371,13 +1369,22 @@ export default function DraftPage() {
 		setTimeout(() => setCopiedTheme(null), 2200);
 	};
 
-	const filtered = items.filter(
-		(i) =>
-			i.title?.toLowerCase().includes(search.toLowerCase()) ||
-			(i.preview || i.description || "")
-				.toLowerCase()
-				.includes(search.toLowerCase()),
-	);
+	const filtered = items.filter((i) => {
+		const q = search.toLowerCase().trim();
+		if (!q) return true;
+		const title = (i.title || "").toLowerCase();
+		const preview = (i.preview || i.description || "").toLowerCase();
+		const type = (i.type || "").toLowerCase();
+		const tag = (i.tag || (i.type === "table" ? "Table" : "Draft")).toLowerCase();
+		const format = (i.format || "").toLowerCase();
+		return (
+			title.includes(q) ||
+			preview.includes(q) ||
+			type.includes(q) ||
+			tag.includes(q) ||
+			format.includes(q)
+		);
+	});
 
 	const sourceUrl = Array.isArray(draft?.urls)
 		? draft.urls[0] || ""
@@ -1415,7 +1422,7 @@ export default function DraftPage() {
 				<a
 					href="/"
 					style={{
-						fontFamily: "'Instrument Serif',serif",
+						fontFamily: "",
 						fontSize: 20,
 						color: T.accent,
 						textDecoration: "none",
@@ -1728,7 +1735,7 @@ export default function DraftPage() {
 									<input
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
-										placeholder="Search drafts…"
+										placeholder="Search drafts, tables, blog, scrape…"
 										style={{
 											width: "100%",
 											background: T.surface,
@@ -1764,9 +1771,9 @@ export default function DraftPage() {
 										</motion.div>
 									) : (
 										filtered.map((d) => (
-											<DraftCard
+											<ItemCard
 												key={d.id}
-												draft={d}
+												item={d}
 												active={d.id === draftId}
 												onClick={() => openDraftInTab(d.id)}
 												onDelete={handleDelete}
@@ -2587,15 +2594,13 @@ export default function DraftPage() {
 												marginBottom: 8,
 												minHeight: 36,
 												fontFamily:
-													editorFont === "Instrument Serif"
-														? "'Instrument Serif', serif"
-														: editorFont === "Inter"
-															? "'Inter', sans-serif"
-															: editorFont === "Georgia"
-																? "Georgia, serif"
-																: editorFont === "system-ui"
-																	? "system-ui, sans-serif"
-																	: "'Outfit', sans-serif",
+													editorFont === "Inter"
+														? "'Inter', sans-serif"
+														: editorFont === "Georgia"
+															? "Georgia, serif"
+															: editorFont === "system-ui"
+																? "system-ui, sans-serif"
+																: "'Outfit', sans-serif",
 											}}
 											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
 										/>
@@ -2624,9 +2629,6 @@ export default function DraftPage() {
 												}}
 											>
 												<option value="Outfit">Outfit</option>
-												<option value="Instrument Serif">
-													Instrument Serif
-												</option>
 												<option value="Inter">Inter</option>
 												<option value="Georgia">Georgia</option>
 												<option value="system-ui">System</option>
@@ -2746,15 +2748,13 @@ export default function DraftPage() {
 											lineHeight: 1.8,
 											color: "#3A3530",
 											fontFamily:
-												editorFont === "Instrument Serif"
-													? "'Instrument Serif', serif"
-													: editorFont === "Inter"
-														? "'Inter', sans-serif"
-														: editorFont === "Georgia"
-															? "Georgia, serif"
-															: editorFont === "system-ui"
-																? "system-ui, sans-serif"
-																: "'Outfit', sans-serif",
+												editorFont === "Inter"
+													? "'Inter', sans-serif"
+													: editorFont === "Georgia"
+														? "Georgia, serif"
+														: editorFont === "system-ui"
+															? "system-ui, sans-serif"
+															: "'Outfit', sans-serif",
 										}}
 									/>
 									{/* Slash command dropdown */}
@@ -3415,7 +3415,7 @@ export default function DraftPage() {
 													fontSize: 15,
 													fontWeight: 700,
 													color: T.accent,
-													fontFamily: "'Instrument Serif',serif",
+													fontFamily: "",
 												}}
 											>
 												Export themes
@@ -3889,7 +3889,6 @@ export default function DraftPage() {
 									fontWeight: 700,
 									color: T.accent,
 									marginBottom: 8,
-									fontFamily: "'Instrument Serif',serif",
 								}}
 							>
 								Delete this draft?

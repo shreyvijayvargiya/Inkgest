@@ -12,7 +12,7 @@ export const config = {
 };
 
 const INKGEST_AGENT_URL =
-	process.env.INKGEST_AGENT_URL || "http://localhost:3002/inkgest-agent";
+ "https://api.buildsaas.dev/inkgest-agent";
 const URL_REGEX = /https?:\/\/[^\s\)\]"'\<\>]+/gi;
 const BARE_DOMAIN_REGEX =
 	/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog)\b/gi;
