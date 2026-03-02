@@ -80,6 +80,7 @@ export default function TableCreatorView() {
 					columns: data.columns || [],
 					rows: data.rows || [],
 					sourceUrls: data.sourceUrls || [],
+					prompt: data.prompt || "",
 				});
 			} catch (e) {
 				console.error("Failed to load table", e);
@@ -165,9 +166,29 @@ export default function TableCreatorView() {
 					<Ic d={sidebarOpen ? ICONS.chevronL : ICONS.chevronR} size={16} stroke={T.muted} />
 				</motion.button>
 				<div style={{ width: 1, height: 20, background: T.border }} />
-				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+				<div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
 					<Ic d={ICONS.table} size={16} stroke={T.warm} />
 					<span style={{ fontSize: 14, fontWeight: 700, color: T.accent }}>{tableData.title || "Untitled"}</span>
+					{tableData.prompt && (
+						<>
+							<div style={{ width: 1, height: 16, background: T.border }} />
+							<span
+								style={{
+									fontSize: 11,
+									color: T.muted,
+									maxWidth: 280,
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+								}}
+								title={tableData.prompt}
+							>
+								{tableData.prompt.length > 50
+									? tableData.prompt.slice(0, 47) + "…"
+									: tableData.prompt}
+							</span>
+						</>
+					)}
 				</div>
 				<div style={{ flex: 1 }} />
 				<motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => router.push("/app/table-creator")} style={{ display: "flex", alignItems: "center", gap: 6, background: T.surface, border: `1.5px solid ${T.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: T.accent, cursor: "pointer" }}>

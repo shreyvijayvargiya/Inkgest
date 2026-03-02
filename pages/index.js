@@ -14,6 +14,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { validateUrls } from "../lib/utils/urlAllowlist";
 import { getTheme } from "../lib/utils/theme";
+import { inferFormatFromPrompt } from "../lib/prompts/newsletter";
 import { SparkleIcon } from "lucide-react";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
@@ -73,18 +74,18 @@ const STYLES = [
 	{ id: "persuasive", label: "Persuasive" },
 ];
 
-/* ── InkAgent prompt suggestions ── */
+/* ── InkAgent prompt suggestions — use scrapable URLs (no Medium, X, or auth-required sites) ── */
 const AGENT_PROMPT_SUGGESTIONS = [
 	"Scrape https://www.producthunt.com and turn today's top launches into a newsletter for indie hackers. Focus on SaaS and dev tools.",
 	"Turn https://www.ycombinator.com/blog into a LinkedIn post for founders. Practical takeaways, under 300 words.",
-	"Create a newsletter from https://news.ycombinator.com — summarize the most interesting discussions for entrepreneurs.",
-	"Scrape https://medium.com and create a digest of top startup/tech articles. Casual tone for indie hackers.",
-	"Turn https://techcrunch.com into a Twitter thread. 5–7 tweets, punchy, with key stats and links.",
-	"Scrape https://www.producthunt.com and create a table comparing the top 5 products of the week with name, tagline, and category.",
-	"Write a Substack newsletter from https://www.indiehackers.com — pull insights from recent interviews for founders.",
-	"Summarize trending topics from https://x.com into a newsletter for content writers. Include viral threads and product launches.",
-	"Create a table from this product comparison: https://www.producthunt.com — extract product name, maker, upvotes, and one-liner.",
-	"Scrape https://medium.com and turn the best startup article into a LinkedIn post. Professional tone, actionable takeaways.",
+	"Scrape https://techcrunch.com and create a digest of the latest startup news. Casual tone for entrepreneurs.",
+	"Turn https://github.blog into a Twitter thread. 5–7 tweets on the key announcements, punchy with links.",
+	"Scrape https://www.producthunt.com and create a table comparing the top 5 products with name, tagline, and category.",
+	"Write a Substack newsletter from https://stripe.com/blog — pull insights from recent posts for founders and developers.",
+	"Scrape https://aws.amazon.com/blogs/aws/ and summarize the latest AWS updates into a newsletter for devs.",
+	"Create a table from https://www.producthunt.com — extract product name, maker, upvotes, and one-liner for top launches.",
+	"Scrape https://www.paulgraham.com/startupideas.html and turn it into a LinkedIn post. Key lessons for founders, under 300 words.",
+	"Scrape https://techcrunch.com and turn the top startup story into a LinkedIn post. Professional tone, actionable takeaways.",
 ];
 
 /* ── Reusable fade-up on scroll ── */
@@ -236,6 +237,7 @@ function Hero() {
 	const [agentRunSteps, setAgentRunSteps] = useState([]);
 	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
 	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
+	const [agentThinking, setAgentThinking] = useState("");
 
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
@@ -426,14 +428,32 @@ function Hero() {
 		}
 		if (task.type === "newsletter")
 			return task.label || "Writing newsletter draft…";
+		if (task.type === "linkedin")
+			return task.label || "Writing LinkedIn post…";
+		if (task.type === "blog_post")
+			return task.label || "Writing blog post…";
+		if (task.type === "twitter_thread")
+			return task.label || "Creating thread…";
+		if (task.type === "email_digest")
+			return task.label || "Creating digest…";
 		if (task.type === "table") return task.label || "Creating table…";
 		return task.label || "Processing…";
 	};
 
-	const processAgentExecuted = async (executed) => {
+	const processAgentExecuted = async (executed, userPrompt = "") => {
 		const newTasks = [];
+		const inferred = inferFormatFromPrompt(userPrompt);
+		const CONTENT_TYPES = [
+			"newsletter",
+			"linkedin",
+			"blog_post",
+			"twitter_thread",
+			"email_digest",
+		];
 		for (const task of executed) {
-			if (task.type === "newsletter" && task.content) {
+			const isContentDraft =
+				CONTENT_TYPES.includes(task.type) && task.content;
+			if (isContentDraft) {
 				const lines = (task.content || "").split("\n");
 				const titleLine = lines.find(
 					(l) => l.startsWith("# ") || l.startsWith("## "),
@@ -447,25 +467,28 @@ function Hero() {
 					.replace(/[*_`]/g, "")
 					.replace(/\s+/g, " ")
 					.trim();
+				const tag = task.formatLabel || inferred.label;
+				const format = task.params?.format || inferred.format;
 				const draft = {
 					userId: reduxUser.uid,
 					title,
 					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
 					body: task.content,
 					urls: task.params?.urls || [],
+					prompt: userPrompt || "",
 					words: task.content.trim().split(/\s+/).length,
 					date: new Date().toLocaleDateString("en-US", {
 						weekday: "short",
 						month: "short",
 						day: "numeric",
 					}),
-					tag: task.formatLabel || "Newsletter",
-					format: task.params?.format || "substack",
+					tag,
+					format,
 					createdAt: serverTimestamp(),
 				};
 				const docRef = await addDoc(collection(db, "drafts"), draft);
 				newTasks.push({
-					type: "newsletter",
+					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
 					label: task.label,
 					id: docRef.id,
 					path: `/app/${docRef.id}`,
@@ -477,6 +500,7 @@ function Hero() {
 					preview: (task.content || "").slice(0, 180),
 					body: task.content || "",
 					urls: task.urls || [],
+					prompt: userPrompt || "",
 					images: task.images || [],
 					words: (task.content || "").trim().split(/\s+/).length,
 					date: new Date().toLocaleDateString("en-US", {
@@ -501,6 +525,8 @@ function Hero() {
 					description: task.description || "",
 					columns: task.columns,
 					rows: task.rows || [],
+					sourceUrls: task.sourceUrls || [],
+					prompt: userPrompt || "",
 					createdAt: serverTimestamp(),
 				});
 				newTasks.push({
@@ -535,6 +561,7 @@ function Hero() {
 		setAgentLoading(true);
 		setAgentError(null);
 		setAgentCompletedTasks([]);
+		setAgentThinking("");
 		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
 		setAgentPrompt("");
 		try {
@@ -545,18 +572,158 @@ function Hero() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ prompt: promptText, idToken }),
 			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Agent failed");
-			if (data.executed?.length > 0) {
-				setAgentRunSteps(
-					data.executed.map((t) => ({
-						label: getAgentStepLabel(t),
-						status: "done",
-					})),
-				);
-				await processAgentExecuted(data.executed);
-			} else {
-				setAgentRunSteps([{ label: data.message || "Done.", status: "done" }]);
+			if (!res.ok) {
+				const errData = await res.json().catch(() => ({}));
+				throw new Error(errData.error || "Agent failed");
+			}
+			const contentType = res.headers.get("content-type") || "";
+			if (!contentType.includes("text/event-stream")) {
+				const data = await res.json();
+				if (data.executed?.length > 0) {
+					setAgentRunSteps(
+						data.executed.map((t) => ({
+							label: getAgentStepLabel(t),
+							status: "done",
+						})),
+					);
+					await processAgentExecuted(data.executed, promptText);
+				} else {
+					setAgentRunSteps([
+						{ label: data.message || "Done.", status: "done" },
+					]);
+				}
+				return;
+			}
+			const reader = res.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = "";
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+				const parts = buffer.split("\n\n");
+				buffer = parts.pop() || "";
+				for (const part of parts) {
+					const line = part.trim();
+					if (!line.startsWith("data: ")) continue;
+					const jsonStr = line.slice(6);
+					if (!jsonStr) continue;
+					let data;
+					try {
+						data = JSON.parse(jsonStr);
+					} catch {
+						continue;
+					}
+					if (data.type === "thinking") {
+						const text =
+							data.thinking ??
+							data.reasoning ??
+							data.content ??
+							data.text ??
+							data.output ??
+							"";
+						if (text)
+							setAgentThinking((prev) =>
+								prev ? prev + "\n\n" + String(text).trim() : String(text).trim(),
+							);
+					} else if (data.type === "start") {
+						const thinkingText =
+							data.thinking ??
+							data.reasoning ??
+							data.thought ??
+							data.agent_thought ??
+							data.content ??
+							data.message ??
+							data.text ??
+							data.output ??
+							"";
+						setAgentThinking(
+							thinkingText
+								? String(thinkingText).trim()
+								: (data.message || "Processing your request…").trim(),
+						);
+						const tasks = data.suggestedTasks || [];
+						setAgentRunSteps(
+							tasks.length > 0
+								? tasks.map((t) => ({
+										label: t.label || t.taskLabel || "Task",
+										status: "loading",
+									}))
+								: [
+										{
+											label: data.message || "Running tasks…",
+											status: "loading",
+										},
+									],
+						);
+					} else if (data.type === "task") {
+						const idx = data.index ?? 0;
+						const label =
+							data.taskLabel || data.label || `Task ${idx + 1}`;
+						const status = data.success ? "done" : "error";
+						setAgentRunSteps((prev) => {
+							const next = [...prev];
+							while (next.length <= idx)
+								next.push({
+									label: `Task ${next.length + 1}`,
+									status: "loading",
+								});
+							next[idx] = { label, status };
+							return next;
+						});
+					} else if (data.type === "end") {
+						setAgentThinking("");
+						const executed = data.executed || [];
+						if (executed.length > 0) {
+							await processAgentExecuted(executed, promptText);
+						} else {
+							setAgentRunSteps((prev) =>
+								prev.map((s) => ({
+									...s,
+									status: s.status === "loading" ? "done" : s.status,
+								})),
+							);
+						}
+						const creditsUsed = data.creditsUsed;
+						if (
+							typeof creditsUsed === "number" &&
+							creditsUsed > 0 &&
+							idToken
+						) {
+							fetch("/api/agent/inkagent-deduct", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ idToken, creditsUsed }),
+							}).catch(() => {});
+						}
+					}
+				}
+			}
+			if (buffer.trim()) {
+				const line = buffer.trim();
+				if (line.startsWith("data: ")) {
+					try {
+						const data = JSON.parse(line.slice(6));
+						if (data.type === "end") {
+							if ((data.executed || []).length > 0)
+								await processAgentExecuted(data.executed, promptText);
+							const creditsUsed = data.creditsUsed;
+							if (
+								typeof creditsUsed === "number" &&
+								creditsUsed > 0 &&
+								idToken
+							) {
+								fetch("/api/agent/inkagent-deduct", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ idToken, creditsUsed }),
+								}).catch(() => {});
+							}
+						}
+					} catch {
+						// ignore
+					}
+				}
 			}
 		} catch (e) {
 			const errMsg = e?.message || "Agent failed";
@@ -1192,6 +1359,27 @@ function Hero() {
 							<>Send to InkAgent →</>
 						)}
 					</motion.button>
+					{agentThinking && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "12px 14px",
+								background: T.base,
+								border: `1px solid ${T.border}`,
+								borderRadius: 10,
+								fontSize: 13,
+								lineHeight: 1.6,
+								color: T.muted,
+								maxHeight: 100,
+								overflowY: "auto",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{agentThinking}
+						</motion.div>
+					)}
 					{agentError && (
 						<motion.div
 							initial={{ opacity: 0, y: 4 }}
@@ -1210,23 +1398,24 @@ function Hero() {
 							{agentError}
 						</motion.div>
 					)}
-					<div style={{ marginTop: 18 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Try a suggestion
-						</label>
-						<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-							{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
+					{!agentLoading && agentCompletedTasks.length === 0 && (
+						<div style={{ marginTop: 18 }}>
+							<label
+								style={{
+									display: "block",
+									fontSize: 11,
+									fontWeight: 700,
+									textTransform: "uppercase",
+									letterSpacing: "0.08em",
+									color: T.muted,
+									marginBottom: 8,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Try a suggestion
+							</label>
+							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+								{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
 								<motion.button
 									key={i}
 									whileHover={{ scale: 1.005, x: 4 }}
@@ -1249,9 +1438,10 @@ function Hero() {
 								>
 									{s}
 								</motion.button>
-							))}
+								))}
+							</div>
 						</div>
-					</div>
+					)}
 				</motion.div>
 
 				<motion.p

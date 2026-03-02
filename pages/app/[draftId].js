@@ -925,6 +925,7 @@ export default function DraftPage() {
 						columns: data.columns || [],
 						rows: data.rows || [],
 						sourceUrls: data.sourceUrls || [],
+						prompt: data.prompt || "",
 					},
 				};
 			}
@@ -1377,18 +1378,24 @@ export default function DraftPage() {
 		const type = (i.type || "").toLowerCase();
 		const tag = (i.tag || (i.type === "table" ? "Table" : "Draft")).toLowerCase();
 		const format = (i.format || "").toLowerCase();
+		const prompt = (i.prompt || "").toLowerCase();
 		return (
 			title.includes(q) ||
 			preview.includes(q) ||
 			type.includes(q) ||
 			tag.includes(q) ||
-			format.includes(q)
+			format.includes(q) ||
+			prompt.includes(q)
 		);
 	});
 
-	const sourceUrl = Array.isArray(draft?.urls)
-		? draft.urls[0] || ""
-		: draft?.url || "";
+	const asset = draft || (docData?.type === "table" ? docData.doc : null);
+	const sourceUrl = Array.isArray(asset?.urls)
+		? asset.urls[0] || ""
+		: Array.isArray(asset?.sourceUrls)
+			? asset.sourceUrls[0] || ""
+			: asset?.url || "";
+	const assetPrompt = asset?.prompt || "";
 
 	return (
 		<div
@@ -2450,6 +2457,28 @@ export default function DraftPage() {
 												}
 											})()}
 										</a>
+									</>
+								)}
+								{assetPrompt && (
+									<>
+										<div
+											style={{ width: 1, height: 14, background: T.border }}
+										/>
+										<span
+											style={{
+												fontSize: 11,
+												color: T.muted,
+												maxWidth: 200,
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+											}}
+											title={assetPrompt}
+										>
+											{assetPrompt.length > 40
+												? assetPrompt.slice(0, 37) + "…"
+												: assetPrompt}
+										</span>
 									</>
 								)}
 

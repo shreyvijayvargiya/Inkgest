@@ -1,7 +1,7 @@
 /**
- * InkAgent proxy — forwards prompt to external backend API.
- * External API: INKGEST_AGENT_URL (default http://localhost:3002/inkgest-agent)
- * Returns: success, thinking, message, suggestedTasks, executed, creditsUsed, creditsDistribution, tokenUsage
+ * InkAgent proxy — pure pass-through to external backend API, streams SSE response.
+ * Credit deduction is handled by client calling /api/agent/inkagent-deduct on stream end.
+ * External API: INKGEST_AGENT_URL (env, default http://localhost:3002/inkgest-agent)
  */
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
@@ -12,7 +12,7 @@ export const config = {
 };
 
 const INKGEST_AGENT_URL =
- "https://api.buildsaas.dev/inkgest-agent";
+	process.env.INKGEST_AGENT_URL || "http://localhost:3002/inkgest-agent";
 const URL_REGEX = /https?:\/\/[^\s\)\]"'\<\>]+/gi;
 const BARE_DOMAIN_REGEX =
 	/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog)\b/gi;
@@ -43,7 +43,8 @@ export default async function handler(req, res) {
 	if (req.method !== "POST")
 		return res.status(405).json({ error: "Method not allowed" });
 
-	const { prompt, idToken } = req.body || {};
+	const { prompt, chatHistory = [], executeTasks = [], idToken } =
+		req.body || {};
 	if (!idToken)
 		return res.status(401).json({ error: "Authentication required" });
 
@@ -61,38 +62,60 @@ export default async function handler(req, res) {
 			.json({ error: "Too many requests", retryAfter: rateLimit.resetIn });
 
 	const userPrompt = String(prompt || "").trim();
-	if (!userPrompt) return res.status(400).json({ error: "Prompt required" });
+	const hasExecuteTasks =
+		Array.isArray(executeTasks) && executeTasks.length > 0;
+	if (!userPrompt && !hasExecuteTasks)
+		return res.status(400).json({ error: "Prompt or executeTasks required" });
 
-	const urlCheck = extractAndValidateUrls(userPrompt);
+	const urlsFromTasks = hasExecuteTasks
+		? [
+				...new Set(
+					executeTasks.flatMap((t) =>
+						(Array.isArray(t?.params?.urls) ? t.params.urls : []).filter(
+							(u) => /^https?:\/\/\S+$/i.test(String(u)),
+						),
+					),
+				),
+			]
+		: [];
+	const textToCheck = userPrompt || urlsFromTasks.join(" ");
+	const urlCheck = extractAndValidateUrls(textToCheck);
 	if (!urlCheck.valid) {
-		return res
-			.status(400)
-			.json({
-				error: urlCheck.error || "Invalid URL. Use full URLs with https://",
-			});
+		return res.status(400).json({
+			error: urlCheck.error || "Invalid URL. Use full URLs with https://",
+		});
 	}
 
 	try {
 		const agentRes = await fetch(INKGEST_AGENT_URL, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ prompt: userPrompt }),
+			body: JSON.stringify({
+				prompt: userPrompt,
+				chatHistory: chatHistory.slice(-6),
+				executeTasks,
+			}),
 		});
 
-		const data = await agentRes.json().catch(() => ({}));
 		if (!agentRes.ok) {
-			return res
-				.status(agentRes.status)
-				.json({
-					error:
-						data?.error || data?.message || `Agent error ${agentRes.status}`,
-				});
+			const data = await agentRes.json().catch(() => ({}));
+			return res.status(agentRes.status).json({
+				error: data?.error || data?.message || `Agent error ${agentRes.status}`,
+			});
 		}
 
-		return res.status(200).json({
-			...data,
-			_uid: uid,
-		});
+		res.setHeader("Content-Type", "text/event-stream");
+		res.setHeader("Cache-Control", "no-cache");
+		res.setHeader("Connection", "keep-alive");
+		res.flushHeaders?.();
+
+		const reader = agentRes.body.getReader();
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			res.write(Buffer.from(value));
+		}
+		res.end();
 	} catch (err) {
 		console.error("[inkagent proxy]", err);
 		return res
