@@ -14,8 +14,7 @@ export default async function handler(req, res) {
 		return res.status(401).json({ error: "Authentication required" });
 
 	const amount = Math.max(0, Number(creditsUsed) || 0);
-	if (amount <= 0)
-		return res.status(200).json({ ok: true, deducted: 0 });
+	if (amount <= 0) return res.status(200).json({ ok: true, deducted: 0 });
 
 	let uid;
 	try {
@@ -26,15 +25,14 @@ export default async function handler(req, res) {
 
 	try {
 		const result = await checkAndDeductCredit(uid, amount);
-		if (!result.allowed)
-			return res.status(402).json({ error: result.error });
+		if (!result.allowed) return res.status(402).json({ error: result.error });
 		return res.status(200).json({
 			ok: true,
 			deducted: amount,
 			remaining: result.remaining,
 		});
 	} catch (err) {
-		console.error("[inkagent-deduct]", err);
+		console.error("[inkagent]", err);
 		return res.status(500).json({ error: "Credit deduction failed" });
 	}
 }

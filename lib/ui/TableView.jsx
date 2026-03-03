@@ -193,10 +193,18 @@ const actionBtnStyle = {
 
 /**
  * Reusable TableView component with full table editing UI.
- * Accepts: tableId, tableData, setTableData, reduxUser.
- * Handles all Firestore updates to the "tables" collection internally.
+ * Accepts: tableId, tableData, setTableData, reduxUser, tableDocRef (optional).
+ * When tableDocRef is provided (e.g. from users/uid/assets), uses it for updates.
+ * Otherwise uses doc(db, "tables", tableId).
  */
-export default function TableView({ tableId, tableData, setTableData, reduxUser }) {
+export default function TableView({
+	tableId,
+	tableData,
+	setTableData,
+	reduxUser,
+	tableDocRef,
+}) {
+	const docRef = tableDocRef || (tableId ? doc(db, "tables", tableId) : null);
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [sorting, setSorting] = useState([]);
 	const [copied, setCopied] = useState(false);
@@ -218,10 +226,11 @@ export default function TableView({ tableId, tableData, setTableData, reduxUser 
 			newRows[rowIdx] = { ...newRows[rowIdx], [colKey]: newVal };
 			setTableData((prev) => ({ ...prev, rows: newRows }));
 			try {
-				await updateDoc(doc(db, "tables", tableId), {
-					rows: newRows,
-					updatedAt: serverTimestamp(),
-				});
+				if (docRef)
+					await updateDoc(docRef, {
+						rows: newRows,
+						updatedAt: serverTimestamp(),
+					});
 			} catch (e) {
 				console.error("Failed to save cell", e);
 				setTableData((prev) => ({ ...prev, rows: tableData.rows }));
@@ -229,14 +238,15 @@ export default function TableView({ tableId, tableData, setTableData, reduxUser 
 				setSavingCell(false);
 			}
 		},
-		[tableData, tableId, savingCell, setTableData]
+		[tableData, tableId, savingCell, setTableData, docRef]
 	);
 
 	const handleSaveTable = useCallback(async () => {
 		if (!tableData || savingTable || !tableId) return;
 		setSavingTable(true);
 		try {
-			await updateDoc(doc(db, "tables", tableId), {
+			if (docRef)
+			await updateDoc(docRef, {
 				title: tableData.title || "Untitled Table",
 				description: tableData.description || "",
 				columns: tableData.columns || [],
@@ -245,10 +255,10 @@ export default function TableView({ tableId, tableData, setTableData, reduxUser 
 			});
 		} catch (e) {
 			console.error("Failed to save table", e);
-		} finally {
-			setSavingTable(false);
-		}
-	}, [tableData, tableId, savingTable]);
+	} finally {
+		setSavingTable(false);
+	}
+	}, [tableData, tableId, savingTable, docRef]);
 
 	const handleAddRow = useCallback(() => {
 		if (!tableData?.columns?.length || !tableId) return;
@@ -258,11 +268,12 @@ export default function TableView({ tableId, tableData, setTableData, reduxUser 
 		});
 		const newRows = [...(tableData.rows || []), newRow];
 		setTableData((prev) => ({ ...prev, rows: newRows }));
-		updateDoc(doc(db, "tables", tableId), {
-			rows: newRows,
-			updatedAt: serverTimestamp(),
-		}).catch(console.error);
-	}, [tableData, tableId, setTableData]);
+		if (docRef)
+			updateDoc(docRef, {
+				rows: newRows,
+				updatedAt: serverTimestamp(),
+			}).catch(console.error);
+	}, [tableData, tableId, setTableData, docRef]);
 
 	const handleAddColumn = useCallback(() => {
 		if (!tableId) return;
@@ -283,24 +294,26 @@ export default function TableView({ tableId, tableData, setTableData, reduxUser 
 		setNewColKey("");
 		setNewColLabel("");
 		setNewColType("text");
-		updateDoc(doc(db, "tables", tableId), {
-			columns: newColumns,
-			rows: newRows,
-			updatedAt: serverTimestamp(),
-		}).catch(console.error);
-	}, [tableData, tableId, newColKey, newColLabel, newColType, setTableData]);
+		if (docRef)
+			updateDoc(docRef, {
+				columns: newColumns,
+				rows: newRows,
+				updatedAt: serverTimestamp(),
+			}).catch(console.error);
+	}, [tableData, tableId, newColKey, newColLabel, newColType, setTableData, docRef]);
 
 	const handleDeleteRow = useCallback(
 		(rowIdx) => {
 			if (!tableData?.rows?.length || !tableId) return;
 			const newRows = tableData.rows.filter((_, i) => i !== rowIdx);
 			setTableData((prev) => ({ ...prev, rows: newRows }));
-			updateDoc(doc(db, "tables", tableId), {
-				rows: newRows,
-				updatedAt: serverTimestamp(),
-			}).catch(console.error);
+			if (docRef)
+				updateDoc(docRef, {
+					rows: newRows,
+					updatedAt: serverTimestamp(),
+				}).catch(console.error);
 		},
-		[tableData, tableId, setTableData]
+		[tableData, tableId, setTableData, docRef]
 	);
 
 	const handleDeleteColumn = useCallback(
@@ -312,13 +325,14 @@ export default function TableView({ tableId, tableData, setTableData, reduxUser 
 				return rest;
 			});
 			setTableData((prev) => ({ ...prev, columns: newColumns, rows: newRows }));
-			updateDoc(doc(db, "tables", tableId), {
-				columns: newColumns,
-				rows: newRows,
-				updatedAt: serverTimestamp(),
-			}).catch(console.error);
+			if (docRef)
+				updateDoc(docRef, {
+					columns: newColumns,
+					rows: newRows,
+					updatedAt: serverTimestamp(),
+				}).catch(console.error);
 		},
-		[tableData, tableId, setTableData]
+		[tableData, tableId, setTableData, docRef]
 	);
 
 	const tableColumns = useMemo(() => {

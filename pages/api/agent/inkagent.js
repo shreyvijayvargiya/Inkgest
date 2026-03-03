@@ -1,6 +1,6 @@
 /**
  * InkAgent proxy — pure pass-through to external backend API, streams SSE response.
- * Credit deduction is handled by client calling /api/agent/inkagent-deduct on stream end.
+ * Credit deduction is handled by client calling /api/agent/inkagent on stream end.
  * External API: INKGEST_AGENT_URL (env, default http://localhost:3002/inkgest-agent)
  */
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
@@ -11,13 +11,18 @@ export const config = {
 	api: { bodyParser: { sizeLimit: "512kb" } },
 };
 
+// browser agent UI needs to be made
+// screenshot and other API integration
+// then integrate Notion or Google Doc but not that important but can add
+// market the product agentic ink to gest, first browserless agent, aint need browser to do agentic work
+// how to add
+
 const INKGEST_AGENT_URL =
 	process.env.INKGEST_AGENT_URL || "http://localhost:3002/inkgest-agent";
 const URL_REGEX = /https?:\/\/[^\s\)\]"'\<\>]+/gi;
-const BARE_DOMAIN_REGEX =
-	/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog)\b/gi;
 
-/** Extract URLs from text; validate before invoking AI to save credits */
+/** Extract URLs from text; validate before invoking AI to save credits.
+ * Full URLs (https://) are validated. Bare domains (e.g. buildsaas.dev, dev.to) are allowed — backend normalizes them. */
 function extractAndValidateUrls(text) {
 	if (!text || typeof text !== "string") return { valid: true, urls: [] };
 	const fullUrls = (text.match(URL_REGEX) || []).map((u) =>
@@ -28,14 +33,7 @@ function extractAndValidateUrls(text) {
 		const result = validateUrls(urls);
 		if (!result.valid) return result;
 	}
-	const textWithoutProtocol = text.replace(URL_REGEX, "");
-	const bareMatch = textWithoutProtocol.match(BARE_DOMAIN_REGEX);
-	if (bareMatch && bareMatch.length > 0) {
-		return {
-			valid: false,
-			error: "URLs must include https:// (e.g. https://example.com)",
-		};
-	}
+	// Bare domains (buildsaas.dev, dev.to, etc.) without https:// are allowed — backend handles them
 	return { valid: true, urls };
 }
 
@@ -43,8 +41,12 @@ export default async function handler(req, res) {
 	if (req.method !== "POST")
 		return res.status(405).json({ error: "Method not allowed" });
 
-	const { prompt, chatHistory = [], executeTasks = [], idToken } =
-		req.body || {};
+	const {
+		prompt,
+		chatHistory = [],
+		executeTasks = [],
+		idToken,
+	} = req.body || {};
 	if (!idToken)
 		return res.status(401).json({ error: "Authentication required" });
 
@@ -71,8 +73,8 @@ export default async function handler(req, res) {
 		? [
 				...new Set(
 					executeTasks.flatMap((t) =>
-						(Array.isArray(t?.params?.urls) ? t.params.urls : []).filter(
-							(u) => /^https?:\/\/\S+$/i.test(String(u)),
+						(Array.isArray(t?.params?.urls) ? t.params.urls : []).filter((u) =>
+							/^https?:\/\/\S+$/i.test(String(u)),
 						),
 					),
 				),

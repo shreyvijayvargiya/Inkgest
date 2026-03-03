@@ -2,15 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
-import {
-	collection,
-	getDocs,
-	getDoc,
-	doc,
-	query,
-	where,
-} from "firebase/firestore";
-import { db } from "../../../lib/config/firebase";
+import { getAsset, listAssets } from "../../../lib/api/userAssets";
 import TableView from "../../../lib/ui/TableView";
 import { getTheme } from "../../../lib/utils/theme";
 
@@ -62,18 +54,13 @@ export default function TableCreatorView() {
 			setLoading(true);
 			setError(null);
 			try {
-				const d = await getDoc(doc(db, "tables", id));
-				if (!d.exists()) {
+				const result = await getAsset(reduxUser.uid, id);
+				if (!result || result.type !== "table") {
 					setError("Table not found");
 					setTableData(null);
 					return;
 				}
-				const data = d.data();
-				if (data.userId !== reduxUser.uid) {
-					setError("Access denied");
-					setTableData(null);
-					return;
-				}
+				const data = result.doc;
 				setTableData({
 					title: data.title,
 					description: data.description,
@@ -100,12 +87,10 @@ export default function TableCreatorView() {
 		}
 		const load = async () => {
 			try {
-				const q = query(
-					collection(db, "tables"),
-					where("userId", "==", reduxUser.uid),
-				);
-				const snap = await getDocs(q);
-				const tables = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+				const items = await listAssets(reduxUser.uid);
+				const tables = items
+					.filter((i) => i.type === "table")
+					.map((t) => ({ id: t.id, ...t }));
 				tables.sort((a, b) => {
 					const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
 					const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;

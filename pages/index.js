@@ -9,8 +9,8 @@ import {
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import LoginModal from "../lib/ui/LoginModal";
-import { auth, db } from "../lib/config/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "../lib/config/firebase";
+import { createDraft, createTable } from "../lib/api/userAssets";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { validateUrls } from "../lib/utils/urlAllowlist";
 import { getTheme } from "../lib/utils/theme";
@@ -337,7 +337,6 @@ function Hero() {
 			});
 
 			const draft = {
-				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content,
@@ -347,13 +346,12 @@ function Hero() {
 				tag: data.formatLabel || "Newsletter",
 				format: data.format || format,
 				style: data.style || style,
-				createdAt: serverTimestamp(),
 			};
 
-			const docRef = await addDoc(collection(db, "drafts"), draft);
+			const { id } = await createDraft(reduxUser.uid, draft);
 			setUrls([""]);
 			setPrompt("");
-			router.push(`/app/${docRef.id}`);
+			router.push(`/app/${id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
 		} finally {
@@ -470,7 +468,6 @@ function Hero() {
 				const tag = task.formatLabel || inferred.label;
 				const format = task.params?.format || inferred.format;
 				const draft = {
-					userId: reduxUser.uid,
 					title,
 					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
 					body: task.content,
@@ -484,18 +481,16 @@ function Hero() {
 					}),
 					tag,
 					format,
-					createdAt: serverTimestamp(),
 				};
-				const docRef = await addDoc(collection(db, "drafts"), draft);
+				const { id } = await createDraft(reduxUser.uid, draft);
 				newTasks.push({
 					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
 					label: task.label,
-					id: docRef.id,
-					path: `/app/${docRef.id}`,
+					id,
+					path: `/app/${id}`,
 				});
 			} else if (task.type === "scrape" && task.content) {
 				const draft = {
-					userId: reduxUser.uid,
 					title: task.title || "Scraped",
 					preview: (task.content || "").slice(0, 180),
 					body: task.content || "",
@@ -509,31 +504,28 @@ function Hero() {
 						day: "numeric",
 					}),
 					tag: "Scraped",
-					createdAt: serverTimestamp(),
 				};
-				const docRef = await addDoc(collection(db, "drafts"), draft);
+				const { id } = await createDraft(reduxUser.uid, draft);
 				newTasks.push({
 					type: "scrape",
 					label: task.label,
-					id: docRef.id,
-					path: `/app/${docRef.id}`,
+					id,
+					path: `/app/${id}`,
 				});
 			} else if (task.type === "table" && task.columns) {
-				const docRef = await addDoc(collection(db, "tables"), {
-					userId: reduxUser.uid,
+				const { id } = await createTable(reduxUser.uid, {
 					title: task.title || "Table",
 					description: task.description || "",
 					columns: task.columns,
 					rows: task.rows || [],
 					sourceUrls: task.sourceUrls || [],
 					prompt: userPrompt || "",
-					createdAt: serverTimestamp(),
 				});
 				newTasks.push({
 					type: "table",
 					label: task.label,
-					id: docRef.id,
-					path: `/app/table-creator/${docRef.id}`,
+					id,
+					path: `/app/${id}`,
 				});
 			}
 		}
@@ -690,7 +682,7 @@ function Hero() {
 							creditsUsed > 0 &&
 							idToken
 						) {
-							fetch("/api/agent/inkagent-deduct", {
+							fetch("/api/agent/inkagent", {
 								method: "POST",
 								headers: { "Content-Type": "application/json" },
 								body: JSON.stringify({ idToken, creditsUsed }),
@@ -713,7 +705,7 @@ function Hero() {
 								creditsUsed > 0 &&
 								idToken
 							) {
-								fetch("/api/agent/inkagent-deduct", {
+								fetch("/api/agent/inkagent", {
 									method: "POST",
 									headers: { "Content-Type": "application/json" },
 									body: JSON.stringify({ idToken, creditsUsed }),

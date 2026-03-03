@@ -22,6 +22,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
+import { assetRef } from "../api/userAssets";
 
 /* ─── Builds a fully self-contained HTML file from a card's rendered DOM ─── */
 function wrapStandaloneHTML(innerHTML, igType = "") {
@@ -1261,6 +1262,7 @@ export default function InfographicsModal({
 	title,
 	userId,
 	draftId,
+	docSource = "drafts",
 	savedInfographics = [],
 	onInsertToEditor,
 }) {
@@ -1382,10 +1384,14 @@ export default function InfographicsModal({
 	};
 
 	const handleSaveAll = async () => {
-		if (!draftId || allItems.length === 0 || saving) return;
+		if (!draftId || allItems.length === 0 || saving || !userId) return;
 		setSaving(true);
 		try {
-			await updateDoc(doc(db, "drafts", draftId), { infographics: allItems });
+			const ref =
+				docSource === "assets"
+					? assetRef(userId, draftId)
+					: doc(db, "drafts", draftId);
+			await updateDoc(ref, { infographics: allItems });
 			setSaved(true);
 			setTimeout(() => setSaved(false), 2500);
 		} catch (err) {

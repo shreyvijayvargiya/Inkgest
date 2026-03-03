@@ -16,6 +16,12 @@ import {
 	serverTimestamp,
 } from "firebase/firestore";
 import {
+	listAssets,
+	createDraft,
+	createTable,
+	deleteAsset,
+} from "../../lib/api/userAssets";
+import {
 	getUserCredits,
 	FREE_CREDIT_LIMIT,
 	formatRenewalDate,
@@ -482,48 +488,9 @@ export default function inkgestApp() {
 		}
 		const load = async () => {
 			try {
-				const [draftsSnap, tablesSnap] = await Promise.all([
-					getDocs(
-						query(
-							collection(db, "drafts"),
-							where("userId", "==", reduxUser.uid),
-							orderBy("createdAt", "desc"),
-						),
-					),
-					getDocs(
-						query(
-							collection(db, "tables"),
-							where("userId", "==", reduxUser.uid),
-						),
-					),
-				]);
-				setDrafts(
-					draftsSnap.docs.map((d) => ({
-						id: d.id,
-						type: "draft",
-						...d.data(),
-					})),
-				);
-				setTables(
-					tablesSnap.docs.map((d) => {
-						const data = d.data();
-						const created = data.createdAt;
-						const date =
-							created?.toDate?.()?.toLocaleDateString?.("en-US", {
-								weekday: "short",
-								month: "short",
-								day: "numeric",
-							}) ?? "";
-						return {
-							id: d.id,
-							type: "table",
-							title: data.title,
-							description: data.description,
-							createdAt: created,
-							date,
-						};
-					}),
-				);
+				const items = await listAssets(reduxUser.uid);
+				setDrafts(items.filter((i) => i.type === "draft"));
+				setTables(items.filter((i) => i.type === "table"));
 			} catch (e) {
 				console.error("Failed to load drafts/tables", e);
 			}
@@ -676,7 +643,6 @@ export default function inkgestApp() {
 			});
 
 			const draft = {
-				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content,
@@ -686,12 +652,11 @@ export default function inkgestApp() {
 				tag: data.formatLabel || "Newsletter",
 				format: data.format || format,
 				style: data.style || style,
-				createdAt: serverTimestamp(),
 			};
 
-			const docRef = await addDoc(collection(db, "drafts"), draft);
+			const { id } = await createDraft(reduxUser.uid, draft);
 			setDrafts((prev) => [
-				{ id: docRef.id, ...draft, createdAt: new Date() },
+				{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
 				...prev,
 			]);
 			setUrls([""]);
@@ -701,7 +666,7 @@ export default function inkgestApp() {
 				getUserCredits(reduxUser.uid)
 					.then(setCredits)
 					.catch(() => {});
-			router.push(`/app/${docRef.id}`);
+			router.push(`/app/${id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
 		} finally {
@@ -730,11 +695,11 @@ export default function inkgestApp() {
 	};
 
 	const confirmDelete = async () => {
-		if (!deleteConfirm) return;
+		if (!deleteConfirm || !reduxUser) return;
 		const item = sidebarItems.find((i) => i.id === deleteConfirm);
-		const coll = item?.type === "table" ? "tables" : "drafts";
+		const source = item?.source || (item?.type === "table" ? "tables" : "drafts");
 		try {
-			await deleteDoc(doc(db, coll, deleteConfirm));
+			await deleteAsset(reduxUser.uid, deleteConfirm, source);
 			if (item?.type === "table") {
 				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
 			} else {
@@ -818,7 +783,6 @@ export default function inkgestApp() {
 			const preview = (data.content || "").slice(0, 180);
 
 			const draft = {
-				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content || "",
@@ -827,11 +791,10 @@ export default function inkgestApp() {
 				words,
 				date,
 				tag: "Scraped",
-				createdAt: serverTimestamp(),
 			};
-			const docRef = await addDoc(collection(db, "drafts"), draft);
+			const { id } = await createDraft(reduxUser.uid, draft);
 			setDrafts((prev) => [
-				{ id: docRef.id, ...draft, createdAt: new Date() },
+				{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
 				...prev,
 			]);
 			setScrapeUrl("");
@@ -840,7 +803,7 @@ export default function inkgestApp() {
 				getUserCredits(reduxUser.uid)
 					.then(setCredits)
 					.catch(() => {});
-			router.push(`/app/${docRef.id}`);
+			router.push(`/app/${id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Scrape failed");
 		} finally {
@@ -866,14 +829,10 @@ export default function inkgestApp() {
 		}
 		if (task.type === "newsletter")
 			return task.label || "Writing newsletter draft…";
-		if (task.type === "linkedin")
-			return task.label || "Writing LinkedIn post…";
-		if (task.type === "blog_post")
-			return task.label || "Writing blog post…";
-		if (task.type === "twitter_thread")
-			return task.label || "Creating thread…";
-		if (task.type === "email_digest")
-			return task.label || "Creating digest…";
+		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
+		if (task.type === "blog_post") return task.label || "Writing blog post…";
+		if (task.type === "twitter_thread") return task.label || "Creating thread…";
+		if (task.type === "email_digest") return task.label || "Creating digest…";
 		if (task.type === "table") return task.label || "Creating table…";
 		return task.label || "Processing…";
 	};
@@ -960,7 +919,9 @@ export default function inkgestApp() {
 							"";
 						if (text)
 							setAgentThinking((prev) =>
-								prev ? prev + "\n\n" + String(text).trim() : String(text).trim(),
+								prev
+									? prev + "\n\n" + String(text).trim()
+									: String(text).trim(),
 							);
 					} else if (data.type === "start") {
 						const thinkingText =
@@ -994,8 +955,7 @@ export default function inkgestApp() {
 						);
 					} else if (data.type === "task") {
 						const idx = data.index ?? 0;
-						const label =
-							data.taskLabel || data.label || `Task ${idx + 1}`;
+						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
 						const status = data.success ? "done" : "error";
 						setAgentRunSteps((prev) => {
 							const next = [...prev];
@@ -1021,12 +981,8 @@ export default function inkgestApp() {
 							);
 						}
 						const creditsUsed = data.creditsUsed;
-						if (
-							typeof creditsUsed === "number" &&
-							creditsUsed > 0 &&
-							idToken
-						) {
-							fetch("/api/agent/inkagent-deduct", {
+						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
+							fetch("/api/agent/inkagent", {
 								method: "POST",
 								headers: { "Content-Type": "application/json" },
 								body: JSON.stringify({ idToken, creditsUsed }),
@@ -1053,7 +1009,7 @@ export default function inkgestApp() {
 								creditsUsed > 0 &&
 								idToken
 							) {
-								fetch("/api/agent/inkagent-deduct", {
+								fetch("/api/agent/inkagent", {
 									method: "POST",
 									headers: { "Content-Type": "application/json" },
 									body: JSON.stringify({ idToken, creditsUsed }),
@@ -1089,8 +1045,7 @@ export default function inkgestApp() {
 			"email_digest",
 		];
 		for (const task of executed) {
-			const isContentDraft =
-				CONTENT_TYPES.includes(task.type) && task.content;
+			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
 			if (isContentDraft) {
 				const lines = (task.content || "").split("\n");
 				const titleLine = lines.find(
@@ -1108,7 +1063,6 @@ export default function inkgestApp() {
 				const tag = task.formatLabel || inferred.label;
 				const format = task.params?.format || inferred.format;
 				const draft = {
-					userId: reduxUser.uid,
 					title,
 					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
 					body: task.content,
@@ -1122,22 +1076,20 @@ export default function inkgestApp() {
 					}),
 					tag,
 					format,
-					createdAt: serverTimestamp(),
 				};
-				const docRef = await addDoc(collection(db, "drafts"), draft);
+				const { id } = await createDraft(reduxUser.uid, draft);
 				setDrafts((prev) => [
-					{ id: docRef.id, ...draft, createdAt: new Date() },
+					{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
 					...prev,
 				]);
 				newTasks.push({
 					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
 					label: task.label,
-					id: docRef.id,
-					path: `/app/${docRef.id}`,
+					id,
+					path: `/app/${id}`,
 				});
 			} else if (task.type === "scrape" && task.content) {
 				const draft = {
-					userId: reduxUser.uid,
 					title: task.title || "Scraped",
 					preview: (task.content || "").slice(0, 180),
 					body: task.content || "",
@@ -1151,35 +1103,48 @@ export default function inkgestApp() {
 						day: "numeric",
 					}),
 					tag: "Scraped",
-					createdAt: serverTimestamp(),
 				};
-				const docRef = await addDoc(collection(db, "drafts"), draft);
+				const { id } = await createDraft(reduxUser.uid, draft);
 				setDrafts((prev) => [
-					{ id: docRef.id, ...draft, createdAt: new Date() },
+					{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
 					...prev,
 				]);
 				newTasks.push({
 					type: "scrape",
 					label: task.label,
-					id: docRef.id,
-					path: `/app/${docRef.id}`,
+					id,
+					path: `/app/${id}`,
 				});
 			} else if (task.type === "table" && task.columns) {
-				const docRef = await addDoc(collection(db, "tables"), {
-					userId: reduxUser.uid,
+				const { id } = await createTable(reduxUser.uid, {
 					title: task.title || "Generated Table",
 					description: task.description || "",
 					columns: task.columns || [],
 					rows: task.rows || [],
 					sourceUrls: task.sourceUrls || [],
 					prompt: userPrompt || "",
-					createdAt: serverTimestamp(),
 				});
+				setTables((prev) => [
+					{
+						id,
+						type: "table",
+						title: task.title || "Generated Table",
+						description: task.description || "",
+						createdAt: new Date(),
+						date: new Date().toLocaleDateString("en-US", {
+							weekday: "short",
+							month: "short",
+							day: "numeric",
+						}),
+						source: "assets",
+					},
+					...prev,
+				]);
 				newTasks.push({
 					type: "table",
 					label: task.label,
-					id: docRef.id,
-					path: `/app/${docRef.id}`,
+					id,
+					path: `/app/${id}`,
 				});
 			}
 		}
@@ -1200,7 +1165,6 @@ export default function inkgestApp() {
 			day: "numeric",
 		});
 		const draft = {
-			userId: reduxUser.uid,
 			title,
 			preview: "",
 			body: "",
@@ -1208,15 +1172,14 @@ export default function inkgestApp() {
 			words: 0,
 			date,
 			tag: "Draft",
-			createdAt: serverTimestamp(),
 		};
-		const docRef = await addDoc(collection(db, "drafts"), draft);
+		const { id } = await createDraft(reduxUser.uid, draft);
 		setDrafts((prev) => [
-			{ id: docRef.id, ...draft, createdAt: new Date() },
+			{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
 			...prev,
 		]);
 		setBlankTitle("");
-		router.push(`/app/${docRef.id}`);
+		router.push(`/app/${id}`);
 	};
 
 	return (
@@ -1749,16 +1712,29 @@ export default function inkgestApp() {
 								}}
 							>
 								{/* Input section — URL chips + textarea attached */}
-								<div
-									className="flex flex-col gap-0 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50"
-								>
+								<div className="flex flex-col gap-0 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50">
 									{/* URL chips parsed from prompt — above textarea */}
 									{(() => {
-										const urlRegex = /https?:\/\/[^\s]+/g;
-										const extracted = (agentPrompt.match(urlRegex) || [])
+										const fullUrlRegex = /https?:\/\/[^\s]+/g;
+										const bareDomainRegex =
+											/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog|to|me|info|edu|gov)\b/gi;
+										const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
 											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
 											.filter(Boolean);
-										const unique = [...new Set(extracted)];
+										const bareDomains = (agentPrompt.match(bareDomainRegex) || [])
+											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
+											.filter(Boolean);
+										const unique = [
+											...new Set([
+												...fullUrls,
+												...bareDomains.filter(
+													(b) =>
+														!fullUrls.some(
+															(f) => f.includes(b) || f.includes(`https://${b}`),
+														),
+												),
+											]),
+										].filter(Boolean);
 										if (unique.length === 0) return null;
 										return (
 											<div
@@ -1936,7 +1912,7 @@ export default function inkgestApp() {
 												);
 											})()}
 										</div>
-									</div> 
+									</div>
 								</div>
 								<div
 									style={{
@@ -2637,14 +2613,10 @@ export default function inkgestApp() {
 									>
 										Your angle / prompt *
 									</label>
-									<div
-										className="flex flex-col gap-0 bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden"
-									>
+									<div className="flex flex-col gap-0 bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden">
 										{/* URL chips above prompt */}
 										{urls.filter(Boolean).length > 0 && (
-											<div
-												className="flex flex-wrap gap-2 px-2 py-1 "
-											>
+											<div className="flex flex-wrap gap-2 px-2 py-1 ">
 												{urls.map((urlVal, idx) =>
 													urlVal.trim() ? (
 														<motion.div
@@ -3121,7 +3093,7 @@ export default function inkgestApp() {
 								position: "fixed",
 								top: "50%",
 								left: "50%",
-								transform: "translate(-50%,-50%)",
+								transform: "translate(-40%,-40%)",
 								background: T.surface,
 								border: `1px solid ${T.border}`,
 								borderRadius: 16,

@@ -19,6 +19,13 @@ import {
 	where,
 	updateDoc,
 } from "firebase/firestore";
+import {
+	listAssets,
+	getAsset,
+	updateAsset,
+	deleteAsset,
+	assetRef,
+} from "../../lib/api/userAssets";
 import { uploadFile } from "../../lib/api/upload";
 import {
 	getUserCredits,
@@ -803,10 +810,12 @@ export default function DraftPage() {
 		navigateWithTabs(target, next);
 	};
 
-	/* Lookup draft title by id (from drafts list or current draft) */
+	/* Lookup draft title by id (from drafts list, tables list, or current doc) */
 	const getTabTitle = (id) => {
 		if (draft?.id === id) return draft?.title || "Untitled";
-		const d = drafts.find((x) => x.id === id);
+		if (docData?.type === "table" && docData.doc?.id === id)
+			return docData.doc.title || "Untitled";
+		const d = drafts.find((x) => x.id === id) || tables.find((x) => x.id === id);
 		return d?.title || "Untitled";
 	};
 
@@ -837,98 +846,35 @@ export default function DraftPage() {
 	const [previewData, setPreviewData] = useState({ title: "", htmlDoc: "" });
 	const [editorFont, setEditorFont] = useState("Outfit");
 	const [editorFontSize, setEditorFontSize] = useState(15);
+	const [localTableData, setLocalTableData] = useState(null);
 	const editorRef = useRef(null);
 	const titleRef = useRef(null);
 	const imageFileInputRef = useRef(null);
 	const editorContainerRef = useRef(null);
 
-	/* All drafts for sidebar */
-	const { data: drafts = [] } = useQuery({
-		queryKey: ["drafts", reduxUser?.uid],
-		queryFn: async () => {
-			const q = query(
-				collection(db, "drafts"),
-				where("userId", "==", reduxUser.uid),
-				orderBy("createdAt", "desc"),
-			);
-			const snap = await getDocs(q);
-			return snap.docs.map((d) => ({ id: d.id, type: "draft", ...d.data() }));
-		},
+	/* All assets (drafts + tables) — from users/uid/assets or fallback to drafts+tables */
+	const { data: items = [] } = useQuery({
+		queryKey: ["assets", reduxUser?.uid],
+		queryFn: () => listAssets(reduxUser.uid),
 		enabled: !!reduxUser,
 		staleTime: 2 * 60 * 1000,
 	});
 
-	/* All tables for sidebar */
-	const { data: tables = [] } = useQuery({
-		queryKey: ["tables", reduxUser?.uid],
-		queryFn: async () => {
-			const q = query(
-				collection(db, "tables"),
-				where("userId", "==", reduxUser.uid),
-			);
-			const snap = await getDocs(q);
-			return snap.docs.map((d) => {
-				const data = d.data();
-				const created = data.createdAt;
-				const date =
-					created?.toDate?.()?.toLocaleDateString?.("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}) ?? "";
-				return {
-					id: d.id,
-					type: "table",
-					title: data.title,
-					description: data.description,
-					createdAt: created,
-					date,
-				};
-			});
-		},
-		enabled: !!reduxUser,
-		staleTime: 2 * 60 * 1000,
-	});
+	const drafts = useMemo(
+		() => items.filter((i) => i.type === "draft"),
+		[items],
+	);
+	const tables = useMemo(
+		() => items.filter((i) => i.type === "table"),
+		[items],
+	);
 
-	/* Merged items (drafts + tables) sorted by date */
-	const items = useMemo(() => {
-		const merged = [...drafts, ...tables];
-		merged.sort((a, b) => {
-			const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
-			const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
-			return bT - aT;
-		});
-		return merged;
-	}, [drafts, tables]);
-
-	/* Single doc by ID — try drafts first, then tables */
+	/* Single doc by ID — assets first, then drafts, then tables */
 	const { data: docData, isLoading: loadingDraft } = useQuery({
-		queryKey: ["doc", draftId],
+		queryKey: ["doc", draftId, reduxUser?.uid],
 		queryFn: async () => {
-			const draftSnap = await getDoc(doc(db, "drafts", draftId));
-			if (draftSnap.exists()) {
-				return {
-					type: "draft",
-					doc: { id: draftSnap.id, ...draftSnap.data() },
-				};
-			}
-			const tableSnap = await getDoc(doc(db, "tables", draftId));
-			if (tableSnap.exists()) {
-				const data = tableSnap.data();
-				if (data.userId !== reduxUser?.uid) return null;
-				return {
-					type: "table",
-					doc: {
-						id: tableSnap.id,
-						title: data.title,
-						description: data.description,
-						columns: data.columns || [],
-						rows: data.rows || [],
-						sourceUrls: data.sourceUrls || [],
-						prompt: data.prompt || "",
-					},
-				};
-			}
+			const result = await getAsset(reduxUser.uid, draftId);
+			if (result) return result;
 			router.replace("/app");
 			return null;
 		},
@@ -938,6 +884,22 @@ export default function DraftPage() {
 	});
 
 	const draft = docData?.type === "draft" ? docData.doc : null;
+	const tableDoc = docData?.type === "table" ? docData.doc : null;
+
+	useEffect(() => {
+		if (tableDoc) {
+			setLocalTableData({
+				title: tableDoc.title,
+				description: tableDoc.description,
+				columns: tableDoc.columns || [],
+				rows: tableDoc.rows || [],
+				sourceUrls: tableDoc.sourceUrls || [],
+				prompt: tableDoc.prompt || "",
+			});
+		} else {
+			setLocalTableData(null);
+		}
+	}, [draftId, tableDoc?.id]);
 
 	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
@@ -1044,7 +1006,12 @@ export default function DraftPage() {
 		if (!draftId) return;
 		try {
 			const html = editorRef.current?.innerHTML || "";
-			await updateDoc(doc(db, "drafts", draftId), { body: html });
+			await updateAsset(
+				reduxUser.uid,
+				draftId,
+				{ body: html },
+				docData?.source || "drafts",
+			);
 		} catch (e) {
 			console.error("Save failed", e);
 		}
@@ -1346,8 +1313,10 @@ export default function DraftPage() {
 
 	const confirmDelete = async () => {
 		try {
-			await deleteDoc(doc(db, "drafts", deleteConfirm));
-			queryClient.setQueryData(["drafts", reduxUser?.uid], (old = []) =>
+			const item = items.find((i) => i.id === deleteConfirm);
+			const source = item?.source || (tables.some((t) => t.id === deleteConfirm) ? "tables" : "drafts");
+			await deleteAsset(reduxUser.uid, deleteConfirm, source);
+			queryClient.setQueryData(["assets", reduxUser?.uid], (old = []) =>
 				old.filter((d) => d.id !== deleteConfirm),
 			);
 			if (deleteConfirm === draftId) {
@@ -1893,7 +1862,7 @@ export default function DraftPage() {
 						minWidth: 0,
 					}}
 				>
-					{loadingDraft && !draft && draftId && (
+					{loadingDraft && !draft && !tableDoc && draftId && (
 						<div
 							style={{
 								flex: 1,
@@ -3341,6 +3310,43 @@ export default function DraftPage() {
 							</div>
 						</motion.div>
 					)}
+					{tableDoc && localTableData && (
+						<motion.div
+							key={`table-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<div
+								style={{
+									flex: 1,
+									overflowY: "auto",
+									maxWidth: 1100,
+									margin: "0 auto",
+									width: "100%",
+									padding: "28px 20px",
+								}}
+							>
+								<TableView
+									tableId={draftId}
+									tableData={localTableData}
+									setTableData={setLocalTableData}
+									reduxUser={reduxUser}
+									tableDocRef={
+										docData?.source === "assets" && reduxUser?.uid
+											? assetRef(reduxUser.uid, draftId)
+											: null
+									}
+								/>
+							</div>
+						</motion.div>
+					)}
 				</div>
 
 				{/* ── RIGHT PANEL — AI Chat (inline, not overlay) ── */}
@@ -3902,7 +3908,7 @@ export default function DraftPage() {
 								position: "fixed",
 								top: "50%",
 								left: "50%",
-								transform: "translate(-50%,-50%)",
+								transform: "translate(-40%,-40%)",
 								background: T.surface,
 								border: `1px solid ${T.border}`,
 								borderRadius: 16,
@@ -3984,6 +3990,7 @@ export default function DraftPage() {
 				title={draft?.title || "Draft"}
 				userId={reduxUser?.uid || ""}
 				draftId={draftId}
+				docSource={docData?.source || "drafts"}
 				savedInfographics={draft?.infographics || []}
 				onInsertToEditor={(html) => {
 					editorRef.current?.focus();

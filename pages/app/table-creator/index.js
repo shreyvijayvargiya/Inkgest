@@ -12,14 +12,13 @@ import {
 } from "@tanstack/react-table";
 import {
 	collection,
-	addDoc,
 	getDocs,
 	doc,
 	query,
 	where,
-	serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/config/firebase";
+import { listAssets, createTable } from "../../../lib/api/userAssets";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
 import { getTheme } from "../../../lib/utils/theme";
 
@@ -199,12 +198,10 @@ export default function TableCreatorIndex() {
 		}
 		const load = async () => {
 			try {
-				const q = query(
-					collection(db, "tables"),
-					where("userId", "==", reduxUser.uid),
-				);
-				const snap = await getDocs(q);
-				const tables = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+				const items = await listAssets(reduxUser.uid);
+				const tables = items
+					.filter((i) => i.type === "table")
+					.map((t) => ({ id: t.id, title: t.title, ...t }));
 				tables.sort((a, b) => {
 					const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
 					const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
@@ -377,20 +374,18 @@ export default function TableCreatorIndex() {
 		if (!displayTableData || !reduxUser || saving) return;
 		setSaving(true);
 		try {
-			const docRef = await addDoc(collection(db, "tables"), {
-				userId: reduxUser.uid,
+			const { id } = await createTable(reduxUser.uid, {
 				title: displayTableData.title || "Untitled Table",
 				description: displayTableData.description || "",
 				columns: displayTableData.columns || [],
 				rows: displayTableData.rows || [],
 				sourceUrls: displayTableData.sourceUrls || [displayTableData.sourceUrl].filter(Boolean),
-				createdAt: serverTimestamp(),
 			});
 			setSavedTables((prev) => [
-				{ id: docRef.id, title: displayTableData.title, createdAt: new Date() },
+				{ id, title: displayTableData.title, createdAt: new Date() },
 				...prev,
 			]);
-			router.push(`/app/${docRef.id}`);
+			router.push(`/app/${id}`);
 		} catch (e) {
 			console.error("Save failed", e);
 		} finally {
