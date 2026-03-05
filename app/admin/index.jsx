@@ -6,24 +6,13 @@ import HomeTab from "./components/HomeTab";
 import BlogTab from "./components/BlogTab";
 import EmailTab from "./components/EmailTab";
 import KanbanBoardTab from "./components/KanbanBoardTab";
-import IdeaDatabaseTab from "./components/IdeaDatabaseTab";
 import SubscribersTab from "./components/SubscribersTab";
 import UsersTab from "./components/UsersTab";
 import CustomersTab from "./components/CustomersTab";
 import PaymentsTab from "./components/PaymentsTab";
-import MessagesTab from "./components/MessagesTab";
-import InvoiceTab from "./components/InvoiceTab";
-import WaitlistTab from "./components/WaitlistTab";
-import ReportIssuesTab from "./components/ReportIssuesTab";
-import ProductsTab from "./components/ProductsTab";
 import TeamsTab from "./components/TeamsTab";
 import CreditsSettingsTab from "./components/CreditsSettingsTab";
-import FormsTab from "./components/FormsTab";
-import ChangelogTab from "./components/ChangelogTab";
-import AssetsTab from "./components/AssetsTab";
 import AnalyticsTab from "./components/AnalyticsTab";
-import CronJobsTab from "./components/CronJobsTab";
-import DocsEditorTab from "./components/DocsEditorTab";
 import SearchModal from "./components/SearchModal";
 import Sidebar from "./components/Sidebar";
 import { onAuthStateChange } from "../../lib/api/auth";
@@ -38,8 +27,6 @@ import {
 	setUserCookie,
 } from "../../lib/utils/cookies";
 import { useAppQueryClient } from "../../lib/hooks/useQueryClient";
-import WorkflowAutomationsTab from "./components/WorkflowTab";
-import TablesTab from "./components/TablesTab";
 import { useRouter } from "next/router";
 
 const Admin = () => {
@@ -59,7 +46,7 @@ const Admin = () => {
 		if (id !== "tables") {
 			setSelectedTable(null);
 		}
-	}
+	};
 	// Modal states
 	const [showConfirmModal, setShowConfirmModal] = useState(false);
 	const [confirmAction, setConfirmAction] = useState(null);
@@ -71,7 +58,7 @@ const Admin = () => {
 
 	const router = useRouter();
 	const pathname = router?.query?.path || "home";
-	
+
 	useEffect(() => {
 		if (pathname) {
 			setActiveTab(pathname);
@@ -223,16 +210,7 @@ const Admin = () => {
 							{activeTab === "kanban-board" && (
 								<KanbanBoardTab queryClient={queryClient} />
 							)}
-							{activeTab === "idea-database" && (
-								<IdeaDatabaseTab queryClient={queryClient} />
-							)}
-							{activeTab === "assets" && (
-								<AssetsTab queryClient={queryClient} />
-							)}
-							{activeTab === "cron-jobs" && (
-								<CronJobsTab queryClient={queryClient} />
-							)}
-							{activeTab === "docs-editor" && <DocsEditorTab />}
+
 							{activeTab === "subscribers" && (
 								<SubscribersTab queryClient={queryClient} />
 							)}
@@ -241,34 +219,7 @@ const Admin = () => {
 							{activeTab === "payments" && (
 								<PaymentsTab queryClient={queryClient} />
 							)}
-							{activeTab === "invoices" && (
-								<InvoiceTab queryClient={queryClient} />
-							)}
-							{activeTab === "products" && (
-								<ProductsTab queryClient={queryClient} />
-							)}
-							{activeTab === "messages" && (
-								<MessagesTab queryClient={queryClient} />
-							)}
-							{activeTab === "forms" && <FormsTab queryClient={queryClient} />}
-							{activeTab === "changelog" && (
-								<ChangelogTab queryClient={queryClient} />
-							)}
-							{activeTab === "workflows" && <WorkflowAutomationsTab />}
-							{activeTab === "tables" && (
-								<TablesTab
-									queryClient={queryClient}
-									selectedTable={selectedTable}
-									onTableSelect={setSelectedTable}
-								/>
-							)}
-							{activeTab === "waitlist" && (
-								<WaitlistTab queryClient={queryClient} />
-							)}
 							{activeTab === "analytics" && <AnalyticsTab />}
-							{activeTab === "reportIssues" && (
-								<ReportIssuesTab queryClient={queryClient} />
-							)}
 							{activeTab === "teams" && <TeamsTab queryClient={queryClient} />}
 							{activeTab === "credits" && (
 								<CreditsSettingsTab queryClient={queryClient} />

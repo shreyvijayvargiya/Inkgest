@@ -95,60 +95,14 @@ const DEFAULT_NAV_STRUCTURE = [
 			{ id: "blogs", label: "Blogs", icon: "FileText" },
 			{ id: "emails", label: "Emails", icon: "Mail" },
 			{ id: "kanban-board", label: "Kanban Board", icon: "LayoutGrid" },
-			{ id: "idea-database", label: "Idea Database", icon: "Lightbulb" },
-			{ id: "assets", label: "Assets", icon: "FolderOpen" },
-			{ id: "cron-jobs", label: "CRON Jobs", icon: "Clock" },
+			,
 		],
 	},
-	{
-		id: "audience",
-		title: "Audience",
-		items: [
-			{ id: "subscribers", label: "Email Subscribers", icon: "User" },
-			{ id: "users", label: "Users", icon: "Users" },
-			{ id: "customers", label: "Customers", icon: "Building2" },
-			{ id: "waitlist", label: "Waitlist", icon: "UsersRound" },
-			{ id: "analytics", label: "Analytics", icon: "Eye" },
-		],
-	},
+
 	{
 		id: "financial",
 		title: "Financial",
-		items: [
-			{ id: "payments", label: "Payments", icon: "CreditCard" },
-			{ id: "invoices", label: "Invoices", icon: "Receipt" },
-			{ id: "products", label: "Products", icon: "ShoppingBag" },
-		],
-	},
-	{
-		id: "communication",
-		title: "Communication",
-		items: [
-			{ id: "messages", label: "Messages", icon: "MessageSquare" },
-			{ id: "forms", label: "Forms", icon: "FileEdit" },
-		],
-	},
-	{
-		id: "support",
-		title: "Support",
-		items: [
-			{ id: "reportIssues", label: "Report Issues", icon: "AlertCircle" },
-		],
-	},
-	{
-		id: "frontend",
-		title: "Frontend",
-		items: [{ id: "changelog", label: "Changelog", icon: "GitBranch" }],
-	},
-	{
-		id: "automations",
-		title: "Automations",
-		items: [{ id: "workflows", label: "Workflows", icon: "Bot" }],
-	},
-	{
-		id: "Database",
-		title: "Database",
-		items: [{ id: "tables", label: "Tables", icon: "Table2" }],
+		items: [{ id: "payments", label: "Payments", icon: "CreditCard" }],
 	},
 	{
 		id: "settings",
@@ -182,8 +136,9 @@ const SortableNavItem = ({ item, activeTab, onSelect }) => {
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`group relative flex items-center rounded-xl transition-all ${isDragging ? "bg-zinc-50 ring-2 ring-zinc-200 shadow-sm z-50" : ""
-				}`}
+			className={`group relative flex items-center rounded-xl transition-all ${
+				isDragging ? "bg-zinc-50 ring-2 ring-zinc-200 shadow-sm z-50" : ""
+			}`}
 		>
 			<button
 				{...attributes}
@@ -194,10 +149,11 @@ const SortableNavItem = ({ item, activeTab, onSelect }) => {
 			</button>
 			<button
 				onClick={() => onSelect(item.id)}
-				className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors rounded-xl flex items-center gap-2 ${activeTab === item.id
+				className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors rounded-xl flex items-center gap-2 ${
+					activeTab === item.id
 						? "bg-zinc-100 text-zinc-900"
 						: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-					}`}
+				}`}
 			>
 				<Icon className="w-3.5 h-3.5" />
 				{item.label}
@@ -226,10 +182,11 @@ const SortableCategory = ({ category, activeTab, onSelect }) => {
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`pt-2 group/category rounded-xl transition-all ${isDragging
+			className={`pt-2 group/category rounded-xl transition-all ${
+				isDragging
 					? "bg-white ring-2 ring-zinc-100 shadow-lg z-50 px-1 pb-2"
 					: ""
-				}`}
+			}`}
 		>
 			<div className="flex items-center justify-between mb-1">
 				<p className="px-2.5 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
@@ -453,8 +410,8 @@ const Sidebar = ({
 
 	const activeItem = activeId
 		? navStructure
-			.flatMap((cat) => [cat, ...cat.items])
-			.find((item) => item.id === activeId)
+				.flatMap((cat) => [cat, ...cat.items])
+				.find((item) => item.id === activeId)
 		: null;
 
 	const isCategory = (id) => navStructure.some((cat) => cat.id === id);
@@ -476,8 +433,9 @@ const Sidebar = ({
 						<span className="text-xs font-medium">Inkgest Admin</span>
 						{isMobile && (
 							<ChevronDown
-								className={`w-4 h-4 ml-auto text-zinc-400 transition-transform ${isProjectDropdownOpen ? "rotate-180" : ""
-									}`}
+								className={`w-4 h-4 ml-auto text-zinc-400 transition-transform ${
+									isProjectDropdownOpen ? "rotate-180" : ""
+								}`}
 							/>
 						)}
 					</motion.button>
@@ -599,13 +557,6 @@ const Sidebar = ({
 
 			{/* Footer Section */}
 			<div className="mt-auto pt-4 space-y-2 border-t border-zinc-100">
-				<a
-					className="flex gap-2 items-center px-2 py-1.5 cursor-pointer text-xs font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
-					href="/docs"
-					target="_blank"
-				>
-					<ExternalLink className="w-3 h-3" /> Read Docs
-				</a>
 				<button
 					onClick={() => setShowLoginModal(true)}
 					className="w-full px-2.5 py-1.5 text-xs font-medium transition-colors rounded-xl flex items-center gap-2 bg-zinc-100 hover:bg-zinc-200 text-black"
@@ -615,22 +566,6 @@ const Sidebar = ({
 						{user ? user.displayName || "Logged In" : "Login"}
 					</span>
 				</button>
-
-				<div className="p-3 bg-white border border-zinc-200 rounded-xl shadow-sm">
-					<p className="font-bold text-zinc-900 text-sm">Inkgest PRO</p>
-					<p className="text-[10px] text-zinc-500 mt-1 mb-2 leading-relaxed">
-						Build SAAS applications 10x Faster. The complete boilerplate for
-						developers.
-					</p>
-					<a
-						className="block text-center bg-zinc-900 text-white text-[10px] py-1.5 rounded-xl font-medium hover:bg-zinc-800 transition-colors"
-						target="_blank"
-						rel="noopener noreferrer"
-						href="https://buy.polar.sh/polar_cl_4DKKA9Ohkz60mo6VtK0VetQLUkkS5lWnjpeRv4Y9rPK"
-					>
-						Get PRO Access
-					</a>
-				</div>
 			</div>
 		</div>
 	);
