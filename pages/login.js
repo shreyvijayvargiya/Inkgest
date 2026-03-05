@@ -3,8 +3,6 @@ import LoginModal from "../lib/ui/LoginModal";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 
-
-
 export default function Login() {
 	const [isOpen, setIsOpen] = useState(false);
 	const { user } = useSelector((state) => state.user);

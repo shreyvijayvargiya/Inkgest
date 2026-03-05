@@ -28,8 +28,16 @@ const T = {
 function formatCreatedAt(doc) {
 	const ts = doc?.createdAt;
 	if (!ts) return null;
-	const d = ts?.toDate?.() ?? (typeof ts === "object" && ts?.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
-	return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+	const d =
+		ts?.toDate?.() ??
+		(typeof ts === "object" && ts?.seconds
+			? new Date(ts.seconds * 1000)
+			: new Date(ts));
+	return d.toLocaleDateString(undefined, {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
 }
 
 function serializeInfographicsForApi(doc) {
@@ -49,7 +57,13 @@ function serializeInfographicsForApi(doc) {
 	return parts.filter(Boolean).join("\n");
 }
 
-export default function InfographicsAssetView({ doc, userId, assetId, docSource, onUpdate }) {
+export default function InfographicsAssetView({
+	doc,
+	userId,
+	assetId,
+	docSource,
+	onUpdate,
+}) {
 	const [generating, setGenerating] = useState(false);
 	const [error, setError] = useState("");
 
@@ -73,7 +87,7 @@ export default function InfographicsAssetView({ doc, userId, assetId, docSource,
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
 			const excludeTypes = infographics.map((ig) => ig.type);
-			const res = await fetch("/api/automations/infographics-generate", {
+			const res = await fetch("/api/agent/inkagent", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -87,7 +101,12 @@ export default function InfographicsAssetView({ doc, userId, assetId, docSource,
 			if (!res.ok) throw new Error(data.error || "Generation failed");
 			const newBatch = data.infographics || [];
 			if (newBatch.length > 0) {
-				await updateAsset(userId, assetId, { infographics: [...infographics, ...newBatch] }, docSource);
+				await updateAsset(
+					userId,
+					assetId,
+					{ infographics: [...infographics, ...newBatch] },
+					docSource,
+				);
 				onUpdate?.();
 			}
 		} catch (err) {
@@ -95,7 +114,16 @@ export default function InfographicsAssetView({ doc, userId, assetId, docSource,
 		} finally {
 			setGenerating(false);
 		}
-	}, [doc, infographics, userId, assetId, docSource, onUpdate, generating, canGenerateMore]);
+	}, [
+		doc,
+		infographics,
+		userId,
+		assetId,
+		docSource,
+		onUpdate,
+		generating,
+		canGenerateMore,
+	]);
 
 	if (infographics.length === 0) {
 		return (
@@ -111,11 +139,27 @@ export default function InfographicsAssetView({ doc, userId, assetId, docSource,
 				}}
 			>
 				<p style={{ fontSize: 32, marginBottom: 12 }}>📊</p>
-				<p style={{ fontSize: 16, fontWeight: 600, color: T.accent, marginBottom: 8 }}>
+				<p
+					style={{
+						fontSize: 16,
+						fontWeight: 600,
+						color: T.accent,
+						marginBottom: 8,
+					}}
+				>
 					No infographics yet
 				</p>
-				<p style={{ fontSize: 13, color: T.muted, textAlign: "center", maxWidth: 320 }}>
-					{prompt ? `Prompt: ${prompt}` : "This asset has no infographics data."}
+				<p
+					style={{
+						fontSize: 13,
+						color: T.muted,
+						textAlign: "center",
+						maxWidth: 320,
+					}}
+				>
+					{prompt
+						? `Prompt: ${prompt}`
+						: "This asset has no infographics data."}
 				</p>
 			</div>
 		);
@@ -201,7 +245,15 @@ export default function InfographicsAssetView({ doc, userId, assetId, docSource,
 				</div>
 
 				{canGenerateMore && (
-					<div style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+					<div
+						style={{
+							marginTop: 24,
+							display: "flex",
+							flexDirection: "column",
+							alignItems: "flex-start",
+							gap: 8,
+						}}
+					>
 						<button
 							type="button"
 							onClick={handleGenerateMore}

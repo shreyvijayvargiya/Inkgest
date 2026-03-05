@@ -65,21 +65,6 @@ const PRESETS = [
 	},
 ];
 
-/* ── Format / Style config (mirrors app) ── */
-const FORMATS = [
-	{ id: "substack", label: "Newsletter", icon: "✉️" },
-	{ id: "linkedin", label: "LinkedIn", icon: "💼" },
-	{ id: "twitter_thread", label: "Thread", icon: "🐦" },
-	{ id: "blog_post", label: "Blog Post", icon: "📝" },
-	{ id: "email_digest", label: "Digest", icon: "📰" },
-];
-const STYLES = [
-	{ id: "casual", label: "Casual" },
-	{ id: "professional", label: "Professional" },
-	{ id: "educational", label: "Educational" },
-	{ id: "persuasive", label: "Persuasive" },
-];
-
 /* ── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ── */
 const AGENT_PROMPT_SUGGESTIONS = [
 	"Find Hacker News latest news and create a summary of the top stories.",
@@ -227,14 +212,8 @@ function Hero() {
 	const pendingGenerateRef = useRef(false);
 	const pendingAgentRef = useRef(false);
 
-	const [urls, setUrls] = useState([""]);
-	const [prompt, setPrompt] = useState("");
-	const [format, setFormat] = useState("substack");
-	const [style, setStyle] = useState("casual");
-	const [generating, setGenerating] = useState(false);
-	const [generateError, setGenerateError] = useState(null);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
-	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
+	const [credits, setCredits] = useState(null);
 
 	// InkAgent state
 	const [agentPrompt, setAgentPrompt] = useState("");
@@ -252,140 +231,23 @@ function Hero() {
 	const y = useTransform(scrollYProgress, [0, 1], [0, 80]);
 	const opacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
 
-	const addUrl = () => setUrls((prev) => [...prev, ""]);
-	const updateUrl = (idx, val) => {
-		setUrls((prev) => {
-			const next = [...prev];
-			next[idx] = val;
-			return next;
-		});
-	};
-	const removeUrl = (idx) =>
-		setUrls((prev) => prev.filter((_, i) => i !== idx));
-
-	const handleGenerate = async () => {
-		if (!prompt.trim() || generating) return;
-		if (!reduxUser) return;
-		// Credits check — redirect to pricing if out
-		const creds = await getUserCredits(reduxUser.uid).catch(() => null);
-		if (creds && creds.plan !== "pro" && (creds.remaining ?? 0) <= 0) {
-			router.push("/pricing");
-			return;
-		}
-		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
-		if (validUrls.length > 0) {
-			const urlCheck = validateUrls(validUrls);
-			if (!urlCheck.valid) {
-				setGenerateError(
-					urlCheck.error || "Invalid URL. Use full URLs with https://",
-				);
-				return;
-			}
-		}
-		setGenerating(true);
-		setGenerateError(null);
-		const msgs = [
-			"Reading URL content…",
-			"Analysing key points…",
-			"Drafting your newsletter…",
-		];
-		let idx = 0;
-		setLoadingMsg(msgs[0]);
-		const iv = setInterval(() => {
-			idx = (idx + 1) % msgs.length;
-			setLoadingMsg(msgs[idx]);
-		}, 3500);
-		try {
-			const idToken = await auth.currentUser?.getIdToken();
-			if (!idToken) {
-				clearInterval(iv);
-				setGenerateError("Session expired. Please sign in again.");
-				setGenerating(false);
-				return;
-			}
-			const res = await fetch("/api/automations/newsletter-generate", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					urls: validUrls,
-					prompt: prompt.trim(),
-					format,
-					style,
-					idToken,
-				}),
-			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Generation failed");
-
-			const lines = (data.content || "").split("\n");
-			const titleLine = lines.find(
-				(l) => l.startsWith("# ") || l.startsWith("## "),
-			);
-			const title = titleLine
-				? titleLine.replace(/^#+\s*/, "").trim()
-				: prompt.slice(0, 60) || "Untitled draft";
-
-			const bodyText = lines
-				.filter((l) => !l.match(/^#{1,6}\s/))
-				.join(" ")
-				.replace(/[*_`]/g, "")
-				.replace(/\s+/g, " ")
-				.trim();
-			const preview =
-				bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : "");
-
-			const words = data.content.trim().split(/\s+/).length;
-			const now = new Date();
-			const date = now.toLocaleDateString("en-US", {
-				weekday: "short",
-				month: "short",
-				day: "numeric",
-			});
-
-			const draft = {
-				title,
-				preview,
-				body: data.content,
-				urls: validUrls,
-				words,
-				date,
-				tag: data.formatLabel || "Newsletter",
-				format: data.format || format,
-				style: data.style || style,
-			};
-
-			const { id } = await createDraft(reduxUser.uid, draft);
-			setUrls([""]);
-			setPrompt("");
-			router.push(`/app/${id}`);
-		} catch (e) {
-			setGenerateError(e?.message || "Failed to generate");
-		} finally {
-			clearInterval(iv);
-			setGenerating(false);
-		}
-	};
-
 	const applyPreset = (p) => {
-		setUrls(p.urls.length ? p.urls : [""]);
-		setPrompt(p.prompt);
+		const urlPart =
+			p.urls?.length && p.urls[0]
+				? `\n\nSource: ${p.urls.join(", ")}`
+				: "";
+		setAgentPrompt(`${p.prompt}${urlPart}`);
 	};
 
-	const handleGenerateClick = () => {
+	/* Load credits when user is logged in */
+	useEffect(() => {
 		if (!reduxUser) {
-			pendingGenerateRef.current = true;
-			setLoginModalOpen(true);
+			setCredits(null);
 			return;
 		}
-		handleGenerate();
-	};
-
-	useEffect(() => {
-		if (reduxUser && pendingGenerateRef.current && prompt.trim()) {
-			pendingGenerateRef.current = false;
-			handleGenerate();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		getUserCredits(reduxUser.uid)
+			.then(setCredits)
+			.catch(() => setCredits(null));
 	}, [reduxUser]);
 
 	useEffect(() => {
@@ -432,14 +294,10 @@ function Hero() {
 		}
 		if (task.type === "newsletter")
 			return task.label || "Writing newsletter draft…";
-		if (task.type === "linkedin")
-			return task.label || "Writing LinkedIn post…";
-		if (task.type === "blog_post")
-			return task.label || "Writing blog post…";
-		if (task.type === "twitter_thread")
-			return task.label || "Creating thread…";
-		if (task.type === "email_digest")
-			return task.label || "Creating digest…";
+		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
+		if (task.type === "blog_post") return task.label || "Writing blog post…";
+		if (task.type === "twitter_thread") return task.label || "Creating thread…";
+		if (task.type === "email_digest") return task.label || "Creating digest…";
 		if (task.type === "table") return task.label || "Creating table…";
 		return task.label || "Processing…";
 	};
@@ -455,8 +313,7 @@ function Hero() {
 			"email_digest",
 		];
 		for (const task of executed) {
-			const isContentDraft =
-				CONTENT_TYPES.includes(task.type) && task.content;
+			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
 			if (isContentDraft) {
 				const lines = (task.content || "").split("\n");
 				const titleLine = lines.find(
@@ -533,7 +390,10 @@ function Hero() {
 					id,
 					path: `/app/${id}`,
 				});
-			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+			} else if (
+				task.type === "infographics" ||
+				task.type === "infographics-svg-generator"
+			) {
 				let infographics = task.infographics ?? task.result?.infographics ?? [];
 				if (!Array.isArray(infographics) && typeof task.content === "string") {
 					try {
@@ -557,11 +417,28 @@ function Hero() {
 					});
 				}
 			} else if (
-				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
-				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+				(task.type === "landing_page" ||
+					task.type === "landing-page" ||
+					task.type === "landing-page-generator") &&
+				(task.html ||
+					task.result?.html ||
+					task.result?.result?.html ||
+					task.url ||
+					task.result?.url ||
+					(typeof task.content === "string" &&
+						task.content.trim().startsWith("<")))
 			) {
-				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
-				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				const html =
+					task.html ??
+					task.result?.html ??
+					task.result?.result?.html ??
+					(typeof task.content === "string" &&
+					task.content.trim().startsWith("<")
+						? task.content
+						: "") ??
+					"";
+				const url =
+					task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
 				if (html || url) {
 					const { id } = await createLandingPageAsset(reduxUser.uid, {
 						title: task.title || "Landing Page",
@@ -576,20 +453,33 @@ function Hero() {
 						path: `/app/${id}`,
 					});
 				}
-			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
-				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+			} else if (
+				task.type === "image_gallery" ||
+				task.type === "image-gallery" ||
+				task.type === "image-gallery-generator" ||
+				task.type === "image-gallery-creator"
+			) {
+				let images =
+					task.images ??
+					task.result?.images ??
+					task.result?.data ??
+					task.result?.result?.images ??
+					[];
 				if (!Array.isArray(images) && typeof task.content === "string") {
 					try {
 						const parsed = JSON.parse(task.content);
-						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
 					} catch {
 						images = [];
 					}
 				}
-				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+				if (
+					!Array.isArray(images) &&
+					typeof task.result?.content === "string"
+				) {
 					try {
 						const parsed = JSON.parse(task.result.content);
-						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
 					} catch {
 						// keep existing images
 					}
@@ -701,7 +591,9 @@ function Hero() {
 							"";
 						if (text)
 							setAgentThinking((prev) =>
-								prev ? prev + "\n\n" + String(text).trim() : String(text).trim(),
+								prev
+									? prev + "\n\n" + String(text).trim()
+									: String(text).trim(),
 							);
 					} else if (data.type === "start") {
 						const thinkingText =
@@ -735,8 +627,7 @@ function Hero() {
 						);
 					} else if (data.type === "task") {
 						const idx = data.index ?? 0;
-						const label =
-							data.taskLabel || data.label || `Task ${idx + 1}`;
+						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
 						const status = data.success ? "done" : "error";
 						setAgentRunSteps((prev) => {
 							const next = [...prev];
@@ -762,11 +653,7 @@ function Hero() {
 							);
 						}
 						const creditsUsed = data.creditsUsed;
-						if (
-							typeof creditsUsed === "number" &&
-							creditsUsed > 0 &&
-							idToken
-						) {
+						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
 							fetch("/api/agent/inkagent", {
 								method: "POST",
 								headers: { "Content-Type": "application/json" },
@@ -813,7 +700,7 @@ function Hero() {
 
 	/* Confirm when leaving during API load */
 	useEffect(() => {
-		if (!generating && !agentLoading) return;
+		if (!agentLoading) return;
 		const onBeforeUnload = (e) => {
 			e.preventDefault();
 			e.returnValue = "";
@@ -831,7 +718,7 @@ function Hero() {
 			router.events.off("routeChangeStart", onRouteChange);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [generating, agentLoading]);
+	}, [agentLoading]);
 
 	const texts = [
 		"Scrape content from URL turn into newsletter",
@@ -936,7 +823,7 @@ function Hero() {
 					under 60 seconds.
 				</motion.p>
 
-				{/* AI draft form */}
+				{/* Agentic form — same as /app page, uses /api/agent/inkagent */}
 				<motion.div
 					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -952,6 +839,31 @@ function Hero() {
 						textAlign: "left",
 					}}
 				>
+					<p
+						style={{
+							fontSize: 15,
+							fontWeight: 700,
+							color: T.accent,
+							marginBottom: 8,
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						<span style={{ color: T.warm }}>✦</span> InkAgent
+					</p>
+					<p
+						style={{
+							fontSize: 13,
+							color: T.muted,
+							marginBottom: 16,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						One prompt: scrape URLs, create newsletters, tables, or blog posts.
+					</p>
+
 					{/* Preset chips */}
 					<div style={{ marginBottom: 14 }}>
 						<label
@@ -994,366 +906,130 @@ function Hero() {
 						</div>
 					</div>
 
-					{/* URLs */}
-					<div style={{ marginBottom: 18 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Source URLs (optional)
-						</label>
-						{urls.map((urlVal, idx) => (
-							<div
-								key={idx}
-								style={{
-									display: "flex",
-									gap: 8,
-									marginBottom: 8,
-									alignItems: "center",
-								}}
-							>
-								<input
-									value={urlVal}
-									onChange={(e) => updateUrl(idx, e.target.value)}
-									placeholder={`https://example.com/article${idx > 0 ? `-${idx + 1}` : ""}`}
-									style={{
-										flex: 1,
-										background: T.base,
-										border: `1.5px solid ${T.border}`,
-										borderRadius: 10,
-										padding: "11px 14px",
-										fontSize: 14,
-										color: T.accent,
-										outline: "none",
-										transition: "border-color 0.2s",
-										fontFamily: "'Outfit', sans-serif",
-									}}
-									onFocus={(e) => (e.target.style.borderColor = T.warm)}
-									onBlur={(e) => (e.target.style.borderColor = T.border)}
-								/>
-								{urls.length > 1 && (
-									<motion.button
-										whileHover={{ background: "#FEE2E2" }}
-										whileTap={{ scale: 0.95 }}
-										onClick={() => removeUrl(idx)}
-										style={{
-											background: T.base,
-											border: `1.5px solid ${T.border}`,
-											borderRadius: 8,
-											width: 38,
-											height: 38,
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											cursor: "pointer",
-											flexShrink: 0,
-											transition: "background 0.15s",
-										}}
-									>
-										<svg
-											width={14}
-											height={14}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="#EF4444"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-										</svg>
-									</motion.button>
-								)}
-							</div>
-						))}
-						<motion.button
-							whileHover={{ background: "#F0ECE5" }}
-							whileTap={{ scale: 0.97 }}
-							onClick={addUrl}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 6,
-								background: "transparent",
-								border: `1px dashed ${T.border}`,
-								borderRadius: 8,
-								padding: "6px 12px",
-								fontSize: 12,
-								fontWeight: 600,
-								color: T.muted,
-								cursor: "pointer",
-								transition: "background 0.15s",
-								marginTop: 4,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							+ Add another URL
-						</motion.button>
-					</div>
-
-					{/* Prompt */}
-					<div style={{ marginBottom: 20 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Your angle / prompt *
-						</label>
-						<textarea
-							value={prompt}
-							onChange={(e) => setPrompt(e.target.value)}
-							placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words."
-							rows={3}
-							style={{
-								width: "100%",
-								background: T.base,
-								border: `1.5px solid ${T.border}`,
-								borderRadius: 10,
-								padding: "11px 14px",
-								fontSize: 14,
-								color: T.accent,
-								resize: "vertical",
-								outline: "none",
-								lineHeight: 1.6,
-								transition: "border-color 0.2s",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-							onFocus={(e) => (e.target.style.borderColor = T.warm)}
-							onBlur={(e) => (e.target.style.borderColor = T.border)}
-						/>
-					</div>
-
-					{/* Format selector */}
-					<div style={{ marginBottom: 14 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Format
-						</label>
-						<div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-							{FORMATS.map((f) => (
-								<motion.button
-									key={f.id}
-									whileTap={{ scale: 0.96 }}
-									onClick={() => setFormat(f.id)}
+					{/* URL chips + textarea (agentic form like /app) */}
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							gap: 0,
+							border: `1px solid ${T.border}`,
+							borderRadius: 12,
+							overflow: "hidden",
+							background: T.base,
+						}}
+					>
+						{(() => {
+							const fullUrlRegex = /https?:\/\/[^\s]+/g;
+							const bareDomainRegex =
+								/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog|to|me|info|edu|gov)\b/gi;
+							const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
+								.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
+								.filter(Boolean);
+							const bareDomains = (
+								agentPrompt.match(bareDomainRegex) || []
+							)
+								.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
+								.filter(Boolean);
+							const unique = [
+								...new Set([
+									...fullUrls,
+									...bareDomains.filter(
+										(b) =>
+											!fullUrls.some(
+												(f) =>
+													f.includes(b) || f.includes(`https://${b}`),
+											),
+									),
+								]),
+							].filter(Boolean);
+							if (unique.length === 0) return null;
+							return (
+								<div
 									style={{
 										display: "flex",
-										alignItems: "center",
+										flexWrap: "wrap",
 										gap: 8,
-										padding: "6px 12px",
-										borderRadius: 8,
-										fontSize: 13,
-										fontWeight: 600,
-										cursor: "pointer",
-										border: `1.5px solid ${format === f.id ? T.accent : T.border}`,
-										background: format === f.id ? T.accent : T.base,
-										color: format === f.id ? "white" : T.muted,
-										transition: "all 0.15s",
-										fontFamily: "'Outfit', sans-serif",
+										padding: "12px 16px",
+										borderBottom: `1px solid ${T.border}`,
+										background: T.base,
 									}}
 								>
-									<span>{f.icon}</span>
-									{f.label}
-								</motion.button>
-							))}
-						</div>
-					</div>
-
-					{/* Style selector */}
-					<div style={{ marginBottom: 20 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Tone
-						</label>
-						<div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-							{STYLES.map((s) => (
-								<motion.button
-									key={s.id}
-									whileTap={{ scale: 0.96 }}
-									onClick={() => setStyle(s.id)}
-									style={{
-										padding: "5px 11px",
-										borderRadius: 8,
-										fontSize: 13,
-										fontWeight: 600,
-										cursor: "pointer",
-										border: `1.5px solid ${style === s.id ? T.warm : T.border}`,
-										background: style === s.id ? "#FEF3E2" : T.base,
-										color: style === s.id ? T.warm : T.muted,
-										transition: "all 0.15s",
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{s.label}
-								</motion.button>
-							))}
-						</div>
-					</div>
-
-					{/* Generate button */}
-					<motion.button
-						onClick={handleGenerateClick}
-						disabled={generating}
-						whileHover={
-							!generating
-								? {
-										scale: 1.02,
-										y: -1,
-										boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-									}
-								: {}
-						}
-						whileTap={!generating ? { scale: 0.97 } : {}}
-						style={{
-							width: "100%",
-							background: generating ? "#E8E4DC" : T.accent,
-							color: generating ? T.muted : "white",
-							border: "none",
-							padding: "14px",
-							borderRadius: 12,
-							fontSize: 15,
-							fontWeight: 700,
-							cursor: generating ? "not-allowed" : "pointer",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							gap: 10,
-							transition: "all 0.2s",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						{generating ? (
-							<>
-								<motion.span
-									animate={{ rotate: 360 }}
-									transition={{
-										duration: 0.9,
-										repeat: Infinity,
-										ease: "linear",
-									}}
-									style={{ display: "inline-flex" }}
-								>
-									↻
-								</motion.span>
-								{loadingMsg}
-							</>
-						) : !reduxUser ? (
-							<>Sign in & generate draft →</>
-						) : (
-							<>Generate draft →</>
-						)}
-					</motion.button>
-
-					{generateError && (
-						<motion.div
-							initial={{ opacity: 0, y: 4 }}
-							animate={{ opacity: 1, y: 0 }}
-							style={{
-								marginTop: 12,
-								padding: "10px 14px",
-								background: "#FEF2F2",
-								border: "1px solid #FECACA",
-								borderRadius: 10,
-								fontSize: 13,
-								color: "#DC2626",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{generateError}
-						</motion.div>
-					)}
-				</motion.div>
-
-				{/* InkAgent form — same card styling as newsletter form */}
-				<motion.div
-					initial={{ opacity: 0, y: 24 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.5, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-					style={{
-						maxWidth: 640,
-						margin: "32px auto 0",
-						background: T.surface,
-						borderRadius: 16,
-						border: `1px solid ${T.border}`,
-						boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-						padding: "28px 24px",
-						textAlign: "left",
-					}}
-				>
-					<p
-						style={{
-							fontSize: 15,
-							fontWeight: 700,
-							color: T.accent,
-							marginBottom: 16,
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						<span style={{ color: T.warm }}>✦</span> InkAgent
-					</p>
-					<p
-						style={{
-							fontSize: 13,
-							color: T.muted,
-							marginBottom: 16,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						One prompt: scrape URLs, create newsletters, tables, or blog posts.
-					</p>
-					<div style={{ marginBottom: 14 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Your prompt *
-						</label>
+									{unique.map((url, i) => (
+										<motion.div
+											key={`${url}-${i}`}
+											initial={{ opacity: 0, scale: 0.9 }}
+											animate={{ opacity: 1, scale: 1 }}
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 6,
+												padding: "6px 10px",
+												background: T.surface,
+												border: `1px solid ${T.border}`,
+												borderRadius: 8,
+												fontSize: 12,
+												color: T.accent,
+												maxWidth: 220,
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+											}}
+										>
+											<span
+												style={{
+													flex: 1,
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+												}}
+											>
+												{url}
+											</span>
+											<motion.button
+												whileHover={{ scale: 1.1 }}
+												whileTap={{ scale: 0.9 }}
+												onClick={() => {
+													setAgentPrompt((p) =>
+														p
+															.replace(
+																new RegExp(
+																	url.replace(
+																		/[.*+?^${}()|[\]\\]/g,
+																		"\\$&",
+																	),
+																	"g",
+																),
+																"",
+															)
+															.replace(/\s+/g, " ")
+															.trim(),
+													);
+												}}
+												style={{
+													background: "none",
+													border: "none",
+													cursor: "pointer",
+													padding: 0,
+													display: "flex",
+													color: T.muted,
+													flexShrink: 0,
+												}}
+											>
+												<svg
+													width={12}
+													height={12}
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth={2}
+												>
+													<path d="M18 6L6 18M6 6l12 12" />
+												</svg>
+											</motion.button>
+										</motion.div>
+									))}
+								</div>
+							);
+						})()}
 						<textarea
 							value={agentPrompt}
 							onChange={(e) => setAgentPrompt(e.target.value)}
@@ -1363,14 +1039,14 @@ function Hero() {
 								(e.preventDefault(), handleAgentSend())
 							}
 							placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
-							rows={3}
+							rows={4}
 							disabled={agentLoading}
 							style={{
 								width: "100%",
-								background: T.base,
-								border: `1.5px solid ${T.border}`,
-								borderRadius: 10,
-								padding: "11px 14px",
+								background: "transparent",
+								border: "none",
+								borderRadius: 0,
+								padding: "14px 16px",
 								fontSize: 14,
 								color: T.accent,
 								resize: "vertical",
@@ -1379,10 +1055,45 @@ function Hero() {
 								transition: "border-color 0.2s",
 								fontFamily: "'Outfit', sans-serif",
 							}}
-							onFocus={(e) => (e.target.style.borderColor = T.warm)}
-							onBlur={(e) => (e.target.style.borderColor = T.border)}
+							onFocus={(e) => (e.target.style.outline = "none")}
 						/>
+						<div
+							style={{
+								display: "flex",
+								gap: 8,
+								alignItems: "center",
+								justifyContent: "space-between",
+								padding: "10px 16px",
+								background: "rgba(254, 243, 226, 0.3)",
+								borderTop: `1px solid ${T.border}`,
+							}}
+						>
+							<span
+								style={{
+									fontSize: 12,
+									color: T.muted,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Create tables, newsletter, infographics and more
+							</span>
+							{reduxUser && credits && (
+								<span
+									style={{
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.muted,
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{credits?.plan === "pro"
+									? "Pro"
+									: `${Math.max(0, credits?.remaining ?? FREE_CREDIT_LIMIT).toFixed(1)}/${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
+								</span>
+							)}
+						</div>
 					</div>
+
 					<motion.button
 						onClick={handleAgentSend}
 						disabled={agentLoading || !agentPrompt.trim()}
@@ -1398,6 +1109,7 @@ function Hero() {
 						whileTap={!agentLoading ? { scale: 0.97 } : {}}
 						style={{
 							width: "100%",
+							marginTop: 16,
 							background:
 								agentLoading || !agentPrompt.trim() ? "#E8E4DC" : T.accent,
 							color: agentLoading || !agentPrompt.trim() ? T.muted : "white",
@@ -1436,6 +1148,7 @@ function Hero() {
 							<>Send to InkAgent →</>
 						)}
 					</motion.button>
+
 					{agentThinking && (
 						<motion.div
 							initial={{ opacity: 0, y: 4 }}
@@ -1475,6 +1188,47 @@ function Hero() {
 							{agentError}
 						</motion.div>
 					)}
+					{agentRunSteps.length > 0 && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "12px 14px",
+								background: T.base,
+								border: `1px solid ${T.border}`,
+								borderRadius: 10,
+								fontSize: 13,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{agentRunSteps.map((s, i) => (
+								<div
+									key={i}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 8,
+										marginBottom: i < agentRunSteps.length - 1 ? 6 : 0,
+									}}
+								>
+									<span
+										style={{
+											color:
+												s.status === "done"
+													? "#22C55E"
+													: s.status === "error"
+														? "#DC2626"
+														: T.warm,
+										}}
+									>
+										{s.status === "loading" ? "↻" : s.status === "done" ? "✓" : "✗"}
+									</span>
+									<span style={{ color: T.muted }}>{s.label}</span>
+								</div>
+							))}
+						</motion.div>
+					)}
 					{!agentLoading && agentCompletedTasks.length === 0 && (
 						<div style={{ marginTop: 18 }}>
 							<label
@@ -1493,28 +1247,28 @@ function Hero() {
 							</label>
 							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 								{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
-								<motion.button
-									key={i}
-									whileHover={{ scale: 1.005, x: 4 }}
-									whileTap={{ scale: 0.995 }}
-									onClick={() => setAgentPrompt(s)}
-									style={{
-										width: "100%",
-										padding: "12px 16px",
-										borderRadius: 10,
-										fontSize: 13,
-										fontWeight: 500,
-										cursor: "pointer",
-										border: `1.5px solid ${T.border}`,
-										background: T.base,
-										color: T.accent,
-										textAlign: "left",
-										lineHeight: 1.5,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{s}
-								</motion.button>
+									<motion.button
+										key={i}
+										whileHover={{ scale: 1.005, x: 4 }}
+										whileTap={{ scale: 0.995 }}
+										onClick={() => setAgentPrompt(s)}
+										style={{
+											width: "100%",
+											padding: "12px 16px",
+											borderRadius: 10,
+											fontSize: 13,
+											fontWeight: 500,
+											cursor: "pointer",
+											border: `1.5px solid ${T.border}`,
+											background: T.base,
+											color: T.accent,
+											textAlign: "left",
+											lineHeight: 1.5,
+											fontFamily: "'Outfit', sans-serif",
+										}}
+									>
+										{s}
+									</motion.button>
 								))}
 							</div>
 						</div>

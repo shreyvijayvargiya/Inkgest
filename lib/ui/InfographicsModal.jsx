@@ -1347,7 +1347,7 @@ export default function InfographicsModal({
 			}
 
 			try {
-				const res = await fetch("/api/automations/infographics-generate", {
+				const res = await fetch("/api/agent/inkagent", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({ content, title, idToken, excludeTypes }),
