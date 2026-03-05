@@ -10,7 +10,7 @@ import TableView from "../../lib/ui/TableView";
 import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
 import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
 import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
-import { getUserCredits } from "../../lib/utils/credits";
+import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
 
 /* ─── Fonts ─── */
