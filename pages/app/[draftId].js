@@ -10,31 +10,7 @@ import TableView from "../../lib/ui/TableView";
 import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
 import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
 import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
-import { db } from "../../lib/config/firebase";
-import {
-	collection,
-	getDocs,
-	deleteDoc,
-	doc,
-	getDoc,
-	query,
-	orderBy,
-	where,
-	updateDoc,
-} from "firebase/firestore";
-import {
-	listAssets,
-	getAsset,
-	updateAsset,
-	deleteAsset,
-	assetRef,
-} from "../../lib/api/userAssets";
-import { uploadFile } from "../../lib/api/upload";
-import {
-	getUserCredits,
-	FREE_CREDIT_LIMIT,
-	formatRenewalDate,
-} from "../../lib/utils/credits";
+import { getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
 
 /* ─── Fonts ─── */
@@ -540,9 +516,14 @@ const ASSET_TYPE_LABELS = {
 function ItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
 	const isTable = item.type === "table";
-	const isAssetWithDesc = ["table", "infographics", "landing_page", "image_gallery"].includes(item.type);
+	const isAssetWithDesc = [
+		"table",
+		"infographics",
+		"landing_page",
+		"image_gallery",
+	].includes(item.type);
 	const tag = ASSET_TYPE_LABELS[item.type] || item.tag || "Draft";
-	const preview = isAssetWithDesc ? (item.description || "") : (item.preview || "");
+	const preview = isAssetWithDesc ? item.description || "" : item.preview || "";
 	const meta = isTable ? "" : `${item.words ?? 0}w`;
 	const date = item.date
 		? typeof item.date === "string"
@@ -923,7 +904,8 @@ export default function DraftPage() {
 	const tableDoc = docData?.type === "table" ? docData.doc : null;
 	const infographicsDoc = docData?.type === "infographics" ? docData.doc : null;
 	const landingPageDoc = docData?.type === "landing_page" ? docData.doc : null;
-	const imageGalleryDoc = docData?.type === "image_gallery" ? docData.doc : null;
+	const imageGalleryDoc =
+		docData?.type === "image_gallery" ? docData.doc : null;
 
 	useEffect(() => {
 		if (tableDoc) {
@@ -1354,9 +1336,12 @@ export default function DraftPage() {
 		try {
 			const item = items.find((i) => i.id === deleteConfirm);
 			const isAsset =
-				["infographics", "landing_page", "image_gallery"].includes(item?.type) ||
-				tables.some((t) => t.id === deleteConfirm);
-			const source = item?.source || (isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
+				["infographics", "landing_page", "image_gallery"].includes(
+					item?.type,
+				) || tables.some((t) => t.id === deleteConfirm);
+			const source =
+				item?.source ||
+				(isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
 			queryClient.setQueryData(["assets", reduxUser?.uid], (old = []) =>
 				old.filter((d) => d.id !== deleteConfirm),
@@ -1916,24 +1901,24 @@ export default function DraftPage() {
 						!landingPageDoc &&
 						!imageGalleryDoc &&
 						draftId && (
-						<div
-							style={{
-								flex: 1,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-								background: T.surface,
-							}}
-						>
-							<motion.div
-								animate={{ opacity: [0.4, 1, 0.4] }}
-								transition={{ duration: 1.2, repeat: Infinity }}
-								style={{ fontSize: 13, color: T.muted }}
+							<div
+								style={{
+									flex: 1,
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+									background: T.surface,
+								}}
 							>
-								Loading…
-							</motion.div>
-						</div>
-					)}
+								<motion.div
+									animate={{ opacity: [0.4, 1, 0.4] }}
+									transition={{ duration: 1.2, repeat: Infinity }}
+									style={{ fontSize: 13, color: T.muted }}
+								>
+									Loading…
+								</motion.div>
+							</div>
+						)}
 					{draft && (
 						<motion.div
 							key={`editor-${draftId}`}
@@ -3418,7 +3403,13 @@ export default function DraftPage() {
 								userId={reduxUser?.uid}
 								assetId={draftId}
 								docSource={docData?.source || "assets"}
-								onUpdate={() => queryClient.invalidateQueries(["doc", draftId, reduxUser?.uid])}
+								onUpdate={() =>
+									queryClient.invalidateQueries([
+										"doc",
+										draftId,
+										reduxUser?.uid,
+									])
+								}
 							/>
 						</motion.div>
 					)}

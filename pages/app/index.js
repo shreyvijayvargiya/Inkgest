@@ -276,9 +276,14 @@ const SIDEBAR_ASSET_LABELS = {
 /* ─── Item card in sidebar (drafts + tables + assets) ─── */
 function SidebarItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
-	const isAssetWithDesc = ["table", "infographics", "landing_page", "image_gallery"].includes(item.type);
+	const isAssetWithDesc = [
+		"table",
+		"infographics",
+		"landing_page",
+		"image_gallery",
+	].includes(item.type);
 	const tag = SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft";
-	const preview = isAssetWithDesc ? (item.description || "") : (item.preview || "");
+	const preview = isAssetWithDesc ? item.description || "" : item.preview || "";
 	const meta = isAssetWithDesc ? "" : `${item.words ?? 0}w`;
 	const date = item.date
 		? typeof item.date === "string"
@@ -536,15 +541,6 @@ export default function inkgestApp() {
 			.catch((e) => console.error("Failed to load credits", e));
 	}, [reduxUser]);
 
-	/* Auto-generate after login if there was a pending request */
-	useEffect(() => {
-		if (reduxUser && pendingGenerateRef.current && prompt.trim()) {
-			pendingGenerateRef.current = false;
-			handleGenerate();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [reduxUser]);
-
 	/* Confirm when leaving during API load (back, close, navigate) */
 	const isLoading = generating || scraping;
 	useEffect(() => {
@@ -574,7 +570,11 @@ export default function inkgestApp() {
 		const title = (item.title || "").toLowerCase();
 		const preview = (item.preview || item.description || "").toLowerCase();
 		const type = (item.type || "").toLowerCase();
-		const tag = (SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft").toLowerCase();
+		const tag = (
+			SIDEBAR_ASSET_LABELS[item.type] ||
+			item.tag ||
+			"Draft"
+		).toLowerCase();
 		const format = (item.format || "").toLowerCase();
 		return (
 			title.includes(q) ||
@@ -585,128 +585,9 @@ export default function inkgestApp() {
 		);
 	});
 
-	const handleGenerate = async () => {
-		if (!prompt.trim() || generating) return;
-		if (llmRemaining <= 0) {
-			router.push("/pricing");
-			return;
-		}
-		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
-		if (validUrls.length > 0) {
-			const urlCheck = validateUrls(validUrls);
-			if (!urlCheck.valid) {
-				setGenerateError(
-					urlCheck.error || "Invalid URL. Use full URLs with https://",
-				);
-				return;
-			}
-		}
-		setGenerating(true);
-		setGenerateError(null);
-		const msgs = [
-			"Reading URL content…",
-			"Analysing key points…",
-			"Drafting your newsletter…",
-		];
-		let idx = 0;
-		setLoadingMsg(msgs[0]);
-		const iv = setInterval(() => {
-			idx = (idx + 1) % msgs.length;
-			setLoadingMsg(msgs[idx]);
-		}, 3500);
-		try {
-			const idToken = await auth.currentUser?.getIdToken();
-			if (!idToken) {
-				clearInterval(iv);
-				setGenerateError("Session expired. Please sign in again.");
-				setGenerating(false);
-				return;
-			}
-			const res = await fetch("/api/automations/newsletter-generate", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					urls: validUrls,
-					prompt: prompt.trim(),
-					format,
-					style,
-					idToken,
-				}),
-			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Generation failed");
-
-			const lines = (data.content || "").split("\n");
-			const titleLine = lines.find(
-				(l) => l.startsWith("# ") || l.startsWith("## "),
-			);
-			const title = titleLine
-				? titleLine.replace(/^#+\s*/, "").trim()
-				: prompt.slice(0, 60) || "Untitled draft";
-
-			const bodyText = lines
-				.filter((l) => !l.match(/^#{1,6}\s/))
-				.join(" ")
-				.replace(/[*_`]/g, "")
-				.replace(/\s+/g, " ")
-				.trim();
-			const preview =
-				bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : "");
-
-			const words = data.content.trim().split(/\s+/).length;
-			const now = new Date();
-			const date = now.toLocaleDateString("en-US", {
-				weekday: "short",
-				month: "short",
-				day: "numeric",
-			});
-
-			const draft = {
-				title,
-				preview,
-				body: data.content,
-				urls: validUrls,
-				words,
-				date,
-				tag: data.formatLabel || "Newsletter",
-				format: data.format || format,
-				style: data.style || style,
-			};
-
-			const { id } = await createDraft(reduxUser.uid, draft);
-			setDrafts((prev) => [
-				{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
-				...prev,
-			]);
-			setUrls([""]);
-			setPrompt("");
-			// Refresh credits counter
-			if (reduxUser)
-				getUserCredits(reduxUser.uid)
-					.then(setCredits)
-					.catch(() => {});
-			router.push(`/app/${id}`);
-		} catch (e) {
-			setGenerateError(e?.message || "Failed to generate");
-		} finally {
-			clearInterval(iv);
-			setGenerating(false);
-		}
-	};
-
 	const applyPreset = (p) => {
 		setUrls(p.urls.length ? p.urls : [""]);
 		setPrompt(p.prompt);
-	};
-
-	/* Click handler for the generate button — gates on login */
-	const handleGenerateClick = () => {
-		if (!reduxUser) {
-			pendingGenerateRef.current = true;
-			setLoginModalOpen(true);
-			return;
-		}
-		handleGenerate();
 	};
 
 	const handleDelete = (id) => {
@@ -716,13 +597,20 @@ export default function inkgestApp() {
 	const confirmDelete = async () => {
 		if (!deleteConfirm || !reduxUser) return;
 		const item = sidebarItems.find((i) => i.id === deleteConfirm);
-		const isAssetType = ["table", "infographics", "landing_page", "image_gallery"].includes(item?.type);
+		const isAssetType = [
+			"table",
+			"infographics",
+			"landing_page",
+			"image_gallery",
+		].includes(item?.type);
 		const source = item?.source || (isAssetType ? "assets" : "drafts");
 		try {
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
 			if (item?.type === "table") {
 				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			} else if (["infographics", "landing_page", "image_gallery"].includes(item?.type)) {
+			} else if (
+				["infographics", "landing_page", "image_gallery"].includes(item?.type)
+			) {
 				setOtherAssets((prev) => prev.filter((d) => d.id !== deleteConfirm));
 			} else {
 				setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
@@ -731,16 +619,6 @@ export default function inkgestApp() {
 			console.error("Delete failed", e);
 		}
 		setDeleteConfirm(null);
-	};
-
-	const addUrl = () => setUrls((prev) => [...prev, ""]);
-
-	const updateUrl = (idx, val) => {
-		setUrls((prev) => {
-			const next = [...prev];
-			next[idx] = val;
-			return next;
-		});
 	};
 
 	const removeUrl = (idx) => {
@@ -816,7 +694,13 @@ export default function inkgestApp() {
 			};
 			const { id } = await createDraft(reduxUser.uid, draft);
 			setDrafts((prev) => [
-				{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+				{
+					id,
+					type: "draft",
+					...draft,
+					createdAt: new Date(),
+					source: "assets",
+				},
 				...prev,
 			]);
 			setScrapeUrl("");
@@ -856,11 +740,23 @@ export default function inkgestApp() {
 		if (task.type === "twitter_thread") return task.label || "Creating thread…";
 		if (task.type === "email_digest") return task.label || "Creating digest…";
 		if (task.type === "table") return task.label || "Creating table…";
-		if (task.type === "infographics" || task.type === "infographics-svg-generator")
+		if (
+			task.type === "infographics" ||
+			task.type === "infographics-svg-generator"
+		)
 			return task.label || "Creating infographics…";
-		if (task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator")
+		if (
+			task.type === "landing_page" ||
+			task.type === "landing-page" ||
+			task.type === "landing-page-generator"
+		)
 			return task.label || "Creating landing page…";
-		if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator")
+		if (
+			task.type === "image_gallery" ||
+			task.type === "image-gallery" ||
+			task.type === "image-gallery-generator" ||
+			task.type === "image-gallery-creator"
+		)
 			return task.label || "Creating image gallery…";
 		return task.label || "Processing…";
 	};
@@ -1107,7 +1003,13 @@ export default function inkgestApp() {
 				};
 				const { id } = await createDraft(reduxUser.uid, draft);
 				setDrafts((prev) => [
-					{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+					{
+						id,
+						type: "draft",
+						...draft,
+						createdAt: new Date(),
+						source: "assets",
+					},
 					...prev,
 				]);
 				newTasks.push({
@@ -1134,7 +1036,13 @@ export default function inkgestApp() {
 				};
 				const { id } = await createDraft(reduxUser.uid, draft);
 				setDrafts((prev) => [
-					{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+					{
+						id,
+						type: "draft",
+						...draft,
+						createdAt: new Date(),
+						source: "assets",
+					},
 					...prev,
 				]);
 				newTasks.push({
@@ -1174,7 +1082,10 @@ export default function inkgestApp() {
 					id,
 					path: `/app/${id}`,
 				});
-			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+			} else if (
+				task.type === "infographics" ||
+				task.type === "infographics-svg-generator"
+			) {
 				let infographics = task.infographics ?? task.result?.infographics ?? [];
 				if (!Array.isArray(infographics) && typeof task.content === "string") {
 					try {
@@ -1211,11 +1122,28 @@ export default function inkgestApp() {
 					path: `/app/${id}`,
 				});
 			} else if (
-				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
-				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+				(task.type === "landing_page" ||
+					task.type === "landing-page" ||
+					task.type === "landing-page-generator") &&
+				(task.html ||
+					task.result?.html ||
+					task.result?.result?.html ||
+					task.url ||
+					task.result?.url ||
+					(typeof task.content === "string" &&
+						task.content.trim().startsWith("<")))
 			) {
-				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
-				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				const html =
+					task.html ??
+					task.result?.html ??
+					task.result?.result?.html ??
+					(typeof task.content === "string" &&
+					task.content.trim().startsWith("<")
+						? task.content
+						: "") ??
+					"";
+				const url =
+					task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
 				if (!html && !url) continue;
 				const { id } = await createLandingPageAsset(reduxUser.uid, {
 					title: task.title || "Landing Page",
@@ -1243,20 +1171,33 @@ export default function inkgestApp() {
 					id,
 					path: `/app/${id}`,
 				});
-			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
-				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+			} else if (
+				task.type === "image_gallery" ||
+				task.type === "image-gallery" ||
+				task.type === "image-gallery-generator" ||
+				task.type === "image-gallery-creator"
+			) {
+				let images =
+					task.images ??
+					task.result?.images ??
+					task.result?.data ??
+					task.result?.result?.images ??
+					[];
 				if (!Array.isArray(images) && typeof task.content === "string") {
 					try {
 						const parsed = JSON.parse(task.content);
-						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
 					} catch {
 						images = [];
 					}
 				}
-				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+				if (
+					!Array.isArray(images) &&
+					typeof task.result?.content === "string"
+				) {
 					try {
 						const parsed = JSON.parse(task.result.content);
-						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
 					} catch {
 						// keep existing images
 					}
@@ -1872,7 +1813,9 @@ export default function inkgestApp() {
 										const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
 											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
 											.filter(Boolean);
-										const bareDomains = (agentPrompt.match(bareDomainRegex) || [])
+										const bareDomains = (
+											agentPrompt.match(bareDomainRegex) || []
+										)
 											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
 											.filter(Boolean);
 										const unique = [
@@ -1881,7 +1824,8 @@ export default function inkgestApp() {
 												...bareDomains.filter(
 													(b) =>
 														!fullUrls.some(
-															(f) => f.includes(b) || f.includes(`https://${b}`),
+															(f) =>
+																f.includes(b) || f.includes(`https://${b}`),
 														),
 												),
 											]),
@@ -2965,7 +2909,7 @@ export default function inkgestApp() {
 									</motion.button>
 								) : (
 									<motion.button
-										onClick={handleGenerateClick}
+										onClick={handleAgentSend}
 										disabled={generating}
 										whileHover={
 											!generating

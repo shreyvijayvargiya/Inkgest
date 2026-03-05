@@ -263,130 +263,10 @@ function Hero() {
 	const removeUrl = (idx) =>
 		setUrls((prev) => prev.filter((_, i) => i !== idx));
 
-	const handleGenerate = async () => {
-		if (!prompt.trim() || generating) return;
-		if (!reduxUser) return;
-		// Credits check — redirect to pricing if out
-		const creds = await getUserCredits(reduxUser.uid).catch(() => null);
-		if (creds && creds.plan !== "pro" && (creds.remaining ?? 0) <= 0) {
-			router.push("/pricing");
-			return;
-		}
-		const validUrls = urls.map((u) => u.trim()).filter(Boolean);
-		if (validUrls.length > 0) {
-			const urlCheck = validateUrls(validUrls);
-			if (!urlCheck.valid) {
-				setGenerateError(
-					urlCheck.error || "Invalid URL. Use full URLs with https://",
-				);
-				return;
-			}
-		}
-		setGenerating(true);
-		setGenerateError(null);
-		const msgs = [
-			"Reading URL content…",
-			"Analysing key points…",
-			"Drafting your newsletter…",
-		];
-		let idx = 0;
-		setLoadingMsg(msgs[0]);
-		const iv = setInterval(() => {
-			idx = (idx + 1) % msgs.length;
-			setLoadingMsg(msgs[idx]);
-		}, 3500);
-		try {
-			const idToken = await auth.currentUser?.getIdToken();
-			if (!idToken) {
-				clearInterval(iv);
-				setGenerateError("Session expired. Please sign in again.");
-				setGenerating(false);
-				return;
-			}
-			const res = await fetch("/api/automations/newsletter-generate", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					urls: validUrls,
-					prompt: prompt.trim(),
-					format,
-					style,
-					idToken,
-				}),
-			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Generation failed");
-
-			const lines = (data.content || "").split("\n");
-			const titleLine = lines.find(
-				(l) => l.startsWith("# ") || l.startsWith("## "),
-			);
-			const title = titleLine
-				? titleLine.replace(/^#+\s*/, "").trim()
-				: prompt.slice(0, 60) || "Untitled draft";
-
-			const bodyText = lines
-				.filter((l) => !l.match(/^#{1,6}\s/))
-				.join(" ")
-				.replace(/[*_`]/g, "")
-				.replace(/\s+/g, " ")
-				.trim();
-			const preview =
-				bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : "");
-
-			const words = data.content.trim().split(/\s+/).length;
-			const now = new Date();
-			const date = now.toLocaleDateString("en-US", {
-				weekday: "short",
-				month: "short",
-				day: "numeric",
-			});
-
-			const draft = {
-				title,
-				preview,
-				body: data.content,
-				urls: validUrls,
-				words,
-				date,
-				tag: data.formatLabel || "Newsletter",
-				format: data.format || format,
-				style: data.style || style,
-			};
-
-			const { id } = await createDraft(reduxUser.uid, draft);
-			setUrls([""]);
-			setPrompt("");
-			router.push(`/app/${id}`);
-		} catch (e) {
-			setGenerateError(e?.message || "Failed to generate");
-		} finally {
-			clearInterval(iv);
-			setGenerating(false);
-		}
-	};
-
 	const applyPreset = (p) => {
 		setUrls(p.urls.length ? p.urls : [""]);
 		setPrompt(p.prompt);
 	};
-
-	const handleGenerateClick = () => {
-		if (!reduxUser) {
-			pendingGenerateRef.current = true;
-			setLoginModalOpen(true);
-			return;
-		}
-		handleGenerate();
-	};
-
-	useEffect(() => {
-		if (reduxUser && pendingGenerateRef.current && prompt.trim()) {
-			pendingGenerateRef.current = false;
-			handleGenerate();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [reduxUser]);
 
 	useEffect(() => {
 		if (reduxUser && pendingAgentRef.current && agentPrompt.trim()) {
@@ -432,14 +312,10 @@ function Hero() {
 		}
 		if (task.type === "newsletter")
 			return task.label || "Writing newsletter draft…";
-		if (task.type === "linkedin")
-			return task.label || "Writing LinkedIn post…";
-		if (task.type === "blog_post")
-			return task.label || "Writing blog post…";
-		if (task.type === "twitter_thread")
-			return task.label || "Creating thread…";
-		if (task.type === "email_digest")
-			return task.label || "Creating digest…";
+		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
+		if (task.type === "blog_post") return task.label || "Writing blog post…";
+		if (task.type === "twitter_thread") return task.label || "Creating thread…";
+		if (task.type === "email_digest") return task.label || "Creating digest…";
 		if (task.type === "table") return task.label || "Creating table…";
 		return task.label || "Processing…";
 	};
@@ -455,8 +331,7 @@ function Hero() {
 			"email_digest",
 		];
 		for (const task of executed) {
-			const isContentDraft =
-				CONTENT_TYPES.includes(task.type) && task.content;
+			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
 			if (isContentDraft) {
 				const lines = (task.content || "").split("\n");
 				const titleLine = lines.find(
@@ -533,7 +408,10 @@ function Hero() {
 					id,
 					path: `/app/${id}`,
 				});
-			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+			} else if (
+				task.type === "infographics" ||
+				task.type === "infographics-svg-generator"
+			) {
 				let infographics = task.infographics ?? task.result?.infographics ?? [];
 				if (!Array.isArray(infographics) && typeof task.content === "string") {
 					try {
@@ -557,11 +435,28 @@ function Hero() {
 					});
 				}
 			} else if (
-				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
-				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+				(task.type === "landing_page" ||
+					task.type === "landing-page" ||
+					task.type === "landing-page-generator") &&
+				(task.html ||
+					task.result?.html ||
+					task.result?.result?.html ||
+					task.url ||
+					task.result?.url ||
+					(typeof task.content === "string" &&
+						task.content.trim().startsWith("<")))
 			) {
-				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
-				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				const html =
+					task.html ??
+					task.result?.html ??
+					task.result?.result?.html ??
+					(typeof task.content === "string" &&
+					task.content.trim().startsWith("<")
+						? task.content
+						: "") ??
+					"";
+				const url =
+					task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
 				if (html || url) {
 					const { id } = await createLandingPageAsset(reduxUser.uid, {
 						title: task.title || "Landing Page",
@@ -576,20 +471,33 @@ function Hero() {
 						path: `/app/${id}`,
 					});
 				}
-			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
-				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+			} else if (
+				task.type === "image_gallery" ||
+				task.type === "image-gallery" ||
+				task.type === "image-gallery-generator" ||
+				task.type === "image-gallery-creator"
+			) {
+				let images =
+					task.images ??
+					task.result?.images ??
+					task.result?.data ??
+					task.result?.result?.images ??
+					[];
 				if (!Array.isArray(images) && typeof task.content === "string") {
 					try {
 						const parsed = JSON.parse(task.content);
-						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
 					} catch {
 						images = [];
 					}
 				}
-				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+				if (
+					!Array.isArray(images) &&
+					typeof task.result?.content === "string"
+				) {
 					try {
 						const parsed = JSON.parse(task.result.content);
-						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
 					} catch {
 						// keep existing images
 					}
@@ -701,7 +609,9 @@ function Hero() {
 							"";
 						if (text)
 							setAgentThinking((prev) =>
-								prev ? prev + "\n\n" + String(text).trim() : String(text).trim(),
+								prev
+									? prev + "\n\n" + String(text).trim()
+									: String(text).trim(),
 							);
 					} else if (data.type === "start") {
 						const thinkingText =
@@ -735,8 +645,7 @@ function Hero() {
 						);
 					} else if (data.type === "task") {
 						const idx = data.index ?? 0;
-						const label =
-							data.taskLabel || data.label || `Task ${idx + 1}`;
+						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
 						const status = data.success ? "done" : "error";
 						setAgentRunSteps((prev) => {
 							const next = [...prev];
@@ -762,11 +671,7 @@ function Hero() {
 							);
 						}
 						const creditsUsed = data.creditsUsed;
-						if (
-							typeof creditsUsed === "number" &&
-							creditsUsed > 0 &&
-							idToken
-						) {
+						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
 							fetch("/api/agent/inkagent", {
 								method: "POST",
 								headers: { "Content-Type": "application/json" },
@@ -1227,7 +1132,7 @@ function Hero() {
 
 					{/* Generate button */}
 					<motion.button
-						onClick={handleGenerateClick}
+						onClick={handleAgentSend}
 						disabled={generating}
 						whileHover={
 							!generating
@@ -1493,28 +1398,28 @@ function Hero() {
 							</label>
 							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 								{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
-								<motion.button
-									key={i}
-									whileHover={{ scale: 1.005, x: 4 }}
-									whileTap={{ scale: 0.995 }}
-									onClick={() => setAgentPrompt(s)}
-									style={{
-										width: "100%",
-										padding: "12px 16px",
-										borderRadius: 10,
-										fontSize: 13,
-										fontWeight: 500,
-										cursor: "pointer",
-										border: `1.5px solid ${T.border}`,
-										background: T.base,
-										color: T.accent,
-										textAlign: "left",
-										lineHeight: 1.5,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{s}
-								</motion.button>
+									<motion.button
+										key={i}
+										whileHover={{ scale: 1.005, x: 4 }}
+										whileTap={{ scale: 0.995 }}
+										onClick={() => setAgentPrompt(s)}
+										style={{
+											width: "100%",
+											padding: "12px 16px",
+											borderRadius: 10,
+											fontSize: 13,
+											fontWeight: 500,
+											cursor: "pointer",
+											border: `1.5px solid ${T.border}`,
+											background: T.base,
+											color: T.accent,
+											textAlign: "left",
+											lineHeight: 1.5,
+											fontFamily: "'Outfit', sans-serif",
+										}}
+									>
+										{s}
+									</motion.button>
 								))}
 							</div>
 						</div>
