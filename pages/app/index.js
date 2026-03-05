@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import { db, auth } from "../../lib/config/firebase";
 import {
@@ -430,7 +430,6 @@ export default function inkgestApp() {
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const pendingGenerateRef = useRef(false);
 
-	const [drafts, setDrafts] = useState([]);
 	const [search, setSearch] = useState("");
 	const [urls, setUrls] = useState([""]);
 	const [newUrlInput, setNewUrlInput] = useState("");
@@ -497,32 +496,19 @@ export default function inkgestApp() {
 		}
 	}, [agentThinking, agentRunSteps.length]);
 
-	/* Load drafts, tables, and other assets per user from Firestore */
-	const [tables, setTables] = useState([]);
-	const [otherAssets, setOtherAssets] = useState([]);
-	useEffect(() => {
-		if (!reduxUser) {
-			setDrafts([]);
-			setTables([]);
-			setOtherAssets([]);
-			return;
-		}
-		const load = async () => {
-			try {
-				const items = await listAssets(reduxUser.uid);
-				setDrafts(items.filter((i) => i.type === "draft"));
-				setTables(items.filter((i) => i.type === "table"));
-				setOtherAssets(
-					items.filter((i) =>
-						["infographics", "landing_page", "image_gallery"].includes(i.type),
-					),
-				);
-			} catch (e) {
-				console.error("Failed to load assets", e);
-			}
-		};
-		load();
-	}, [reduxUser]);
+	/* Load drafts, tables, and other assets via React Query (shared with draftId page) */
+	const { data: items = [] } = useQuery({
+		queryKey: ["assets", reduxUser?.uid],
+		queryFn: () => listAssets(reduxUser.uid),
+		enabled: !!reduxUser,
+		staleTime: 2 * 60 * 1000,
+	});
+
+	const drafts = items.filter((i) => i.type === "draft");
+	const tables = items.filter((i) => i.type === "table");
+	const otherAssets = items.filter((i) =>
+		["infographics", "landing_page", "image_gallery"].includes(i.type),
+	);
 
 	const sidebarItems = [...drafts, ...tables, ...otherAssets].sort((a, b) => {
 		const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
@@ -606,15 +592,8 @@ export default function inkgestApp() {
 		const source = item?.source || (isAssetType ? "assets" : "drafts");
 		try {
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
-			if (item?.type === "table") {
-				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			} else if (
-				["infographics", "landing_page", "image_gallery"].includes(item?.type)
-			) {
-				setOtherAssets((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			} else {
-				setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			}
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
@@ -693,16 +672,7 @@ export default function inkgestApp() {
 				tag: "Scraped",
 			};
 			const { id } = await createDraft(reduxUser.uid, draft);
-			setDrafts((prev) => [
-				{
-					id,
-					type: "draft",
-					...draft,
-					createdAt: new Date(),
-					source: "assets",
-				},
-				...prev,
-			]);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 			setScrapeUrl("");
 			// Refresh credits counter
 			if (reduxUser)
@@ -965,6 +935,7 @@ export default function inkgestApp() {
 			"newsletter",
 			"linkedin",
 			"blog_post",
+			"blog",
 			"twitter_thread",
 			"email_digest",
 		];
@@ -1002,16 +973,7 @@ export default function inkgestApp() {
 					format,
 				};
 				const { id } = await createDraft(reduxUser.uid, draft);
-				setDrafts((prev) => [
-					{
-						id,
-						type: "draft",
-						...draft,
-						createdAt: new Date(),
-						source: "assets",
-					},
-					...prev,
-				]);
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				newTasks.push({
 					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
 					label: task.label,
@@ -1035,53 +997,41 @@ export default function inkgestApp() {
 					tag: "Scraped",
 				};
 				const { id } = await createDraft(reduxUser.uid, draft);
-				setDrafts((prev) => [
-					{
-						id,
-						type: "draft",
-						...draft,
-						createdAt: new Date(),
-						source: "assets",
-					},
-					...prev,
-				]);
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				newTasks.push({
 					type: "scrape",
 					label: task.label,
 					id,
 					path: `/app/${id}`,
 				});
-			} else if (task.type === "table" && task.columns) {
-				const { id } = await createTable(reduxUser.uid, {
-					title: task.title || "Generated Table",
-					description: task.description || "",
-					columns: task.columns || [],
-					rows: task.rows || [],
-					sourceUrls: task.sourceUrls || [],
-					prompt: userPrompt || "",
-				});
-				setTables((prev) => [
-					{
-						id,
+			} else if (
+				(task.type === "table" ||
+					task.type === "table-creator" ||
+					task.type === "table-generator") &&
+				(task.columns || task.result?.columns)
+			) {
+				const columns = task.columns ?? task.result?.columns ?? [];
+				const rows = task.rows ?? task.result?.rows ?? [];
+				const sourceUrls =
+					task.sourceUrls ?? task.result?.sourceUrls ?? [];
+				if (Array.isArray(columns) && columns.length > 0) {
+					const { id } = await createTable(reduxUser.uid, {
+						title: task.title ?? task.result?.title ?? "Generated Table",
+						description:
+							task.description ?? task.result?.description ?? "",
+						columns,
+						rows,
+						sourceUrls,
+						prompt: userPrompt || "",
+					});
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+					newTasks.push({
 						type: "table",
-						title: task.title || "Generated Table",
-						description: task.description || "",
-						createdAt: new Date(),
-						date: new Date().toLocaleDateString("en-US", {
-							weekday: "short",
-							month: "short",
-							day: "numeric",
-						}),
-						source: "assets",
-					},
-					...prev,
-				]);
-				newTasks.push({
-					type: "table",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
+						label: task.label,
+						id,
+						path: `/app/${id}`,
+					});
+				}
 			} else if (
 				task.type === "infographics" ||
 				task.type === "infographics-svg-generator"
@@ -1101,20 +1051,7 @@ export default function inkgestApp() {
 					prompt: userPrompt || "",
 					infographics,
 				});
-				const item = {
-					id,
-					type: "infographics",
-					title: task.title || "Infographics",
-					description: task.description || "",
-					createdAt: new Date(),
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					source: "assets",
-				};
-				setOtherAssets((prev) => [item, ...prev]);
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				newTasks.push({
 					type: "infographics",
 					label: task.label || "Infographics",
@@ -1151,20 +1088,7 @@ export default function inkgestApp() {
 					html,
 					url,
 				});
-				const item = {
-					id,
-					type: "landing_page",
-					title: task.title || "Landing Page",
-					description: task.description || "",
-					createdAt: new Date(),
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					source: "assets",
-				};
-				setOtherAssets((prev) => [item, ...prev]);
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				newTasks.push({
 					type: "landing_page",
 					label: task.label || "Landing Page",
@@ -1214,20 +1138,7 @@ export default function inkgestApp() {
 					description: task.description || "",
 					images,
 				});
-				const item = {
-					id,
-					type: "image_gallery",
-					title: task.title || "Image Gallery",
-					description: task.description || "",
-					createdAt: new Date(),
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					source: "assets",
-				};
-				setOtherAssets((prev) => [item, ...prev]);
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				newTasks.push({
 					type: "image_gallery",
 					label: task.label || "Gallery",
@@ -1266,10 +1177,7 @@ export default function inkgestApp() {
 			tag: "Draft",
 		};
 		const { id } = await createDraft(reduxUser.uid, draft);
-		setDrafts((prev) => [
-			{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
-			...prev,
-		]);
+		queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 		setBlankTitle("");
 		router.push(`/app/${id}`);
 	};
@@ -1587,7 +1495,12 @@ export default function inkgestApp() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
+											<p style={{ fontSize: 13, marginBottom: 12 }}>
+												No drafts or tables found
+											</p>
+											<p style={{ fontSize: 12, color: T.muted }}>
+												Use InkAgent above to create your first draft
+											</p>
 										</motion.div>
 									) : (
 										filtered.map((item) => (

@@ -10,6 +10,12 @@ import TableView from "../../lib/ui/TableView";
 import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
 import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
 import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
+import {
+	listAssets,
+	getAsset,
+	deleteAsset,
+	assetRef,
+} from "../../lib/api/userAssets";
 import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
 
@@ -31,8 +37,6 @@ const FontLink = () => (
 );
 
 const T = getTheme();
-
-const FREE_LIMIT = 40;
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;
@@ -895,17 +899,44 @@ export default function DraftPage() {
 			router.replace("/app");
 			return null;
 		},
-		enabled: !!draftId && !!reduxUser,
+		enabled: !!router.isReady && !!draftId && !!reduxUser,
 		staleTime: 5 * 60 * 1000,
 		retry: false,
 	});
 
-	const draft = docData?.type === "draft" ? docData.doc : null;
-	const tableDoc = docData?.type === "table" ? docData.doc : null;
-	const infographicsDoc = docData?.type === "infographics" ? docData.doc : null;
-	const landingPageDoc = docData?.type === "landing_page" ? docData.doc : null;
+	/* Resolve doc by type; fallback: infer from structure when type missing/wrong */
+	const doc = docData?.doc;
+	const docType = docData?.type;
+	const draft =
+		(docType === "draft" || docType === "blog")
+			? doc
+			: (!docType && doc?.body != null)
+				? doc
+				: null;
+	const tableDoc =
+		docType === "table"
+			? doc
+			: !docType && Array.isArray(doc?.columns)
+				? doc
+				: null;
+	const infographicsDoc =
+		docType === "infographics"
+			? doc
+			: !docType && Array.isArray(doc?.infographics) && doc.infographics.length > 0
+				? doc
+				: null;
+	const landingPageDoc =
+		docType === "landing_page"
+			? doc
+			: !docType && (doc?.html || doc?.url)
+				? doc
+				: null;
 	const imageGalleryDoc =
-		docData?.type === "image_gallery" ? docData.doc : null;
+		docType === "image_gallery"
+			? doc
+			: !docType && Array.isArray(doc?.images) && doc.images.length > 0
+				? doc
+				: null;
 
 	useEffect(() => {
 		if (tableDoc) {
@@ -922,9 +953,20 @@ export default function DraftPage() {
 		}
 	}, [draftId, tableDoc?.id]);
 
+	/* Derive table data synchronously so content shows on first render (no useEffect delay) */
+	const tableDataForView = tableDoc
+		? localTableData ?? {
+				title: tableDoc.title,
+				description: tableDoc.description,
+				columns: tableDoc.columns || [],
+				rows: tableDoc.rows || [],
+				sourceUrls: tableDoc.sourceUrls || [],
+				prompt: tableDoc.prompt || "",
+			}
+		: null;
+
 	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
-	const remaining = Math.max(0, FREE_LIMIT - used);
 
 	/* Credits for free users (10/month) */
 	const [credits, setCredits] = useState(null);
@@ -1343,9 +1385,8 @@ export default function DraftPage() {
 				item?.source ||
 				(isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
-			queryClient.setQueryData(["assets", reduxUser?.uid], (old = []) =>
-				old.filter((d) => d.id !== deleteConfirm),
-			);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser?.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
 			if (deleteConfirm === draftId) {
 				router.push("/app");
 			}
@@ -1390,7 +1431,9 @@ export default function DraftPage() {
 		(docData?.type === "table" ? docData.doc : null) ||
 		(docData?.type === "infographics" ? docData.doc : null) ||
 		(docData?.type === "landing_page" ? docData.doc : null) ||
-		(docData?.type === "image_gallery" ? docData.doc : null);
+		(docData?.type === "image_gallery" ? docData.doc : null) ||
+		/* Fallback: doc exists but type unknown — treat as draft if has body */
+		(docData?.doc?.body != null ? docData.doc : null);
 	const sourceUrl = Array.isArray(asset?.urls)
 		? asset.urls[0] || ""
 		: Array.isArray(asset?.sourceUrls)
@@ -1775,7 +1818,26 @@ export default function DraftPage() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
+											<p style={{ fontSize: 13, marginBottom: 12 }}>
+												No drafts or tables found
+											</p>
+											<motion.button
+												whileHover={{ scale: 1.02 }}
+												whileTap={{ scale: 0.98 }}
+												onClick={() => router.push("/app")}
+												style={{
+													fontSize: 12,
+													fontWeight: 600,
+													color: T.warm,
+													background: "transparent",
+													border: `1px solid ${T.border}`,
+													borderRadius: 8,
+													padding: "8px 14px",
+													cursor: "pointer",
+												}}
+											>
+												Create with InkAgent →
+											</motion.button>
 										</motion.div>
 									) : (
 										filtered.map((d) => (
@@ -1894,13 +1956,13 @@ export default function DraftPage() {
 						minWidth: 0,
 					}}
 				>
-					{loadingDraft &&
+					{((!router.isReady || loadingDraft) &&
 						!draft &&
 						!tableDoc &&
 						!infographicsDoc &&
 						!landingPageDoc &&
 						!imageGalleryDoc &&
-						draftId && (
+						draftId) && (
 							<div
 								style={{
 									flex: 1,
@@ -3348,7 +3410,7 @@ export default function DraftPage() {
 							</div>
 						</motion.div>
 					)}
-					{tableDoc && localTableData && (
+					{tableDoc && tableDataForView && (
 						<motion.div
 							key={`table-${draftId}`}
 							initial={{ opacity: 0 }}
@@ -3373,7 +3435,7 @@ export default function DraftPage() {
 							>
 								<TableView
 									tableId={draftId}
-									tableData={localTableData}
+									tableData={tableDataForView}
 									setTableData={setLocalTableData}
 									reduxUser={reduxUser}
 									tableDocRef={
@@ -3404,11 +3466,9 @@ export default function DraftPage() {
 								assetId={draftId}
 								docSource={docData?.source || "assets"}
 								onUpdate={() =>
-									queryClient.invalidateQueries([
-										"doc",
-										draftId,
-										reduxUser?.uid,
-									])
+									queryClient.invalidateQueries({
+										queryKey: ["doc", draftId, reduxUser?.uid],
+									})
 								}
 							/>
 						</motion.div>

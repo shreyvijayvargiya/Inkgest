@@ -309,6 +309,7 @@ function Hero() {
 			"newsletter",
 			"linkedin",
 			"blog_post",
+			"blog",
 			"twitter_thread",
 			"email_digest",
 		];
@@ -375,21 +376,33 @@ function Hero() {
 					id,
 					path: `/app/${id}`,
 				});
-			} else if (task.type === "table" && task.columns) {
-				const { id } = await createTable(reduxUser.uid, {
-					title: task.title || "Table",
-					description: task.description || "",
-					columns: task.columns,
-					rows: task.rows || [],
-					sourceUrls: task.sourceUrls || [],
-					prompt: userPrompt || "",
-				});
-				newTasks.push({
-					type: "table",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
+			} else if (
+				(task.type === "table" ||
+					task.type === "table-creator" ||
+					task.type === "table-generator") &&
+				(task.columns || task.result?.columns)
+			) {
+				const columns = task.columns ?? task.result?.columns ?? [];
+				const rows = task.rows ?? task.result?.rows ?? [];
+				const sourceUrls =
+					task.sourceUrls ?? task.result?.sourceUrls ?? [];
+				if (Array.isArray(columns) && columns.length > 0) {
+					const { id } = await createTable(reduxUser.uid, {
+						title: task.title ?? task.result?.title ?? "Table",
+						description:
+							task.description ?? task.result?.description ?? "",
+						columns,
+						rows,
+						sourceUrls,
+						prompt: userPrompt || "",
+					});
+					newTasks.push({
+						type: "table",
+						label: task.label,
+						id,
+						path: `/app/${id}`,
+					});
+				}
 			} else if (
 				task.type === "infographics" ||
 				task.type === "infographics-svg-generator"
