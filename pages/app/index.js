@@ -33,6 +33,8 @@ import {
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
 import { inferFormatFromPrompt } from "../../lib/prompts/newsletter";
+import { INKGEST_AGENT_URL } from "../../lib/config/agent";
+import { deductCredits } from "../../lib/api/deductCredits";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -115,6 +117,8 @@ const Icons = {
 		"M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3 M8 12h8",
 	settings:
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+	send: "M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z",
+	stop: "M6 6h12v12H6z",
 };
 
 /* ─── Prefill presets (URLs + prompt) ─── */
@@ -457,6 +461,7 @@ export default function inkgestApp() {
 	const [agentError, setAgentError] = useState(null);
 	const [agentThinking, setAgentThinking] = useState(""); // Streaming "thinking" text from SSE
 	const agentOutputRef = useRef(null);
+	const agentAbortRef = useRef(null);
 
 	/* Derived helpers — single unified credit pool */
 	const creditRemaining = credits
@@ -689,6 +694,52 @@ export default function inkgestApp() {
 	};
 
 	/* Get step label from executed task */
+	const TRUNCATE_WORDS = 12;
+	const formatTaskOutputDisplay = (step) => {
+		const output = step.output;
+		const task = step.fullTask || {};
+		let urls = task.urls || task.sourceUrls || task.params?.urls || [];
+		const content = typeof output === "string" ? output : "";
+		// Parse "--- Source N: URL ---" from combined scrape content
+		if (urls.length === 0 && content.includes("--- Source")) {
+			urls = [...content.matchAll(/--- Source \d+: (https?:\/\/[^\s]+) ---/g)].map((m) => m[1]);
+		}
+		const isScrape = task.type === "scrape" || urls.length > 0 || content.length > 500;
+		const truncate = (str, words = TRUNCATE_WORDS) => {
+			const w = (str || "").trim().split(/\s+/).slice(0, words).join(" ");
+			return w + (str && str.trim().split(/\s+/).length > words ? "…" : "");
+		};
+		if (isScrape && (content || urls.length > 0)) {
+			if (urls.length > 1) {
+				return (
+					<>
+						{urls.map((url) => (
+							<div key={url} style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+								<span style={{ color: "#16A34A", flexShrink: 0 }}>✓</span>
+								<span style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}>{url}</span>
+							</div>
+						))}
+						{content && <div style={{ marginTop: 6, marginLeft: 18, color: T.accent }}>{truncate(content)}</div>}
+					</>
+				);
+			}
+			if (urls.length === 1) {
+				return (
+					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+							<span style={{ color: "#16A34A" }}>✓</span>
+							<span style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}>{urls[0]}</span>
+						</div>
+						{content && <span style={{ marginLeft: 18, color: T.accent }}>{truncate(content)}</span>}
+					</div>
+				);
+			}
+			return <><span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}</>;
+		}
+		if (content.length > 200) return <><span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}</>;
+		return typeof output === "string" ? output : JSON.stringify(output).slice(0, 300) + (JSON.stringify(output).length > 300 ? "…" : "");
+	};
+
 	const getAgentStepLabel = (task) => {
 		if (task.type === "scrape") {
 			const url = task.urls?.[0] || task.sourceUrls?.[0];
@@ -749,13 +800,16 @@ export default function inkgestApp() {
 		setAgentThinking("");
 		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
 		setAgentPrompt("");
+		const abortController = new AbortController();
+		agentAbortRef.current = abortController;
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
-			const res = await fetch("/api/agent/inkagent", {
+			const res = await fetch(INKGEST_AGENT_URL, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ prompt: promptText, idToken }),
+				signal: abortController.signal,
 			});
 			if (!res.ok) {
 				const errData = await res.json().catch(() => ({}));
@@ -772,6 +826,11 @@ export default function inkgestApp() {
 						})),
 					);
 					await processAgentExecuted(data.executed, promptText);
+					const creditsUsed =
+						typeof data.creditsUsed === "number" && data.creditsUsed > 0
+							? data.creditsUsed
+							: 1;
+					deductCredits(idToken, creditsUsed);
 				} else {
 					setAgentRunSteps([
 						{ label: data.message || "Done.", status: "done" },
@@ -851,6 +910,24 @@ export default function inkgestApp() {
 						const idx = data.index ?? 0;
 						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
 						const status = data.success ? "done" : "error";
+						const output =
+							data.content ??
+							data.output ??
+							(typeof data.result === "string"
+								? data.result
+								: data.error ??
+									(data.result && typeof data.result === "object"
+										? data.result.content ??
+											(data.result.columns && data.result.rows
+												? `Table: ${data.result.rows.length} rows`
+												: data.result.infographics
+													? `${data.result.infographics.length} infographics`
+													: null)
+										: data.columns && data.rows
+											? `Table: ${data.rows.length} rows`
+											: Array.isArray(data.infographics)
+												? `${data.infographics.length} infographics`
+												: null));
 						setAgentRunSteps((prev) => {
 							const next = [...prev];
 							while (next.length <= idx)
@@ -858,7 +935,7 @@ export default function inkgestApp() {
 									label: `Task ${next.length + 1}`,
 									status: "loading",
 								});
-							next[idx] = { label, status };
+							next[idx] = { label, status, output, fullTask: data };
 							return next;
 						});
 					} else if (data.type === "end") {
@@ -866,6 +943,49 @@ export default function inkgestApp() {
 						const executed = data.executed || [];
 						if (executed.length > 0) {
 							await processAgentExecuted(executed, promptText);
+							// Merge executed task outputs into steps (in case backend only sends end)
+							setAgentRunSteps((prev) => {
+								const next = [...prev];
+								executed.forEach((t, i) => {
+									const output =
+										t.content ??
+										t.output ??
+										(typeof t.result === "string"
+											? t.result
+											: t.error ??
+												(t.result && typeof t.result === "object"
+													? t.result.content ??
+														(t.result.columns && t.result.rows
+															? `Table: ${t.result.rows.length} rows`
+															: t.result.infographics
+																? `${t.result.infographics.length} infographics`
+																: null)
+													: t.columns && t.rows
+														? `Table: ${t.rows.length} rows`
+														: Array.isArray(t.infographics)
+															? `${t.infographics.length} infographics`
+															: null)
+												);
+									if (next[i]) {
+										next[i] = {
+											...next[i],
+											output: next[i].output ?? output,
+											status: next[i].status === "loading" ? "done" : next[i].status,
+										};
+									} else {
+										next.push({
+											label: t.label || t.taskLabel || `Task ${i + 1}`,
+											status: "done",
+											output,
+											fullTask: t,
+										});
+									}
+								});
+								return next.map((s) => ({
+									...s,
+									status: s.status === "loading" ? "done" : s.status,
+								}));
+							});
 						} else {
 							setAgentRunSteps((prev) =>
 								prev.map((s) => ({
@@ -874,14 +994,13 @@ export default function inkgestApp() {
 								})),
 							);
 						}
-						const creditsUsed = data.creditsUsed;
-						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
-							fetch("/api/agent/inkagent", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ idToken, creditsUsed }),
-							}).catch(() => {});
-						}
+						const creditsUsed =
+							typeof data.creditsUsed === "number" && data.creditsUsed > 0
+								? data.creditsUsed
+								: executed.length > 0
+									? 1
+									: 0;
+						if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
 						if (reduxUser)
 							getUserCredits(reduxUser.uid)
 								.then(setCredits)
@@ -897,18 +1016,13 @@ export default function inkgestApp() {
 						if (data.type === "end") {
 							if ((data.executed || []).length > 0)
 								await processAgentExecuted(data.executed, promptText);
-							const creditsUsed = data.creditsUsed;
-							if (
-								typeof creditsUsed === "number" &&
-								creditsUsed > 0 &&
-								idToken
-							) {
-								fetch("/api/agent/inkagent", {
-									method: "POST",
-									headers: { "Content-Type": "application/json" },
-									body: JSON.stringify({ idToken, creditsUsed }),
-								}).catch(() => {});
-							}
+							const creditsUsed =
+								typeof data.creditsUsed === "number" && data.creditsUsed > 0
+									? data.creditsUsed
+									: (data.executed || []).length > 0
+										? 1
+										: 0;
+							if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
 						}
 						if (reduxUser)
 							getUserCredits(reduxUser.uid)
@@ -920,12 +1034,27 @@ export default function inkgestApp() {
 				}
 			}
 		} catch (e) {
+			const isAborted =
+				e?.name === "AbortError" ||
+				e?.code === "ABORT_ERR" ||
+				e?.reason === "user_cancelled" ||
+				/abort/i.test(e?.message || "");
+			if (isAborted) {
+				setAgentError(null);
+				setAgentRunSteps([]);
+				return;
+			}
 			const errMsg = e?.message || "Agent failed";
 			setAgentError(errMsg);
 			setAgentRunSteps([{ label: errMsg, status: "error" }]);
 		} finally {
+			agentAbortRef.current = null;
 			setAgentLoading(false);
 		}
+	};
+
+	const handleAgentCancel = () => {
+		agentAbortRef.current?.abort("user_cancelled");
 	};
 
 	const processAgentExecuted = async (executed, userPrompt = "") => {
@@ -1844,14 +1973,12 @@ export default function inkgestApp() {
 										disabled={!reduxUser || agentLoading}
 										className="w-full bg-zinc-50 border border-zinc-200 rounded-xl bg-transparent px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
 									/>
-									<div className="flex gap-2 items-center justify-between px-2 py-1  bg-amber-50/20">
+									<div className="flex gap-2 items-center justify-between px-2 py-1 bg-amber-50/20">
 										<div className="text-xs text-zinc-700">
 											Create tables, newsletter, infographics and models
 										</div>
-										{/* Circular credits progress — justify-end */}
-										<div
-											style={{ display: "flex", justifyContent: "flex-end" }}
-										>
+										<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+											{/* Circular credits progress */}
 											{(() => {
 												const limit =
 													credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
@@ -1919,76 +2046,60 @@ export default function inkgestApp() {
 													</div>
 												);
 											})()}
+											{/* Small send / stop button */}
+											<motion.button
+												onClick={
+													agentLoading
+														? handleAgentCancel
+														: handleAgentSend
+												}
+												disabled={!reduxUser || (!agentLoading && !agentPrompt.trim())}
+												whileHover={
+													(agentLoading || (agentPrompt.trim() && reduxUser))
+														? { scale: 1.05 }
+														: {}
+												}
+												whileTap={{ scale: 0.95 }}
+												title={agentLoading ? "Stop" : "Send"}
+												style={{
+													width: 32,
+													height: 32,
+													borderRadius: 8,
+													background:
+														agentLoading
+															? "#FEE2E2"
+															: agentPrompt.trim() && reduxUser
+																? T.accent
+																: T.border,
+													color: agentLoading
+														? "#DC2626"
+														: agentPrompt.trim() && reduxUser
+															? "white"
+															: T.muted,
+													border: "none",
+													cursor:
+														!reduxUser || (!agentLoading && !agentPrompt.trim())
+															? "not-allowed"
+															: "pointer",
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "center",
+													flexShrink: 0,
+												}}
+											>
+												{agentLoading ? (
+													<Icon d={Icons.stop} size={14} stroke="currentColor" fill="currentColor" />
+												) : (
+													<Icon
+														d={Icons.send}
+														size={14}
+														stroke="currentColor"
+														fill="none"
+													/>
+												)}
+											</motion.button>
 										</div>
 									</div>
-								</div>
-								<div
-									style={{
-										display: "flex",
-										flexDirection: "column",
-										gap: 12,
-									}}
-								>
-									<motion.button
-										onClick={handleAgentSend}
-										disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
-										whileHover={
-											!agentLoading && agentPrompt.trim()
-												? { scale: 1.02, y: -1 }
-												: {}
-										}
-										whileTap={!agentLoading ? { scale: 0.97 } : {}}
-										style={{
-											width: "100%",
-											background:
-												agentLoading || !agentPrompt.trim() || !reduxUser
-													? "#E8E4DC"
-													: T.accent,
-											color:
-												agentLoading || !agentPrompt.trim() || !reduxUser
-													? T.muted
-													: "white",
-											border: "none",
-											padding: "15px",
-											borderRadius: 12,
-											fontSize: 16,
-											fontWeight: 700,
-											cursor:
-												agentLoading || !reduxUser ? "not-allowed" : "pointer",
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											gap: 10,
-										}}
-									>
-										{agentLoading ? (
-											<>
-												<motion.span
-													animate={{ rotate: 360 }}
-													transition={{
-														duration: 0.9,
-														repeat: Infinity,
-														ease: "linear",
-													}}
-												>
-													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
-												</motion.span>
-												{agentLoadingMsg}
-											</>
-										) : !reduxUser ? (
-											"Sign in to use AI Agent"
-										) : (
-											<>
-												<Icon
-													d={Icons.zap}
-													size={18}
-													stroke="white"
-													fill="white"
-												/>
-												Send to InkAgent
-											</>
-										)}
-									</motion.button>
 								</div>
 
 								{agentError && (
@@ -2060,66 +2171,85 @@ export default function inkgestApp() {
 												style={{
 													display: "flex",
 													flexDirection: "column",
-													gap: 10,
+													gap: 12,
 													marginBottom: agentCompletedTasks.length > 0 ? 16 : 0,
 												}}
 											>
 												{agentRunSteps.map((step, i) => (
-													<div
-														key={i}
-														style={{
-															display: "flex",
-															alignItems: "center",
-															justifyContent: "space-between",
-															gap: 12,
-														}}
-													>
-														<span
+													<div key={i}>
+														<div
 															style={{
-																fontSize: 13,
-																color: T.accent,
-																fontWeight: 500,
+																display: "flex",
+																alignItems: "center",
+																justifyContent: "space-between",
+																gap: 12,
 															}}
 														>
-															{step.label}
-														</span>
-														{step.status === "loading" && (
-															<motion.span
-																animate={{ rotate: 360 }}
-																transition={{
-																	duration: 0.9,
-																	repeat: Infinity,
-																	ease: "linear",
-																}}
-															>
-																<Icon
-																	d={Icons.refresh}
-																	size={14}
-																	stroke={T.warm}
-																/>
-															</motion.span>
-														)}
-														{step.status === "done" && (
 															<span
 																style={{
-																	fontSize: 14,
-																	color: "#16A34A",
-																	fontWeight: 700,
+																	fontSize: 13,
+																	color: T.accent,
+																	fontWeight: 500,
 																}}
 															>
-																✓
+																{step.label}
 															</span>
-														)}
-														{step.status === "error" && (
-															<span
+															{step.status === "loading" && (
+																<motion.span
+																	animate={{ rotate: 360 }}
+																	transition={{
+																		duration: 0.9,
+																		repeat: Infinity,
+																		ease: "linear",
+																	}}
+																>
+																	<Icon
+																		d={Icons.refresh}
+																		size={14}
+																		stroke={T.warm}
+																	/>
+																</motion.span>
+															)}
+															{step.status === "done" && (
+																<span
+																	style={{
+																		fontSize: 14,
+																		color: "#16A34A",
+																		fontWeight: 700,
+																	}}
+																>
+																	✓
+																</span>
+															)}
+															{step.status === "error" && (
+																<span
+																	style={{
+																		fontSize: 14,
+																		color: "#DC2626",
+																		fontWeight: 700,
+																	}}
+																>
+																	✗
+																</span>
+															)}
+														</div>
+														{step.output && step.status !== "loading" && (
+															<div
 																style={{
-																	fontSize: 14,
-																	color: "#DC2626",
-																	fontWeight: 700,
+																	marginTop: 8,
+																	padding: "12px 14px",
+																	background: T.base,
+																	border: `1px solid ${T.border}`,
+																	borderRadius: 10,
+																	fontSize: 12,
+																	lineHeight: 1.6,
+																	color: T.accent,
+																	whiteSpace: "pre-wrap",
+																	wordBreak: "break-word",
 																}}
 															>
-																✗
-															</span>
+																{formatTaskOutputDisplay(step)}
+															</div>
 														)}
 													</div>
 												))}

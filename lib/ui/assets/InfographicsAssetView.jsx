@@ -15,6 +15,8 @@ import { motion } from "framer-motion";
 import { InfographicCard } from "../InfographicsModal";
 import { auth } from "../../config/firebase";
 import { updateAsset } from "../../api/userAssets";
+import { INKGEST_AGENT_URL } from "../../config/agent";
+import { deductCredits } from "../../api/deductCredits";
 
 const T = {
 	base: "#F7F5F0",
@@ -87,7 +89,7 @@ export default function InfographicsAssetView({
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
 			const excludeTypes = infographics.map((ig) => ig.type);
-			const res = await fetch("/api/agent/inkagent", {
+			const res = await fetch(INKGEST_AGENT_URL, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -101,6 +103,7 @@ export default function InfographicsAssetView({
 			if (!res.ok) throw new Error(data.error || "Generation failed");
 			const newBatch = data.infographics || [];
 			if (newBatch.length > 0) {
+				deductCredits(idToken, 1);
 				await updateAsset(
 					userId,
 					assetId,
