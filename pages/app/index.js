@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
+import { useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import { db, auth } from "../../lib/config/firebase";
 import {
@@ -19,6 +20,9 @@ import {
 	listAssets,
 	createDraft,
 	createTable,
+	createInfographicsAsset,
+	createLandingPageAsset,
+	createImageGalleryAsset,
 	deleteAsset,
 } from "../../lib/api/userAssets";
 import {
@@ -145,24 +149,24 @@ const PRESETS = [
 const AGENT_LOADING_MSGS = [
 	"InkAgent thinking…",
 	"InkAgent analysing your request…",
-	"InkAgent scraping URLs…",
+	"InkAgent browsing & finding content…",
 	"InkAgent creating newsletter…",
 	"InkAgent building table…",
 	"InkAgent preparing content…",
 ];
 
-/* ─── InkAgent prompt suggestions — use scrapable URLs (no Medium, X, or auth-required sites) ─── */
+/* ─── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ─── */
 const AGENT_PROMPT_SUGGESTIONS = [
-	"Scrape https://www.producthunt.com and turn today's top launches into a newsletter for indie hackers. Focus on SaaS and dev tools.",
-	"Turn https://www.ycombinator.com/blog into a LinkedIn post for founders. Practical takeaways, under 300 words.",
-	"Scrape https://techcrunch.com and create a digest of the latest startup news. Casual tone for entrepreneurs.",
-	"Turn https://github.blog into a Twitter thread. 5–7 tweets on the key announcements, punchy with links.",
-	"Scrape https://www.producthunt.com and create a table comparing the top 5 products with name, tagline, and category.",
-	"Write a Substack newsletter from https://stripe.com/blog — pull insights from recent posts for founders and developers.",
-	"Scrape https://aws.amazon.com/blogs/aws/ and summarize the latest AWS updates into a newsletter for devs.",
-	"Create a table from https://www.producthunt.com — extract product name, maker, upvotes, and one-liner for top launches.",
-	"Scrape https://www.paulgraham.com/startupideas.html and turn it into a LinkedIn post. Key lessons for founders, under 300 words.",
-	"Scrape https://techcrunch.com and turn the top startup story into a LinkedIn post. Professional tone, actionable takeaways.",
+	"Find Hacker News latest news and create a summary of the top stories.",
+	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
+	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
+	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
+	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
+	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
+	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
+	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
+	"Find top news from India and create a realistic table — headlines, source, key points.",
+	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
 ];
 
 /* ─── Format / Style config (mirrors API) ─── */
@@ -260,13 +264,22 @@ function UpgradeBanner({ credits, onUpgrade }) {
 	);
 }
 
-/* ─── Item card in sidebar (drafts + tables) ─── */
+/* ─── Asset type labels ─── */
+const SIDEBAR_ASSET_LABELS = {
+	table: "Table",
+	draft: "Draft",
+	infographics: "Infographics",
+	landing_page: "Landing Page",
+	image_gallery: "Gallery",
+};
+
+/* ─── Item card in sidebar (drafts + tables + assets) ─── */
 function SidebarItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
-	const isTable = item.type === "table";
-	const tag = isTable ? "Table" : item.tag || "Draft";
-	const preview = isTable ? item.description || "" : item.preview || "";
-	const meta = isTable ? "" : `${item.words ?? 0}w`;
+	const isAssetWithDesc = ["table", "infographics", "landing_page", "image_gallery"].includes(item.type);
+	const tag = SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft";
+	const preview = isAssetWithDesc ? (item.description || "") : (item.preview || "");
+	const meta = isAssetWithDesc ? "" : `${item.words ?? 0}w`;
 	const date = item.date
 		? typeof item.date === "string"
 			? item.date
@@ -408,6 +421,7 @@ function SidebarItemCard({ item, active, onClick, onDelete }) {
 /* ─── Main App ─── */
 export default function inkgestApp() {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const pendingGenerateRef = useRef(false);
 
@@ -478,12 +492,14 @@ export default function inkgestApp() {
 		}
 	}, [agentThinking, agentRunSteps.length]);
 
-	/* Load drafts and tables per user from Firestore */
+	/* Load drafts, tables, and other assets per user from Firestore */
 	const [tables, setTables] = useState([]);
+	const [otherAssets, setOtherAssets] = useState([]);
 	useEffect(() => {
 		if (!reduxUser) {
 			setDrafts([]);
 			setTables([]);
+			setOtherAssets([]);
 			return;
 		}
 		const load = async () => {
@@ -491,14 +507,19 @@ export default function inkgestApp() {
 				const items = await listAssets(reduxUser.uid);
 				setDrafts(items.filter((i) => i.type === "draft"));
 				setTables(items.filter((i) => i.type === "table"));
+				setOtherAssets(
+					items.filter((i) =>
+						["infographics", "landing_page", "image_gallery"].includes(i.type),
+					),
+				);
 			} catch (e) {
-				console.error("Failed to load drafts/tables", e);
+				console.error("Failed to load assets", e);
 			}
 		};
 		load();
 	}, [reduxUser]);
 
-	const sidebarItems = [...drafts, ...tables].sort((a, b) => {
+	const sidebarItems = [...drafts, ...tables, ...otherAssets].sort((a, b) => {
 		const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
 		const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
 		return bT - aT;
@@ -553,9 +574,7 @@ export default function inkgestApp() {
 		const title = (item.title || "").toLowerCase();
 		const preview = (item.preview || item.description || "").toLowerCase();
 		const type = (item.type || "").toLowerCase();
-		const tag = (
-			item.tag || (item.type === "table" ? "Table" : "Draft")
-		).toLowerCase();
+		const tag = (SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft").toLowerCase();
 		const format = (item.format || "").toLowerCase();
 		return (
 			title.includes(q) ||
@@ -697,11 +716,14 @@ export default function inkgestApp() {
 	const confirmDelete = async () => {
 		if (!deleteConfirm || !reduxUser) return;
 		const item = sidebarItems.find((i) => i.id === deleteConfirm);
-		const source = item?.source || (item?.type === "table" ? "tables" : "drafts");
+		const isAssetType = ["table", "infographics", "landing_page", "image_gallery"].includes(item?.type);
+		const source = item?.source || (isAssetType ? "assets" : "drafts");
 		try {
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
 			if (item?.type === "table") {
 				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			} else if (["infographics", "landing_page", "image_gallery"].includes(item?.type)) {
+				setOtherAssets((prev) => prev.filter((d) => d.id !== deleteConfirm));
 			} else {
 				setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
 			}
@@ -825,7 +847,7 @@ export default function inkgestApp() {
 						}
 					})()
 				: "";
-			return host ? `Scraping ${host}…` : task.label || "Scraping…";
+			return host ? `Browsing ${host}…` : task.label || "Browsing…";
 		}
 		if (task.type === "newsletter")
 			return task.label || "Writing newsletter draft…";
@@ -834,6 +856,12 @@ export default function inkgestApp() {
 		if (task.type === "twitter_thread") return task.label || "Creating thread…";
 		if (task.type === "email_digest") return task.label || "Creating digest…";
 		if (task.type === "table") return task.label || "Creating table…";
+		if (task.type === "infographics" || task.type === "infographics-svg-generator")
+			return task.label || "Creating infographics…";
+		if (task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator")
+			return task.label || "Creating landing page…";
+		if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator")
+			return task.label || "Creating image gallery…";
 		return task.label || "Processing…";
 	};
 
@@ -1146,9 +1174,132 @@ export default function inkgestApp() {
 					id,
 					path: `/app/${id}`,
 				});
+			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+				let infographics = task.infographics ?? task.result?.infographics ?? [];
+				if (!Array.isArray(infographics) && typeof task.content === "string") {
+					try {
+						infographics = JSON.parse(task.content);
+					} catch {
+						infographics = [];
+					}
+				}
+				if (!Array.isArray(infographics) || infographics.length === 0) continue;
+				const { id } = await createInfographicsAsset(reduxUser.uid, {
+					title: task.title || "Infographics",
+					description: task.description || "",
+					prompt: userPrompt || "",
+					infographics,
+				});
+				const item = {
+					id,
+					type: "infographics",
+					title: task.title || "Infographics",
+					description: task.description || "",
+					createdAt: new Date(),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					source: "assets",
+				};
+				setOtherAssets((prev) => [item, ...prev]);
+				newTasks.push({
+					type: "infographics",
+					label: task.label || "Infographics",
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (
+				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
+				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+			) {
+				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
+				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				if (!html && !url) continue;
+				const { id } = await createLandingPageAsset(reduxUser.uid, {
+					title: task.title || "Landing Page",
+					description: task.description || "",
+					html,
+					url,
+				});
+				const item = {
+					id,
+					type: "landing_page",
+					title: task.title || "Landing Page",
+					description: task.description || "",
+					createdAt: new Date(),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					source: "assets",
+				};
+				setOtherAssets((prev) => [item, ...prev]);
+				newTasks.push({
+					type: "landing_page",
+					label: task.label || "Landing Page",
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
+				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+				if (!Array.isArray(images) && typeof task.content === "string") {
+					try {
+						const parsed = JSON.parse(task.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						images = [];
+					}
+				}
+				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+					try {
+						const parsed = JSON.parse(task.result.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						// keep existing images
+					}
+				}
+				// Normalize: allow { url }, { src }, or plain string URLs
+				images = Array.isArray(images)
+					? images
+							.map((img) => (typeof img === "string" ? { url: img } : img))
+							.filter((img) => img?.url || img?.src)
+					: [];
+				if (images.length === 0) continue;
+				const { id } = await createImageGalleryAsset(reduxUser.uid, {
+					title: task.title || "Image Gallery",
+					description: task.description || "",
+					images,
+				});
+				const item = {
+					id,
+					type: "image_gallery",
+					title: task.title || "Image Gallery",
+					description: task.description || "",
+					createdAt: new Date(),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					source: "assets",
+				};
+				setOtherAssets((prev) => [item, ...prev]);
+				newTasks.push({
+					type: "image_gallery",
+					label: task.label || "Gallery",
+					id,
+					path: `/app/${id}`,
+				});
 			}
 		}
 		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
+		if (newTasks.length > 0 && reduxUser?.uid) {
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
+		}
 	};
 
 	/* Create a blank draft and open it */
@@ -2181,7 +2332,13 @@ export default function inkgestApp() {
 																						? "📬"
 																						: t.type === "table"
 																							? "📊"
-																							: "📄"}
+																							: t.type === "infographics"
+																								? "📊"
+																								: t.type === "landing_page"
+																									? "🌐"
+																									: t.type === "image_gallery"
+																										? "🖼️"
+																										: "📄"}
 																</span>
 																<span>
 																	{t.type === "newsletter"
@@ -2196,7 +2353,13 @@ export default function inkgestApp() {
 																						? "Digest"
 																						: t.type === "table"
 																							? "Table"
-																							: "Scrape"}
+																							: t.type === "infographics"
+																								? "Infographics"
+																								: t.type === "landing_page"
+																									? "Landing Page"
+																									: t.type === "image_gallery"
+																										? "Gallery"
+																										: "Scrape"}
 																	: {t.label}
 																</span>
 															</span>

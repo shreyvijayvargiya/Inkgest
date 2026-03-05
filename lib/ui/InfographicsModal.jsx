@@ -1180,8 +1180,8 @@ function MetricGridCard({ data }) {
 	);
 }
 
-/* Dispatcher */
-function InfographicCard({ ig }) {
+/* Dispatcher — exported for InfographicsAssetView */
+export function InfographicCard({ ig }) {
 	switch (ig.type) {
 		case "donut":
 			return <DonutChart data={ig} />;

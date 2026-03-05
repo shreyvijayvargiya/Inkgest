@@ -115,6 +115,7 @@ export default async function handler(req, res) {
 		while (true) {
 			const { done, value } = await reader.read();
 			if (done) break;
+			
 			res.write(Buffer.from(value));
 		}
 		res.end();

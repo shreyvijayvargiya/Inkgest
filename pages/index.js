@@ -10,7 +10,13 @@ import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import LoginModal from "../lib/ui/LoginModal";
 import { auth } from "../lib/config/firebase";
-import { createDraft, createTable } from "../lib/api/userAssets";
+import {
+	createDraft,
+	createTable,
+	createInfographicsAsset,
+	createLandingPageAsset,
+	createImageGalleryAsset,
+} from "../lib/api/userAssets";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { validateUrls } from "../lib/utils/urlAllowlist";
 import { getTheme } from "../lib/utils/theme";
@@ -74,18 +80,18 @@ const STYLES = [
 	{ id: "persuasive", label: "Persuasive" },
 ];
 
-/* ── InkAgent prompt suggestions — use scrapable URLs (no Medium, X, or auth-required sites) ── */
+/* ── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ── */
 const AGENT_PROMPT_SUGGESTIONS = [
-	"Scrape https://www.producthunt.com and turn today's top launches into a newsletter for indie hackers. Focus on SaaS and dev tools.",
-	"Turn https://www.ycombinator.com/blog into a LinkedIn post for founders. Practical takeaways, under 300 words.",
-	"Scrape https://techcrunch.com and create a digest of the latest startup news. Casual tone for entrepreneurs.",
-	"Turn https://github.blog into a Twitter thread. 5–7 tweets on the key announcements, punchy with links.",
-	"Scrape https://www.producthunt.com and create a table comparing the top 5 products with name, tagline, and category.",
-	"Write a Substack newsletter from https://stripe.com/blog — pull insights from recent posts for founders and developers.",
-	"Scrape https://aws.amazon.com/blogs/aws/ and summarize the latest AWS updates into a newsletter for devs.",
-	"Create a table from https://www.producthunt.com — extract product name, maker, upvotes, and one-liner for top launches.",
-	"Scrape https://www.paulgraham.com/startupideas.html and turn it into a LinkedIn post. Key lessons for founders, under 300 words.",
-	"Scrape https://techcrunch.com and turn the top startup story into a LinkedIn post. Professional tone, actionable takeaways.",
+	"Find Hacker News latest news and create a summary of the top stories.",
+	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
+	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
+	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
+	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
+	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
+	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
+	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
+	"Find top news from India and create a realistic table — headlines, source, key points.",
+	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
 ];
 
 /* ── Reusable fade-up on scroll ── */
@@ -396,7 +402,7 @@ function Hero() {
 		const msgs = [
 			"InkAgent thinking…",
 			"InkAgent analysing your request…",
-			"InkAgent scraping URLs…",
+			"InkAgent browsing & finding content…",
 			"InkAgent creating newsletter…",
 			"InkAgent building table…",
 			"InkAgent preparing content…",
@@ -422,7 +428,7 @@ function Hero() {
 						}
 					})()
 				: "";
-			return host ? `Scraping ${host}…` : task.label || "Scraping…";
+			return host ? `Browsing ${host}…` : task.label || "Browsing…";
 		}
 		if (task.type === "newsletter")
 			return task.label || "Writing newsletter draft…";
@@ -527,6 +533,85 @@ function Hero() {
 					id,
 					path: `/app/${id}`,
 				});
+			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+				let infographics = task.infographics ?? task.result?.infographics ?? [];
+				if (!Array.isArray(infographics) && typeof task.content === "string") {
+					try {
+						infographics = JSON.parse(task.content);
+					} catch {
+						infographics = [];
+					}
+				}
+				if (Array.isArray(infographics) && infographics.length > 0) {
+					const { id } = await createInfographicsAsset(reduxUser.uid, {
+						title: task.title || "Infographics",
+						description: task.description || "",
+						prompt: userPrompt || "",
+						infographics,
+					});
+					newTasks.push({
+						type: "infographics",
+						label: task.label || "Infographics",
+						id,
+						path: `/app/${id}`,
+					});
+				}
+			} else if (
+				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
+				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+			) {
+				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
+				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				if (html || url) {
+					const { id } = await createLandingPageAsset(reduxUser.uid, {
+						title: task.title || "Landing Page",
+						description: task.description || "",
+						html,
+						url,
+					});
+					newTasks.push({
+						type: "landing_page",
+						label: task.label || "Landing Page",
+						id,
+						path: `/app/${id}`,
+					});
+				}
+			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
+				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+				if (!Array.isArray(images) && typeof task.content === "string") {
+					try {
+						const parsed = JSON.parse(task.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						images = [];
+					}
+				}
+				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+					try {
+						const parsed = JSON.parse(task.result.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						// keep existing images
+					}
+				}
+				images = Array.isArray(images)
+					? images
+							.map((img) => (typeof img === "string" ? { url: img } : img))
+							.filter((img) => img?.url || img?.src)
+					: [];
+				if (images.length > 0) {
+					const { id } = await createImageGalleryAsset(reduxUser.uid, {
+						title: task.title || "Image Gallery",
+						description: task.description || "",
+						images,
+					});
+					newTasks.push({
+						type: "image_gallery",
+						label: task.label || "Gallery",
+						id,
+						path: `/app/${id}`,
+					});
+				}
 			}
 		}
 		setAgentCompletedTasks(newTasks);

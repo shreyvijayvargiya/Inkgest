@@ -7,6 +7,9 @@ import LoginModal from "../../lib/ui/LoginModal";
 import InfographicsModal from "../../lib/ui/InfographicsModal";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
 import TableView from "../../lib/ui/TableView";
+import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
+import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
+import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
 import { db } from "../../lib/config/firebase";
 import {
 	collection,
@@ -524,12 +527,22 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 </html>`;
 }
 
-/* ─── Item card in sidebar (drafts + tables) ─── */
+/* ─── Asset type labels ─── */
+const ASSET_TYPE_LABELS = {
+	table: "Table",
+	draft: "Draft",
+	infographics: "Infographics",
+	landing_page: "Landing Page",
+	image_gallery: "Gallery",
+};
+
+/* ─── Item card in sidebar (drafts + tables + assets) ─── */
 function ItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
 	const isTable = item.type === "table";
-	const tag = isTable ? "Table" : item.tag || "Draft";
-	const preview = isTable ? item.description || "" : item.preview || "";
+	const isAssetWithDesc = ["table", "infographics", "landing_page", "image_gallery"].includes(item.type);
+	const tag = ASSET_TYPE_LABELS[item.type] || item.tag || "Draft";
+	const preview = isAssetWithDesc ? (item.description || "") : (item.preview || "");
 	const meta = isTable ? "" : `${item.words ?? 0}w`;
 	const date = item.date
 		? typeof item.date === "string"
@@ -815,7 +828,18 @@ export default function DraftPage() {
 		if (draft?.id === id) return draft?.title || "Untitled";
 		if (docData?.type === "table" && docData.doc?.id === id)
 			return docData.doc.title || "Untitled";
-		const d = drafts.find((x) => x.id === id) || tables.find((x) => x.id === id);
+		if (docData?.type === "infographics" && docData.doc?.id === id)
+			return docData.doc.title || "Infographics";
+		if (docData?.type === "landing_page" && docData.doc?.id === id)
+			return docData.doc.title || "Landing Page";
+		if (docData?.type === "image_gallery" && docData.doc?.id === id)
+			return docData.doc.title || "Image Gallery";
+		const d =
+			drafts.find((x) => x.id === id) ||
+			tables.find((x) => x.id === id) ||
+			infographics.find((x) => x.id === id) ||
+			landingPages.find((x) => x.id === id) ||
+			imageGalleries.find((x) => x.id === id);
 		return d?.title || "Untitled";
 	};
 
@@ -868,6 +892,18 @@ export default function DraftPage() {
 		() => items.filter((i) => i.type === "table"),
 		[items],
 	);
+	const infographics = useMemo(
+		() => items.filter((i) => i.type === "infographics"),
+		[items],
+	);
+	const landingPages = useMemo(
+		() => items.filter((i) => i.type === "landing_page"),
+		[items],
+	);
+	const imageGalleries = useMemo(
+		() => items.filter((i) => i.type === "image_gallery"),
+		[items],
+	);
 
 	/* Single doc by ID — assets first, then drafts, then tables */
 	const { data: docData, isLoading: loadingDraft } = useQuery({
@@ -885,6 +921,9 @@ export default function DraftPage() {
 
 	const draft = docData?.type === "draft" ? docData.doc : null;
 	const tableDoc = docData?.type === "table" ? docData.doc : null;
+	const infographicsDoc = docData?.type === "infographics" ? docData.doc : null;
+	const landingPageDoc = docData?.type === "landing_page" ? docData.doc : null;
+	const imageGalleryDoc = docData?.type === "image_gallery" ? docData.doc : null;
 
 	useEffect(() => {
 		if (tableDoc) {
@@ -1314,7 +1353,10 @@ export default function DraftPage() {
 	const confirmDelete = async () => {
 		try {
 			const item = items.find((i) => i.id === deleteConfirm);
-			const source = item?.source || (tables.some((t) => t.id === deleteConfirm) ? "tables" : "drafts");
+			const isAsset =
+				["infographics", "landing_page", "image_gallery"].includes(item?.type) ||
+				tables.some((t) => t.id === deleteConfirm);
+			const source = item?.source || (isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
 			queryClient.setQueryData(["assets", reduxUser?.uid], (old = []) =>
 				old.filter((d) => d.id !== deleteConfirm),
@@ -1345,7 +1387,7 @@ export default function DraftPage() {
 		const title = (i.title || "").toLowerCase();
 		const preview = (i.preview || i.description || "").toLowerCase();
 		const type = (i.type || "").toLowerCase();
-		const tag = (i.tag || (i.type === "table" ? "Table" : "Draft")).toLowerCase();
+		const tag = (ASSET_TYPE_LABELS[i.type] || i.tag || "Draft").toLowerCase();
 		const format = (i.format || "").toLowerCase();
 		const prompt = (i.prompt || "").toLowerCase();
 		return (
@@ -1358,7 +1400,12 @@ export default function DraftPage() {
 		);
 	});
 
-	const asset = draft || (docData?.type === "table" ? docData.doc : null);
+	const asset =
+		draft ||
+		(docData?.type === "table" ? docData.doc : null) ||
+		(docData?.type === "infographics" ? docData.doc : null) ||
+		(docData?.type === "landing_page" ? docData.doc : null) ||
+		(docData?.type === "image_gallery" ? docData.doc : null);
 	const sourceUrl = Array.isArray(asset?.urls)
 		? asset.urls[0] || ""
 		: Array.isArray(asset?.sourceUrls)
@@ -1862,7 +1909,13 @@ export default function DraftPage() {
 						minWidth: 0,
 					}}
 				>
-					{loadingDraft && !draft && !tableDoc && draftId && (
+					{loadingDraft &&
+						!draft &&
+						!tableDoc &&
+						!infographicsDoc &&
+						!landingPageDoc &&
+						!imageGalleryDoc &&
+						draftId && (
 						<div
 							style={{
 								flex: 1,
@@ -3345,6 +3398,60 @@ export default function DraftPage() {
 									}
 								/>
 							</div>
+						</motion.div>
+					)}
+					{infographicsDoc && (
+						<motion.div
+							key={`infographics-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<InfographicsAssetView
+								doc={infographicsDoc}
+								userId={reduxUser?.uid}
+								assetId={draftId}
+								docSource={docData?.source || "assets"}
+								onUpdate={() => queryClient.invalidateQueries(["doc", draftId, reduxUser?.uid])}
+							/>
+						</motion.div>
+					)}
+					{landingPageDoc && (
+						<motion.div
+							key={`landing-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<LandingPageAssetView doc={landingPageDoc} />
+						</motion.div>
+					)}
+					{imageGalleryDoc && (
+						<motion.div
+							key={`gallery-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<ImageGalleryAssetView doc={imageGalleryDoc} />
 						</motion.div>
 					)}
 				</div>
