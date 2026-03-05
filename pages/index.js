@@ -9,21 +9,26 @@ import {
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import LoginModal from "../lib/ui/LoginModal";
-import { auth, db } from "../lib/config/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { auth } from "../lib/config/firebase";
+import {
+	createDraft,
+	createTable,
+	createInfographicsAsset,
+	createLandingPageAsset,
+	createImageGalleryAsset,
+} from "../lib/api/userAssets";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { validateUrls } from "../lib/utils/urlAllowlist";
 import { getTheme } from "../lib/utils/theme";
+import { inferFormatFromPrompt } from "../lib/prompts/newsletter";
 import { SparkleIcon } from "lucide-react";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body { background: #F7F5F0; }
-    .font-serif  { font-family: 'Instrument Serif', serif; }
-    .font-sans   { font-family: 'Outfit', sans-serif; }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #F7F5F0; }
     ::-webkit-scrollbar-thumb { background: #C17B2F; border-radius: 10px; }
@@ -73,6 +78,20 @@ const STYLES = [
 	{ id: "professional", label: "Professional" },
 	{ id: "educational", label: "Educational" },
 	{ id: "persuasive", label: "Persuasive" },
+];
+
+/* ── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ── */
+const AGENT_PROMPT_SUGGESTIONS = [
+	"Find Hacker News latest news and create a summary of the top stories.",
+	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
+	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
+	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
+	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
+	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
+	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
+	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
+	"Find top news from India and create a realistic table — headlines, source, key points.",
+	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
 ];
 
 /* ── Reusable fade-up on scroll ── */
@@ -127,7 +146,7 @@ function Nav() {
 						href="#"
 						className="flex items-center gap-2 no-underline"
 						style={{
-							fontFamily: "'Instrument Serif', serif",
+							fontFamily: "'Outfit', sans-serif",
 							fontSize: 22,
 							color: T.accent,
 						}}
@@ -206,6 +225,7 @@ function Hero() {
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const heroRef = useRef(null);
 	const pendingGenerateRef = useRef(false);
+	const pendingAgentRef = useRef(false);
 
 	const [urls, setUrls] = useState([""]);
 	const [prompt, setPrompt] = useState("");
@@ -215,6 +235,15 @@ function Hero() {
 	const [generateError, setGenerateError] = useState(null);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
+
+	// InkAgent state
+	const [agentPrompt, setAgentPrompt] = useState("");
+	const [agentLoading, setAgentLoading] = useState(false);
+	const [agentError, setAgentError] = useState(null);
+	const [agentRunSteps, setAgentRunSteps] = useState([]);
+	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
+	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
+	const [agentThinking, setAgentThinking] = useState("");
 
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
@@ -314,7 +343,6 @@ function Hero() {
 			});
 
 			const draft = {
-				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content,
@@ -324,13 +352,12 @@ function Hero() {
 				tag: data.formatLabel || "Newsletter",
 				format: data.format || format,
 				style: data.style || style,
-				createdAt: serverTimestamp(),
 			};
 
-			const docRef = await addDoc(collection(db, "drafts"), draft);
+			const { id } = await createDraft(reduxUser.uid, draft);
 			setUrls([""]);
 			setPrompt("");
-			router.push(`/app/${docRef.id}`);
+			router.push(`/app/${id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
 		} finally {
@@ -361,9 +388,432 @@ function Hero() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [reduxUser]);
 
+	useEffect(() => {
+		if (reduxUser && pendingAgentRef.current && agentPrompt.trim()) {
+			pendingAgentRef.current = false;
+			handleAgentSend();
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [reduxUser]);
+
+	/* Cycle InkAgent loading messages while loading */
+	useEffect(() => {
+		if (!agentLoading) return;
+		const msgs = [
+			"InkAgent thinking…",
+			"InkAgent analysing your request…",
+			"InkAgent browsing & finding content…",
+			"InkAgent creating newsletter…",
+			"InkAgent building table…",
+			"InkAgent preparing content…",
+		];
+		let i = 0;
+		setAgentLoadingMsg(msgs[0]);
+		const iv = setInterval(() => {
+			i = (i + 1) % msgs.length;
+			setAgentLoadingMsg(msgs[i]);
+		}, 2500);
+		return () => clearInterval(iv);
+	}, [agentLoading]);
+
+	const getAgentStepLabel = (task) => {
+		if (task.type === "scrape") {
+			const url = task.urls?.[0] || task.sourceUrls?.[0];
+			const host = url
+				? (() => {
+						try {
+							return new URL(url).hostname;
+						} catch {
+							return url.slice(0, 30);
+						}
+					})()
+				: "";
+			return host ? `Browsing ${host}…` : task.label || "Browsing…";
+		}
+		if (task.type === "newsletter")
+			return task.label || "Writing newsletter draft…";
+		if (task.type === "linkedin")
+			return task.label || "Writing LinkedIn post…";
+		if (task.type === "blog_post")
+			return task.label || "Writing blog post…";
+		if (task.type === "twitter_thread")
+			return task.label || "Creating thread…";
+		if (task.type === "email_digest")
+			return task.label || "Creating digest…";
+		if (task.type === "table") return task.label || "Creating table…";
+		return task.label || "Processing…";
+	};
+
+	const processAgentExecuted = async (executed, userPrompt = "") => {
+		const newTasks = [];
+		const inferred = inferFormatFromPrompt(userPrompt);
+		const CONTENT_TYPES = [
+			"newsletter",
+			"linkedin",
+			"blog_post",
+			"twitter_thread",
+			"email_digest",
+		];
+		for (const task of executed) {
+			const isContentDraft =
+				CONTENT_TYPES.includes(task.type) && task.content;
+			if (isContentDraft) {
+				const lines = (task.content || "").split("\n");
+				const titleLine = lines.find(
+					(l) => l.startsWith("# ") || l.startsWith("## "),
+				);
+				const title = titleLine
+					? titleLine.replace(/^#+\s*/, "").trim()
+					: task.label || "Draft";
+				const bodyText = lines
+					.filter((l) => !l.match(/^#{1,6}\s/))
+					.join(" ")
+					.replace(/[*_`]/g, "")
+					.replace(/\s+/g, " ")
+					.trim();
+				const tag = task.formatLabel || inferred.label;
+				const format = task.params?.format || inferred.format;
+				const draft = {
+					title,
+					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
+					body: task.content,
+					urls: task.params?.urls || [],
+					prompt: userPrompt || "",
+					words: task.content.trim().split(/\s+/).length,
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					tag,
+					format,
+				};
+				const { id } = await createDraft(reduxUser.uid, draft);
+				newTasks.push({
+					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
+					label: task.label,
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "scrape" && task.content) {
+				const draft = {
+					title: task.title || "Scraped",
+					preview: (task.content || "").slice(0, 180),
+					body: task.content || "",
+					urls: task.urls || [],
+					prompt: userPrompt || "",
+					images: task.images || [],
+					words: (task.content || "").trim().split(/\s+/).length,
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					tag: "Scraped",
+				};
+				const { id } = await createDraft(reduxUser.uid, draft);
+				newTasks.push({
+					type: "scrape",
+					label: task.label,
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "table" && task.columns) {
+				const { id } = await createTable(reduxUser.uid, {
+					title: task.title || "Table",
+					description: task.description || "",
+					columns: task.columns,
+					rows: task.rows || [],
+					sourceUrls: task.sourceUrls || [],
+					prompt: userPrompt || "",
+				});
+				newTasks.push({
+					type: "table",
+					label: task.label,
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+				let infographics = task.infographics ?? task.result?.infographics ?? [];
+				if (!Array.isArray(infographics) && typeof task.content === "string") {
+					try {
+						infographics = JSON.parse(task.content);
+					} catch {
+						infographics = [];
+					}
+				}
+				if (Array.isArray(infographics) && infographics.length > 0) {
+					const { id } = await createInfographicsAsset(reduxUser.uid, {
+						title: task.title || "Infographics",
+						description: task.description || "",
+						prompt: userPrompt || "",
+						infographics,
+					});
+					newTasks.push({
+						type: "infographics",
+						label: task.label || "Infographics",
+						id,
+						path: `/app/${id}`,
+					});
+				}
+			} else if (
+				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
+				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+			) {
+				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
+				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				if (html || url) {
+					const { id } = await createLandingPageAsset(reduxUser.uid, {
+						title: task.title || "Landing Page",
+						description: task.description || "",
+						html,
+						url,
+					});
+					newTasks.push({
+						type: "landing_page",
+						label: task.label || "Landing Page",
+						id,
+						path: `/app/${id}`,
+					});
+				}
+			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
+				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+				if (!Array.isArray(images) && typeof task.content === "string") {
+					try {
+						const parsed = JSON.parse(task.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						images = [];
+					}
+				}
+				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+					try {
+						const parsed = JSON.parse(task.result.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						// keep existing images
+					}
+				}
+				images = Array.isArray(images)
+					? images
+							.map((img) => (typeof img === "string" ? { url: img } : img))
+							.filter((img) => img?.url || img?.src)
+					: [];
+				if (images.length > 0) {
+					const { id } = await createImageGalleryAsset(reduxUser.uid, {
+						title: task.title || "Image Gallery",
+						description: task.description || "",
+						images,
+					});
+					newTasks.push({
+						type: "image_gallery",
+						label: task.label || "Gallery",
+						id,
+						path: `/app/${id}`,
+					});
+				}
+			}
+		}
+		setAgentCompletedTasks(newTasks);
+		if (newTasks.length === 1) {
+			router.push(newTasks[0].path);
+		} else if (newTasks.length > 1) {
+			router.push("/app");
+		}
+	};
+
+	const handleAgentSend = async () => {
+		const promptText = agentPrompt.trim();
+		if (!promptText || agentLoading) return;
+		if (!reduxUser) {
+			pendingAgentRef.current = true;
+			setLoginModalOpen(true);
+			return;
+		}
+		const creds = await getUserCredits(reduxUser.uid).catch(() => null);
+		if (creds && creds.plan !== "pro" && (creds.remaining ?? 0) <= 0) {
+			router.push("/pricing");
+			return;
+		}
+		setAgentLoading(true);
+		setAgentError(null);
+		setAgentCompletedTasks([]);
+		setAgentThinking("");
+		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
+		setAgentPrompt("");
+		try {
+			const idToken = await auth.currentUser?.getIdToken();
+			if (!idToken) throw new Error("Session expired. Please sign in again.");
+			const res = await fetch("/api/agent/inkagent", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ prompt: promptText, idToken }),
+			});
+			if (!res.ok) {
+				const errData = await res.json().catch(() => ({}));
+				throw new Error(errData.error || "Agent failed");
+			}
+			const contentType = res.headers.get("content-type") || "";
+			if (!contentType.includes("text/event-stream")) {
+				const data = await res.json();
+				if (data.executed?.length > 0) {
+					setAgentRunSteps(
+						data.executed.map((t) => ({
+							label: getAgentStepLabel(t),
+							status: "done",
+						})),
+					);
+					await processAgentExecuted(data.executed, promptText);
+				} else {
+					setAgentRunSteps([
+						{ label: data.message || "Done.", status: "done" },
+					]);
+				}
+				return;
+			}
+			const reader = res.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = "";
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+				const parts = buffer.split("\n\n");
+				buffer = parts.pop() || "";
+				for (const part of parts) {
+					const line = part.trim();
+					if (!line.startsWith("data: ")) continue;
+					const jsonStr = line.slice(6);
+					if (!jsonStr) continue;
+					let data;
+					try {
+						data = JSON.parse(jsonStr);
+					} catch {
+						continue;
+					}
+					if (data.type === "thinking") {
+						const text =
+							data.thinking ??
+							data.reasoning ??
+							data.content ??
+							data.text ??
+							data.output ??
+							"";
+						if (text)
+							setAgentThinking((prev) =>
+								prev ? prev + "\n\n" + String(text).trim() : String(text).trim(),
+							);
+					} else if (data.type === "start") {
+						const thinkingText =
+							data.thinking ??
+							data.reasoning ??
+							data.thought ??
+							data.agent_thought ??
+							data.content ??
+							data.message ??
+							data.text ??
+							data.output ??
+							"";
+						setAgentThinking(
+							thinkingText
+								? String(thinkingText).trim()
+								: (data.message || "Processing your request…").trim(),
+						);
+						const tasks = data.suggestedTasks || [];
+						setAgentRunSteps(
+							tasks.length > 0
+								? tasks.map((t) => ({
+										label: t.label || t.taskLabel || "Task",
+										status: "loading",
+									}))
+								: [
+										{
+											label: data.message || "Running tasks…",
+											status: "loading",
+										},
+									],
+						);
+					} else if (data.type === "task") {
+						const idx = data.index ?? 0;
+						const label =
+							data.taskLabel || data.label || `Task ${idx + 1}`;
+						const status = data.success ? "done" : "error";
+						setAgentRunSteps((prev) => {
+							const next = [...prev];
+							while (next.length <= idx)
+								next.push({
+									label: `Task ${next.length + 1}`,
+									status: "loading",
+								});
+							next[idx] = { label, status };
+							return next;
+						});
+					} else if (data.type === "end") {
+						setAgentThinking("");
+						const executed = data.executed || [];
+						if (executed.length > 0) {
+							await processAgentExecuted(executed, promptText);
+						} else {
+							setAgentRunSteps((prev) =>
+								prev.map((s) => ({
+									...s,
+									status: s.status === "loading" ? "done" : s.status,
+								})),
+							);
+						}
+						const creditsUsed = data.creditsUsed;
+						if (
+							typeof creditsUsed === "number" &&
+							creditsUsed > 0 &&
+							idToken
+						) {
+							fetch("/api/agent/inkagent", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ idToken, creditsUsed }),
+							}).catch(() => {});
+						}
+					}
+				}
+			}
+			if (buffer.trim()) {
+				const line = buffer.trim();
+				if (line.startsWith("data: ")) {
+					try {
+						const data = JSON.parse(line.slice(6));
+						if (data.type === "end") {
+							if ((data.executed || []).length > 0)
+								await processAgentExecuted(data.executed, promptText);
+							const creditsUsed = data.creditsUsed;
+							if (
+								typeof creditsUsed === "number" &&
+								creditsUsed > 0 &&
+								idToken
+							) {
+								fetch("/api/agent/inkagent", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ idToken, creditsUsed }),
+								}).catch(() => {});
+							}
+						}
+					} catch {
+						// ignore
+					}
+				}
+			}
+		} catch (e) {
+			const errMsg = e?.message || "Agent failed";
+			setAgentError(errMsg);
+			setAgentRunSteps([{ label: errMsg, status: "error" }]);
+		} finally {
+			setAgentLoading(false);
+		}
+	};
+
 	/* Confirm when leaving during API load */
 	useEffect(() => {
-		if (!generating) return;
+		if (!generating && !agentLoading) return;
 		const onBeforeUnload = (e) => {
 			e.preventDefault();
 			e.returnValue = "";
@@ -381,7 +831,7 @@ function Hero() {
 			router.events.off("routeChangeStart", onRouteChange);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [generating]);
+	}, [generating, agentLoading]);
 
 	const texts = [
 		"Scrape content from URL turn into newsletter",
@@ -849,6 +1299,228 @@ function Hero() {
 					)}
 				</motion.div>
 
+				{/* InkAgent form — same card styling as newsletter form */}
+				<motion.div
+					initial={{ opacity: 0, y: 24 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ delay: 0.5, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+					style={{
+						maxWidth: 640,
+						margin: "32px auto 0",
+						background: T.surface,
+						borderRadius: 16,
+						border: `1px solid ${T.border}`,
+						boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+						padding: "28px 24px",
+						textAlign: "left",
+					}}
+				>
+					<p
+						style={{
+							fontSize: 15,
+							fontWeight: 700,
+							color: T.accent,
+							marginBottom: 16,
+							display: "flex",
+							alignItems: "center",
+							gap: 8,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						<span style={{ color: T.warm }}>✦</span> InkAgent
+					</p>
+					<p
+						style={{
+							fontSize: 13,
+							color: T.muted,
+							marginBottom: 16,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						One prompt: scrape URLs, create newsletters, tables, or blog posts.
+					</p>
+					<div style={{ marginBottom: 14 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.08em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Your prompt *
+						</label>
+						<textarea
+							value={agentPrompt}
+							onChange={(e) => setAgentPrompt(e.target.value)}
+							onKeyDown={(e) =>
+								e.key === "Enter" &&
+								!e.shiftKey &&
+								(e.preventDefault(), handleAgentSend())
+							}
+							placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
+							rows={3}
+							disabled={agentLoading}
+							style={{
+								width: "100%",
+								background: T.base,
+								border: `1.5px solid ${T.border}`,
+								borderRadius: 10,
+								padding: "11px 14px",
+								fontSize: 14,
+								color: T.accent,
+								resize: "vertical",
+								outline: "none",
+								lineHeight: 1.6,
+								transition: "border-color 0.2s",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+							onFocus={(e) => (e.target.style.borderColor = T.warm)}
+							onBlur={(e) => (e.target.style.borderColor = T.border)}
+						/>
+					</div>
+					<motion.button
+						onClick={handleAgentSend}
+						disabled={agentLoading || !agentPrompt.trim()}
+						whileHover={
+							!agentLoading && agentPrompt.trim()
+								? {
+										scale: 1.02,
+										y: -1,
+										boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+									}
+								: {}
+						}
+						whileTap={!agentLoading ? { scale: 0.97 } : {}}
+						style={{
+							width: "100%",
+							background:
+								agentLoading || !agentPrompt.trim() ? "#E8E4DC" : T.accent,
+							color: agentLoading || !agentPrompt.trim() ? T.muted : "white",
+							border: "none",
+							padding: "14px",
+							borderRadius: 12,
+							fontSize: 15,
+							fontWeight: 700,
+							cursor: agentLoading ? "not-allowed" : "pointer",
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "center",
+							gap: 10,
+							transition: "all 0.2s",
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						{agentLoading ? (
+							<>
+								<motion.span
+									animate={{ rotate: 360 }}
+									transition={{
+										duration: 0.9,
+										repeat: Infinity,
+										ease: "linear",
+									}}
+									style={{ display: "inline-flex" }}
+								>
+									↻
+								</motion.span>
+								{agentLoadingMsg}
+							</>
+						) : !reduxUser ? (
+							<>Sign in & use InkAgent →</>
+						) : (
+							<>Send to InkAgent →</>
+						)}
+					</motion.button>
+					{agentThinking && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "12px 14px",
+								background: T.base,
+								border: `1px solid ${T.border}`,
+								borderRadius: 10,
+								fontSize: 13,
+								lineHeight: 1.6,
+								color: T.muted,
+								maxHeight: 100,
+								overflowY: "auto",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{agentThinking}
+						</motion.div>
+					)}
+					{agentError && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "10px 14px",
+								background: "#FEF2F2",
+								border: "1px solid #FECACA",
+								borderRadius: 10,
+								fontSize: 13,
+								color: "#DC2626",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{agentError}
+						</motion.div>
+					)}
+					{!agentLoading && agentCompletedTasks.length === 0 && (
+						<div style={{ marginTop: 18 }}>
+							<label
+								style={{
+									display: "block",
+									fontSize: 11,
+									fontWeight: 700,
+									textTransform: "uppercase",
+									letterSpacing: "0.08em",
+									color: T.muted,
+									marginBottom: 8,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Try a suggestion
+							</label>
+							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+								{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
+								<motion.button
+									key={i}
+									whileHover={{ scale: 1.005, x: 4 }}
+									whileTap={{ scale: 0.995 }}
+									onClick={() => setAgentPrompt(s)}
+									style={{
+										width: "100%",
+										padding: "12px 16px",
+										borderRadius: 10,
+										fontSize: 13,
+										fontWeight: 500,
+										cursor: "pointer",
+										border: `1.5px solid ${T.border}`,
+										background: T.base,
+										color: T.accent,
+										textAlign: "left",
+										lineHeight: 1.5,
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{s}
+								</motion.button>
+								))}
+							</div>
+						</div>
+					)}
+				</motion.div>
+
 				<motion.p
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
@@ -953,7 +1625,7 @@ function Features() {
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Instrument Serif', serif",
+							fontFamily: "'Outfit', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
@@ -1143,7 +1815,7 @@ function HowItWorks() {
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Instrument Serif', serif",
+							fontFamily: "'Outfit', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
@@ -1196,7 +1868,7 @@ function HowItWorks() {
 							>
 								<div
 									style={{
-										fontFamily: "'Instrument Serif', serif",
+										fontFamily: "'Outfit', sans-serif",
 										fontSize: 42,
 										color: T.warm,
 										lineHeight: 1,
@@ -1266,7 +1938,7 @@ function StatsStrip() {
 						>
 							<div
 								style={{
-									fontFamily: "'Instrument Serif', serif",
+									fontFamily: "'Outfit', sans-serif",
 									fontSize: 54,
 									color: "white",
 									lineHeight: 1,
@@ -1341,7 +2013,7 @@ function Testimonials() {
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Instrument Serif', serif",
+							fontFamily: "'Outfit', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
@@ -1497,7 +2169,7 @@ function Pricing() {
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Instrument Serif', serif",
+							fontFamily: "'Outfit', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							textAlign: "center",
 							color: T.accent,
@@ -1560,7 +2232,7 @@ function Pricing() {
 							</p>
 							<div
 								style={{
-									fontFamily: "'Instrument Serif', serif",
+									fontFamily: "'Outfit', sans-serif",
 									fontSize: 52,
 									color: T.accent,
 									lineHeight: 1,
@@ -1653,7 +2325,7 @@ function Pricing() {
 							</p>
 							<div
 								style={{
-									fontFamily: "'Instrument Serif', serif",
+									fontFamily: "'Outfit', sans-serif",
 									fontSize: 52,
 									color: "white",
 									lineHeight: 1,
@@ -1768,7 +2440,7 @@ function OpenSource() {
 							</p>
 							<h2
 								style={{
-									fontFamily: "'Instrument Serif', serif",
+									fontFamily: "'Outfit', sans-serif",
 									fontSize: "clamp(36px,4vw,54px)",
 									color: T.accent,
 									lineHeight: 1.1,
@@ -1997,7 +2669,7 @@ function FAQ() {
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Instrument Serif', serif",
+							fontFamily: "'Outfit', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
@@ -2112,7 +2784,7 @@ function Footer() {
 					<div>
 						<div
 							style={{
-								fontFamily: "'Instrument Serif', serif",
+								fontFamily: "'Outfit', sans-serif",
 								fontSize: 24,
 								color: "white",
 								display: "flex",

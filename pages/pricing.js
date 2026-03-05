@@ -19,7 +19,7 @@ import { toast } from "sonner";
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
     button, input { font-family: 'Outfit', sans-serif; }
@@ -270,7 +270,7 @@ const PricingPage = () => {
 						<div>
 							<div
 								style={{
-									fontFamily: "'Instrument Serif', serif",
+									fontFamily: "'Outfit', sans-serif",
 									fontSize: 24,
 									color: "white",
 									display: "flex",
@@ -428,7 +428,7 @@ const PricingPage = () => {
 					<a
 						href="/app"
 						style={{
-							fontFamily: "'Instrument Serif',serif",
+							fontFamily: "",
 							fontSize: 20,
 							color: T.accent,
 							textDecoration: "none",
@@ -537,7 +537,7 @@ const PricingPage = () => {
 					</p>
 					<h1
 						style={{
-							fontFamily: "'Instrument Serif',serif",
+							fontFamily: "",
 							fontSize: "clamp(32px, 5vw, 52px)",
 							color: T.accent,
 							letterSpacing: "-1px",
@@ -594,7 +594,7 @@ const PricingPage = () => {
 								</p>
 								<p
 									style={{
-										fontFamily: "'Instrument Serif',serif",
+										fontFamily: "",
 										fontSize: 22,
 										marginBottom: 4,
 									}}
@@ -754,7 +754,7 @@ const PricingPage = () => {
 								>
 									<span
 										style={{
-											fontFamily: "'Instrument Serif',serif",
+											fontFamily: "",
 											fontSize: 44,
 											color: plan.popular ? "white" : T.accent,
 											lineHeight: 1,
@@ -1115,6 +1115,6 @@ const PricingPage = () => {
 			/>
 		</>
 	);
-};;
+};
 
 export default PricingPage;

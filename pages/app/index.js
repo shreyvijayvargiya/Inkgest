@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
+import { useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import { db, auth } from "../../lib/config/firebase";
 import {
@@ -16,17 +17,27 @@ import {
 	serverTimestamp,
 } from "firebase/firestore";
 import {
+	listAssets,
+	createDraft,
+	createTable,
+	createInfographicsAsset,
+	createLandingPageAsset,
+	createImageGalleryAsset,
+	deleteAsset,
+} from "../../lib/api/userAssets";
+import {
 	getUserCredits,
 	FREE_CREDIT_LIMIT,
 	formatRenewalDate,
 } from "../../lib/utils/credits";
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
+import { inferFormatFromPrompt } from "../../lib/prompts/newsletter";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
     body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
@@ -111,23 +122,51 @@ const PRESETS = [
 	{
 		label: "Y Combinator",
 		urls: ["https://www.ycombinator.com/blog"],
-		prompt: "Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
+		prompt:
+			"Write a newsletter summarizing key insights for founders. Practical and direct tone. Under 400 words.",
 	},
 	{
 		label: "Hacker News",
 		urls: ["https://news.ycombinator.com"],
-		prompt: "Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
+		prompt:
+			"Turn this into a digest for tech enthusiasts. Highlight the most interesting discussions and trends.",
 	},
 	{
 		label: "TechCrunch",
 		urls: ["https://techcrunch.com"],
-		prompt: "Summarize the main points and add actionable takeaways for startup founders.",
+		prompt:
+			"Summarize the main points and add actionable takeaways for startup founders.",
 	},
 	{
 		label: "X / Twitter",
 		urls: ["https://x.com"],
-		prompt: "Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
+		prompt:
+			"Create a newsletter from trending tech discussions. Concise and engaging. Under 350 words.",
 	},
+];
+
+/* ─── InkAgent loader messages (rotate while loading) ─── */
+const AGENT_LOADING_MSGS = [
+	"InkAgent thinking…",
+	"InkAgent analysing your request…",
+	"InkAgent browsing & finding content…",
+	"InkAgent creating newsletter…",
+	"InkAgent building table…",
+	"InkAgent preparing content…",
+];
+
+/* ─── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ─── */
+const AGENT_PROMPT_SUGGESTIONS = [
+	"Find Hacker News latest news and create a summary of the top stories.",
+	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
+	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
+	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
+	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
+	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
+	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
+	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
+	"Find top news from India and create a realistic table — headlines, source, key points.",
+	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
 ];
 
 /* ─── Format / Style config (mirrors API) ─── */
@@ -174,21 +213,40 @@ function UpgradeBanner({ credits, onUpgrade }) {
 				marginBottom: 16,
 			}}
 		>
-			<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-				<div>
-				<p style={{ fontSize: 13, fontWeight: 700, color: out ? "white" : "#92400E", marginBottom: 2 }}>
-					{heading}
-				</p>
-				<p style={{ fontSize: 12, color: out ? "rgba(255,255,255,0.65)" : "#B45309" }}>
-					{sub}
-				</p>
-			</div>
-			<motion.button
-				whileHover={{ scale: 1.04 }}
-				whileTap={{ scale: 0.97 }}
-				onClick={onUpgrade}
+			<div
 				style={{
-					background: out ? T.warm : T.accent,
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					gap: 12,
+				}}
+			>
+				<div>
+					<p
+						style={{
+							fontSize: 13,
+							fontWeight: 700,
+							color: out ? "white" : "#92400E",
+							marginBottom: 2,
+						}}
+					>
+						{heading}
+					</p>
+					<p
+						style={{
+							fontSize: 12,
+							color: out ? "rgba(255,255,255,0.65)" : "#B45309",
+						}}
+					>
+						{sub}
+					</p>
+				</div>
+				<motion.button
+					whileHover={{ scale: 1.04 }}
+					whileTap={{ scale: 0.97 }}
+					onClick={onUpgrade}
+					style={{
+						background: out ? T.warm : T.accent,
 						color: "white",
 						border: "none",
 						padding: "8px 16px",
@@ -206,9 +264,31 @@ function UpgradeBanner({ credits, onUpgrade }) {
 	);
 }
 
-/* ─── Draft card in sidebar ─── */
-function DraftCard({ draft, active, onClick, onDelete }) {
+/* ─── Asset type labels ─── */
+const SIDEBAR_ASSET_LABELS = {
+	table: "Table",
+	draft: "Draft",
+	infographics: "Infographics",
+	landing_page: "Landing Page",
+	image_gallery: "Gallery",
+};
+
+/* ─── Item card in sidebar (drafts + tables + assets) ─── */
+function SidebarItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
+	const isAssetWithDesc = ["table", "infographics", "landing_page", "image_gallery"].includes(item.type);
+	const tag = SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft";
+	const preview = isAssetWithDesc ? (item.description || "") : (item.preview || "");
+	const meta = isAssetWithDesc ? "" : `${item.words ?? 0}w`;
+	const date = item.date
+		? typeof item.date === "string"
+			? item.date
+			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+				}) ?? "")
+		: "";
 	return (
 		<motion.div
 			layout
@@ -269,7 +349,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							WebkitBoxOrient: "vertical",
 						}}
 					>
-						{draft.title}
+						{item.title || "Untitled"}
 					</p>
 					<p
 						style={{
@@ -283,7 +363,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							marginBottom: 6,
 						}}
 					>
-						{draft.preview}
+						{preview}
 					</p>
 					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 						<span
@@ -296,13 +376,15 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 								borderRadius: 100,
 							}}
 						>
-							{draft.tag}
+							{tag}
 						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>
-							{draft.words}w
-						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>·</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>{draft.date}</span>
+						{meta && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
+						)}
+						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
+						{date && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
+						)}
 					</div>
 				</div>
 				<AnimatePresence>
@@ -313,7 +395,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							exit={{ opacity: 0, scale: 0.8 }}
 							onClick={(e) => {
 								e.stopPropagation();
-								onDelete(draft.id);
+								onDelete(item.id);
 							}}
 							style={{
 								background: "none",
@@ -339,12 +421,14 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 /* ─── Main App ─── */
 export default function inkgestApp() {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const pendingGenerateRef = useRef(false);
 
 	const [drafts, setDrafts] = useState([]);
 	const [search, setSearch] = useState("");
 	const [urls, setUrls] = useState([""]);
+	const [newUrlInput, setNewUrlInput] = useState("");
 	const [prompt, setPrompt] = useState("");
 	const [format, setFormat] = useState("substack");
 	const [style, setStyle] = useState("casual");
@@ -354,11 +438,21 @@ export default function inkgestApp() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
-	const [draftMode, setDraftMode] = useState("ai"); // "ai" | "scrape" | "blank"
+	const [draftMode, setDraftMode] = useState("agent"); // "ai" | "scrape" | "blank" | "agent"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
 	const [credits, setCredits] = useState(null); // { plan, creditsUsed, creditsLimit, remaining }
+
+	// InkAgent state
+	const [agentPrompt, setAgentPrompt] = useState("");
+	const [agentRunSteps, setAgentRunSteps] = useState([]); // [{ label, status: 'loading'|'done'|'error' }]
+	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
+	const [agentLoading, setAgentLoading] = useState(false);
+	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
+	const [agentError, setAgentError] = useState(null);
+	const [agentThinking, setAgentThinking] = useState(""); // Streaming "thinking" text from SSE
+	const agentOutputRef = useRef(null);
 
 	/* Derived helpers — single unified credit pool */
 	const creditRemaining = credits
@@ -370,27 +464,66 @@ export default function inkgestApp() {
 	const llmRemaining = creditRemaining;
 	const scrapeRemaining = creditRemaining;
 
-	/* Load drafts per user from Firestore */
+	/* Cycle InkAgent loading messages — only when we have a single placeholder step */
+	useEffect(() => {
+		if (!agentLoading) return;
+		setAgentLoadingMsg(AGENT_LOADING_MSGS[0]);
+		let idx = 0;
+		const iv = setInterval(() => {
+			idx = (idx + 1) % AGENT_LOADING_MSGS.length;
+			const msg = AGENT_LOADING_MSGS[idx];
+			setAgentLoadingMsg(msg);
+			setAgentRunSteps((prev) => {
+				// Don't overwrite when we have multiple steps (from suggestedTasks)
+				if (prev.length !== 1 || prev[0]?.status !== "loading") return prev;
+				return [{ label: msg, status: "loading" }];
+			});
+		}, 2500);
+		return () => clearInterval(iv);
+	}, [agentLoading]);
+
+	/* Scroll InkAgent output into view when thinking/steps appear */
+	useEffect(() => {
+		if ((agentThinking || agentRunSteps.length > 0) && agentOutputRef.current) {
+			agentOutputRef.current.scrollIntoView({
+				behavior: "smooth",
+				block: "nearest",
+			});
+		}
+	}, [agentThinking, agentRunSteps.length]);
+
+	/* Load drafts, tables, and other assets per user from Firestore */
+	const [tables, setTables] = useState([]);
+	const [otherAssets, setOtherAssets] = useState([]);
 	useEffect(() => {
 		if (!reduxUser) {
 			setDrafts([]);
+			setTables([]);
+			setOtherAssets([]);
 			return;
 		}
-		const loadDrafts = async () => {
+		const load = async () => {
 			try {
-				const q = query(
-					collection(db, "drafts"),
-					where("userId", "==", reduxUser.uid),
-					orderBy("createdAt", "desc"),
+				const items = await listAssets(reduxUser.uid);
+				setDrafts(items.filter((i) => i.type === "draft"));
+				setTables(items.filter((i) => i.type === "table"));
+				setOtherAssets(
+					items.filter((i) =>
+						["infographics", "landing_page", "image_gallery"].includes(i.type),
+					),
 				);
-				const snap = await getDocs(q);
-				setDrafts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
 			} catch (e) {
-				console.error("Failed to load drafts", e);
+				console.error("Failed to load assets", e);
 			}
 		};
-		loadDrafts();
+		load();
 	}, [reduxUser]);
+
+	const sidebarItems = [...drafts, ...tables, ...otherAssets].sort((a, b) => {
+		const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
+		const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
+		return bT - aT;
+	});
 
 	/* Load real credit state from Firestore */
 	useEffect(() => {
@@ -435,11 +568,22 @@ export default function inkgestApp() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isLoading]);
 
-	const filtered = drafts.filter(
-		(d) =>
-			d.title?.toLowerCase().includes(search.toLowerCase()) ||
-			d.preview?.toLowerCase().includes(search.toLowerCase()),
-	);
+	const filtered = sidebarItems.filter((item) => {
+		const q = search.toLowerCase().trim();
+		if (!q) return true;
+		const title = (item.title || "").toLowerCase();
+		const preview = (item.preview || item.description || "").toLowerCase();
+		const type = (item.type || "").toLowerCase();
+		const tag = (SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft").toLowerCase();
+		const format = (item.format || "").toLowerCase();
+		return (
+			title.includes(q) ||
+			preview.includes(q) ||
+			type.includes(q) ||
+			tag.includes(q) ||
+			format.includes(q)
+		);
+	});
 
 	const handleGenerate = async () => {
 		if (!prompt.trim() || generating) return;
@@ -451,13 +595,19 @@ export default function inkgestApp() {
 		if (validUrls.length > 0) {
 			const urlCheck = validateUrls(validUrls);
 			if (!urlCheck.valid) {
-				setGenerateError(urlCheck.error || "Invalid URL. Use full URLs with https://");
+				setGenerateError(
+					urlCheck.error || "Invalid URL. Use full URLs with https://",
+				);
 				return;
 			}
 		}
 		setGenerating(true);
 		setGenerateError(null);
-		const msgs = ["Reading URL content…", "Analysing key points…", "Drafting your newsletter…"];
+		const msgs = [
+			"Reading URL content…",
+			"Analysing key points…",
+			"Drafting your newsletter…",
+		];
 		let idx = 0;
 		setLoadingMsg(msgs[0]);
 		const iv = setInterval(() => {
@@ -512,7 +662,6 @@ export default function inkgestApp() {
 			});
 
 			const draft = {
-				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content,
@@ -522,19 +671,21 @@ export default function inkgestApp() {
 				tag: data.formatLabel || "Newsletter",
 				format: data.format || format,
 				style: data.style || style,
-				createdAt: serverTimestamp(),
 			};
 
-			const docRef = await addDoc(collection(db, "drafts"), draft);
+			const { id } = await createDraft(reduxUser.uid, draft);
 			setDrafts((prev) => [
-				{ id: docRef.id, ...draft, createdAt: new Date() },
+				{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
 				...prev,
 			]);
 			setUrls([""]);
 			setPrompt("");
 			// Refresh credits counter
-			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => { });
-			router.push(`/app/${docRef.id}`);
+			if (reduxUser)
+				getUserCredits(reduxUser.uid)
+					.then(setCredits)
+					.catch(() => {});
+			router.push(`/app/${id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Failed to generate");
 		} finally {
@@ -563,9 +714,19 @@ export default function inkgestApp() {
 	};
 
 	const confirmDelete = async () => {
+		if (!deleteConfirm || !reduxUser) return;
+		const item = sidebarItems.find((i) => i.id === deleteConfirm);
+		const isAssetType = ["table", "infographics", "landing_page", "image_gallery"].includes(item?.type);
+		const source = item?.source || (isAssetType ? "assets" : "drafts");
 		try {
-			await deleteDoc(doc(db, "drafts", deleteConfirm));
-			setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			await deleteAsset(reduxUser.uid, deleteConfirm, source);
+			if (item?.type === "table") {
+				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			} else if (["infographics", "landing_page", "image_gallery"].includes(item?.type)) {
+				setOtherAssets((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			} else {
+				setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
+			}
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
@@ -589,16 +750,28 @@ export default function inkgestApp() {
 	/* Scrape a URL and open raw content in the editor */
 	const handleScrape = async () => {
 		if (!scrapeUrl.trim() || scraping) return;
-		if (!reduxUser) { setLoginModalOpen(true); return; }
-		if (scrapeRemaining <= 0) { router.push("/pricing"); return; }
+		if (!reduxUser) {
+			setLoginModalOpen(true);
+			return;
+		}
+		if (scrapeRemaining <= 0) {
+			router.push("/pricing");
+			return;
+		}
 		const urlCheck = validateUrl(scrapeUrl.trim());
 		if (!urlCheck.valid) {
-			setGenerateError(urlCheck.error || "Invalid URL. Use full URLs with https://");
+			setGenerateError(
+				urlCheck.error || "Invalid URL. Use full URLs with https://",
+			);
 			return;
 		}
 		setScraping(true);
 		setGenerateError(null);
-		const scrapeMsgs = ["Reading URL content…", "Extracting text…", "Preparing draft…"];
+		const scrapeMsgs = [
+			"Reading URL content…",
+			"Extracting text…",
+			"Preparing draft…",
+		];
 		let sIdx = 0;
 		const scrapeIv = setInterval(() => {
 			sIdx = (sIdx + 1) % scrapeMsgs.length;
@@ -624,11 +797,14 @@ export default function inkgestApp() {
 			const title = data.title || scrapeUrl.trim();
 			const words = (data.content || "").trim().split(/\s+/).length;
 			const now = new Date();
-			const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+			const date = now.toLocaleDateString("en-US", {
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+			});
 			const preview = (data.content || "").slice(0, 180);
 
 			const draft = {
-				userId: reduxUser.uid,
 				title,
 				preview,
 				body: data.content || "",
@@ -637,14 +813,19 @@ export default function inkgestApp() {
 				words,
 				date,
 				tag: "Scraped",
-				createdAt: serverTimestamp(),
 			};
-			const docRef = await addDoc(collection(db, "drafts"), draft);
-			setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+			const { id } = await createDraft(reduxUser.uid, draft);
+			setDrafts((prev) => [
+				{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+				...prev,
+			]);
 			setScrapeUrl("");
 			// Refresh credits counter
-			if (reduxUser) getUserCredits(reduxUser.uid).then(setCredits).catch(() => { });
-			router.push(`/app/${docRef.id}`);
+			if (reduxUser)
+				getUserCredits(reduxUser.uid)
+					.then(setCredits)
+					.catch(() => {});
+			router.push(`/app/${id}`);
 		} catch (e) {
 			setGenerateError(e?.message || "Scrape failed");
 		} finally {
@@ -653,14 +834,488 @@ export default function inkgestApp() {
 		}
 	};
 
+	/* Get step label from executed task */
+	const getAgentStepLabel = (task) => {
+		if (task.type === "scrape") {
+			const url = task.urls?.[0] || task.sourceUrls?.[0];
+			const host = url
+				? (() => {
+						try {
+							return new URL(url).hostname;
+						} catch {
+							return url.slice(0, 30);
+						}
+					})()
+				: "";
+			return host ? `Browsing ${host}…` : task.label || "Browsing…";
+		}
+		if (task.type === "newsletter")
+			return task.label || "Writing newsletter draft…";
+		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
+		if (task.type === "blog_post") return task.label || "Writing blog post…";
+		if (task.type === "twitter_thread") return task.label || "Creating thread…";
+		if (task.type === "email_digest") return task.label || "Creating digest…";
+		if (task.type === "table") return task.label || "Creating table…";
+		if (task.type === "infographics" || task.type === "infographics-svg-generator")
+			return task.label || "Creating infographics…";
+		if (task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator")
+			return task.label || "Creating landing page…";
+		if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator")
+			return task.label || "Creating image gallery…";
+		return task.label || "Processing…";
+	};
+
+	/* InkAgent: stream SSE from API, show real-time task progress */
+	const handleAgentSend = async () => {
+		const promptText = agentPrompt.trim();
+		if (!promptText || agentLoading) return;
+		if (!reduxUser) {
+			setLoginModalOpen(true);
+			return;
+		}
+		if (creditRemaining <= 0) {
+			router.push("/pricing");
+			return;
+		}
+		setAgentLoading(true);
+		setAgentError(null);
+		setAgentCompletedTasks([]);
+		setAgentThinking("");
+		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
+		setAgentPrompt("");
+		try {
+			const idToken = await auth.currentUser?.getIdToken();
+			if (!idToken) throw new Error("Session expired. Please sign in again.");
+			const res = await fetch("/api/agent/inkagent", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ prompt: promptText, idToken }),
+			});
+			if (!res.ok) {
+				const errData = await res.json().catch(() => ({}));
+				throw new Error(errData.error || "Agent failed");
+			}
+			const contentType = res.headers.get("content-type") || "";
+			if (!contentType.includes("text/event-stream")) {
+				const data = await res.json();
+				if (data.executed?.length > 0) {
+					setAgentRunSteps(
+						data.executed.map((t) => ({
+							label: getAgentStepLabel(t),
+							status: "done",
+						})),
+					);
+					await processAgentExecuted(data.executed, promptText);
+				} else {
+					setAgentRunSteps([
+						{ label: data.message || "Done.", status: "done" },
+					]);
+				}
+				if (reduxUser)
+					getUserCredits(reduxUser.uid)
+						.then(setCredits)
+						.catch(() => {});
+				return;
+			}
+			const reader = res.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = "";
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+				const parts = buffer.split("\n\n");
+				buffer = parts.pop() || "";
+				for (const part of parts) {
+					const line = part.trim();
+					if (!line.startsWith("data: ")) continue;
+					const jsonStr = line.slice(6);
+					if (!jsonStr) continue;
+					let data;
+					try {
+						data = JSON.parse(jsonStr);
+					} catch {
+						continue;
+					}
+					if (data.type === "thinking") {
+						const text =
+							data.thinking ??
+							data.reasoning ??
+							data.content ??
+							data.text ??
+							data.output ??
+							"";
+						if (text)
+							setAgentThinking((prev) =>
+								prev
+									? prev + "\n\n" + String(text).trim()
+									: String(text).trim(),
+							);
+					} else if (data.type === "start") {
+						const thinkingText =
+							data.thinking ??
+							data.reasoning ??
+							data.thought ??
+							data.agent_thought ??
+							data.content ??
+							data.message ??
+							data.text ??
+							data.output ??
+							"";
+						setAgentThinking(
+							thinkingText
+								? String(thinkingText).trim()
+								: (data.message || "Processing your request…").trim(),
+						);
+						const tasks = data.suggestedTasks || [];
+						setAgentRunSteps(
+							tasks.length > 0
+								? tasks.map((t) => ({
+										label: t.label || t.taskLabel || "Task",
+										status: "loading",
+									}))
+								: [
+										{
+											label: data.message || "Running tasks…",
+											status: "loading",
+										},
+									],
+						);
+					} else if (data.type === "task") {
+						const idx = data.index ?? 0;
+						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
+						const status = data.success ? "done" : "error";
+						setAgentRunSteps((prev) => {
+							const next = [...prev];
+							while (next.length <= idx)
+								next.push({
+									label: `Task ${next.length + 1}`,
+									status: "loading",
+								});
+							next[idx] = { label, status };
+							return next;
+						});
+					} else if (data.type === "end") {
+						setAgentThinking("");
+						const executed = data.executed || [];
+						if (executed.length > 0) {
+							await processAgentExecuted(executed, promptText);
+						} else {
+							setAgentRunSteps((prev) =>
+								prev.map((s) => ({
+									...s,
+									status: s.status === "loading" ? "done" : s.status,
+								})),
+							);
+						}
+						const creditsUsed = data.creditsUsed;
+						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
+							fetch("/api/agent/inkagent", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ idToken, creditsUsed }),
+							}).catch(() => {});
+						}
+						if (reduxUser)
+							getUserCredits(reduxUser.uid)
+								.then(setCredits)
+								.catch(() => {});
+					}
+				}
+			}
+			if (buffer.trim()) {
+				const line = buffer.trim();
+				if (line.startsWith("data: ")) {
+					try {
+						const data = JSON.parse(line.slice(6));
+						if (data.type === "end") {
+							if ((data.executed || []).length > 0)
+								await processAgentExecuted(data.executed, promptText);
+							const creditsUsed = data.creditsUsed;
+							if (
+								typeof creditsUsed === "number" &&
+								creditsUsed > 0 &&
+								idToken
+							) {
+								fetch("/api/agent/inkagent", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ idToken, creditsUsed }),
+								}).catch(() => {});
+							}
+						}
+						if (reduxUser)
+							getUserCredits(reduxUser.uid)
+								.then(setCredits)
+								.catch(() => {});
+					} catch {
+						// ignore
+					}
+				}
+			}
+		} catch (e) {
+			const errMsg = e?.message || "Agent failed";
+			setAgentError(errMsg);
+			setAgentRunSteps([{ label: errMsg, status: "error" }]);
+		} finally {
+			setAgentLoading(false);
+		}
+	};
+
+	const processAgentExecuted = async (executed, userPrompt = "") => {
+		const newTasks = [];
+		const inferred = inferFormatFromPrompt(userPrompt);
+		const CONTENT_TYPES = [
+			"newsletter",
+			"linkedin",
+			"blog_post",
+			"twitter_thread",
+			"email_digest",
+		];
+		for (const task of executed) {
+			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
+			if (isContentDraft) {
+				const lines = (task.content || "").split("\n");
+				const titleLine = lines.find(
+					(l) => l.startsWith("# ") || l.startsWith("## "),
+				);
+				const title = titleLine
+					? titleLine.replace(/^#+\s*/, "").trim()
+					: task.label || "Draft";
+				const bodyText = lines
+					.filter((l) => !l.match(/^#{1,6}\s/))
+					.join(" ")
+					.replace(/[*_`]/g, "")
+					.replace(/\s+/g, " ")
+					.trim();
+				const tag = task.formatLabel || inferred.label;
+				const format = task.params?.format || inferred.format;
+				const draft = {
+					title,
+					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
+					body: task.content,
+					urls: task.params?.urls || [],
+					prompt: userPrompt || "",
+					words: task.content.trim().split(/\s+/).length,
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					tag,
+					format,
+				};
+				const { id } = await createDraft(reduxUser.uid, draft);
+				setDrafts((prev) => [
+					{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+					...prev,
+				]);
+				newTasks.push({
+					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
+					label: task.label,
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "scrape" && task.content) {
+				const draft = {
+					title: task.title || "Scraped",
+					preview: (task.content || "").slice(0, 180),
+					body: task.content || "",
+					urls: task.urls || [],
+					prompt: userPrompt || "",
+					images: task.images || [],
+					words: (task.content || "").trim().split(/\s+/).length,
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					tag: "Scraped",
+				};
+				const { id } = await createDraft(reduxUser.uid, draft);
+				setDrafts((prev) => [
+					{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+					...prev,
+				]);
+				newTasks.push({
+					type: "scrape",
+					label: task.label,
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "table" && task.columns) {
+				const { id } = await createTable(reduxUser.uid, {
+					title: task.title || "Generated Table",
+					description: task.description || "",
+					columns: task.columns || [],
+					rows: task.rows || [],
+					sourceUrls: task.sourceUrls || [],
+					prompt: userPrompt || "",
+				});
+				setTables((prev) => [
+					{
+						id,
+						type: "table",
+						title: task.title || "Generated Table",
+						description: task.description || "",
+						createdAt: new Date(),
+						date: new Date().toLocaleDateString("en-US", {
+							weekday: "short",
+							month: "short",
+							day: "numeric",
+						}),
+						source: "assets",
+					},
+					...prev,
+				]);
+				newTasks.push({
+					type: "table",
+					label: task.label,
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "infographics" || task.type === "infographics-svg-generator") {
+				let infographics = task.infographics ?? task.result?.infographics ?? [];
+				if (!Array.isArray(infographics) && typeof task.content === "string") {
+					try {
+						infographics = JSON.parse(task.content);
+					} catch {
+						infographics = [];
+					}
+				}
+				if (!Array.isArray(infographics) || infographics.length === 0) continue;
+				const { id } = await createInfographicsAsset(reduxUser.uid, {
+					title: task.title || "Infographics",
+					description: task.description || "",
+					prompt: userPrompt || "",
+					infographics,
+				});
+				const item = {
+					id,
+					type: "infographics",
+					title: task.title || "Infographics",
+					description: task.description || "",
+					createdAt: new Date(),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					source: "assets",
+				};
+				setOtherAssets((prev) => [item, ...prev]);
+				newTasks.push({
+					type: "infographics",
+					label: task.label || "Infographics",
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (
+				(task.type === "landing_page" || task.type === "landing-page" || task.type === "landing-page-generator") &&
+				(task.html || task.result?.html || task.result?.result?.html || task.url || task.result?.url || (typeof task.content === "string" && task.content.trim().startsWith("<")))
+			) {
+				const html = task.html ?? task.result?.html ?? task.result?.result?.html ?? (typeof task.content === "string" && task.content.trim().startsWith("<") ? task.content : "") ?? "";
+				const url = task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
+				if (!html && !url) continue;
+				const { id } = await createLandingPageAsset(reduxUser.uid, {
+					title: task.title || "Landing Page",
+					description: task.description || "",
+					html,
+					url,
+				});
+				const item = {
+					id,
+					type: "landing_page",
+					title: task.title || "Landing Page",
+					description: task.description || "",
+					createdAt: new Date(),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					source: "assets",
+				};
+				setOtherAssets((prev) => [item, ...prev]);
+				newTasks.push({
+					type: "landing_page",
+					label: task.label || "Landing Page",
+					id,
+					path: `/app/${id}`,
+				});
+			} else if (task.type === "image_gallery" || task.type === "image-gallery" || task.type === "image-gallery-generator" || task.type === "image-gallery-creator") {
+				let images = task.images ?? task.result?.images ?? task.result?.data ?? task.result?.result?.images ?? [];
+				if (!Array.isArray(images) && typeof task.content === "string") {
+					try {
+						const parsed = JSON.parse(task.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						images = [];
+					}
+				}
+				if (!Array.isArray(images) && typeof task.result?.content === "string") {
+					try {
+						const parsed = JSON.parse(task.result.content);
+						images = Array.isArray(parsed) ? parsed : parsed?.images ?? [];
+					} catch {
+						// keep existing images
+					}
+				}
+				// Normalize: allow { url }, { src }, or plain string URLs
+				images = Array.isArray(images)
+					? images
+							.map((img) => (typeof img === "string" ? { url: img } : img))
+							.filter((img) => img?.url || img?.src)
+					: [];
+				if (images.length === 0) continue;
+				const { id } = await createImageGalleryAsset(reduxUser.uid, {
+					title: task.title || "Image Gallery",
+					description: task.description || "",
+					images,
+				});
+				const item = {
+					id,
+					type: "image_gallery",
+					title: task.title || "Image Gallery",
+					description: task.description || "",
+					createdAt: new Date(),
+					date: new Date().toLocaleDateString("en-US", {
+						weekday: "short",
+						month: "short",
+						day: "numeric",
+					}),
+					source: "assets",
+				};
+				setOtherAssets((prev) => [item, ...prev]);
+				newTasks.push({
+					type: "image_gallery",
+					label: task.label || "Gallery",
+					id,
+					path: `/app/${id}`,
+				});
+			}
+		}
+		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
+		if (newTasks.length > 0 && reduxUser?.uid) {
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
+		}
+	};
+
 	/* Create a blank draft and open it */
 	const handleBlank = async () => {
-		if (!reduxUser) { setLoginModalOpen(true); return; }
+		if (!reduxUser) {
+			setLoginModalOpen(true);
+			return;
+		}
 		const title = blankTitle.trim() || "Untitled draft";
 		const now = new Date();
-		const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+		const date = now.toLocaleDateString("en-US", {
+			weekday: "short",
+			month: "short",
+			day: "numeric",
+		});
 		const draft = {
-			userId: reduxUser.uid,
 			title,
 			preview: "",
 			body: "",
@@ -668,12 +1323,14 @@ export default function inkgestApp() {
 			words: 0,
 			date,
 			tag: "Draft",
-			createdAt: serverTimestamp(),
 		};
-		const docRef = await addDoc(collection(db, "drafts"), draft);
-		setDrafts((prev) => [{ id: docRef.id, ...draft, createdAt: new Date() }, ...prev]);
+		const { id } = await createDraft(reduxUser.uid, draft);
+		setDrafts((prev) => [
+			{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
+			...prev,
+		]);
 		setBlankTitle("");
-		router.push(`/app/${docRef.id}`);
+		router.push(`/app/${id}`);
 	};
 
 	return (
@@ -707,7 +1364,7 @@ export default function inkgestApp() {
 				<a
 					href="/"
 					style={{
-						fontFamily: "'Instrument Serif',serif",
+						fontFamily: "",
 						fontSize: 20,
 						color: T.accent,
 						textDecoration: "none",
@@ -821,7 +1478,6 @@ export default function inkgestApp() {
 					<div
 						className="sm:hidden md:flex"
 						style={{
-							
 							alignItems: "center",
 							gap: 8,
 							marginLeft: 4,
@@ -958,7 +1614,7 @@ export default function inkgestApp() {
 									<input
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
-										placeholder="Search drafts…"
+										placeholder="Search drafts, tables, blog, scrape…"
 										style={{
 											width: "100%",
 											background: T.surface,
@@ -990,15 +1646,15 @@ export default function inkgestApp() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts found</p>
+											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
 										</motion.div>
 									) : (
-										filtered.map((draft) => (
-											<DraftCard
-												key={draft.id}
-												draft={draft}
+										filtered.map((item) => (
+											<SidebarItemCard
+												key={item.id}
+												item={item}
 												active={false}
-												onClick={() => router.push(`/app/${draft.id}`)}
+												onClick={() => router.push(`/app/${item.id}`)}
 												onDelete={handleDelete}
 											/>
 										))
@@ -1126,215 +1782,14 @@ export default function inkgestApp() {
 						<div style={{ marginBottom: 24 }}>
 							<h1
 								style={{
-									fontFamily: "'Instrument Serif',serif",
+									fontFamily: "",
 									fontSize: 32,
 									color: T.accent,
-									marginBottom: 6,
 									letterSpacing: "-0.5px",
 								}}
 							>
 								New draft
 							</h1>
-							<p style={{ fontSize: 15, color: T.muted, lineHeight: 1.6 }}>
-								Choose how you want to start writing.
-							</p>
-						</div>
-
-						{/* ── Mode selector cards ── */}
-						<div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
-							{[
-								{
-									id: "ai",
-									icon: (
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-										</svg>
-									),
-									label: "AI Draft",
-									desc: "URLs + prompt → full draft",
-								},
-								{
-									id: "scrape",
-									icon: (
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-											<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-										</svg>
-									),
-									label: "Scrape URL",
-									desc: "Raw content into editor",
-								},
-								{
-									id: "blank",
-									icon: (
-										<svg
-											width={16}
-											height={16}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-										</svg>
-									),
-									label: "Blank editor",
-									desc: "Start from scratch",
-								},
-							].map((m) => {
-								const active = draftMode === m.id;
-								return (
-									<motion.button
-										key={m.id}
-										whileTap={{ scale: 0.97 }}
-										onClick={() => {
-											setDraftMode(m.id);
-											setGenerateError(null);
-										}}
-										style={{
-											flex: 1,
-											background: active ? T.accent : T.surface,
-											border: `1.5px solid ${active ? T.accent : T.border}`,
-											borderRadius: 12,
-											padding: "14px 16px",
-											cursor: "pointer",
-											textAlign: "left",
-											transition: "all 0.15s",
-										}}
-									>
-										<div
-											style={{
-												display: "inline-flex",
-												alignItems: "center",
-												justifyContent: "center",
-												width: 28,
-												height: 28,
-												borderRadius: 7,
-												background: active ? "rgba(255,255,255,0.15)" : T.base,
-												color: active ? "white" : T.warm,
-												marginBottom: 10,
-											}}
-										>
-											{m.icon}
-										</div>
-										<p
-											style={{
-												fontSize: 13,
-												fontWeight: 700,
-												color: active ? "white" : T.accent,
-												marginBottom: 3,
-											}}
-										>
-											{m.label}
-										</p>
-										<p
-											style={{
-												fontSize: 11,
-												color: active ? "rgba(255,255,255,0.65)" : T.muted,
-											}}
-										>
-											{m.desc}
-										</p>
-									</motion.button>
-								);
-							})}
-
-							{/* ── Table Creator — navigates to its own page ── */}
-							<motion.button
-								whileTap={{ scale: 0.97 }}
-								onClick={() => router.push("/app/table-creator")}
-								style={{
-									flex: 1,
-									background: T.surface,
-									border: `1.5px solid ${T.border}`,
-									borderRadius: 12,
-									padding: "14px 16px",
-									cursor: "pointer",
-									textAlign: "left",
-									transition: "all 0.15s",
-									position: "relative",
-								}}
-							>
-								<div
-									style={{
-										position: "absolute",
-										top: 8,
-										right: 10,
-										fontSize: 9,
-										fontWeight: 700,
-										color: T.warm,
-										background: "#FEF3E2",
-										border: "1px solid #F5C97A",
-										borderRadius: 20,
-										padding: "1px 6px",
-										letterSpacing: "0.05em",
-										textTransform: "uppercase",
-									}}
-								>
-									New
-								</div>
-								<div
-									style={{
-										display: "inline-flex",
-										alignItems: "center",
-										justifyContent: "center",
-										width: 28,
-										height: 28,
-										borderRadius: 7,
-										background: T.base,
-										color: T.warm,
-										marginBottom: 10,
-									}}
-								>
-									<svg
-										width={16}
-										height={16}
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth={2}
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<rect x="3" y="3" width="18" height="18" rx="2" />
-										<path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
-									</svg>
-								</div>
-								<p
-									style={{
-										fontSize: 13,
-										fontWeight: 700,
-										color: T.accent,
-										marginBottom: 3,
-									}}
-								>
-									Create Table
-								</p>
-								<p style={{ fontSize: 11, color: T.muted }}>
-									URL → AI-structured table
-								</p>
-							</motion.button>
 						</div>
 
 						{/* Not logged in info banner */}
@@ -1347,7 +1802,6 @@ export default function inkgestApp() {
 									border: "1px solid #F5C97A",
 									borderRadius: 10,
 									padding: "12px 16px",
-									marginBottom: 16,
 									display: "flex",
 									alignItems: "center",
 									justifyContent: "space-between",
@@ -1393,6 +1847,595 @@ export default function inkgestApp() {
 							credits={credits}
 							onUpgrade={() => router.push("/pricing")}
 						/>
+
+						{/* ── INKAGENT MODE ── */}
+						{draftMode === "agent" && (
+							<motion.div
+								key="agent-form"
+								initial={{ opacity: 0, y: 8 }}
+								animate={{ opacity: 1, y: 0 }}
+								style={{
+									display: "flex",
+									flexDirection: "column",
+									gap: 24,
+									marginBottom: 24,
+									width: "100%",
+								}}
+							>
+								{/* Input section — URL chips + textarea attached */}
+								<div className="flex flex-col gap-0 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50">
+									{/* URL chips parsed from prompt — above textarea */}
+									{(() => {
+										const fullUrlRegex = /https?:\/\/[^\s]+/g;
+										const bareDomainRegex =
+											/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog|to|me|info|edu|gov)\b/gi;
+										const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
+											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
+											.filter(Boolean);
+										const bareDomains = (agentPrompt.match(bareDomainRegex) || [])
+											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
+											.filter(Boolean);
+										const unique = [
+											...new Set([
+												...fullUrls,
+												...bareDomains.filter(
+													(b) =>
+														!fullUrls.some(
+															(f) => f.includes(b) || f.includes(`https://${b}`),
+														),
+												),
+											]),
+										].filter(Boolean);
+										if (unique.length === 0) return null;
+										return (
+											<div
+												style={{
+													display: "flex",
+													flexWrap: "wrap",
+													gap: 8,
+													padding: "12px 16px",
+													borderBottom: `1px solid ${T.border}`,
+													background: T.base,
+												}}
+											>
+												{unique.map((url, i) => (
+													<motion.div
+														key={`${url}-${i}`}
+														initial={{ opacity: 0, scale: 0.9 }}
+														animate={{ opacity: 1, scale: 1 }}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															gap: 6,
+															padding: "6px 10px",
+															background: T.surface,
+															border: `1px solid ${T.border}`,
+															borderRadius: 8,
+															fontSize: 12,
+															color: T.accent,
+															maxWidth: 220,
+															overflow: "hidden",
+															textOverflow: "ellipsis",
+															whiteSpace: "nowrap",
+														}}
+													>
+														<span
+															style={{
+																flex: 1,
+																overflow: "hidden",
+																textOverflow: "ellipsis",
+															}}
+														>
+															{url}
+														</span>
+														<motion.button
+															whileHover={{ scale: 1.1 }}
+															whileTap={{ scale: 0.9 }}
+															onClick={() => {
+																setAgentPrompt((p) =>
+																	p
+																		.replace(
+																			new RegExp(
+																				url.replace(
+																					/[.*+?^${}()|[\]\\]/g,
+																					"\\$&",
+																				),
+																				"g",
+																			),
+																			"",
+																		)
+																		.replace(/\s+/g, " ")
+																		.trim(),
+																);
+															}}
+															style={{
+																background: "none",
+																border: "none",
+																cursor: "pointer",
+																padding: 0,
+																display: "flex",
+																color: T.muted,
+																flexShrink: 0,
+															}}
+														>
+															<svg
+																width={12}
+																height={12}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2}
+															>
+																<path d="M18 6L6 18M6 6l12 12" />
+															</svg>
+														</motion.button>
+													</motion.div>
+												))}
+											</div>
+										);
+									})()}
+									<textarea
+										value={agentPrompt}
+										onChange={(e) => setAgentPrompt(e.target.value)}
+										onKeyDown={(e) =>
+											e.key === "Enter" &&
+											!e.shiftKey &&
+											(e.preventDefault(), handleAgentSend())
+										}
+										placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
+										rows={4}
+										disabled={!reduxUser || agentLoading}
+										className="w-full bg-zinc-50 border border-zinc-200 rounded-xl bg-transparent px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
+									/>
+									<div className="flex gap-2 items-center justify-between px-2 py-1  bg-amber-50/20">
+										<div className="text-xs text-zinc-700">
+											Create tables, newsletter, infographics and models
+										</div>
+										{/* Circular credits progress — justify-end */}
+										<div
+											style={{ display: "flex", justifyContent: "flex-end" }}
+										>
+											{(() => {
+												const limit =
+													credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
+												const remaining =
+													credits?.plan === "pro"
+														? limit
+														: Math.max(0, credits?.remaining ?? limit);
+												const pct = limit > 0 ? remaining / limit : 0;
+												const r = 14;
+												const circ = 2 * Math.PI * r;
+												const dash = pct * circ;
+												const strokeCol =
+													pct > 0.3
+														? T.warm
+														: pct > 0.1
+															? "#D97706"
+															: "#DC2626";
+												return (
+													<div
+														style={{
+															display: "flex",
+															alignItems: "center",
+															gap: 4,
+														}}
+													>
+														<svg
+															width={24}
+															height={24}
+															viewBox="0 0 36 36"
+															style={{ transform: "rotate(-90deg)" }}
+														>
+															<circle
+																cx={18}
+																cy={18}
+																r={r}
+																fill="none"
+																stroke={T.border}
+																strokeWidth={4}
+															/>
+															<circle
+																cx={18}
+																cy={18}
+																r={r}
+																fill="none"
+																stroke={strokeCol}
+																strokeWidth={4}
+																strokeDasharray={`${dash} ${circ}`}
+																strokeLinecap="round"
+																style={{
+																	transition: "stroke-dasharray 0.3s ease",
+																}}
+															/>
+														</svg>
+														<span
+															style={{
+																fontSize: 12,
+																fontWeight: 600,
+																color: T.muted,
+															}}
+														>
+															{credits?.plan === "pro"
+																? "Pro"
+																: `${remaining.toFixed(1)}/${limit}`}
+														</span>
+													</div>
+												);
+											})()}
+										</div>
+									</div>
+								</div>
+								<div
+									style={{
+										display: "flex",
+										flexDirection: "column",
+										gap: 12,
+									}}
+								>
+									<motion.button
+										onClick={handleAgentSend}
+										disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
+										whileHover={
+											!agentLoading && agentPrompt.trim()
+												? { scale: 1.02, y: -1 }
+												: {}
+										}
+										whileTap={!agentLoading ? { scale: 0.97 } : {}}
+										style={{
+											width: "100%",
+											background:
+												agentLoading || !agentPrompt.trim() || !reduxUser
+													? "#E8E4DC"
+													: T.accent,
+											color:
+												agentLoading || !agentPrompt.trim() || !reduxUser
+													? T.muted
+													: "white",
+											border: "none",
+											padding: "15px",
+											borderRadius: 12,
+											fontSize: 16,
+											fontWeight: 700,
+											cursor:
+												agentLoading || !reduxUser ? "not-allowed" : "pointer",
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											gap: 10,
+										}}
+									>
+										{agentLoading ? (
+											<>
+												<motion.span
+													animate={{ rotate: 360 }}
+													transition={{
+														duration: 0.9,
+														repeat: Infinity,
+														ease: "linear",
+													}}
+												>
+													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
+												</motion.span>
+												{agentLoadingMsg}
+											</>
+										) : !reduxUser ? (
+											"Sign in to use AI Agent"
+										) : (
+											<>
+												<Icon
+													d={Icons.zap}
+													size={18}
+													stroke="white"
+													fill="white"
+												/>
+												Send to InkAgent
+											</>
+										)}
+									</motion.button>
+								</div>
+
+								{agentError && (
+									<motion.div
+										initial={{ opacity: 0, y: 4 }}
+										animate={{ opacity: 1, y: 0 }}
+										style={{
+											padding: "12px 16px",
+											background: "#FEF2F2",
+											border: "1px solid #FECACA",
+											borderRadius: 10,
+											fontSize: 13,
+											color: "#DC2626",
+										}}
+									>
+										{agentError}
+									</motion.div>
+								)}
+
+								{/* InkAgent output card — below Send button */}
+								{(agentRunSteps.length > 0 ||
+									agentCompletedTasks.length > 0 ||
+									agentThinking) && (
+									<motion.div
+										ref={agentOutputRef}
+										initial={{ opacity: 0, y: -8 }}
+										animate={{ opacity: 1, y: 0 }}
+										style={{
+											background: T.surface,
+											border: `1px solid ${T.border}`,
+											borderRadius: 14,
+											padding: 20,
+											boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+										}}
+									>
+										<p
+											style={{
+												fontSize: 15,
+												fontWeight: 700,
+												color: T.accent,
+												marginBottom: 16,
+												display: "flex",
+												alignItems: "center",
+												gap: 8,
+											}}
+										>
+											<span style={{ color: T.warm }}>✦</span> InkAgent
+										</p>
+										{agentThinking && (
+											<div
+												style={{
+													background: T.base,
+													border: `1px solid ${T.border}`,
+													borderRadius: 10,
+													padding: "14px 16px",
+													marginBottom: 16,
+													fontSize: 13,
+													lineHeight: 1.6,
+													color: T.muted,
+													maxHeight: 120,
+													overflowY: "auto",
+												}}
+											>
+												{agentThinking}
+											</div>
+										)}
+										{agentRunSteps.length > 0 && (
+											<div
+												style={{
+													display: "flex",
+													flexDirection: "column",
+													gap: 10,
+													marginBottom: agentCompletedTasks.length > 0 ? 16 : 0,
+												}}
+											>
+												{agentRunSteps.map((step, i) => (
+													<div
+														key={i}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															justifyContent: "space-between",
+															gap: 12,
+														}}
+													>
+														<span
+															style={{
+																fontSize: 13,
+																color: T.accent,
+																fontWeight: 500,
+															}}
+														>
+															{step.label}
+														</span>
+														{step.status === "loading" && (
+															<motion.span
+																animate={{ rotate: 360 }}
+																transition={{
+																	duration: 0.9,
+																	repeat: Infinity,
+																	ease: "linear",
+																}}
+															>
+																<Icon
+																	d={Icons.refresh}
+																	size={14}
+																	stroke={T.warm}
+																/>
+															</motion.span>
+														)}
+														{step.status === "done" && (
+															<span
+																style={{
+																	fontSize: 14,
+																	color: "#16A34A",
+																	fontWeight: 700,
+																}}
+															>
+																✓
+															</span>
+														)}
+														{step.status === "error" && (
+															<span
+																style={{
+																	fontSize: 14,
+																	color: "#DC2626",
+																	fontWeight: 700,
+																}}
+															>
+																✗
+															</span>
+														)}
+													</div>
+												))}
+											</div>
+										)}
+										{agentCompletedTasks.length > 0 && (
+											<>
+												<p
+													style={{
+														fontSize: 12,
+														color: T.muted,
+														marginBottom: 12,
+														fontWeight: 600,
+													}}
+												>
+													Created {agentCompletedTasks.length} asset
+													{agentCompletedTasks.length !== 1 ? "s" : ""}
+												</p>
+												<div
+													style={{
+														display: "flex",
+														flexDirection: "column",
+														gap: 8,
+													}}
+												>
+													{agentCompletedTasks.map((t, i) => (
+														<motion.a
+															key={i}
+															href={t.path}
+															onClick={(e) => {
+																e.preventDefault();
+																router.push(t.path);
+															}}
+															whileHover={{ x: 2, scale: 1.01 }}
+															whileTap={{ scale: 0.99 }}
+															style={{
+																display: "flex",
+																alignItems: "center",
+																justifyContent: "space-between",
+																padding: "12px 14px",
+																background: T.base,
+																border: `1px solid ${T.border}`,
+																borderRadius: 10,
+																textDecoration: "none",
+																color: T.accent,
+																fontSize: 13,
+																fontWeight: 600,
+															}}
+														>
+															<span
+																style={{
+																	display: "flex",
+																	alignItems: "center",
+																	gap: 8,
+																}}
+															>
+																<span style={{ fontSize: 14 }}>
+																	{t.type === "newsletter"
+																		? "📧"
+																		: t.type === "linkedin"
+																			? "💼"
+																			: t.type === "blog_post"
+																				? "📝"
+																				: t.type === "twitter_thread"
+																					? "🐦"
+																					: t.type === "email_digest"
+																						? "📬"
+																						: t.type === "table"
+																							? "📊"
+																							: t.type === "infographics"
+																								? "📊"
+																								: t.type === "landing_page"
+																									? "🌐"
+																									: t.type === "image_gallery"
+																										? "🖼️"
+																										: "📄"}
+																</span>
+																<span>
+																	{t.type === "newsletter"
+																		? "Newsletter"
+																		: t.type === "linkedin"
+																			? "LinkedIn"
+																			: t.type === "blog_post"
+																				? "Blog"
+																				: t.type === "twitter_thread"
+																					? "Thread"
+																					: t.type === "email_digest"
+																						? "Digest"
+																						: t.type === "table"
+																							? "Table"
+																							: t.type === "infographics"
+																								? "Infographics"
+																								: t.type === "landing_page"
+																									? "Landing Page"
+																									: t.type === "image_gallery"
+																										? "Gallery"
+																										: "Scrape"}
+																	: {t.label}
+																</span>
+															</span>
+															<span
+																style={{
+																	fontSize: 12,
+																	color: T.warm,
+																	fontWeight: 700,
+																}}
+															>
+																Open →
+															</span>
+														</motion.a>
+													))}
+												</div>
+											</>
+										)}
+									</motion.div>
+								)}
+
+								{/* Try a suggestion — hidden when loading or assets generated */}
+								{!agentLoading && agentCompletedTasks.length === 0 && (
+									<div
+										style={{
+											display: "flex",
+											flexDirection: "column",
+											gap: 12,
+											width: "100%",
+										}}
+									>
+										<label
+											style={{
+												fontSize: 12,
+												fontWeight: 700,
+												textTransform: "uppercase",
+												letterSpacing: "0.08em",
+												color: T.muted,
+											}}
+										>
+											Try a suggestion
+										</label>
+										<div
+											style={{
+												display: "flex",
+												flexDirection: "column",
+												gap: 8,
+											}}
+										>
+											{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
+												<motion.button
+													key={i}
+													whileHover={{ scale: 1.005, x: 4 }}
+													whileTap={{ scale: 0.995 }}
+													onClick={() => setAgentPrompt(s)}
+													style={{
+														width: "100%",
+														padding: "12px 16px",
+														borderRadius: 10,
+														fontSize: 13,
+														fontWeight: 500,
+														cursor: "pointer",
+														border: `1.5px solid ${T.border}`,
+														background: T.surface,
+														color: T.accent,
+														textAlign: "left",
+														lineHeight: 1.5,
+													}}
+												>
+													{s}
+												</motion.button>
+											))}
+										</div>
+									</div>
+								)}
+							</motion.div>
+						)}
 
 						{/* ── SCRAPE MODE ── */}
 						<AnimatePresence mode="wait">
@@ -1643,8 +2686,8 @@ export default function inkgestApp() {
 									</div>
 								</div>
 
-								{/* Multiple URLs input */}
-								<div style={{ marginBottom: 20 }}>
+								{/* Add URL input */}
+								<div style={{ marginBottom: 12 }}>
 									<label
 										style={{
 											display: "block",
@@ -1658,89 +2701,68 @@ export default function inkgestApp() {
 									>
 										Source URLs (optional)
 									</label>
-									{urls.map((urlVal, idx) => (
-										<div
-											key={idx}
+									<div style={{ display: "flex", gap: 8 }}>
+										<input
+											type="url"
+											value={newUrlInput}
+											onChange={(e) => setNewUrlInput(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") {
+													e.preventDefault();
+													const val = newUrlInput.trim();
+													if (val) {
+														setUrls((prev) =>
+															prev[0] === "" ? [val] : [...prev, val],
+														);
+														setNewUrlInput("");
+													}
+												}
+											}}
+											placeholder="Paste URL and press Enter"
 											style={{
-												display: "flex",
-												gap: 8,
-												marginBottom: 8,
-												alignItems: "center",
+												flex: 1,
+												background: T.surface,
+												border: `1.5px solid ${T.border}`,
+												borderRadius: 11,
+												padding: "13px 16px",
+												fontSize: 14,
+												color: T.accent,
+												outline: "none",
+												transition: "border-color 0.2s",
+											}}
+											onFocus={(e) => (e.target.style.borderColor = T.warm)}
+											onBlur={(e) => (e.target.style.borderColor = T.border)}
+										/>
+										<motion.button
+											whileHover={{ background: "#F0ECE5" }}
+											whileTap={{ scale: 0.97 }}
+											onClick={() => {
+												const val = newUrlInput.trim();
+												if (val) {
+													setUrls((prev) =>
+														prev[0] === "" ? [val] : [...prev, val],
+													);
+													setNewUrlInput("");
+												}
+											}}
+											style={{
+												padding: "12px 16px",
+												background: T.base,
+												border: `1.5px solid ${T.border}`,
+												borderRadius: 11,
+												fontSize: 13,
+												fontWeight: 600,
+												color: T.accent,
+												cursor: "pointer",
+												whiteSpace: "nowrap",
 											}}
 										>
-											<input
-												value={urlVal}
-												onChange={(e) => updateUrl(idx, e.target.value)}
-												placeholder={`https://example.com/article${idx > 0 ? `-${idx + 1}` : ""}`}
-												style={{
-													flex: 1,
-													background: T.surface,
-													border: `1.5px solid ${T.border}`,
-													borderRadius: 11,
-													padding: "13px 16px",
-													fontSize: 14,
-													color: T.accent,
-													outline: "none",
-													transition: "border-color 0.2s",
-												}}
-												onFocus={(e) => (e.target.style.borderColor = T.warm)}
-												onBlur={(e) => (e.target.style.borderColor = T.border)}
-											/>
-											{urls.length > 1 && (
-												<motion.button
-													whileHover={{ background: "#FEE2E2" }}
-													whileTap={{ scale: 0.95 }}
-													onClick={() => removeUrl(idx)}
-													style={{
-														background: T.surface,
-														border: `1.5px solid ${T.border}`,
-														borderRadius: 9,
-														width: 42,
-														height: 42,
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														cursor: "pointer",
-														flexShrink: 0,
-														transition: "background 0.15s",
-													}}
-												>
-													<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-												</motion.button>
-											)}
-										</div>
-									))}
-									<motion.button
-										whileHover={{ background: "#F0ECE5" }}
-										whileTap={{ scale: 0.97 }}
-										onClick={addUrl}
-										style={{
-											display: "flex",
-											alignItems: "center",
-											gap: 6,
-											background: "transparent",
-											border: `1.5px dashed ${T.border}`,
-											borderRadius: 9,
-											padding: "8px 14px",
-											fontSize: 13,
-											fontWeight: 600,
-											color: T.muted,
-											cursor: "pointer",
-											transition: "background 0.15s",
-											marginTop: 4,
-										}}
-									>
-										<Icon d={Icons.plus} size={13} stroke={T.muted} />
-										Add another URL
-									</motion.button>
-									<p style={{ fontSize: 12, color: T.muted, marginTop: 6 }}>
-										Works with blog posts, news articles, Medium, Substack,
-										research papers
-									</p>
+											<Icon d={Icons.plus} size={14} stroke={T.muted} /> Add
+										</motion.button>
+									</div>
 								</div>
-
-								{/* Prompt input */}
-								<div style={{ marginBottom: 24 }}>
+								{/* URL chips + prompt — attached in one container */}
+								<div style={{ marginBottom: 12 }}>
 									<label
 										style={{
 											display: "block",
@@ -1754,27 +2776,79 @@ export default function inkgestApp() {
 									>
 										Your angle / prompt *
 									</label>
-									<textarea
-										value={prompt}
-										onChange={(e) => setPrompt(e.target.value)}
-										placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words. Focus on the actionable takeaways."
-										rows={4}
-										style={{
-											width: "100%",
-											background: T.surface,
-											border: `1.5px solid ${T.border}`,
-											borderRadius: 11,
-											padding: "13px 16px",
-											fontSize: 14,
-											color: T.accent,
-											resize: "vertical",
-											outline: "none",
-											lineHeight: 1.6,
-											transition: "border-color 0.2s",
-										}}
-										onFocus={(e) => (e.target.style.borderColor = T.warm)}
-										onBlur={(e) => (e.target.style.borderColor = T.border)}
-									/>
+									<div className="flex flex-col gap-0 bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden">
+										{/* URL chips above prompt */}
+										{urls.filter(Boolean).length > 0 && (
+											<div className="flex flex-wrap gap-2 px-2 py-1 ">
+												{urls.map((urlVal, idx) =>
+													urlVal.trim() ? (
+														<motion.div
+															key={`${urlVal}-${idx}`}
+															initial={{ opacity: 0, scale: 0.9 }}
+															animate={{ opacity: 1, scale: 1 }}
+															style={{
+																display: "flex",
+																alignItems: "center",
+																gap: 6,
+																padding: "6px 10px",
+																background: T.surface,
+																border: `1px solid ${T.border}`,
+																borderRadius: 8,
+																fontSize: 12,
+																color: T.accent,
+																maxWidth: 220,
+																overflow: "hidden",
+																textOverflow: "ellipsis",
+																whiteSpace: "nowrap",
+															}}
+														>
+															<span
+																style={{
+																	flex: 1,
+																	overflow: "hidden",
+																	textOverflow: "ellipsis",
+																}}
+															>
+																{urlVal.trim()}
+															</span>
+															<motion.button
+																whileHover={{ scale: 1.1 }}
+																whileTap={{ scale: 0.9 }}
+																onClick={() => removeUrl(idx)}
+																style={{
+																	background: "none",
+																	border: "none",
+																	cursor: "pointer",
+																	padding: 0,
+																	display: "flex",
+																	color: T.muted,
+																	flexShrink: 0,
+																}}
+															>
+																<svg
+																	width={12}
+																	height={12}
+																	viewBox="0 0 24 24"
+																	fill="none"
+																	stroke="currentColor"
+																	strokeWidth={2}
+																>
+																	<path d="M18 6L6 18M6 6l12 12" />
+																</svg>
+															</motion.button>
+														</motion.div>
+													) : null,
+												)}
+											</div>
+										)}
+										<textarea
+											value={prompt}
+											onChange={(e) => setPrompt(e.target.value)}
+											placeholder="e.g. Write a Sunday newsletter for indie founders. Practical and direct tone. Under 400 words. Focus on the actionable takeaways."
+											rows={4}
+											className="w-full bg-transparent border-none px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
+										/>
+									</div>
 								</div>
 
 								{/* Format selector */}
@@ -1958,6 +3032,69 @@ export default function inkgestApp() {
 										)}
 									</motion.button>
 								)}
+								{/* Circular credits progress — justify-end below generate */}
+								<div style={{ display: "flex", justifyContent: "flex-end" }}>
+									{(() => {
+										const limit = credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
+										const remaining =
+											credits?.plan === "pro"
+												? limit
+												: Math.max(0, credits?.remaining ?? limit);
+										const pct = limit > 0 ? remaining / limit : 0;
+										const r = 14;
+										const circ = 2 * Math.PI * r;
+										const dash = pct * circ;
+										const strokeCol =
+											pct > 0.3 ? T.warm : pct > 0.1 ? "#D97706" : "#DC2626";
+										return (
+											<div
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 8,
+												}}
+											>
+												<svg
+													width={24}
+													height={24}
+													viewBox="0 0 36 36"
+													style={{ transform: "rotate(-90deg)" }}
+												>
+													<circle
+														cx={18}
+														cy={18}
+														r={r}
+														fill="none"
+														stroke={T.border}
+														strokeWidth={4}
+													/>
+													<circle
+														cx={18}
+														cy={18}
+														r={r}
+														fill="none"
+														stroke={strokeCol}
+														strokeWidth={4}
+														strokeDasharray={`${dash} ${circ}`}
+														strokeLinecap="round"
+														style={{ transition: "stroke-dasharray 0.3s ease" }}
+													/>
+												</svg>
+												<span
+													style={{
+														fontSize: 12,
+														fontWeight: 600,
+														color: T.muted,
+													}}
+												>
+													{credits?.plan === "pro"
+														? "Pro"
+														: `${remaining.toFixed(1)}/${limit}`}
+												</span>
+											</div>
+										);
+									})()}
+								</div>
 
 								{/* Error message */}
 								{generateError && (
@@ -2119,7 +3256,7 @@ export default function inkgestApp() {
 								position: "fixed",
 								top: "50%",
 								left: "50%",
-								transform: "translate(-50%,-50%)",
+								transform: "translate(-40%,-40%)",
 								background: T.surface,
 								border: `1px solid ${T.border}`,
 								borderRadius: 16,
@@ -2135,7 +3272,6 @@ export default function inkgestApp() {
 									fontWeight: 700,
 									color: T.accent,
 									marginBottom: 8,
-									fontFamily: "'Instrument Serif',serif",
 								}}
 							>
 								Delete this draft?

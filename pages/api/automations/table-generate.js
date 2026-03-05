@@ -3,41 +3,14 @@ import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
 import { scrapeUrls } from "../../../lib/utils/scrapeApi";
+import {
+	TABLE_SYSTEM_PROMPT,
+	parseTableJson,
+	MAX_CONTENT_CHARS,
+} from "../../../lib/prompts/table";
 
 // No body size limit — tables can be large
 const URL_REGEX = /^https?:\/\/\S+$/i;
-const MAX_CONTENT_CHARS = 14000;
-
-const SYSTEM_PROMPT = `You are a data-extraction and table-generation expert.
-
-Given scraped webpage content and a user request, extract structured tabular data and return it as raw valid JSON — no markdown fences, no explanation, no extra text.
-
-Use this exact schema:
-{
-  "title": "Descriptive title for this table",
-  "description": "One-sentence description of what this data represents",
-  "columns": [
-    { "key": "snake_case_key", "label": "Human Readable Label", "type": "text|number|date|url|percentage" }
-  ],
-  "rows": [
-    { "snake_case_key": "cell value" }
-  ]
-}
-
-Rules:
-- Create 3–8 columns; never exceed 8.
-- Extract as many rows as the content supports (max 100 rows).
-- Column keys MUST be unique lowercase_snake_case with no spaces.
-- type "number"     → store only the numeric value (e.g. 42, not "$42").
-- type "percentage" → store only the numeric value (e.g. 12.5, not "12.5%"). Put "(%)" in the label.
-- type "url"        → store the full URL string.
-- type "date"       → use ISO 8601 (YYYY-MM-DD) where possible.
-- type "text"       → everything else.
-- If numbers have units put the unit in the label (e.g. "Price (USD)", "Size (MB)").
-- Order columns logically — primary identifier column first, then descriptive, then numeric.
-- Prioritise what the user requests in their prompt.
-- Never return empty rows or columns.
-- If you cannot find enough structured data to build a table, return an empty rows array and explain in "description".`;
 
 async function callOpenRouter(apiKey, messages) {
 	const model = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
@@ -64,26 +37,12 @@ async function callOpenRouter(apiKey, messages) {
 	return data?.choices?.[0]?.message?.content || "";
 }
 
-function parseTableJson(raw) {
-	// Try stripping markdown code fences first
-	const fenced = raw.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-	const jsonStr = fenced ? fenced[1] : raw.trim();
-	try {
-		return JSON.parse(jsonStr);
-	} catch {
-		// Last-resort: find first { … }
-		const braceMatch = raw.match(/\{[\s\S]*\}/);
-		if (braceMatch) return JSON.parse(braceMatch[0]);
-		throw new Error("Failed to parse table JSON from AI response.");
-	}
-}
-
 export default async function handler(req, res) {
 	if (req.method !== "POST") {
 		return res.status(405).json({ error: "Method not allowed" });
 	}
 
-	const { url, urls: urlsBody, prompt: userPrompt, idToken } = req.body || {};
+	const { url, urls: urlsBody, sources: preScrapedSources, prompt: userPrompt, idToken } = req.body || {};
 
 	// ── Auth ──────────────────────────────────────────────────────────────────
 	if (!idToken) {
@@ -112,20 +71,30 @@ export default async function handler(req, res) {
 			: url && String(url).trim()
 				? [String(url).trim()]
 				: [];
-	if (urlList.length === 0) {
+
+	const hasPreScraped =
+		Array.isArray(preScrapedSources) &&
+		preScrapedSources.length > 0 &&
+		preScrapedSources.every(
+			(s) => s && typeof s.url === "string" && (typeof s.markdown === "string" || typeof s.content === "string")
+		);
+
+	if (!hasPreScraped && urlList.length === 0) {
 		return res
 			.status(400)
-			.json({ error: "At least one valid URL is required." });
+			.json({ error: "At least one valid URL or pre-scraped sources is required." });
 	}
-	if (urlList.length > 10) {
+	if (!hasPreScraped && urlList.length > 10) {
 		return res.status(400).json({ error: "Maximum 10 URLs per request." });
 	}
-	if (urlList.some((u) => !URL_REGEX.test(u))) {
+	if (urlList.length > 0 && urlList.some((u) => !URL_REGEX.test(u))) {
 		return res.status(400).json({ error: "One or more URLs are invalid." });
 	}
-	const urlValidation = validateUrls(urlList);
-	if (!urlValidation.valid) {
-		return res.status(400).json({ error: urlValidation.error });
+	if (urlList.length > 0) {
+		const urlValidation = validateUrls(urlList);
+		if (!urlValidation.valid) {
+			return res.status(400).json({ error: urlValidation.error });
+		}
 	}
 	if (!userPrompt?.trim()) {
 		return res.status(400).json({
@@ -144,24 +113,36 @@ export default async function handler(req, res) {
 		return res.status(429).json({ error: creditCheck.error });
 	}
 
-	// ── Scrape all URLs — uses batch endpoint when multiple ───────────────────
-	const scraped = await scrapeUrls({
-		urls: urlList,
-		apiKey: "apiKey",
-	});
-	const sources = scraped.sources.map((s) => ({
-		url: s.url,
-		content: (s.markdown || "").slice(0, MAX_CONTENT_CHARS),
-	}));
-	const scrapeErrors = scraped.scrapeErrors;
+	// ── Use pre-scraped sources or scrape ────────────────────────────────────
+	let sources;
+	let scrapeErrors = [];
 
-	if (sources.length === 0) {
-		return res.status(422).json({
-			error:
-				"Could not extract content from any URL. Please check the URLs and try again.",
-			details: scrapeErrors,
+	if (hasPreScraped) {
+		sources = preScrapedSources.map((s) => ({
+			url: s.url,
+			content: (s.markdown || s.content || "").slice(0, MAX_CONTENT_CHARS),
+		}));
+	} else {
+		const scraped = await scrapeUrls({
+			urls: urlList,
+			apiKey: process.env.BUILDSAAS_API_KEY || "apiKey",
 		});
+		sources = scraped.sources.map((s) => ({
+			url: s.url,
+			content: (s.markdown || "").slice(0, MAX_CONTENT_CHARS),
+		}));
+		scrapeErrors = scraped.scrapeErrors;
+
+		if (sources.length === 0) {
+			return res.status(422).json({
+				error:
+					"Could not extract content from any URL. Please check the URLs and try again.",
+				details: scrapeErrors,
+			});
+		}
 	}
+
+	const effectiveUrlList = urlList.length > 0 ? urlList : sources.map((s) => s.url);
 
 	const combinedContent = sources
 		.map((s, i) => `--- SOURCE ${i + 1}: ${s.url} ---\n\n${s.content}`)
@@ -170,9 +151,9 @@ export default async function handler(req, res) {
 	// ── LLM ───────────────────────────────────────────────────────────────────
 	let raw;
 	try {
-		const urlListStr = urlList.length === 1 ? urlList[0] : urlList.join(", ");
+		const urlListStr = effectiveUrlList.length === 1 ? effectiveUrlList[0] : effectiveUrlList.join(", ");
 		raw = await callOpenRouter(openRouterKey, [
-			{ role: "system", content: SYSTEM_PROMPT },
+			{ role: "system", content: TABLE_SYSTEM_PROMPT },
 			{
 				role: "user",
 				content: `URL(s): ${urlListStr}\n\nUser request: ${userPrompt.trim()}\n\nScraped content from ${sources.length} source(s):\n\n${combinedContent}`,
@@ -206,8 +187,8 @@ export default async function handler(req, res) {
 		description: tableData.description || "",
 		columns: tableData.columns,
 		rows: tableData.rows || [],
-		sourceUrls: urlList,
-		sourceUrl: urlList[0],
+		sourceUrls: effectiveUrlList,
+		sourceUrl: effectiveUrlList[0],
 		scrapeErrors: scrapeErrors.length > 0 ? scrapeErrors : undefined,
 	});
 }

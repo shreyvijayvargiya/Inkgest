@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
@@ -6,6 +6,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import InfographicsModal from "../../lib/ui/InfographicsModal";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
+import TableView from "../../lib/ui/TableView";
+import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
+import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
+import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
 import { db } from "../../lib/config/firebase";
 import {
 	collection,
@@ -18,6 +22,13 @@ import {
 	where,
 	updateDoc,
 } from "firebase/firestore";
+import {
+	listAssets,
+	getAsset,
+	updateAsset,
+	deleteAsset,
+	assetRef,
+} from "../../lib/api/userAssets";
 import { uploadFile } from "../../lib/api/upload";
 import {
 	getUserCredits,
@@ -29,7 +40,7 @@ import { getTheme } from "../../lib/utils/theme";
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
     body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
@@ -122,18 +133,18 @@ const parseCSSProp = (cssStr = "", prop) => {
 const THEMES = {
 	ink: {
 		name: "Ink",
-		label: "Warm editorial · Serif",
+		label: "Warm editorial · Sans",
 		palette: ["#F7F5F0", "#1A1A1A", "#C17B2F", "#7A7570"],
 		fontUrl:
-			"https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap",
+			"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
 		bodyFont: "'Outfit', sans-serif",
 		bg: "#F7F5F0",
 		text: "#3A3530",
 		container:
 			"max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Outfit',sans-serif;",
-		h1: "font-family:'Instrument Serif',serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
-		h2: "font-family:'Instrument Serif',serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
-		h3: "font-family:'Instrument Serif',serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
+		h1: "font-family:'Outfit',sans-serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
+		h2: "font-family:'Outfit',sans-serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
+		h3: "font-family:'Outfit',sans-serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:16px;line-height:1.85;color:#3A3530;margin:0 0 14px;",
 		blockquote:
 			"border-left:3px solid #C17B2F;padding:4px 0 4px 20px;color:#7A7570;font-style:italic;margin:20px 0;",
@@ -516,9 +527,32 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 </html>`;
 }
 
-/* ─── Draft card in sidebar ─── */
-function DraftCard({ draft, active, onClick, onDelete }) {
+/* ─── Asset type labels ─── */
+const ASSET_TYPE_LABELS = {
+	table: "Table",
+	draft: "Draft",
+	infographics: "Infographics",
+	landing_page: "Landing Page",
+	image_gallery: "Gallery",
+};
+
+/* ─── Item card in sidebar (drafts + tables + assets) ─── */
+function ItemCard({ item, active, onClick, onDelete }) {
 	const [hovering, setHovering] = useState(false);
+	const isTable = item.type === "table";
+	const isAssetWithDesc = ["table", "infographics", "landing_page", "image_gallery"].includes(item.type);
+	const tag = ASSET_TYPE_LABELS[item.type] || item.tag || "Draft";
+	const preview = isAssetWithDesc ? (item.description || "") : (item.preview || "");
+	const meta = isTable ? "" : `${item.words ?? 0}w`;
+	const date = item.date
+		? typeof item.date === "string"
+			? item.date
+			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+				}) ?? "")
+		: "";
 	return (
 		<motion.div
 			layout
@@ -579,7 +613,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							WebkitBoxOrient: "vertical",
 						}}
 					>
-						{draft.title}
+						{item.title || "Untitled"}
 					</p>
 					<p
 						style={{
@@ -593,7 +627,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							marginBottom: 6,
 						}}
 					>
-						{draft.preview}
+						{preview}
 					</p>
 					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 						<span
@@ -606,13 +640,15 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 								borderRadius: 100,
 							}}
 						>
-							{draft.tag}
+							{tag}
 						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>
-							{draft.words}w
-						</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>·</span>
-						<span style={{ fontSize: 10.5, color: T.muted }}>{draft.date}</span>
+						{meta && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
+						)}
+						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
+						{date && (
+							<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
+						)}
 					</div>
 				</div>
 				<AnimatePresence>
@@ -623,7 +659,7 @@ function DraftCard({ draft, active, onClick, onDelete }) {
 							exit={{ opacity: 0, scale: 0.8 }}
 							onClick={(e) => {
 								e.stopPropagation();
-								onDelete(draft.id);
+								onDelete(item.id);
 							}}
 							style={{
 								background: "none",
@@ -750,21 +786,29 @@ export default function DraftPage() {
 	/* Open tabs from URL query (?tabs=id1,id2,id3) — active tab = draftId from path */
 	const openTabs = (() => {
 		if (!draftId) return [];
-		const fromQuery = typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
+		const fromQuery =
+			typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
 		if (fromQuery.length === 0) return [draftId];
-		if (!fromQuery.includes(draftId)) return [draftId, ...fromQuery].slice(0, MAX_TABS);
+		if (!fromQuery.includes(draftId))
+			return [draftId, ...fromQuery].slice(0, MAX_TABS);
 		return fromQuery;
 	})();
 
 	const navigateWithTabs = (targetDraftId, newTabIds) => {
 		const ids = newTabIds.length > 0 ? newTabIds : [targetDraftId];
-		router.push(`/app/${targetDraftId}?tabs=${ids.join(",")}`, undefined, { shallow: false });
+		router.push(`/app/${targetDraftId}?tabs=${ids.join(",")}`, undefined, {
+			shallow: false,
+		});
 	};
 
 	const openDraftInTab = (id) => {
 		if (id === draftId) return;
-		const current = openTabs.includes(draftId) ? openTabs : [draftId, ...openTabs];
-		let next = current.includes(id) ? current : [id, ...current.filter((x) => x !== id)].slice(0, MAX_TABS);
+		const current = openTabs.includes(draftId)
+			? openTabs
+			: [draftId, ...openTabs];
+		let next = current.includes(id)
+			? current
+			: [id, ...current.filter((x) => x !== id)].slice(0, MAX_TABS);
 		navigateWithTabs(id, next);
 	};
 
@@ -779,10 +823,23 @@ export default function DraftPage() {
 		navigateWithTabs(target, next);
 	};
 
-	/* Lookup draft title by id (from drafts list or current draft) */
+	/* Lookup draft title by id (from drafts list, tables list, or current doc) */
 	const getTabTitle = (id) => {
 		if (draft?.id === id) return draft?.title || "Untitled";
-		const d = drafts.find((x) => x.id === id);
+		if (docData?.type === "table" && docData.doc?.id === id)
+			return docData.doc.title || "Untitled";
+		if (docData?.type === "infographics" && docData.doc?.id === id)
+			return docData.doc.title || "Infographics";
+		if (docData?.type === "landing_page" && docData.doc?.id === id)
+			return docData.doc.title || "Landing Page";
+		if (docData?.type === "image_gallery" && docData.doc?.id === id)
+			return docData.doc.title || "Image Gallery";
+		const d =
+			drafts.find((x) => x.id === id) ||
+			tables.find((x) => x.id === id) ||
+			infographics.find((x) => x.id === id) ||
+			landingPages.find((x) => x.id === id) ||
+			imageGalleries.find((x) => x.id === id);
 		return d?.title || "Untitled";
 	};
 
@@ -813,42 +870,75 @@ export default function DraftPage() {
 	const [previewData, setPreviewData] = useState({ title: "", htmlDoc: "" });
 	const [editorFont, setEditorFont] = useState("Outfit");
 	const [editorFontSize, setEditorFontSize] = useState(15);
+	const [localTableData, setLocalTableData] = useState(null);
 	const editorRef = useRef(null);
 	const titleRef = useRef(null);
 	const imageFileInputRef = useRef(null);
 	const editorContainerRef = useRef(null);
 
-	/* All drafts for sidebar */
-	const { data: drafts = [] } = useQuery({
-		queryKey: ["drafts", reduxUser?.uid],
-		queryFn: async () => {
-			const q = query(
-				collection(db, "drafts"),
-				where("userId", "==", reduxUser.uid),
-				orderBy("createdAt", "desc"),
-			);
-			const snap = await getDocs(q);
-			return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-		},
+	/* All assets (drafts + tables) — from users/uid/assets or fallback to drafts+tables */
+	const { data: items = [] } = useQuery({
+		queryKey: ["assets", reduxUser?.uid],
+		queryFn: () => listAssets(reduxUser.uid),
 		enabled: !!reduxUser,
 		staleTime: 2 * 60 * 1000,
 	});
 
-	/* Single draft by ID */
-	const { data: draft, isLoading: loadingDraft } = useQuery({
-		queryKey: ["draft", draftId],
+	const drafts = useMemo(
+		() => items.filter((i) => i.type === "draft"),
+		[items],
+	);
+	const tables = useMemo(
+		() => items.filter((i) => i.type === "table"),
+		[items],
+	);
+	const infographics = useMemo(
+		() => items.filter((i) => i.type === "infographics"),
+		[items],
+	);
+	const landingPages = useMemo(
+		() => items.filter((i) => i.type === "landing_page"),
+		[items],
+	);
+	const imageGalleries = useMemo(
+		() => items.filter((i) => i.type === "image_gallery"),
+		[items],
+	);
+
+	/* Single doc by ID — assets first, then drafts, then tables */
+	const { data: docData, isLoading: loadingDraft } = useQuery({
+		queryKey: ["doc", draftId, reduxUser?.uid],
 		queryFn: async () => {
-			const snap = await getDoc(doc(db, "drafts", draftId));
-			if (!snap.exists()) {
-				router.replace("/app");
-				return null;
-			}
-			return { id: snap.id, ...snap.data() };
+			const result = await getAsset(reduxUser.uid, draftId);
+			if (result) return result;
+			router.replace("/app");
+			return null;
 		},
-		enabled: !!draftId,
+		enabled: !!draftId && !!reduxUser,
 		staleTime: 5 * 60 * 1000,
 		retry: false,
 	});
+
+	const draft = docData?.type === "draft" ? docData.doc : null;
+	const tableDoc = docData?.type === "table" ? docData.doc : null;
+	const infographicsDoc = docData?.type === "infographics" ? docData.doc : null;
+	const landingPageDoc = docData?.type === "landing_page" ? docData.doc : null;
+	const imageGalleryDoc = docData?.type === "image_gallery" ? docData.doc : null;
+
+	useEffect(() => {
+		if (tableDoc) {
+			setLocalTableData({
+				title: tableDoc.title,
+				description: tableDoc.description,
+				columns: tableDoc.columns || [],
+				rows: tableDoc.rows || [],
+				sourceUrls: tableDoc.sourceUrls || [],
+				prompt: tableDoc.prompt || "",
+			});
+		} else {
+			setLocalTableData(null);
+		}
+	}, [draftId, tableDoc?.id]);
 
 	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
@@ -908,11 +998,11 @@ export default function DraftPage() {
 			.map((line) => {
 				if (/\x01BLK\d+\x01/.test(line)) return restore(line);
 				if (line.startsWith("### "))
-					return `<h3 style="font-family:'Instrument Serif',serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
+					return `<h3 style="font-family:'Outfit',sans-serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
 				if (line.startsWith("## "))
-					return `<h2 style="font-family:'Instrument Serif',serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
+					return `<h2 style="font-family:'Outfit',sans-serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
 				if (line.startsWith("# "))
-					return `<h1 style="font-family:'Instrument Serif',serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
+					return `<h1 style="font-family:'Outfit',sans-serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
 				if (line.trim() === "") return "<br/>";
 				return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
 			})
@@ -922,9 +1012,12 @@ export default function DraftPage() {
 	/* Sync tabs to URL when we have draftId but no tabs query (e.g. direct link) */
 	useEffect(() => {
 		if (!draftId || !router.isReady) return;
-		const fromQuery = typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
+		const fromQuery =
+			typeof tabsQuery === "string" ? tabsQuery.split(",").filter(Boolean) : [];
 		if (fromQuery.length === 0 && openTabs.length > 0) {
-			router.replace(`/app/${draftId}?tabs=${openTabs.join(",")}`, undefined, { shallow: true });
+			router.replace(`/app/${draftId}?tabs=${openTabs.join(",")}`, undefined, {
+				shallow: true,
+			});
 		}
 	}, [draftId, router.isReady, tabsQuery]);
 
@@ -952,7 +1045,12 @@ export default function DraftPage() {
 		if (!draftId) return;
 		try {
 			const html = editorRef.current?.innerHTML || "";
-			await updateDoc(doc(db, "drafts", draftId), { body: html });
+			await updateAsset(
+				reduxUser.uid,
+				draftId,
+				{ body: html },
+				docData?.source || "drafts",
+			);
 		} catch (e) {
 			console.error("Save failed", e);
 		}
@@ -993,11 +1091,16 @@ export default function DraftPage() {
 				insertImageOrVideo(dataUrl, false);
 				/* Upload in background and replace base64 with Firebase URL */
 				if (reduxUser?.uid) {
-					uploadFile(file, `users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${file.name.split(".").pop() || "png"}`)
+					uploadFile(
+						file,
+						`users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${file.name.split(".").pop() || "png"}`,
+					)
 						.then((firebaseUrl) => {
 							const html = editorRef.current?.innerHTML || "";
 							if (html.includes(dataUrl)) {
-								editorRef.current.innerHTML = html.split(dataUrl).join(firebaseUrl);
+								editorRef.current.innerHTML = html
+									.split(dataUrl)
+									.join(firebaseUrl);
 							}
 						})
 						.catch((err) => {
@@ -1113,7 +1216,8 @@ export default function DraftPage() {
 	useEffect(() => {
 		if (!imageDropdownOpen) return;
 		const close = (e) => {
-			if (!e.target.closest("[data-image-dropdown]")) setImageDropdownOpen(false);
+			if (!e.target.closest("[data-image-dropdown]"))
+				setImageDropdownOpen(false);
 		};
 		document.addEventListener("mousedown", close);
 		return () => document.removeEventListener("mousedown", close);
@@ -1152,7 +1256,10 @@ export default function DraftPage() {
 				if (rect.width === 0 && rect.height === 0) return;
 				setSelectionDropdown({
 					text,
-					x: Math.max(8, Math.min(rect.left + rect.width / 2 - 200, window.innerWidth - 420)),
+					x: Math.max(
+						8,
+						Math.min(rect.left + rect.width / 2 - 200, window.innerWidth - 420),
+					),
 					top: rect.top - 48,
 				});
 			} catch {
@@ -1167,9 +1274,13 @@ export default function DraftPage() {
 	useEffect(() => {
 		if (!selectionDropdown) return;
 		const close = (e) => {
-			if (!e.target.closest("[data-selection-dropdown]")) setSelectionDropdown(null);
+			if (!e.target.closest("[data-selection-dropdown]"))
+				setSelectionDropdown(null);
 		};
-		const t = setTimeout(() => document.addEventListener("mousedown", close), 50);
+		const t = setTimeout(
+			() => document.addEventListener("mousedown", close),
+			50,
+		);
 		return () => {
 			clearTimeout(t);
 			document.removeEventListener("mousedown", close);
@@ -1186,7 +1297,10 @@ export default function DraftPage() {
 			if (!e.target.closest("[data-slash-command]")) setSlashCommand(null);
 		};
 		document.addEventListener("keydown", onKey);
-		const t = setTimeout(() => document.addEventListener("mousedown", close), 50);
+		const t = setTimeout(
+			() => document.addEventListener("mousedown", close),
+			50,
+		);
 		return () => {
 			document.removeEventListener("keydown", onKey);
 			clearTimeout(t);
@@ -1238,8 +1352,13 @@ export default function DraftPage() {
 
 	const confirmDelete = async () => {
 		try {
-			await deleteDoc(doc(db, "drafts", deleteConfirm));
-			queryClient.setQueryData(["drafts", reduxUser?.uid], (old = []) =>
+			const item = items.find((i) => i.id === deleteConfirm);
+			const isAsset =
+				["infographics", "landing_page", "image_gallery"].includes(item?.type) ||
+				tables.some((t) => t.id === deleteConfirm);
+			const source = item?.source || (isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
+			await deleteAsset(reduxUser.uid, deleteConfirm, source);
+			queryClient.setQueryData(["assets", reduxUser?.uid], (old = []) =>
 				old.filter((d) => d.id !== deleteConfirm),
 			);
 			if (deleteConfirm === draftId) {
@@ -1262,15 +1381,37 @@ export default function DraftPage() {
 		setTimeout(() => setCopiedTheme(null), 2200);
 	};
 
-	const filtered = drafts.filter(
-		(d) =>
-			d.title?.toLowerCase().includes(search.toLowerCase()) ||
-			d.preview?.toLowerCase().includes(search.toLowerCase()),
-	);
+	const filtered = items.filter((i) => {
+		const q = search.toLowerCase().trim();
+		if (!q) return true;
+		const title = (i.title || "").toLowerCase();
+		const preview = (i.preview || i.description || "").toLowerCase();
+		const type = (i.type || "").toLowerCase();
+		const tag = (ASSET_TYPE_LABELS[i.type] || i.tag || "Draft").toLowerCase();
+		const format = (i.format || "").toLowerCase();
+		const prompt = (i.prompt || "").toLowerCase();
+		return (
+			title.includes(q) ||
+			preview.includes(q) ||
+			type.includes(q) ||
+			tag.includes(q) ||
+			format.includes(q) ||
+			prompt.includes(q)
+		);
+	});
 
-	const sourceUrl = Array.isArray(draft?.urls)
-		? draft.urls[0] || ""
-		: draft?.url || "";
+	const asset =
+		draft ||
+		(docData?.type === "table" ? docData.doc : null) ||
+		(docData?.type === "infographics" ? docData.doc : null) ||
+		(docData?.type === "landing_page" ? docData.doc : null) ||
+		(docData?.type === "image_gallery" ? docData.doc : null);
+	const sourceUrl = Array.isArray(asset?.urls)
+		? asset.urls[0] || ""
+		: Array.isArray(asset?.sourceUrls)
+			? asset.sourceUrls[0] || ""
+			: asset?.url || "";
+	const assetPrompt = asset?.prompt || "";
 
 	return (
 		<div
@@ -1304,7 +1445,7 @@ export default function DraftPage() {
 				<a
 					href="/"
 					style={{
-						fontFamily: "'Instrument Serif',serif",
+						fontFamily: "",
 						fontSize: 20,
 						color: T.accent,
 						textDecoration: "none",
@@ -1617,7 +1758,7 @@ export default function DraftPage() {
 									<input
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
-										placeholder="Search drafts…"
+										placeholder="Search drafts, tables, blog, scrape…"
 										style={{
 											width: "100%",
 											background: T.surface,
@@ -1649,13 +1790,13 @@ export default function DraftPage() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts found</p>
+											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
 										</motion.div>
 									) : (
 										filtered.map((d) => (
-											<DraftCard
+											<ItemCard
 												key={d.id}
-												draft={d}
+												item={d}
 												active={d.id === draftId}
 												onClick={() => openDraftInTab(d.id)}
 												onDelete={handleDelete}
@@ -1768,7 +1909,13 @@ export default function DraftPage() {
 						minWidth: 0,
 					}}
 				>
-					{loadingDraft && !draft && draftId && (
+					{loadingDraft &&
+						!draft &&
+						!tableDoc &&
+						!infographicsDoc &&
+						!landingPageDoc &&
+						!imageGalleryDoc &&
+						draftId && (
 						<div
 							style={{
 								flex: 1,
@@ -2334,6 +2481,28 @@ export default function DraftPage() {
 										</a>
 									</>
 								)}
+								{assetPrompt && (
+									<>
+										<div
+											style={{ width: 1, height: 14, background: T.border }}
+										/>
+										<span
+											style={{
+												fontSize: 11,
+												color: T.muted,
+												maxWidth: 200,
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+											}}
+											title={assetPrompt}
+										>
+											{assetPrompt.length > 40
+												? assetPrompt.slice(0, 37) + "…"
+												: assetPrompt}
+										</span>
+									</>
+								)}
 
 								<div style={{ flex: 1 }} />
 								<span style={{ fontSize: 12, color: T.muted }}>
@@ -2476,15 +2645,13 @@ export default function DraftPage() {
 												marginBottom: 8,
 												minHeight: 36,
 												fontFamily:
-													editorFont === "Instrument Serif"
-														? "'Instrument Serif', serif"
-														: editorFont === "Inter"
-															? "'Inter', sans-serif"
-															: editorFont === "Georgia"
-																? "Georgia, serif"
-																: editorFont === "system-ui"
-																	? "system-ui, sans-serif"
-																	: "'Outfit', sans-serif",
+													editorFont === "Inter"
+														? "'Inter', sans-serif"
+														: editorFont === "Georgia"
+															? "Georgia, serif"
+															: editorFont === "system-ui"
+																? "system-ui, sans-serif"
+																: "'Outfit', sans-serif",
 											}}
 											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
 										/>
@@ -2513,9 +2680,6 @@ export default function DraftPage() {
 												}}
 											>
 												<option value="Outfit">Outfit</option>
-												<option value="Instrument Serif">
-													Instrument Serif
-												</option>
 												<option value="Inter">Inter</option>
 												<option value="Georgia">Georgia</option>
 												<option value="system-ui">System</option>
@@ -2616,7 +2780,10 @@ export default function DraftPage() {
 												const rect = range.getBoundingClientRect();
 												if (rect.width === 0 && rect.height === 0) return;
 												setSlashCommand({
-													x: Math.max(12, Math.min(rect.left, window.innerWidth - 280)),
+													x: Math.max(
+														12,
+														Math.min(rect.left, window.innerWidth - 280),
+													),
 													y: rect.bottom + 4,
 												});
 											}
@@ -2632,15 +2799,13 @@ export default function DraftPage() {
 											lineHeight: 1.8,
 											color: "#3A3530",
 											fontFamily:
-												editorFont === "Instrument Serif"
-													? "'Instrument Serif', serif"
-													: editorFont === "Inter"
-														? "'Inter', sans-serif"
-														: editorFont === "Georgia"
-															? "Georgia, serif"
-															: editorFont === "system-ui"
-																? "system-ui, sans-serif"
-																: "'Outfit', sans-serif",
+												editorFont === "Inter"
+													? "'Inter', sans-serif"
+													: editorFont === "Georgia"
+														? "Georgia, serif"
+														: editorFont === "system-ui"
+															? "system-ui, sans-serif"
+															: "'Outfit', sans-serif",
 										}}
 									/>
 									{/* Slash command dropdown */}
@@ -2757,8 +2922,16 @@ export default function DraftPage() {
 													{ id: "h1", label: "Heading 1", icon: "H₁" },
 													{ id: "h2", label: "Heading 2", icon: "H₂" },
 													{ id: "h3", label: "Heading 3", icon: "H₃" },
-													{ id: "bullet", label: "Bullet List", icon: Icons.list },
-													{ id: "numbered", label: "Numbered List", icon: Icons.list },
+													{
+														id: "bullet",
+														label: "Bullet List",
+														icon: Icons.list,
+													},
+													{
+														id: "numbered",
+														label: "Numbered List",
+														icon: Icons.list,
+													},
 													{ id: "todo", label: "To-do list", icon: "☐" },
 												].map(({ id, label, icon }) => (
 													<motion.button
@@ -2782,8 +2955,18 @@ export default function DraftPage() {
 															textAlign: "left",
 														}}
 													>
-														{typeof icon === "string" && !icon.startsWith("M") ? (
-															<span style={{ fontSize: 14, fontWeight: 600, width: 20, textAlign: "center" }}>{icon}</span>
+														{typeof icon === "string" &&
+														!icon.startsWith("M") ? (
+															<span
+																style={{
+																	fontSize: 14,
+																	fontWeight: 600,
+																	width: 20,
+																	textAlign: "center",
+																}}
+															>
+																{icon}
+															</span>
 														) : (
 															<Icon d={icon} size={16} stroke={T.muted} />
 														)}
@@ -2907,37 +3090,45 @@ export default function DraftPage() {
 														margin: "0 2px",
 													}}
 												/>
-												{[{ cmd: "p", label: "Text" }, { cmd: "h1", label: "H1" }, { cmd: "h2", label: "H2" }, { cmd: "h3", label: "H3" }, { cmd: "ul", label: "• List" }, { cmd: "ol", label: "1. List" }].map(
-													({ cmd, label }) => (
-														<motion.button
-															key={cmd}
-															whileHover={{ background: "#F0ECE5" }}
-															whileTap={{ scale: 0.96 }}
-															onMouseDown={(e) => e.preventDefault()}
-															onClick={() => {
-																if (cmd === "ul") document.execCommand("insertUnorderedList");
-																else if (cmd === "ol") document.execCommand("insertOrderedList");
-																else document.execCommand("formatBlock", false, cmd);
-																setSelectionDropdown(null);
-																countWords();
-															}}
-															style={{
-																display: "flex",
-																alignItems: "center",
-																padding: "6px 8px",
-																border: "none",
-																borderRadius: 6,
-																background: "none",
-																fontSize: 12,
-																fontWeight: 600,
-																color: T.accent,
-																cursor: "pointer",
-															}}
-														>
-															{label}
-														</motion.button>
-													),
-												)}
+												{[
+													{ cmd: "p", label: "Text" },
+													{ cmd: "h1", label: "H1" },
+													{ cmd: "h2", label: "H2" },
+													{ cmd: "h3", label: "H3" },
+													{ cmd: "ul", label: "• List" },
+													{ cmd: "ol", label: "1. List" },
+												].map(({ cmd, label }) => (
+													<motion.button
+														key={cmd}
+														whileHover={{ background: "#F0ECE5" }}
+														whileTap={{ scale: 0.96 }}
+														onMouseDown={(e) => e.preventDefault()}
+														onClick={() => {
+															if (cmd === "ul")
+																document.execCommand("insertUnorderedList");
+															else if (cmd === "ol")
+																document.execCommand("insertOrderedList");
+															else
+																document.execCommand("formatBlock", false, cmd);
+															setSelectionDropdown(null);
+															countWords();
+														}}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															padding: "6px 8px",
+															border: "none",
+															borderRadius: 6,
+															background: "none",
+															fontSize: 12,
+															fontWeight: 600,
+															color: T.accent,
+															cursor: "pointer",
+														}}
+													>
+														{label}
+													</motion.button>
+												))}
 												<div
 													style={{
 														width: 1,
@@ -3172,6 +3363,97 @@ export default function DraftPage() {
 							</div>
 						</motion.div>
 					)}
+					{tableDoc && localTableData && (
+						<motion.div
+							key={`table-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<div
+								style={{
+									flex: 1,
+									overflowY: "auto",
+									maxWidth: 1100,
+									margin: "0 auto",
+									width: "100%",
+									padding: "28px 20px",
+								}}
+							>
+								<TableView
+									tableId={draftId}
+									tableData={localTableData}
+									setTableData={setLocalTableData}
+									reduxUser={reduxUser}
+									tableDocRef={
+										docData?.source === "assets" && reduxUser?.uid
+											? assetRef(reduxUser.uid, draftId)
+											: null
+									}
+								/>
+							</div>
+						</motion.div>
+					)}
+					{infographicsDoc && (
+						<motion.div
+							key={`infographics-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<InfographicsAssetView
+								doc={infographicsDoc}
+								userId={reduxUser?.uid}
+								assetId={draftId}
+								docSource={docData?.source || "assets"}
+								onUpdate={() => queryClient.invalidateQueries(["doc", draftId, reduxUser?.uid])}
+							/>
+						</motion.div>
+					)}
+					{landingPageDoc && (
+						<motion.div
+							key={`landing-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<LandingPageAssetView doc={landingPageDoc} />
+						</motion.div>
+					)}
+					{imageGalleryDoc && (
+						<motion.div
+							key={`gallery-${draftId}`}
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.2 }}
+							style={{
+								flex: 1,
+								display: "flex",
+								flexDirection: "column",
+								overflow: "hidden",
+							}}
+						>
+							<ImageGalleryAssetView doc={imageGalleryDoc} />
+						</motion.div>
+					)}
 				</div>
 
 				{/* ── RIGHT PANEL — AI Chat (inline, not overlay) ── */}
@@ -3275,7 +3557,7 @@ export default function DraftPage() {
 													fontSize: 15,
 													fontWeight: 700,
 													color: T.accent,
-													fontFamily: "'Instrument Serif',serif",
+													fontFamily: "",
 												}}
 											>
 												Export themes
@@ -3733,7 +4015,7 @@ export default function DraftPage() {
 								position: "fixed",
 								top: "50%",
 								left: "50%",
-								transform: "translate(-50%,-50%)",
+								transform: "translate(-40%,-40%)",
 								background: T.surface,
 								border: `1px solid ${T.border}`,
 								borderRadius: 16,
@@ -3749,7 +4031,6 @@ export default function DraftPage() {
 									fontWeight: 700,
 									color: T.accent,
 									marginBottom: 8,
-									fontFamily: "'Instrument Serif',serif",
 								}}
 							>
 								Delete this draft?
@@ -3816,6 +4097,7 @@ export default function DraftPage() {
 				title={draft?.title || "Draft"}
 				userId={reduxUser?.uid || ""}
 				draftId={draftId}
+				docSource={docData?.source || "drafts"}
 				savedInfographics={draft?.infographics || []}
 				onInsertToEditor={(html) => {
 					editorRef.current?.focus();

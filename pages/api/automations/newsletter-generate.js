@@ -3,13 +3,17 @@ import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
 import { scrapeUrls } from "../../../lib/utils/scrapeApi";
+import {
+	FORMATS,
+	buildNewsletterSystemPrompt,
+	buildNewsletterUserContent,
+} from "../../../lib/prompts/newsletter";
 
 export const config = {
 	api: { bodyParser: { sizeLimit: "1mb" } },
 };
 
 const urlRegex = /^https?:\/\/\S+$/i;
-
 const MAX_URLS = 10;
 const MAX_CHARS_PER_SOURCE = 15000;
 
@@ -172,6 +176,7 @@ export default async function handler(req, res) {
 
 		const {
 			urls,
+			sources: preScrapedSources,
 			prompt,
 			model: requestedModel,
 			format = "substack",
@@ -223,36 +228,50 @@ export default async function handler(req, res) {
 			});
 		}
 
-		if (urlList.length > MAX_URLS) {
+		const hasPreScrapedForValidation =
+			Array.isArray(preScrapedSources) &&
+			preScrapedSources.length > 0 &&
+			preScrapedSources.every(
+				(s) => s && typeof s.url === "string" && typeof s.markdown === "string"
+			);
+
+		if (!hasPreScrapedForValidation && urlList.length > MAX_URLS) {
 			return res.status(400).json({
 				error: `Maximum ${MAX_URLS} URLs allowed per request`,
 			});
 		}
 
-		if (urlList.some((u) => !urlRegex.test(u))) {
+		if (urlList.length > 0 && urlList.some((u) => !urlRegex.test(u))) {
 			return res.status(400).json({ error: "One or more URLs are invalid" });
 		}
 
-		// SSRF protection — block localhost, private IPs, file://
-		const urlValidation = validateUrls(urlList);
-		if (!urlValidation.valid) {
-			return res.status(400).json({ error: urlValidation.error });
+		if (urlList.length > 0) {
+			const urlValidation = validateUrls(urlList);
+			if (!urlValidation.valid) {
+				return res.status(400).json({ error: urlValidation.error });
+			}
 		}
 
-		// Scrape all URLs — uses batch endpoint when multiple, single when one
+		// Use pre-scraped sources if provided (from InkAgent), otherwise scrape
 		let sources = [];
 		let scrapeErrors = [];
 
-		if (urlList.length > 0) {
+		if (hasPreScrapedForValidation) {
+			sources = preScrapedSources.map((s) => ({
+				url: s.url,
+				markdown: s.markdown || "",
+				title: s.title || "",
+				links: s.links || [],
+			}));
+		} else if (urlList.length > 0) {
 			const scraped = await scrapeUrls({
 				urls: urlList,
-				apiKey: "apiKey",
+				apiKey: process.env.BUILDSAAS_API_KEY || "apiKey",
 				includeImages: true,
 			});
 			sources = scraped.sources;
 			scrapeErrors = scraped.scrapeErrors;
 
-			// All URLs were provided but every one failed
 			if (sources.length === 0) {
 				return res.status(422).json({
 					error: "All URL scrapes failed. Please check the URLs and try again.",
@@ -260,14 +279,6 @@ export default async function handler(req, res) {
 				});
 			}
 		}
-
-		// Build combined source content with per-source char limit
-		const combined = sources
-			.map((s, idx) => {
-				const titleLine = s.title ? `Title: ${s.title}\n` : "";
-				return `SOURCE ${idx + 1}\nURL: ${s.url}\n${titleLine}\nCONTENT (markdown):\n${clampText(s.markdown, MAX_CHARS_PER_SOURCE)}\n`;
-			})
-			.join("\n\n---\n\n");
 
 		const model =
 			String(requestedModel || "").trim() ||
@@ -280,45 +291,8 @@ export default async function handler(req, res) {
 		const appTitle = process.env.OPENROUTER_APP_TITLE || "Inkgest";
 
 		const formatConfig = FORMATS[format];
-		const styleNote = STYLES[style] ? `\nTONE: ${STYLES[style]}` : "";
-		const sourceInstruction = sources.length
-			? "Generate the content based ONLY on the sources provided. If a claim isn't in the sources, omit it."
-			: "Generate the content based ONLY on the user's prompt (no sources provided). Don't invent specific facts or quote URLs you didn't read.";
-
-		const BLOCK_SYNTAX = `
-RICH CONTENT BLOCKS — use these in your output where they add value:
-
-Code blocks (standard markdown fencing with language identifier):
-\`\`\`javascript
-const example = "code here";
-\`\`\`
-Supported languages: javascript, typescript, python, css, html, bash, json, sql
-
-Callout blocks (for highlights, warnings, tips):
-:::info
-An informational note or tip.
-:::
-
-:::warning
-Something the reader should be careful about.
-:::
-
-:::success
-A positive outcome or confirmation.
-:::
-
-:::danger
-A critical error or destructive-action warning.
-:::
-
-Use callouts and code blocks sparingly — only when they genuinely improve clarity.`;
-
-		const system = `${formatConfig.system}\n${sourceInstruction}${styleNote}\nOutput in Markdown. You may use the following rich block types where appropriate:\n${BLOCK_SYNTAX}`;
-
-		const user = [
-			`USER PROMPT:\n${safePrompt}`,
-			...(sources.length ? ["", "SOURCES:\n" + combined] : []),
-		].join("\n");
+		const system = buildNewsletterSystemPrompt(format, style, sources.length > 0);
+		const user = buildNewsletterUserContent(safePrompt, sources);
 
 		const { content } = await openRouterChat({
 			apiKey: openRouterKey,

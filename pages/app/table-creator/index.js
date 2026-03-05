@@ -12,21 +12,20 @@ import {
 } from "@tanstack/react-table";
 import {
 	collection,
-	addDoc,
 	getDocs,
 	doc,
 	query,
 	where,
-	serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/config/firebase";
+import { listAssets, createTable } from "../../../lib/api/userAssets";
 import { validateUrls } from "../../../lib/utils/urlAllowlist";
 import { getTheme } from "../../../lib/utils/theme";
 
 /* ─── Fonts & global styles ────────────────────────────────────────────────── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -199,12 +198,10 @@ export default function TableCreatorIndex() {
 		}
 		const load = async () => {
 			try {
-				const q = query(
-					collection(db, "tables"),
-					where("userId", "==", reduxUser.uid),
-				);
-				const snap = await getDocs(q);
-				const tables = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+				const items = await listAssets(reduxUser.uid);
+				const tables = items
+					.filter((i) => i.type === "table")
+					.map((t) => ({ id: t.id, title: t.title, ...t }));
 				tables.sort((a, b) => {
 					const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
 					const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
@@ -377,20 +374,18 @@ export default function TableCreatorIndex() {
 		if (!displayTableData || !reduxUser || saving) return;
 		setSaving(true);
 		try {
-			const docRef = await addDoc(collection(db, "tables"), {
-				userId: reduxUser.uid,
+			const { id } = await createTable(reduxUser.uid, {
 				title: displayTableData.title || "Untitled Table",
 				description: displayTableData.description || "",
 				columns: displayTableData.columns || [],
 				rows: displayTableData.rows || [],
 				sourceUrls: displayTableData.sourceUrls || [displayTableData.sourceUrl].filter(Boolean),
-				createdAt: serverTimestamp(),
 			});
 			setSavedTables((prev) => [
-				{ id: docRef.id, title: displayTableData.title, createdAt: new Date() },
+				{ id, title: displayTableData.title, createdAt: new Date() },
 				...prev,
 			]);
-			router.push(`/app/table-creator/${docRef.id}`);
+			router.push(`/app/${id}`);
 		} catch (e) {
 			console.error("Save failed", e);
 		} finally {
@@ -399,7 +394,7 @@ export default function TableCreatorIndex() {
 	}, [displayTableData, reduxUser, saving, router]);
 
 	const handleOpenTable = useCallback((id) => {
-		router.push(`/app/table-creator/${id}`);
+		router.push(`/app/${id}`);
 	}, [router]);
 
 	const visibleRowCount = table.getFilteredRowModel().rows.length;
