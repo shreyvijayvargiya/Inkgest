@@ -6,17 +6,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import { db, auth } from "../../lib/config/firebase";
 import {
-	collection,
-	addDoc,
-	getDocs,
-	deleteDoc,
-	doc,
-	query,
-	orderBy,
-	where,
-	serverTimestamp,
-} from "firebase/firestore";
-import {
 	listAssets,
 	createDraft,
 	createTable,
@@ -35,6 +24,12 @@ import { getTheme } from "../../lib/utils/theme";
 import { inferFormatFromPrompt } from "../../lib/prompts/newsletter";
 import { INKGEST_AGENT_URL } from "../../lib/config/agent";
 import { deductCredits } from "../../lib/api/deductCredits";
+import { extractAgentTotalTokens } from "../../lib/utils/agentTokens";
+import {
+	getAgentTaskArticleBody,
+	isArticleLikeAgentTask,
+	displayTypeForArticleTask,
+} from "../../lib/utils/agentArticleTask";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -460,6 +455,8 @@ export default function inkgestApp() {
 	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
 	const [agentError, setAgentError] = useState(null);
 	const [agentThinking, setAgentThinking] = useState(""); // Streaming "thinking" text from SSE
+	const [agentRunPrompt, setAgentRunPrompt] = useState("");
+	const [agentTotalTokens, setAgentTotalTokens] = useState(null);
 	const agentOutputRef = useRef(null);
 	const agentAbortRef = useRef(null);
 
@@ -799,7 +796,8 @@ export default function inkgestApp() {
 		setAgentCompletedTasks([]);
 		setAgentThinking("");
 		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
-		setAgentPrompt("");
+		setAgentRunPrompt(promptText);
+		setAgentTotalTokens(null);
 		const abortController = new AbortController();
 		agentAbortRef.current = abortController;
 		try {
@@ -836,6 +834,8 @@ export default function inkgestApp() {
 						{ label: data.message || "Done.", status: "done" },
 					]);
 				}
+				const tok = extractAgentTotalTokens(data);
+				if (tok != null) setAgentTotalTokens(tok);
 				if (reduxUser)
 					getUserCredits(reduxUser.uid)
 						.then(setCredits)
@@ -1001,6 +1001,8 @@ export default function inkgestApp() {
 									? 1
 									: 0;
 						if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
+						const tok = extractAgentTotalTokens(data);
+						if (tok != null) setAgentTotalTokens(tok);
 						if (reduxUser)
 							getUserCredits(reduxUser.uid)
 								.then(setCredits)
@@ -1023,6 +1025,8 @@ export default function inkgestApp() {
 										? 1
 										: 0;
 							if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
+							const tok = extractAgentTotalTokens(data);
+							if (tok != null) setAgentTotalTokens(tok);
 						}
 						if (reduxUser)
 							getUserCredits(reduxUser.uid)
@@ -1042,6 +1046,7 @@ export default function inkgestApp() {
 			if (isAborted) {
 				setAgentError(null);
 				setAgentRunSteps([]);
+				setAgentTotalTokens(null);
 				return;
 			}
 			const errMsg = e?.message || "Agent failed";
@@ -1060,18 +1065,12 @@ export default function inkgestApp() {
 	const processAgentExecuted = async (executed, userPrompt = "") => {
 		const newTasks = [];
 		const inferred = inferFormatFromPrompt(userPrompt);
-		const CONTENT_TYPES = [
-			"newsletter",
-			"linkedin",
-			"blog_post",
-			"blog",
-			"twitter_thread",
-			"email_digest",
-		];
 		for (const task of executed) {
-			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
+			const articleBody = getAgentTaskArticleBody(task);
+			const isContentDraft =
+				isArticleLikeAgentTask(task.type) && articleBody.length > 0;
 			if (isContentDraft) {
-				const lines = (task.content || "").split("\n");
+				const lines = articleBody.split("\n");
 				const titleLine = lines.find(
 					(l) => l.startsWith("# ") || l.startsWith("## "),
 				);
@@ -1089,10 +1088,10 @@ export default function inkgestApp() {
 				const draft = {
 					title,
 					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
-					body: task.content,
-					urls: task.params?.urls || [],
+					body: articleBody,
+					urls: task.params?.urls || task.urls || task.sourceUrls || [],
 					prompt: userPrompt || "",
-					words: task.content.trim().split(/\s+/).length,
+					words: articleBody.trim().split(/\s+/).filter(Boolean).length,
 					date: new Date().toLocaleDateString("en-US", {
 						weekday: "short",
 						month: "short",
@@ -1104,8 +1103,8 @@ export default function inkgestApp() {
 				const { id } = await createDraft(reduxUser.uid, draft);
 				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				newTasks.push({
-					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
-					label: task.label,
+					type: displayTypeForArticleTask(task.type),
+					label: task.label || task.taskLabel,
 					id,
 					path: `/app/${id}`,
 				});
@@ -2122,7 +2121,8 @@ export default function inkgestApp() {
 								{/* InkAgent output card — below Send button */}
 								{(agentRunSteps.length > 0 ||
 									agentCompletedTasks.length > 0 ||
-									agentThinking) && (
+									agentThinking ||
+									agentLoading) && (
 									<motion.div
 										ref={agentOutputRef}
 										initial={{ opacity: 0, y: -8 }}
@@ -2148,6 +2148,44 @@ export default function inkgestApp() {
 										>
 											<span style={{ color: T.warm }}>✦</span> InkAgent
 										</p>
+										{agentRunPrompt && (
+											<div
+												style={{
+													marginBottom: 14,
+													padding: "10px 12px",
+													background: T.base,
+													border: `1px solid ${T.border}`,
+													borderRadius: 10,
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														textTransform: "uppercase",
+														letterSpacing: "0.06em",
+														color: T.muted,
+														marginBottom: 6,
+													}}
+												>
+													Your prompt
+												</p>
+												<p
+													style={{
+														fontSize: 13,
+														lineHeight: 1.5,
+														color: T.accent,
+														maxHeight: 80,
+														overflowY: "auto",
+														whiteSpace: "pre-wrap",
+														wordBreak: "break-word",
+													}}
+												>
+													{agentRunPrompt}
+												</p>
+												
+											</div>
+										)}
 										{agentThinking && (
 											<div
 												style={{
@@ -2311,7 +2349,7 @@ export default function inkgestApp() {
 																		? "📧"
 																		: t.type === "linkedin"
 																			? "💼"
-																			: t.type === "blog_post"
+																				: t.type === "blog_post"
 																				? "📝"
 																				: t.type === "twitter_thread"
 																					? "🐦"
@@ -2333,7 +2371,7 @@ export default function inkgestApp() {
 																		: t.type === "linkedin"
 																			? "LinkedIn"
 																			: t.type === "blog_post"
-																				? "Blog"
+																				? "Article"
 																				: t.type === "twitter_thread"
 																					? "Thread"
 																					: t.type === "email_digest"
@@ -2347,7 +2385,7 @@ export default function inkgestApp() {
 																									: t.type === "image_gallery"
 																										? "Gallery"
 																										: "Scrape"}
-																	: {t.label}
+																	{t.label ? ` · ${t.label}` : ""}
 																</span>
 															</span>
 															<span

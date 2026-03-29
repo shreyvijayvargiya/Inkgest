@@ -23,6 +23,12 @@ import { getTheme } from "../lib/utils/theme";
 import { inferFormatFromPrompt } from "../lib/prompts/newsletter";
 import { INKGEST_AGENT_URL } from "../lib/config/agent";
 import { deductCredits } from "../lib/api/deductCredits";
+import { extractAgentTotalTokens } from "../lib/utils/agentTokens";
+import {
+	getAgentTaskArticleBody,
+	isArticleLikeAgentTask,
+	displayTypeForArticleTask,
+} from "../lib/utils/agentArticleTask";
 import { SparkleIcon } from "lucide-react";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
@@ -225,6 +231,8 @@ function Hero() {
 	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
 	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
 	const [agentThinking, setAgentThinking] = useState("");
+	const [agentRunPrompt, setAgentRunPrompt] = useState("");
+	const [agentTotalTokens, setAgentTotalTokens] = useState(null);
 	const agentAbortRef = useRef(null);
 
 	const { scrollYProgress } = useScroll({
@@ -354,18 +362,12 @@ function Hero() {
 	const processAgentExecuted = async (executed, userPrompt = "") => {
 		const newTasks = [];
 		const inferred = inferFormatFromPrompt(userPrompt);
-		const CONTENT_TYPES = [
-			"newsletter",
-			"linkedin",
-			"blog_post",
-			"blog",
-			"twitter_thread",
-			"email_digest",
-		];
 		for (const task of executed) {
-			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
+			const articleBody = getAgentTaskArticleBody(task);
+			const isContentDraft =
+				isArticleLikeAgentTask(task.type) && articleBody.length > 0;
 			if (isContentDraft) {
-				const lines = (task.content || "").split("\n");
+				const lines = articleBody.split("\n");
 				const titleLine = lines.find(
 					(l) => l.startsWith("# ") || l.startsWith("## "),
 				);
@@ -383,10 +385,10 @@ function Hero() {
 				const draft = {
 					title,
 					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
-					body: task.content,
-					urls: task.params?.urls || [],
+					body: articleBody,
+					urls: task.params?.urls || task.urls || task.sourceUrls || [],
 					prompt: userPrompt || "",
-					words: task.content.trim().split(/\s+/).length,
+					words: articleBody.trim().split(/\s+/).filter(Boolean).length,
 					date: new Date().toLocaleDateString("en-US", {
 						weekday: "short",
 						month: "short",
@@ -397,8 +399,8 @@ function Hero() {
 				};
 				const { id } = await createDraft(reduxUser.uid, draft);
 				newTasks.push({
-					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
-					label: task.label,
+					type: displayTypeForArticleTask(task.type),
+					label: task.label || task.taskLabel,
 					id,
 					path: `/app/${id}`,
 				});
@@ -567,11 +569,6 @@ function Hero() {
 			}
 		}
 		setAgentCompletedTasks(newTasks);
-		if (newTasks.length === 1) {
-			router.push(newTasks[0].path);
-		} else if (newTasks.length > 1) {
-			router.push("/app");
-		}
 	};
 
 	const handleAgentSend = async () => {
@@ -592,7 +589,8 @@ function Hero() {
 		setAgentCompletedTasks([]);
 		setAgentThinking("");
 		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
-		setAgentPrompt("");
+		setAgentRunPrompt(promptText);
+		setAgentTotalTokens(null);
 		const abortController = new AbortController();
 		agentAbortRef.current = abortController;
 		try {
@@ -629,6 +627,8 @@ function Hero() {
 						{ label: data.message || "Done.", status: "done" },
 					]);
 				}
+				const tok = extractAgentTotalTokens(data);
+				if (tok != null) setAgentTotalTokens(tok);
 				return;
 			}
 			const reader = res.body.getReader();
@@ -789,6 +789,8 @@ function Hero() {
 									? 1
 									: 0;
 						if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
+						const tok = extractAgentTotalTokens(data);
+						if (tok != null) setAgentTotalTokens(tok);
 					}
 				}
 			}
@@ -807,6 +809,8 @@ function Hero() {
 										? 1
 										: 0;
 							if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
+							const tok = extractAgentTotalTokens(data);
+							if (tok != null) setAgentTotalTokens(tok);
 						}
 					} catch {
 						// ignore
@@ -822,6 +826,7 @@ function Hero() {
 			if (isAborted) {
 				setAgentError(null);
 				setAgentRunSteps([]);
+				setAgentTotalTokens(null);
 				return;
 			}
 			const errMsg = e?.message || "Agent failed";
@@ -1298,6 +1303,63 @@ function Hero() {
 						</div>
 					</div>
 
+					{agentRunPrompt &&
+						(agentLoading || agentThinking || agentRunSteps.length > 0) && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "10px 14px",
+								background: T.surface,
+								border: `1px solid ${T.border}`,
+								borderRadius: 10,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							<p
+								style={{
+									fontSize: 10,
+									fontWeight: 700,
+									textTransform: "uppercase",
+									letterSpacing: "0.06em",
+									color: T.muted,
+									marginBottom: 6,
+								}}
+							>
+								Your prompt
+							</p>
+							<p
+								style={{
+									fontSize: 13,
+									lineHeight: 1.5,
+									color: T.accent,
+									maxHeight: 72,
+									overflowY: "auto",
+									whiteSpace: "pre-wrap",
+									wordBreak: "break-word",
+								}}
+							>
+								{agentRunPrompt}
+							</p>
+							<p
+								style={{
+									fontSize: 12,
+									color: T.muted,
+									marginTop: 8,
+									marginBottom: 0,
+								}}
+							>
+								Total tokens:{" "}
+								{agentTotalTokens != null
+									? agentTotalTokens
+									: agentLoading
+										? "…"
+										: "—"}
+							</p>
+						</motion.div>
+					)}
+
 					{agentThinking && (
 						<motion.div
 							initial={{ opacity: 0, y: 4 }}
@@ -1400,6 +1462,130 @@ function Hero() {
 									)}
 								</div>
 							))}
+						</motion.div>
+					)}
+					{agentCompletedTasks.length > 0 && (
+						<motion.div
+							initial={{ opacity: 0, y: 4 }}
+							animate={{ opacity: 1, y: 0 }}
+							style={{
+								marginTop: 12,
+								padding: "12px 14px",
+								background: T.surface,
+								border: `1px solid ${T.border}`,
+								borderRadius: 10,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							<p
+								style={{
+									fontSize: 12,
+									color: T.muted,
+									marginBottom: 10,
+									fontWeight: 600,
+								}}
+							>
+								Open in editor
+							</p>
+							<div
+								style={{ display: "flex", flexDirection: "column", gap: 8 }}
+							>
+								{agentCompletedTasks.map((t, i) => (
+									<motion.a
+										key={i}
+										href={t.path}
+										onClick={(e) => {
+											e.preventDefault();
+											router.push(t.path);
+										}}
+										whileHover={{ x: 2, scale: 1.01 }}
+										whileTap={{ scale: 0.99 }}
+										style={{
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "space-between",
+											padding: "12px 14px",
+											background: T.base,
+											border: `1px solid ${T.border}`,
+											borderRadius: 10,
+											textDecoration: "none",
+											color: T.accent,
+											fontSize: 13,
+											fontWeight: 600,
+											cursor: "pointer",
+										}}
+									>
+										<span
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 8,
+												overflow: "hidden",
+											}}
+										>
+											<span style={{ fontSize: 14 }}>
+												{t.type === "newsletter"
+													? "📧"
+													: t.type === "linkedin"
+														? "💼"
+														: t.type === "blog_post"
+															? "📝"
+															: t.type === "twitter_thread"
+																? "🐦"
+																: t.type === "email_digest"
+																	? "📬"
+																	: t.type === "table"
+																		? "📊"
+																		: t.type === "infographics"
+																			? "📊"
+																			: t.type === "landing_page"
+																				? "🌐"
+																				: t.type === "image_gallery"
+																					? "🖼️"
+																					: "📄"}
+											</span>
+											<span
+												style={{
+													overflow: "hidden",
+													textOverflow: "ellipsis",
+													whiteSpace: "nowrap",
+												}}
+											>
+												{t.type === "newsletter"
+													? "Newsletter"
+													: t.type === "linkedin"
+														? "LinkedIn"
+														: t.type === "blog_post"
+															? "Article"
+															: t.type === "twitter_thread"
+																? "Thread"
+																: t.type === "email_digest"
+																	? "Digest"
+																	: t.type === "table"
+																		? "Table"
+																		: t.type === "infographics"
+																			? "Infographics"
+																			: t.type === "landing_page"
+																				? "Landing page"
+																				: t.type === "image_gallery"
+																					? "Gallery"
+																					: "Draft"}
+												{t.label ? ` · ${t.label}` : ""}
+											</span>
+										</span>
+										<span
+											style={{
+												fontSize: 12,
+												color: T.warm,
+												fontWeight: 700,
+												flexShrink: 0,
+											}}
+										>
+											Open →
+										</span>
+									</motion.a>
+								))}
+							</div>
 						</motion.div>
 					)}
 					{!agentLoading && agentCompletedTasks.length === 0 && (
