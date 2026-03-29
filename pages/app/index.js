@@ -22,7 +22,10 @@ import {
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
 import { inferFormatFromPrompt } from "../../lib/prompts/newsletter";
-import { INKGEST_AGENT_URL } from "../../lib/config/agent";
+import {
+	INKGEST_AGENT_URL,
+	inkgestAgentRequestHeaders,
+} from "../../lib/config/agent";
 import { deductCredits } from "../../lib/api/deductCredits";
 import { extractAgentTotalTokens } from "../../lib/utils/agentTokens";
 import {
@@ -805,7 +808,7 @@ export default function inkgestApp() {
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
 			const res = await fetch(INKGEST_AGENT_URL, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: inkgestAgentRequestHeaders(reduxUser?.uid),
 				body: JSON.stringify({ prompt: promptText, idToken }),
 				signal: abortController.signal,
 			});

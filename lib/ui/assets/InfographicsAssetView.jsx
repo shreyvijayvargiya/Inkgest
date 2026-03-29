@@ -15,7 +15,10 @@ import { motion } from "framer-motion";
 import { InfographicCard } from "../InfographicsModal";
 import { auth } from "../../config/firebase";
 import { updateAsset } from "../../api/userAssets";
-import { INKGEST_AGENT_URL } from "../../config/agent";
+import {
+	INKGEST_AGENT_URL,
+	inkgestAgentRequestHeaders,
+} from "../../config/agent";
 import { deductCredits } from "../../api/deductCredits";
 
 const T = {
@@ -91,7 +94,7 @@ export default function InfographicsAssetView({
 			const excludeTypes = infographics.map((ig) => ig.type);
 			const res = await fetch(INKGEST_AGENT_URL, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: inkgestAgentRequestHeaders(userId),
 				body: JSON.stringify({
 					content,
 					title: doc?.title || "Infographics",
