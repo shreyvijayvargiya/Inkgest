@@ -33,6 +33,7 @@ import {
 	isArticleLikeAgentTask,
 	displayTypeForArticleTask,
 } from "../../lib/utils/agentArticleTask";
+import SimpleBuilderTab from "../../lib/ui/SimpleBuilderTab";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -444,7 +445,7 @@ export default function inkgestApp() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
-	const [draftMode, setDraftMode] = useState("agent"); // "ai" | "scrape" | "blank" | "agent"
+	const [draftMode, setDraftMode] = useState("agent"); // "simple" | "agent" | "ai" | "scrape" | "blank"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
@@ -1775,6 +1776,57 @@ export default function inkgestApp() {
 							>
 								New draft
 							</h1>
+							<div
+								style={{
+									display: "flex",
+									gap: 8,
+									marginTop: 16,
+									flexWrap: "wrap",
+								}}
+							>
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={() => setDraftMode("simple")}
+									style={{
+										padding: "8px 14px",
+										borderRadius: 10,
+										border: `1.5px solid ${
+											draftMode === "simple" ? T.accent : T.border
+										}`,
+										background:
+											draftMode === "simple" ? T.surface : T.base,
+										color: T.accent,
+										fontWeight: 700,
+										fontSize: 13,
+										cursor: "pointer",
+									}}
+								>
+									Simple builder
+								</motion.button>
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={() => setDraftMode("agent")}
+									style={{
+										padding: "8px 14px",
+										borderRadius: 10,
+										border: `1.5px solid ${
+											draftMode === "agent" ? T.accent : T.border
+										}`,
+										background:
+											draftMode === "agent" ? T.surface : T.base,
+										color: T.accent,
+										fontWeight: 700,
+										fontSize: 13,
+										cursor: "pointer",
+									}}
+								>
+									AI builder
+								</motion.button>
+							</div>
 						</div>
 
 						{/* Not logged in info banner */}
@@ -1832,6 +1884,14 @@ export default function inkgestApp() {
 							credits={credits}
 							onUpgrade={() => router.push("/pricing")}
 						/>
+
+						{draftMode === "simple" && (
+							<SimpleBuilderTab
+								userId={reduxUser?.uid}
+								theme={T}
+								onLoginRequired={() => setLoginModalOpen(true)}
+							/>
+						)}
 
 						{/* ── INKAGENT MODE ── */}
 						{draftMode === "agent" && (
