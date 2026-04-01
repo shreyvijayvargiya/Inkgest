@@ -33,6 +33,7 @@ import {
 	isArticleLikeAgentTask,
 	displayTypeForArticleTask,
 } from "../../lib/utils/agentArticleTask";
+import SimpleBuilderTab from "../../lib/ui/SimpleBuilderTab";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -444,7 +445,7 @@ export default function inkgestApp() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
-	const [draftMode, setDraftMode] = useState("agent"); // "ai" | "scrape" | "blank" | "agent"
+	const [draftMode, setDraftMode] = useState("agent"); // "simple" | "agent" | "ai" | "scrape" | "blank"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
@@ -702,9 +703,12 @@ export default function inkgestApp() {
 		const content = typeof output === "string" ? output : "";
 		// Parse "--- Source N: URL ---" from combined scrape content
 		if (urls.length === 0 && content.includes("--- Source")) {
-			urls = [...content.matchAll(/--- Source \d+: (https?:\/\/[^\s]+) ---/g)].map((m) => m[1]);
+			urls = [
+				...content.matchAll(/--- Source \d+: (https?:\/\/[^\s]+) ---/g),
+			].map((m) => m[1]);
 		}
-		const isScrape = task.type === "scrape" || urls.length > 0 || content.length > 500;
+		const isScrape =
+			task.type === "scrape" || urls.length > 0 || content.length > 500;
 		const truncate = (str, words = TRUNCATE_WORDS) => {
 			const w = (str || "").trim().split(/\s+/).slice(0, words).join(" ");
 			return w + (str && str.trim().split(/\s+/).length > words ? "…" : "");
@@ -714,12 +718,32 @@ export default function inkgestApp() {
 				return (
 					<>
 						{urls.map((url) => (
-							<div key={url} style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+							<div
+								key={url}
+								style={{
+									marginBottom: 4,
+									display: "flex",
+									alignItems: "center",
+									gap: 6,
+								}}
+							>
 								<span style={{ color: "#16A34A", flexShrink: 0 }}>✓</span>
-								<span style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}>{url}</span>
+								<span
+									style={{
+										fontSize: 11,
+										color: T.muted,
+										wordBreak: "break-all",
+									}}
+								>
+									{url}
+								</span>
 							</div>
 						))}
-						{content && <div style={{ marginTop: 6, marginLeft: 18, color: T.accent }}>{truncate(content)}</div>}
+						{content && (
+							<div style={{ marginTop: 6, marginLeft: 18, color: T.accent }}>
+								{truncate(content)}
+							</div>
+						)}
 					</>
 				);
 			}
@@ -728,16 +752,36 @@ export default function inkgestApp() {
 					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
 						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
 							<span style={{ color: "#16A34A" }}>✓</span>
-							<span style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}>{urls[0]}</span>
+							<span
+								style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}
+							>
+								{urls[0]}
+							</span>
 						</div>
-						{content && <span style={{ marginLeft: 18, color: T.accent }}>{truncate(content)}</span>}
+						{content && (
+							<span style={{ marginLeft: 18, color: T.accent }}>
+								{truncate(content)}
+							</span>
+						)}
 					</div>
 				);
 			}
-			return <><span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}</>;
+			return (
+				<>
+					<span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}
+				</>
+			);
 		}
-		if (content.length > 200) return <><span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}</>;
-		return typeof output === "string" ? output : JSON.stringify(output).slice(0, 300) + (JSON.stringify(output).length > 300 ? "…" : "");
+		if (content.length > 200)
+			return (
+				<>
+					<span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}
+				</>
+			);
+		return typeof output === "string"
+			? output
+			: JSON.stringify(output).slice(0, 300) +
+					(JSON.stringify(output).length > 300 ? "…" : "");
 	};
 
 	const getAgentStepLabel = (task) => {
@@ -918,19 +962,19 @@ export default function inkgestApp() {
 							data.output ??
 							(typeof data.result === "string"
 								? data.result
-								: data.error ??
+								: (data.error ??
 									(data.result && typeof data.result === "object"
-										? data.result.content ??
+										? (data.result.content ??
 											(data.result.columns && data.result.rows
 												? `Table: ${data.result.rows.length} rows`
 												: data.result.infographics
 													? `${data.result.infographics.length} infographics`
-													: null)
+													: null))
 										: data.columns && data.rows
 											? `Table: ${data.rows.length} rows`
 											: Array.isArray(data.infographics)
 												? `${data.infographics.length} infographics`
-												: null));
+												: null)));
 						setAgentRunSteps((prev) => {
 							const next = [...prev];
 							while (next.length <= idx)
@@ -955,25 +999,25 @@ export default function inkgestApp() {
 										t.output ??
 										(typeof t.result === "string"
 											? t.result
-											: t.error ??
+											: (t.error ??
 												(t.result && typeof t.result === "object"
-													? t.result.content ??
+													? (t.result.content ??
 														(t.result.columns && t.result.rows
 															? `Table: ${t.result.rows.length} rows`
 															: t.result.infographics
 																? `${t.result.infographics.length} infographics`
-																: null)
+																: null))
 													: t.columns && t.rows
 														? `Table: ${t.rows.length} rows`
 														: Array.isArray(t.infographics)
 															? `${t.infographics.length} infographics`
-															: null)
-												);
+															: null)));
 									if (next[i]) {
 										next[i] = {
 											...next[i],
 											output: next[i].output ?? output,
-											status: next[i].status === "loading" ? "done" : next[i].status,
+											status:
+												next[i].status === "loading" ? "done" : next[i].status,
 										};
 									} else {
 										next.push({
@@ -1027,7 +1071,8 @@ export default function inkgestApp() {
 									: (data.executed || []).length > 0
 										? 1
 										: 0;
-							if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
+							if (creditsUsed > 0 && idToken)
+								deductCredits(idToken, creditsUsed);
 							const tok = extractAgentTotalTokens(data);
 							if (tok != null) setAgentTotalTokens(tok);
 						}
@@ -1143,19 +1188,19 @@ export default function inkgestApp() {
 			) {
 				const columns = task.columns ?? task.result?.columns ?? [];
 				const rows = task.rows ?? task.result?.rows ?? [];
-				const sourceUrls =
-					task.sourceUrls ?? task.result?.sourceUrls ?? [];
+				const sourceUrls = task.sourceUrls ?? task.result?.sourceUrls ?? [];
 				if (Array.isArray(columns) && columns.length > 0) {
 					const { id } = await createTable(reduxUser.uid, {
 						title: task.title ?? task.result?.title ?? "Generated Table",
-						description:
-							task.description ?? task.result?.description ?? "",
+						description: task.description ?? task.result?.description ?? "",
 						columns,
 						rows,
 						sourceUrls,
 						prompt: userPrompt || "",
 					});
-				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+					queryClient.invalidateQueries({
+						queryKey: ["assets", reduxUser.uid],
+					});
 					newTasks.push({
 						type: "table",
 						label: task.label,
@@ -1646,7 +1691,6 @@ export default function inkgestApp() {
 									)}
 								</AnimatePresence>
 							</div>
-
 							{/* Sidebar footer */}
 							<div
 								style={{
@@ -1763,20 +1807,6 @@ export default function inkgestApp() {
 							margin: "0 auto",
 						}}
 					>
-						{/* ── Page heading ── */}
-						<div style={{ marginBottom: 24 }}>
-							<h1
-								style={{
-									fontFamily: "",
-									fontSize: 32,
-									color: T.accent,
-									letterSpacing: "-0.5px",
-								}}
-							>
-								New draft
-							</h1>
-						</div>
-
 						{/* Not logged in info banner */}
 						{!reduxUser && (
 							<motion.div
@@ -1832,6 +1862,14 @@ export default function inkgestApp() {
 							credits={credits}
 							onUpgrade={() => router.push("/pricing")}
 						/>
+
+						{draftMode === "simple" && (
+							<SimpleBuilderTab
+								userId={reduxUser?.uid}
+								theme={T}
+								onLoginRequired={() => setLoginModalOpen(true)}
+							/>
+						)}
 
 						{/* ── INKAGENT MODE ── */}
 						{draftMode === "agent" && (
@@ -1979,7 +2017,9 @@ export default function inkgestApp() {
 										<div className="text-xs text-zinc-700">
 											Create tables, newsletter, infographics and models
 										</div>
-										<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+										<div
+											style={{ display: "flex", alignItems: "center", gap: 8 }}
+										>
 											{/* Circular credits progress */}
 											{(() => {
 												const limit =
@@ -2051,13 +2091,13 @@ export default function inkgestApp() {
 											{/* Small send / stop button */}
 											<motion.button
 												onClick={
-													agentLoading
-														? handleAgentCancel
-														: handleAgentSend
+													agentLoading ? handleAgentCancel : handleAgentSend
 												}
-												disabled={!reduxUser || (!agentLoading && !agentPrompt.trim())}
+												disabled={
+													!reduxUser || (!agentLoading && !agentPrompt.trim())
+												}
 												whileHover={
-													(agentLoading || (agentPrompt.trim() && reduxUser))
+													agentLoading || (agentPrompt.trim() && reduxUser)
 														? { scale: 1.05 }
 														: {}
 												}
@@ -2067,12 +2107,11 @@ export default function inkgestApp() {
 													width: 32,
 													height: 32,
 													borderRadius: 8,
-													background:
-														agentLoading
-															? "#FEE2E2"
-															: agentPrompt.trim() && reduxUser
-																? T.accent
-																: T.border,
+													background: agentLoading
+														? "#FEE2E2"
+														: agentPrompt.trim() && reduxUser
+															? T.accent
+															: T.border,
 													color: agentLoading
 														? "#DC2626"
 														: agentPrompt.trim() && reduxUser
@@ -2090,7 +2129,12 @@ export default function inkgestApp() {
 												}}
 											>
 												{agentLoading ? (
-													<Icon d={Icons.stop} size={14} stroke="currentColor" fill="currentColor" />
+													<Icon
+														d={Icons.stop}
+														size={14}
+														stroke="currentColor"
+														fill="currentColor"
+													/>
 												) : (
 													<Icon
 														d={Icons.send}
@@ -2186,7 +2230,6 @@ export default function inkgestApp() {
 												>
 													{agentRunPrompt}
 												</p>
-												
 											</div>
 										)}
 										{agentThinking && (
@@ -2352,7 +2395,7 @@ export default function inkgestApp() {
 																		? "📧"
 																		: t.type === "linkedin"
 																			? "💼"
-																				: t.type === "blog_post"
+																			: t.type === "blog_post"
 																				? "📝"
 																				: t.type === "twitter_thread"
 																					? "🐦"
