@@ -33,6 +33,7 @@ import {
 	displayTypeForArticleTask,
 } from "../lib/utils/agentArticleTask";
 import { SparkleIcon } from "lucide-react";
+import Footer from "../app/components/Footer";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -162,10 +163,10 @@ function Nav() {
 
 					{/* Links */}
 					<div className="hidden md:flex items-center gap-8">
-						{["Features", "How it works", "Pricing", "FAQ"].map((l) => (
+						{["Features", "Blog", "How it works", "Pricing", "FAQ"].map((l) => (
 							<a
 								key={l}
-								href={`#${l.toLowerCase().replace(/ /g, "-")}`}
+								href={l.toLowerCase().replace(/ /g, "-") === "blog" ? "/blog" : `#${l.toLowerCase().replace(/ /g, "-")}`}
 								className="no-underline text-sm font-medium transition-colors"
 								style={{ color: T.muted, fontFamily: "'Outfit', sans-serif" }}
 								onMouseEnter={(e) => (e.target.style.color = T.accent)}
@@ -247,9 +248,7 @@ function Hero() {
 
 	const applyPreset = (p) => {
 		const urlPart =
-			p.urls?.length && p.urls[0]
-				? `\n\nSource: ${p.urls.join(", ")}`
-				: "";
+			p.urls?.length && p.urls[0] ? `\n\nSource: ${p.urls.join(", ")}` : "";
 		setAgentPrompt(`${p.prompt}${urlPart}`);
 	};
 
@@ -300,9 +299,12 @@ function Hero() {
 		const content = typeof output === "string" ? output : "";
 		// Parse "--- Source N: URL ---" from combined scrape content
 		if (urls.length === 0 && content.includes("--- Source")) {
-			urls = [...content.matchAll(/--- Source \d+: (https?:\/\/[^\s]+) ---/g)].map((m) => m[1]);
+			urls = [
+				...content.matchAll(/--- Source \d+: (https?:\/\/[^\s]+) ---/g),
+			].map((m) => m[1]);
 		}
-		const isScrape = task.type === "scrape" || urls.length > 0 || content.length > 500;
+		const isScrape =
+			task.type === "scrape" || urls.length > 0 || content.length > 500;
 		const truncate = (str, words = TRUNCATE_WORDS) => {
 			const w = (str || "").trim().split(/\s+/).slice(0, words).join(" ");
 			return w + (str && str.trim().split(/\s+/).length > words ? "…" : "");
@@ -312,12 +314,32 @@ function Hero() {
 				return (
 					<>
 						{urls.map((url) => (
-							<div key={url} style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+							<div
+								key={url}
+								style={{
+									marginBottom: 4,
+									display: "flex",
+									alignItems: "center",
+									gap: 6,
+								}}
+							>
 								<span style={{ color: "#22C55E", flexShrink: 0 }}>✓</span>
-								<span style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}>{url}</span>
+								<span
+									style={{
+										fontSize: 11,
+										color: T.muted,
+										wordBreak: "break-all",
+									}}
+								>
+									{url}
+								</span>
 							</div>
 						))}
-						{content && <div style={{ marginTop: 6, marginLeft: 18, color: T.accent }}>{truncate(content)}</div>}
+						{content && (
+							<div style={{ marginTop: 6, marginLeft: 18, color: T.accent }}>
+								{truncate(content)}
+							</div>
+						)}
 					</>
 				);
 			}
@@ -326,16 +348,36 @@ function Hero() {
 					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
 						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
 							<span style={{ color: "#22C55E" }}>✓</span>
-							<span style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}>{urls[0]}</span>
+							<span
+								style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}
+							>
+								{urls[0]}
+							</span>
 						</div>
-						{content && <span style={{ marginLeft: 18, color: T.accent }}>{truncate(content)}</span>}
+						{content && (
+							<span style={{ marginLeft: 18, color: T.accent }}>
+								{truncate(content)}
+							</span>
+						)}
 					</div>
 				);
 			}
-			return <><span style={{ color: "#22C55E" }}>✓</span> {truncate(content)}</>;
+			return (
+				<>
+					<span style={{ color: "#22C55E" }}>✓</span> {truncate(content)}
+				</>
+			);
 		}
-		if (content.length > 200) return <><span style={{ color: "#22C55E" }}>✓</span> {truncate(content)}</>;
-		return typeof output === "string" ? output : JSON.stringify(output).slice(0, 300) + (JSON.stringify(output).length > 300 ? "…" : "");
+		if (content.length > 200)
+			return (
+				<>
+					<span style={{ color: "#22C55E" }}>✓</span> {truncate(content)}
+				</>
+			);
+		return typeof output === "string"
+			? output
+			: JSON.stringify(output).slice(0, 300) +
+					(JSON.stringify(output).length > 300 ? "…" : "");
 	};
 
 	const getAgentStepLabel = (task) => {
@@ -438,13 +480,11 @@ function Hero() {
 			) {
 				const columns = task.columns ?? task.result?.columns ?? [];
 				const rows = task.rows ?? task.result?.rows ?? [];
-				const sourceUrls =
-					task.sourceUrls ?? task.result?.sourceUrls ?? [];
+				const sourceUrls = task.sourceUrls ?? task.result?.sourceUrls ?? [];
 				if (Array.isArray(columns) && columns.length > 0) {
 					const { id } = await createTable(reduxUser.uid, {
 						title: task.title ?? task.result?.title ?? "Table",
-						description:
-							task.description ?? task.result?.description ?? "",
+						description: task.description ?? task.result?.description ?? "",
 						columns,
 						rows,
 						sourceUrls,
@@ -707,19 +747,19 @@ function Hero() {
 							data.output ??
 							(typeof data.result === "string"
 								? data.result
-								: data.error ??
+								: (data.error ??
 									(data.result && typeof data.result === "object"
-										? data.result.content ??
+										? (data.result.content ??
 											(data.result.columns && data.result.rows
 												? `Table: ${data.result.rows.length} rows`
 												: data.result.infographics
 													? `${data.result.infographics.length} infographics`
-													: null)
+													: null))
 										: data.columns && data.rows
 											? `Table: ${data.rows.length} rows`
 											: Array.isArray(data.infographics)
 												? `${data.infographics.length} infographics`
-												: null));
+												: null)));
 						setAgentRunSteps((prev) => {
 							const next = [...prev];
 							while (next.length <= idx)
@@ -744,24 +784,25 @@ function Hero() {
 										t.output ??
 										(typeof t.result === "string"
 											? t.result
-											: t.error ??
+											: (t.error ??
 												(t.result && typeof t.result === "object"
-													? t.result.content ??
+													? (t.result.content ??
 														(t.result.columns && t.result.rows
 															? `Table: ${t.result.rows.length} rows`
 															: t.result.infographics
 																? `${t.result.infographics.length} infographics`
-																: null)
+																: null))
 													: t.columns && t.rows
 														? `Table: ${t.rows.length} rows`
 														: Array.isArray(t.infographics)
 															? `${t.infographics.length} infographics`
-															: null));
+															: null)));
 									if (next[i]) {
 										next[i] = {
 											...next[i],
 											output: next[i].output ?? output,
-											status: next[i].status === "loading" ? "done" : next[i].status,
+											status:
+												next[i].status === "loading" ? "done" : next[i].status,
 										};
 									} else {
 										next.push({
@@ -799,7 +840,7 @@ function Hero() {
 			}
 			if (buffer.trim()) {
 				const line = buffer.trim();
-						if (line.startsWith("data: ")) {
+				if (line.startsWith("data: ")) {
 					try {
 						const data = JSON.parse(line.slice(6));
 						if (data.type === "end") {
@@ -811,7 +852,8 @@ function Hero() {
 									: (data.executed || []).length > 0
 										? 1
 										: 0;
-							if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
+							if (creditsUsed > 0 && idToken)
+								deductCredits(idToken, creditsUsed);
 							const tok = extractAgentTotalTokens(data);
 							if (tok != null) setAgentTotalTokens(tok);
 						}
@@ -1072,9 +1114,7 @@ function Hero() {
 							const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
 								.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
 								.filter(Boolean);
-							const bareDomains = (
-								agentPrompt.match(bareDomainRegex) || []
-							)
+							const bareDomains = (agentPrompt.match(bareDomainRegex) || [])
 								.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
 								.filter(Boolean);
 							const unique = [
@@ -1083,8 +1123,7 @@ function Hero() {
 									...bareDomains.filter(
 										(b) =>
 											!fullUrls.some(
-												(f) =>
-													f.includes(b) || f.includes(`https://${b}`),
+												(f) => f.includes(b) || f.includes(`https://${b}`),
 											),
 									),
 								]),
@@ -1139,10 +1178,7 @@ function Hero() {
 														p
 															.replace(
 																new RegExp(
-																	url.replace(
-																		/[.*+?^${}()|[\]\\]/g,
-																		"\\$&",
-																	),
+																	url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
 																	"g",
 																),
 																"",
@@ -1240,10 +1276,10 @@ function Hero() {
 									</span>
 								)}
 								<motion.button
-									onClick={
-										agentLoading ? handleAgentCancel : handleAgentSend
+									onClick={agentLoading ? handleAgentCancel : handleAgentSend}
+									disabled={
+										!reduxUser || (!agentLoading && !agentPrompt.trim())
 									}
-									disabled={!reduxUser || (!agentLoading && !agentPrompt.trim())}
 									whileHover={
 										agentLoading || (agentPrompt.trim() && reduxUser)
 											? { scale: 1.05 }
@@ -1308,60 +1344,60 @@ function Hero() {
 
 					{agentRunPrompt &&
 						(agentLoading || agentThinking || agentRunSteps.length > 0) && (
-						<motion.div
-							initial={{ opacity: 0, y: 4 }}
-							animate={{ opacity: 1, y: 0 }}
-							style={{
-								marginTop: 12,
-								padding: "10px 14px",
-								background: T.surface,
-								border: `1px solid ${T.border}`,
-								borderRadius: 10,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							<p
+							<motion.div
+								initial={{ opacity: 0, y: 4 }}
+								animate={{ opacity: 1, y: 0 }}
 								style={{
-									fontSize: 10,
-									fontWeight: 700,
-									textTransform: "uppercase",
-									letterSpacing: "0.06em",
-									color: T.muted,
-									marginBottom: 6,
+									marginTop: 12,
+									padding: "10px 14px",
+									background: T.surface,
+									border: `1px solid ${T.border}`,
+									borderRadius: 10,
+									fontFamily: "'Outfit', sans-serif",
 								}}
 							>
-								Your prompt
-							</p>
-							<p
-								style={{
-									fontSize: 13,
-									lineHeight: 1.5,
-									color: T.accent,
-									maxHeight: 72,
-									overflowY: "auto",
-									whiteSpace: "pre-wrap",
-									wordBreak: "break-word",
-								}}
-							>
-								{agentRunPrompt}
-							</p>
-							<p
-								style={{
-									fontSize: 12,
-									color: T.muted,
-									marginTop: 8,
-									marginBottom: 0,
-								}}
-							>
-								Total tokens:{" "}
-								{agentTotalTokens != null
-									? agentTotalTokens
-									: agentLoading
-										? "…"
-										: "—"}
-							</p>
-						</motion.div>
-					)}
+								<p
+									style={{
+										fontSize: 10,
+										fontWeight: 700,
+										textTransform: "uppercase",
+										letterSpacing: "0.06em",
+										color: T.muted,
+										marginBottom: 6,
+									}}
+								>
+									Your prompt
+								</p>
+								<p
+									style={{
+										fontSize: 13,
+										lineHeight: 1.5,
+										color: T.accent,
+										maxHeight: 72,
+										overflowY: "auto",
+										whiteSpace: "pre-wrap",
+										wordBreak: "break-word",
+									}}
+								>
+									{agentRunPrompt}
+								</p>
+								<p
+									style={{
+										fontSize: 12,
+										color: T.muted,
+										marginTop: 8,
+										marginBottom: 0,
+									}}
+								>
+									Total tokens:{" "}
+									{agentTotalTokens != null
+										? agentTotalTokens
+										: agentLoading
+											? "…"
+											: "—"}
+								</p>
+							</motion.div>
+						)}
 
 					{agentThinking && (
 						<motion.div
@@ -1440,7 +1476,11 @@ function Hero() {
 															: T.warm,
 											}}
 										>
-											{s.status === "loading" ? "↻" : s.status === "done" ? "✓" : "✗"}
+											{s.status === "loading"
+												? "↻"
+												: s.status === "done"
+													? "✓"
+													: "✗"}
 										</span>
 										<span style={{ color: T.muted }}>{s.label}</span>
 									</div>
@@ -1490,9 +1530,7 @@ function Hero() {
 							>
 								Open in editor
 							</p>
-							<div
-								style={{ display: "flex", flexDirection: "column", gap: 8 }}
-							>
+							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 								{agentCompletedTasks.map((t, i) => (
 									<motion.a
 										key={i}
@@ -2882,148 +2920,6 @@ function FAQ() {
 	);
 }
 
-/* ── Footer ── */
-function Footer() {
-	return (
-		<footer style={{ background: T.accent, padding: "56px 24px 36px" }}>
-			<div className="max-w-6xl mx-auto">
-				<div
-					style={{
-						display: "flex",
-						alignItems: "flex-start",
-						justifyContent: "space-between",
-						marginBottom: 48,
-						gap: 40,
-						flexWrap: "wrap",
-					}}
-				>
-					<div>
-						<div
-							style={{
-								fontFamily: "'Outfit', sans-serif",
-								fontSize: 24,
-								color: "white",
-								display: "flex",
-								alignItems: "center",
-								gap: 8,
-								marginBottom: 10,
-							}}
-						>
-							<span
-								style={{
-									width: 8,
-									height: 8,
-									borderRadius: "50%",
-									background: T.warm,
-									display: "inline-block",
-								}}
-							/>
-							inkgest
-						</div>
-						<p
-							style={{
-								fontSize: 13,
-								color: "rgba(255,255,255,0.4)",
-								maxWidth: 200,
-								lineHeight: 1.6,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Turn any URL into a newsletter, email, or blog post, infographics
-							etc
-						</p>
-					</div>
-					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
-						{[
-							{
-								title: "Connect",
-								links: [
-									"https://x.com/treyvijay",
-									"mailto:shreyvijayvargiya26@gmail.com",
-								],
-							},
-						].map((col) => (
-							<div key={col.title}>
-								<p
-									style={{
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.1em",
-										color: "rgba(255,255,255,0.35)",
-										marginBottom: 16,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{col.title}
-								</p>
-								{col.links.map((l) => (
-									<a
-										key={l}
-										href={l}
-										style={{
-											display: "block",
-											fontSize: 14,
-											color: "rgba(255,255,255,0.6)",
-											textDecoration: "none",
-											marginBottom: 10,
-											fontFamily: "'Outfit', sans-serif",
-											transition: "color 0.2s",
-										}}
-										onMouseEnter={(e) => (e.target.style.color = "white")}
-										onMouseLeave={(e) =>
-											(e.target.style.color = "rgba(255,255,255,0.6)")
-										}
-									>
-										{l}
-									</a>
-								))}
-							</div>
-						))}
-					</div>
-				</div>
-				<div
-					style={{
-						borderTop: "1px solid rgba(255,255,255,0.1)",
-						paddingTop: 28,
-						display: "flex",
-						justifyContent: "space-between",
-						flexWrap: "wrap",
-						gap: 12,
-					}}
-				>
-					<span
-						style={{
-							fontSize: 13,
-							color: "rgba(255,255,255,0.3)",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						© 2025 inkgest. All rights reserved.
-					</span>
-					<span
-						style={{
-							fontSize: 13,
-							color: "rgba(255,255,255,0.3)",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Made for writers who publish on a deadline. Built using{" "}
-						<a
-							href="https://buildsaas.dev"
-							target="_blank"
-							className="text-orange-500"
-							style={{ color: T.surface }}
-							rel="noopener noreferrer"
-						>
-							Buildsaas
-						</a>
-					</span>
-				</div>
-			</div>
-		</footer>
-	);
-}
 
 /* ── Root ── */
 export default function inkgestLanding() {

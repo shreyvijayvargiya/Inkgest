@@ -75,9 +75,6 @@ export default function BlogShareBar({ title, slug, shareUrl: shareUrlProp }) {
 
 	return (
 		<div className="flex flex-wrap items-center gap-2 mb-6">
-			<span className="text-xs uppercase tracking-wide text-[#9A9590] mr-1">
-				Share
-			</span>
 			<button
 				type="button"
 				onClick={copyLink}

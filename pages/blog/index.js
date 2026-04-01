@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAllPostsMeta } from "../../lib/blog/loadPosts";
+import Footer from "../../app/components/Footer";
 
 export default function BlogIndex({ posts }) {
 	return (
@@ -17,7 +18,6 @@ export default function BlogIndex({ posts }) {
 					</span>
 				</div>
 			</header>
-
 			<main className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
 				<div className="max-w-2xl mb-12 sm:mb-14">
 					<h1 className="text-3xl sm:text-4xl font-semibold text-[#1A1A1A] tracking-tight mb-3">
@@ -73,6 +73,7 @@ export default function BlogIndex({ posts }) {
 					))}
 				</ul>
 			</main>
+			<Footer />
 		</div>
 	);
 }
