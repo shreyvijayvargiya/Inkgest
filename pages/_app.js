@@ -28,7 +28,7 @@ const MyApp = ({ Component, pageProps }) => {
 				<Provider store={store}>
 					<PersistGate loading={null} persistor={persistor}>
 						{/* Automatic SEO tags based on route - configured in lib/config/seo.js */}
-						<SEO />
+						<SEO customSEO={pageProps.customSEO} />
 						{/* Analytics Tracker - tracks once per session */}
 						<AnalyticsTracker />
 						<Component {...pageProps} />
