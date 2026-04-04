@@ -4,6 +4,9 @@ import { getPostSlugs, getPostBySlug } from "../../lib/blog/loadPosts";
 import { absoluteUrl } from "../../lib/blog/absoluteUrl";
 import BlogMarkdown from "../../lib/blog/BlogMarkdown";
 import BlogShareBar from "../../lib/blog/BlogShareBar";
+import BlogBanner, {
+	isBannerImageUrl,
+} from "../../lib/blog/BlogBanner";
 
 export default function BlogPost({ post, jsonLd, shareUrl }) {
 	if (!post) return null;
@@ -65,11 +68,7 @@ export default function BlogPost({ post, jsonLd, shareUrl }) {
 							shareUrl={shareUrl}
 						/>
 						<div className="aspect-[21/9] rounded-xl overflow-hidden border border-[#E8E4DC] bg-[#F0ECE5]">
-							<img
-								src={post.banner}
-								alt=""
-								className="w-full h-full object-cover"
-							/>
+							<BlogBanner banner={post.banner} variant="hero" />
 						</div>
 						<div className="flex flex-wrap gap-2 mt-6">
 							{post.tags.map((tag) => (
@@ -112,7 +111,9 @@ export async function getStaticProps({ params }) {
 	const canonicalUrl = siteUrl
 		? `${siteUrl.replace(/\/$/, "")}${path}`
 		: path;
-	const ogImageAbs = absoluteUrl(post.banner);
+	const ogImageAbs = isBannerImageUrl(post.banner)
+		? absoluteUrl(post.banner)
+		: absoluteUrl("/inkgest-logo.png");
 
 	const jsonLd = {
 		"@context": "https://schema.org",
