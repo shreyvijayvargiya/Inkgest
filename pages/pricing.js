@@ -108,7 +108,7 @@ const PricingPage = () => {
 			period: "month",
 			description: "Try inkgest with no commitment",
 			features: [
-				"10 credits / month",
+				"50 credits / month",
 				"AI Draft / Newsletter — 1 credit",
 				"URL Scrape — 1 credit",
 				"AI Chat message — ¼ credit",

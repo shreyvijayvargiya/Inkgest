@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
@@ -21,19 +21,13 @@ import {
 } from "../../lib/utils/credits";
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
-import { inferFormatFromPrompt } from "../../lib/prompts/newsletter";
-import {
-	INKGEST_AGENT_URL,
-	inkgestAgentRequestHeaders,
-} from "../../lib/config/agent";
 import { deductCredits } from "../../lib/api/deductCredits";
-import { extractAgentTotalTokens } from "../../lib/utils/agentTokens";
-import {
-	getAgentTaskArticleBody,
-	isArticleLikeAgentTask,
-	displayTypeForArticleTask,
-} from "../../lib/utils/agentArticleTask";
 import SimpleBuilderTab from "../../lib/ui/SimpleBuilderTab";
+import GenerateAssetPanel from "../../lib/ui/GenerateAssetPanel";
+import { persistGenerateResponse } from "../../lib/utils/persistGenerateResponse";
+import { requestGenerate } from "../../lib/api/generateClient";
+import { listCanvasProjects } from "../../lib/api/canvasProjects";
+import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -148,28 +142,51 @@ const PRESETS = [
 	},
 ];
 
-/* ─── InkAgent loader messages (rotate while loading) ─── */
-const AGENT_LOADING_MSGS = [
-	"InkAgent thinking…",
-	"InkAgent analysing your request…",
-	"InkAgent browsing & finding content…",
-	"InkAgent creating newsletter…",
-	"InkAgent building table…",
-	"InkAgent preparing content…",
-];
-
-/* ─── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ─── */
+/* ─── Prompt suggestions for generate panel (URL + short prompt) ─── */
 const AGENT_PROMPT_SUGGESTIONS = [
-	"Find Hacker News latest news and create a summary of the top stories.",
-	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
-	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
-	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
-	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
-	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
-	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
-	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
-	"Find top news from India and create a realistic table — headlines, source, key points.",
-	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
+	{
+		urls: ["https://news.ycombinator.com"],
+		prompt: "Top 5 front-page stories as a dev newsletter.",
+	},
+	{
+		urls: ["https://news.ycombinator.com/newest"],
+		prompt: "Newest posts — quick bullets, no fluff.",
+	},
+	{
+		urls: ["https://blog.ycombinator.com"],
+		prompt: "YC blog themes this week; casual digest.",
+	},
+	{
+		urls: ["https://www.ycombinator.com/companies"],
+		prompt: "Portfolio snapshot; one tight paragraph.",
+	},
+	{
+		urls: ["https://blog.x.com"],
+		prompt: "Engineering blog — concise takeaways for builders.",
+	},
+	{
+		urls: ["https://www.thehindu.com/sci-tech/technology/"],
+		prompt: "India tech headlines; neutral newsletter tone.",
+	},
+	{
+		urls: ["https://indianexpress.com/section/technology/"],
+		prompt: "Short digest with Indian policy + startup angle.",
+	},
+	{
+		urls: [
+			"https://economictimes.indiatimes.com/tech",
+			"https://www.moneycontrol.com/news/technology/",
+		],
+		prompt: "India business + tech roundup; table OK.",
+	},
+	{
+		urls: ["https://www.livemint.com/technology"],
+		prompt: "Mint tech picks; professional LinkedIn style.",
+	},
+	{
+		urls: ["https://www.ndtv.com/topic/tech-news"],
+		prompt: "National tech news summary; general audience.",
+	},
 ];
 
 /* ─── Format / Style config (mirrors API) ─── */
@@ -277,7 +294,36 @@ const SIDEBAR_ASSET_LABELS = {
 };
 
 /* ─── Item card in sidebar (drafts + tables + assets) ─── */
-function SidebarItemCard({ item, active, onClick, onDelete }) {
+function groupSidebarByProject(items, projects) {
+	if (!projects?.length)
+		return [{ id: "_all", name: "All assets", items }];
+	const out = [];
+	const seen = new Set();
+	for (const p of projects) {
+		const ids = new Set(p.assetIds || []);
+		const projItems = items.filter((i) => ids.has(i.id));
+		projItems.forEach((i) => seen.add(i.id));
+		if (projItems.length > 0)
+			out.push({
+				id: p.id,
+				name: p.name || "Project",
+				items: projItems,
+			});
+	}
+	const loose = items.filter((i) => !seen.has(i.id));
+	if (loose.length > 0)
+		out.push({ id: "_unassigned", name: "Unassigned", items: loose });
+	return out.length > 0
+		? out
+		: [{ id: "_all", name: "All assets", items }];
+}
+
+function SidebarItemCard({
+	item,
+	active,
+	onClick,
+	onDelete,
+}) {
 	const [hovering, setHovering] = useState(false);
 	const isAssetWithDesc = [
 		"table",
@@ -397,28 +443,37 @@ function SidebarItemCard({ item, active, onClick, onDelete }) {
 				</div>
 				<AnimatePresence>
 					{hovering && (
-						<motion.button
-							initial={{ opacity: 0, scale: 0.8 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.8 }}
-							onClick={(e) => {
-								e.stopPropagation();
-								onDelete(item.id);
-							}}
+						<div
 							style={{
-								background: "none",
-								border: "none",
-								cursor: "pointer",
-								padding: 4,
-								borderRadius: 6,
+								display: "flex",
+								alignItems: "center",
+								gap: 2,
 								flexShrink: 0,
-								color: "#EF4444",
-								transition: "background 0.15s",
 							}}
-							whileHover={{ background: "#FEE2E2" }}
 						>
-							<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-						</motion.button>
+							<motion.button
+								initial={{ opacity: 0, scale: 0.8 }}
+								animate={{ opacity: 1, scale: 1 }}
+								exit={{ opacity: 0, scale: 0.8 }}
+								onClick={(e) => {
+									e.stopPropagation();
+									onDelete(item.id);
+								}}
+								style={{
+									background: "none",
+									border: "none",
+									cursor: "pointer",
+									padding: 4,
+									borderRadius: 6,
+									flexShrink: 0,
+									color: "#EF4444",
+									transition: "background 0.15s",
+								}}
+								whileHover={{ background: "#FEE2E2" }}
+							>
+								<Icon d={Icons.trash} size={14} stroke="#EF4444" />
+							</motion.button>
+						</div>
 					)}
 				</AnimatePresence>
 			</div>
@@ -451,18 +506,6 @@ export default function inkgestApp() {
 	const [blankTitle, setBlankTitle] = useState("");
 	const [credits, setCredits] = useState(null); // { plan, creditsUsed, creditsLimit, remaining }
 
-	// InkAgent state
-	const [agentPrompt, setAgentPrompt] = useState("");
-	const [agentRunSteps, setAgentRunSteps] = useState([]); // [{ label, status: 'loading'|'done'|'error' }]
-	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
-	const [agentLoading, setAgentLoading] = useState(false);
-	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
-	const [agentError, setAgentError] = useState(null);
-	const [agentThinking, setAgentThinking] = useState(""); // Streaming "thinking" text from SSE
-	const [agentRunPrompt, setAgentRunPrompt] = useState("");
-	const [agentTotalTokens, setAgentTotalTokens] = useState(null);
-	const agentOutputRef = useRef(null);
-	const agentAbortRef = useRef(null);
 
 	/* Derived helpers — single unified credit pool */
 	const creditRemaining = credits
@@ -474,40 +517,19 @@ export default function inkgestApp() {
 	const llmRemaining = creditRemaining;
 	const scrapeRemaining = creditRemaining;
 
-	/* Cycle InkAgent loading messages — only when we have a single placeholder step */
-	useEffect(() => {
-		if (!agentLoading) return;
-		setAgentLoadingMsg(AGENT_LOADING_MSGS[0]);
-		let idx = 0;
-		const iv = setInterval(() => {
-			idx = (idx + 1) % AGENT_LOADING_MSGS.length;
-			const msg = AGENT_LOADING_MSGS[idx];
-			setAgentLoadingMsg(msg);
-			setAgentRunSteps((prev) => {
-				// Don't overwrite when we have multiple steps (from suggestedTasks)
-				if (prev.length !== 1 || prev[0]?.status !== "loading") return prev;
-				return [{ label: msg, status: "loading" }];
-			});
-		}, 2500);
-		return () => clearInterval(iv);
-	}, [agentLoading]);
-
-	/* Scroll InkAgent output into view when thinking/steps appear */
-	useEffect(() => {
-		if ((agentThinking || agentRunSteps.length > 0) && agentOutputRef.current) {
-			agentOutputRef.current.scrollIntoView({
-				behavior: "smooth",
-				block: "nearest",
-			});
-		}
-	}, [agentThinking, agentRunSteps.length]);
-
 	/* Load drafts, tables, and other assets via React Query (shared with draftId page) */
-	const { data: items = [] } = useQuery({
+	const { data: items = [], isLoading: assetsLoading } = useQuery({
 		queryKey: ["assets", reduxUser?.uid],
 		queryFn: () => listAssets(reduxUser.uid),
 		enabled: !!reduxUser,
 		staleTime: 2 * 60 * 1000,
+	});
+
+	const { data: canvasProjects = [] } = useQuery({
+		queryKey: ["canvasProjects", reduxUser?.uid],
+		queryFn: () => listCanvasProjects(reduxUser.uid),
+		enabled: !!reduxUser,
+		staleTime: 60 * 1000,
 	});
 
 	const drafts = items.filter((i) => i.type === "draft");
@@ -576,6 +598,11 @@ export default function inkgestApp() {
 			format.includes(q)
 		);
 	});
+
+	const sidebarGrouped = useMemo(
+		() => groupSidebarByProject(filtered, canvasProjects),
+		[filtered, canvasProjects],
+	);
 
 	const applyPreset = (p) => {
 		setUrls(p.urls.length ? p.urls : [""]);
@@ -694,142 +721,11 @@ export default function inkgestApp() {
 		}
 	};
 
-	/* Get step label from executed task */
-	const TRUNCATE_WORDS = 12;
-	const formatTaskOutputDisplay = (step) => {
-		const output = step.output;
-		const task = step.fullTask || {};
-		let urls = task.urls || task.sourceUrls || task.params?.urls || [];
-		const content = typeof output === "string" ? output : "";
-		// Parse "--- Source N: URL ---" from combined scrape content
-		if (urls.length === 0 && content.includes("--- Source")) {
-			urls = [
-				...content.matchAll(/--- Source \d+: (https?:\/\/[^\s]+) ---/g),
-			].map((m) => m[1]);
-		}
-		const isScrape =
-			task.type === "scrape" || urls.length > 0 || content.length > 500;
-		const truncate = (str, words = TRUNCATE_WORDS) => {
-			const w = (str || "").trim().split(/\s+/).slice(0, words).join(" ");
-			return w + (str && str.trim().split(/\s+/).length > words ? "…" : "");
-		};
-		if (isScrape && (content || urls.length > 0)) {
-			if (urls.length > 1) {
-				return (
-					<>
-						{urls.map((url) => (
-							<div
-								key={url}
-								style={{
-									marginBottom: 4,
-									display: "flex",
-									alignItems: "center",
-									gap: 6,
-								}}
-							>
-								<span style={{ color: "#16A34A", flexShrink: 0 }}>✓</span>
-								<span
-									style={{
-										fontSize: 11,
-										color: T.muted,
-										wordBreak: "break-all",
-									}}
-								>
-									{url}
-								</span>
-							</div>
-						))}
-						{content && (
-							<div style={{ marginTop: 6, marginLeft: 18, color: T.accent }}>
-								{truncate(content)}
-							</div>
-						)}
-					</>
-				);
-			}
-			if (urls.length === 1) {
-				return (
-					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<span style={{ color: "#16A34A" }}>✓</span>
-							<span
-								style={{ fontSize: 11, color: T.muted, wordBreak: "break-all" }}
-							>
-								{urls[0]}
-							</span>
-						</div>
-						{content && (
-							<span style={{ marginLeft: 18, color: T.accent }}>
-								{truncate(content)}
-							</span>
-						)}
-					</div>
-				);
-			}
-			return (
-				<>
-					<span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}
-				</>
-			);
-		}
-		if (content.length > 200)
-			return (
-				<>
-					<span style={{ color: "#16A34A" }}>✓</span> {truncate(content)}
-				</>
-			);
-		return typeof output === "string"
-			? output
-			: JSON.stringify(output).slice(0, 300) +
-					(JSON.stringify(output).length > 300 ? "…" : "");
-	};
-
-	const getAgentStepLabel = (task) => {
-		if (task.type === "scrape") {
-			const url = task.urls?.[0] || task.sourceUrls?.[0];
-			const host = url
-				? (() => {
-						try {
-							return new URL(url).hostname;
-						} catch {
-							return url.slice(0, 30);
-						}
-					})()
-				: "";
-			return host ? `Browsing ${host}…` : task.label || "Browsing…";
-		}
-		if (task.type === "newsletter")
-			return task.label || "Writing newsletter draft…";
-		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
-		if (task.type === "blog_post") return task.label || "Writing blog post…";
-		if (task.type === "twitter_thread") return task.label || "Creating thread…";
-		if (task.type === "email_digest") return task.label || "Creating digest…";
-		if (task.type === "table") return task.label || "Creating table…";
-		if (
-			task.type === "infographics" ||
-			task.type === "infographics-svg-generator"
-		)
-			return task.label || "Creating infographics…";
-		if (
-			task.type === "landing_page" ||
-			task.type === "landing-page" ||
-			task.type === "landing-page-generator"
-		)
-			return task.label || "Creating landing page…";
-		if (
-			task.type === "image_gallery" ||
-			task.type === "image-gallery" ||
-			task.type === "image-gallery-generator" ||
-			task.type === "image-gallery-creator"
-		)
-			return task.label || "Creating image gallery…";
-		return task.label || "Processing…";
-	};
-
-	/* InkAgent: stream SSE from API, show real-time task progress */
-	const handleAgentSend = async () => {
-		const promptText = agentPrompt.trim();
-		if (!promptText || agentLoading) return;
+	const handleDraftGenerate = async () => {
+		const cleanUrls = urls
+			.map((u) => u.trim())
+			.filter((u) => /^https?:\/\//i.test(u));
+		if (!prompt.trim() && cleanUrls.length === 0) return;
 		if (!reduxUser) {
 			setLoginModalOpen(true);
 			return;
@@ -838,499 +734,42 @@ export default function inkgestApp() {
 			router.push("/pricing");
 			return;
 		}
-		setAgentLoading(true);
-		setAgentError(null);
-		setAgentCompletedTasks([]);
-		setAgentThinking("");
-		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
-		setAgentRunPrompt(promptText);
-		setAgentTotalTokens(null);
-		const abortController = new AbortController();
-		agentAbortRef.current = abortController;
+		setGenerating(true);
+		setGenerateError(null);
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
-			const res = await fetch(INKGEST_AGENT_URL, {
-				method: "POST",
-				headers: inkgestAgentRequestHeaders(reduxUser?.uid),
-				body: JSON.stringify({ prompt: promptText, idToken }),
-				signal: abortController.signal,
+			const { data } = await requestGenerate({
+				type: "newsletter",
+				idToken,
+				urls: cleanUrls,
+				prompt: prompt.trim(),
+				format,
+				style,
 			});
-			if (!res.ok) {
-				const errData = await res.json().catch(() => ({}));
-				throw new Error(errData.error || "Agent failed");
+			const tasks = await persistGenerateResponse({
+				uid: reduxUser.uid,
+				generateType: "newsletter",
+				data,
+				prompt: prompt.trim(),
+				urlList: cleanUrls,
+				format,
+				queryClient,
+			});
+			if (tasks.length > 0) {
+				deductCredits(idToken, 1);
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+				if (tasks[0]?.path) router.push(tasks[0].path);
 			}
-			const contentType = res.headers.get("content-type") || "";
-			if (!contentType.includes("text/event-stream")) {
-				const data = await res.json();
-				if (data.executed?.length > 0) {
-					setAgentRunSteps(
-						data.executed.map((t) => ({
-							label: getAgentStepLabel(t),
-							status: "done",
-						})),
-					);
-					await processAgentExecuted(data.executed, promptText);
-					const creditsUsed =
-						typeof data.creditsUsed === "number" && data.creditsUsed > 0
-							? data.creditsUsed
-							: 1;
-					deductCredits(idToken, creditsUsed);
-				} else {
-					setAgentRunSteps([
-						{ label: data.message || "Done.", status: "done" },
-					]);
-				}
-				const tok = extractAgentTotalTokens(data);
-				if (tok != null) setAgentTotalTokens(tok);
-				if (reduxUser)
-					getUserCredits(reduxUser.uid)
-						.then(setCredits)
-						.catch(() => {});
-				return;
-			}
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
-				const parts = buffer.split("\n\n");
-				buffer = parts.pop() || "";
-				for (const part of parts) {
-					const line = part.trim();
-					if (!line.startsWith("data: ")) continue;
-					const jsonStr = line.slice(6);
-					if (!jsonStr) continue;
-					let data;
-					try {
-						data = JSON.parse(jsonStr);
-					} catch {
-						continue;
-					}
-					if (data.type === "thinking") {
-						const text =
-							data.thinking ??
-							data.reasoning ??
-							data.content ??
-							data.text ??
-							data.output ??
-							"";
-						if (text)
-							setAgentThinking((prev) =>
-								prev
-									? prev + "\n\n" + String(text).trim()
-									: String(text).trim(),
-							);
-					} else if (data.type === "start") {
-						const thinkingText =
-							data.thinking ??
-							data.reasoning ??
-							data.thought ??
-							data.agent_thought ??
-							data.content ??
-							data.message ??
-							data.text ??
-							data.output ??
-							"";
-						setAgentThinking(
-							thinkingText
-								? String(thinkingText).trim()
-								: (data.message || "Processing your request…").trim(),
-						);
-						const tasks = data.suggestedTasks || [];
-						setAgentRunSteps(
-							tasks.length > 0
-								? tasks.map((t) => ({
-										label: t.label || t.taskLabel || "Task",
-										status: "loading",
-									}))
-								: [
-										{
-											label: data.message || "Running tasks…",
-											status: "loading",
-										},
-									],
-						);
-					} else if (data.type === "task") {
-						const idx = data.index ?? 0;
-						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
-						const status = data.success ? "done" : "error";
-						const output =
-							data.content ??
-							data.output ??
-							(typeof data.result === "string"
-								? data.result
-								: (data.error ??
-									(data.result && typeof data.result === "object"
-										? (data.result.content ??
-											(data.result.columns && data.result.rows
-												? `Table: ${data.result.rows.length} rows`
-												: data.result.infographics
-													? `${data.result.infographics.length} infographics`
-													: null))
-										: data.columns && data.rows
-											? `Table: ${data.rows.length} rows`
-											: Array.isArray(data.infographics)
-												? `${data.infographics.length} infographics`
-												: null)));
-						setAgentRunSteps((prev) => {
-							const next = [...prev];
-							while (next.length <= idx)
-								next.push({
-									label: `Task ${next.length + 1}`,
-									status: "loading",
-								});
-							next[idx] = { label, status, output, fullTask: data };
-							return next;
-						});
-					} else if (data.type === "end") {
-						setAgentThinking("");
-						const executed = data.executed || [];
-						if (executed.length > 0) {
-							await processAgentExecuted(executed, promptText);
-							// Merge executed task outputs into steps (in case backend only sends end)
-							setAgentRunSteps((prev) => {
-								const next = [...prev];
-								executed.forEach((t, i) => {
-									const output =
-										t.content ??
-										t.output ??
-										(typeof t.result === "string"
-											? t.result
-											: (t.error ??
-												(t.result && typeof t.result === "object"
-													? (t.result.content ??
-														(t.result.columns && t.result.rows
-															? `Table: ${t.result.rows.length} rows`
-															: t.result.infographics
-																? `${t.result.infographics.length} infographics`
-																: null))
-													: t.columns && t.rows
-														? `Table: ${t.rows.length} rows`
-														: Array.isArray(t.infographics)
-															? `${t.infographics.length} infographics`
-															: null)));
-									if (next[i]) {
-										next[i] = {
-											...next[i],
-											output: next[i].output ?? output,
-											status:
-												next[i].status === "loading" ? "done" : next[i].status,
-										};
-									} else {
-										next.push({
-											label: t.label || t.taskLabel || `Task ${i + 1}`,
-											status: "done",
-											output,
-											fullTask: t,
-										});
-									}
-								});
-								return next.map((s) => ({
-									...s,
-									status: s.status === "loading" ? "done" : s.status,
-								}));
-							});
-						} else {
-							setAgentRunSteps((prev) =>
-								prev.map((s) => ({
-									...s,
-									status: s.status === "loading" ? "done" : s.status,
-								})),
-							);
-						}
-						const creditsUsed =
-							typeof data.creditsUsed === "number" && data.creditsUsed > 0
-								? data.creditsUsed
-								: executed.length > 0
-									? 1
-									: 0;
-						if (creditsUsed > 0 && idToken) deductCredits(idToken, creditsUsed);
-						const tok = extractAgentTotalTokens(data);
-						if (tok != null) setAgentTotalTokens(tok);
-						if (reduxUser)
-							getUserCredits(reduxUser.uid)
-								.then(setCredits)
-								.catch(() => {});
-					}
-				}
-			}
-			if (buffer.trim()) {
-				const line = buffer.trim();
-				if (line.startsWith("data: ")) {
-					try {
-						const data = JSON.parse(line.slice(6));
-						if (data.type === "end") {
-							if ((data.executed || []).length > 0)
-								await processAgentExecuted(data.executed, promptText);
-							const creditsUsed =
-								typeof data.creditsUsed === "number" && data.creditsUsed > 0
-									? data.creditsUsed
-									: (data.executed || []).length > 0
-										? 1
-										: 0;
-							if (creditsUsed > 0 && idToken)
-								deductCredits(idToken, creditsUsed);
-							const tok = extractAgentTotalTokens(data);
-							if (tok != null) setAgentTotalTokens(tok);
-						}
-						if (reduxUser)
-							getUserCredits(reduxUser.uid)
-								.then(setCredits)
-								.catch(() => {});
-					} catch {
-						// ignore
-					}
-				}
-			}
+			if (reduxUser)
+				getUserCredits(reduxUser.uid).then(setCredits).catch(() => {});
 		} catch (e) {
-			const isAborted =
-				e?.name === "AbortError" ||
-				e?.code === "ABORT_ERR" ||
-				e?.reason === "user_cancelled" ||
-				/abort/i.test(e?.message || "");
-			if (isAborted) {
-				setAgentError(null);
-				setAgentRunSteps([]);
-				setAgentTotalTokens(null);
-				return;
-			}
-			const errMsg = e?.message || "Agent failed";
-			setAgentError(errMsg);
-			setAgentRunSteps([{ label: errMsg, status: "error" }]);
+			setGenerateError(e?.message || "Something went wrong");
 		} finally {
-			agentAbortRef.current = null;
-			setAgentLoading(false);
+			setGenerating(false);
 		}
 	};
 
-	const handleAgentCancel = () => {
-		agentAbortRef.current?.abort("user_cancelled");
-	};
-
-	const processAgentExecuted = async (executed, userPrompt = "") => {
-		const newTasks = [];
-		const inferred = inferFormatFromPrompt(userPrompt);
-		for (const task of executed) {
-			const articleBody = getAgentTaskArticleBody(task);
-			const isContentDraft =
-				isArticleLikeAgentTask(task.type) && articleBody.length > 0;
-			if (isContentDraft) {
-				const lines = articleBody.split("\n");
-				const titleLine = lines.find(
-					(l) => l.startsWith("# ") || l.startsWith("## "),
-				);
-				const title = titleLine
-					? titleLine.replace(/^#+\s*/, "").trim()
-					: task.label || "Draft";
-				const bodyText = lines
-					.filter((l) => !l.match(/^#{1,6}\s/))
-					.join(" ")
-					.replace(/[*_`]/g, "")
-					.replace(/\s+/g, " ")
-					.trim();
-				const tag = task.formatLabel || inferred.label;
-				const format = task.params?.format || inferred.format;
-				const draft = {
-					title,
-					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
-					body: articleBody,
-					urls: task.params?.urls || task.urls || task.sourceUrls || [],
-					prompt: userPrompt || "",
-					words: articleBody.trim().split(/\s+/).filter(Boolean).length,
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					tag,
-					format,
-				};
-				const { id } = await createDraft(reduxUser.uid, draft);
-				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-				newTasks.push({
-					type: displayTypeForArticleTask(task.type),
-					label: task.label || task.taskLabel,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (task.type === "scrape" && task.content) {
-				const draft = {
-					title: task.title || "Scraped",
-					preview: (task.content || "").slice(0, 180),
-					body: task.content || "",
-					urls: task.urls || [],
-					prompt: userPrompt || "",
-					images: task.images || [],
-					words: (task.content || "").trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					tag: "Scraped",
-				};
-				const { id } = await createDraft(reduxUser.uid, draft);
-				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-				newTasks.push({
-					type: "scrape",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				(task.type === "table" ||
-					task.type === "table-creator" ||
-					task.type === "table-generator") &&
-				(task.columns || task.result?.columns)
-			) {
-				const columns = task.columns ?? task.result?.columns ?? [];
-				const rows = task.rows ?? task.result?.rows ?? [];
-				const sourceUrls = task.sourceUrls ?? task.result?.sourceUrls ?? [];
-				if (Array.isArray(columns) && columns.length > 0) {
-					const { id } = await createTable(reduxUser.uid, {
-						title: task.title ?? task.result?.title ?? "Generated Table",
-						description: task.description ?? task.result?.description ?? "",
-						columns,
-						rows,
-						sourceUrls,
-						prompt: userPrompt || "",
-					});
-					queryClient.invalidateQueries({
-						queryKey: ["assets", reduxUser.uid],
-					});
-					newTasks.push({
-						type: "table",
-						label: task.label,
-						id,
-						path: `/app/${id}`,
-					});
-				}
-			} else if (
-				task.type === "infographics" ||
-				task.type === "infographics-svg-generator"
-			) {
-				let infographics = task.infographics ?? task.result?.infographics ?? [];
-				if (!Array.isArray(infographics) && typeof task.content === "string") {
-					try {
-						infographics = JSON.parse(task.content);
-					} catch {
-						infographics = [];
-					}
-				}
-				if (!Array.isArray(infographics) || infographics.length === 0) continue;
-				const { id } = await createInfographicsAsset(reduxUser.uid, {
-					title: task.title || "Infographics",
-					description: task.description || "",
-					prompt: userPrompt || "",
-					infographics,
-				});
-				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-				newTasks.push({
-					type: "infographics",
-					label: task.label || "Infographics",
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				(task.type === "landing_page" ||
-					task.type === "landing-page" ||
-					task.type === "landing-page-generator") &&
-				(task.html ||
-					task.result?.html ||
-					task.result?.result?.html ||
-					task.url ||
-					task.result?.url ||
-					(typeof task.content === "string" &&
-						task.content.trim().startsWith("<")))
-			) {
-				const html =
-					task.html ??
-					task.result?.html ??
-					task.result?.result?.html ??
-					(typeof task.content === "string" &&
-					task.content.trim().startsWith("<")
-						? task.content
-						: "") ??
-					"";
-				const url =
-					task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
-				if (!html && !url) continue;
-				const { id } = await createLandingPageAsset(reduxUser.uid, {
-					title: task.title || "Landing Page",
-					description: task.description || "",
-					html,
-					url,
-				});
-				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-				newTasks.push({
-					type: "landing_page",
-					label: task.label || "Landing Page",
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				task.type === "image_gallery" ||
-				task.type === "image-gallery" ||
-				task.type === "image-gallery-generator" ||
-				task.type === "image-gallery-creator"
-			) {
-				let images =
-					task.images ??
-					task.result?.images ??
-					task.result?.data ??
-					task.result?.result?.images ??
-					[];
-				if (!Array.isArray(images) && typeof task.content === "string") {
-					try {
-						const parsed = JSON.parse(task.content);
-						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
-					} catch {
-						images = [];
-					}
-				}
-				if (
-					!Array.isArray(images) &&
-					typeof task.result?.content === "string"
-				) {
-					try {
-						const parsed = JSON.parse(task.result.content);
-						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
-					} catch {
-						// keep existing images
-					}
-				}
-				// Normalize: allow { url }, { src }, or plain string URLs
-				images = Array.isArray(images)
-					? images
-							.map((img) => (typeof img === "string" ? { url: img } : img))
-							.filter((img) => img?.url || img?.src)
-					: [];
-				if (images.length === 0) continue;
-				const { id } = await createImageGalleryAsset(reduxUser.uid, {
-					title: task.title || "Image Gallery",
-					description: task.description || "",
-					images,
-				});
-				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-				newTasks.push({
-					type: "image_gallery",
-					label: task.label || "Gallery",
-					id,
-					path: `/app/${id}`,
-				});
-			}
-		}
-		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
-		if (newTasks.length > 0 && reduxUser?.uid) {
-			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-			queryClient.invalidateQueries({ queryKey: ["doc"] });
-		}
-	};
-
-	/* Create a blank draft and open it */
 	const handleBlank = async () => {
 		if (!reduxUser) {
 			setLoginModalOpen(true);
@@ -1371,230 +810,25 @@ export default function inkgestApp() {
 		>
 			<FontLink />
 
-			{/* ── TOP BAR ── */}
-			<div
-				style={{
-					height: 56,
-					background: T.surface,
-					borderBottom: `1px solid ${T.border}`,
-					display: "flex",
-					alignItems: "center",
-					padding: "0 20px",
-					gap: 12,
-					flexShrink: 0,
-					zIndex: 50,
-				}}
-			>
-				{/* Logo */}
-				<a
-					href="/"
-					style={{
-						fontFamily: "",
-						fontSize: 20,
-						color: T.accent,
-						textDecoration: "none",
-						display: "flex",
-						alignItems: "center",
-						gap: 7,
-						flexShrink: 0,
-						marginRight: 8,
-					}}
-				>
-					<motion.span
-						whileHover={{ scale: 1.3 }}
-						style={{
-							width: 8,
-							height: 8,
-							borderRadius: "50%",
-							background: T.warm,
-							display: "inline-block",
-						}}
-					/>
-					inkgest
-				</a>
-
-				{/* Sidebar toggle — only when logged in */}
-				{reduxUser && (
-					<motion.button
-						whileHover={{ background: "#F0ECE5" }}
-						whileTap={{ scale: 0.93 }}
-						onClick={() => setSidebarOpen((s) => !s)}
-						style={{
-							background: "transparent",
-							border: "none",
-							borderRadius: 8,
-							padding: "6px 8px",
-							cursor: "pointer",
-						}}
-					>
-						<Icon d={sidebarOpen ? Icons.chevronL : Icons.chevronR} size={16} />
-					</motion.button>
-				)}
-
-				<div style={{ width: 1, height: 20, background: T.border }} />
-
-				{/* Credits pill */}
-				{reduxUser && (
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-							marginLeft: 4,
-							background: T.base,
-							border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
-							borderRadius: 100,
-							padding: "4px 14px",
-						}}
-					>
-						{credits?.plan === "pro" ? (
-							<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
-								∞ Pro
-							</span>
-						) : (
-							<>
-								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-									Credits{" "}
-									<span
-										style={{
-											fontWeight: 700,
-											color: creditRemaining === 0 ? "#EF4444" : T.accent,
-										}}
-									>
-										{credits
-											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
-											: `0/${FREE_CREDIT_LIMIT}`}
-									</span>
-								</span>
-								{credits?.renewsAt && (
-									<span
-										style={{
-											fontSize: 11,
-											color: T.muted,
-											fontWeight: 500,
-											whiteSpace: "nowrap",
-										}}
-									>
-										Renew at {formatRenewalDate(credits.renewsAt)}
-									</span>
-								)}
-							</>
-						)}
-						<motion.button
-							whileHover={{ scale: 1.04 }}
-							whileTap={{ scale: 0.97 }}
-							onClick={() => router.push("/pricing")}
-							style={{
-								background: T.accent,
-								color: "white",
-								border: "none",
-								padding: "3px 10px",
-								borderRadius: 100,
-								fontSize: 11,
-								fontWeight: 700,
-								cursor: "pointer",
-							}}
-						>
-							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
-						</motion.button>
-					</div>
-				)}
-				{!reduxUser && (
-					<div
-						className="sm:hidden md:flex"
-						style={{
-							alignItems: "center",
-							gap: 8,
-							marginLeft: 4,
-							background: T.base,
-							border: `1px solid ${T.border}`,
-							borderRadius: 100,
-							padding: "4px 12px",
-						}}
-					>
-						<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
-							{FREE_CREDIT_LIMIT} Credits
-						</span>
-					</div>
-				)}
-
-				<div style={{ flex: 1 }} />
-
-				{/* New draft button */}
-				<motion.button
-					whileHover={{
-						scale: 1.03,
-						y: -1,
-						boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-					}}
-					whileTap={{ scale: 0.97 }}
-					onClick={() => router.push("/app")}
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 6,
-						background: T.accent,
-						color: "white",
-						border: "none",
-						padding: "7px 16px",
-						borderRadius: 9,
-						fontSize: 13,
-						fontWeight: 600,
-						cursor: "pointer",
-					}}
-				>
-					<Icon d={Icons.plus} size={14} stroke="white" />{" "}
-					<span className="md:block hidden">New draft</span>
-				</motion.button>
-
-				{/* User avatar / login */}
-				<motion.button
-					whileHover={{ scale: 1.08 }}
-					whileTap={{ scale: 0.95 }}
-					onClick={() => setLoginModalOpen(true)}
-					style={{
-						background: "none",
-						border: "none",
-						padding: 0,
-						cursor: "pointer",
-						borderRadius: "50%",
-					}}
-				>
-					{reduxUser?.photoURL ? (
-						<img
-							src={reduxUser.photoURL}
-							alt={reduxUser.displayName || "User"}
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								objectFit: "cover",
-								border: `2px solid ${T.border}`,
-								display: "block",
-							}}
-						/>
-					) : (
-						<div
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								background: T.border,
-								border: `2px solid ${T.border}`,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<Icon d={Icons.login} size={16} stroke={T.muted} />
-						</div>
-					)}
-				</motion.button>
-				<LoginModal
-					isOpen={loginModalOpen}
-					onClose={() => setLoginModalOpen(false)}
-				/>
-			</div>
+			<AppInkgestTopBar
+				T={T}
+				reduxUser={reduxUser}
+				credits={credits}
+				creditRemaining={creditRemaining}
+				FREE_CREDIT_LIMIT={FREE_CREDIT_LIMIT}
+				formatRenewalDate={formatRenewalDate}
+				router={router}
+				sidebarOpen={sidebarOpen}
+				onSidebarToggle={() => setSidebarOpen((s) => !s)}
+				showSidebarToggle={!!reduxUser}
+				showFormCanvasNav={draftMode === "agent"}
+				formCanvasActive="form"
+				onLogin={() => setLoginModalOpen(true)}
+			/>
+			<LoginModal
+				isOpen={loginModalOpen}
+				onClose={() => setLoginModalOpen(false)}
+			/>
 
 			{/* ── MAIN BODY ── */}
 			<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -1679,14 +913,34 @@ export default function inkgestApp() {
 											</p>
 										</motion.div>
 									) : (
-										filtered.map((item) => (
-											<SidebarItemCard
-												key={item.id}
-												item={item}
-												active={false}
-												onClick={() => router.push(`/app/${item.id}`)}
-												onDelete={handleDelete}
-											/>
+										sidebarGrouped.map((section) => (
+											<div key={section.id} style={{ marginBottom: 14 }}>
+												{sidebarGrouped.length > 1 && (
+													<p
+														style={{
+															fontSize: 10,
+															fontWeight: 700,
+															color: T.muted,
+															textTransform: "uppercase",
+															letterSpacing: "0.1em",
+															margin: "0 4px 8px",
+														}}
+													>
+														{section.name}
+													</p>
+												)}
+												{section.items.map((item) => (
+													<SidebarItemCard
+														key={item.id}
+														item={item}
+														active={false}
+														onClick={() =>
+															router.push(`/app/${item.id}`)
+														}
+														onDelete={handleDelete}
+													/>
+												))}
+											</div>
 										))
 									)}
 								</AnimatePresence>
@@ -1784,13 +1038,16 @@ export default function inkgestApp() {
 					)}
 				</AnimatePresence>
 
-				{/* ── RIGHT PANEL — Generator only ── */}
+				{/* ── MAIN — Generator (pushes right when drafts sidebar open) ── */}
 				<div
 					style={{
 						flex: 1,
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
+						minWidth: 0,
+						marginLeft: reduxUser && sidebarOpen ? 280 : 0,
+						transition: "margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
 					}}
 				>
 					<motion.div
@@ -1800,7 +1057,10 @@ export default function inkgestApp() {
 						transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
 						style={{
 							flex: 1,
-							overflowY: "auto",
+							display: "flex",
+							flexDirection: "column",
+							minHeight: 0,
+							overflow: "auto",
 							padding: "32px 40px",
 							maxWidth: 720,
 							width: "100%",
@@ -1871,7 +1131,7 @@ export default function inkgestApp() {
 							/>
 						)}
 
-						{/* ── INKAGENT MODE ── */}
+						{/* ── Generate asset (form) — canvas lives at /app/canvas ── */}
 						{draftMode === "agent" && (
 							<motion.div
 								key="agent-form"
@@ -1885,626 +1145,25 @@ export default function inkgestApp() {
 									width: "100%",
 								}}
 							>
-								{/* Input section — URL chips + textarea attached */}
-								<div className="flex flex-col gap-0 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50">
-									{/* URL chips parsed from prompt — above textarea */}
-									{(() => {
-										const fullUrlRegex = /https?:\/\/[^\s]+/g;
-										const bareDomainRegex =
-											/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog|to|me|info|edu|gov)\b/gi;
-										const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
-											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
-											.filter(Boolean);
-										const bareDomains = (
-											agentPrompt.match(bareDomainRegex) || []
-										)
-											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
-											.filter(Boolean);
-										const unique = [
-											...new Set([
-												...fullUrls,
-												...bareDomains.filter(
-													(b) =>
-														!fullUrls.some(
-															(f) =>
-																f.includes(b) || f.includes(`https://${b}`),
-														),
-												),
-											]),
-										].filter(Boolean);
-										if (unique.length === 0) return null;
-										return (
-											<div
-												style={{
-													display: "flex",
-													flexWrap: "wrap",
-													gap: 8,
-													padding: "12px 16px",
-													borderBottom: `1px solid ${T.border}`,
-													background: T.base,
-												}}
-											>
-												{unique.map((url, i) => (
-													<motion.div
-														key={`${url}-${i}`}
-														initial={{ opacity: 0, scale: 0.9 }}
-														animate={{ opacity: 1, scale: 1 }}
-														style={{
-															display: "flex",
-															alignItems: "center",
-															gap: 6,
-															padding: "6px 10px",
-															background: T.surface,
-															border: `1px solid ${T.border}`,
-															borderRadius: 8,
-															fontSize: 12,
-															color: T.accent,
-															maxWidth: 220,
-															overflow: "hidden",
-															textOverflow: "ellipsis",
-															whiteSpace: "nowrap",
-														}}
-													>
-														<span
-															style={{
-																flex: 1,
-																overflow: "hidden",
-																textOverflow: "ellipsis",
-															}}
-														>
-															{url}
-														</span>
-														<motion.button
-															whileHover={{ scale: 1.1 }}
-															whileTap={{ scale: 0.9 }}
-															onClick={() => {
-																setAgentPrompt((p) =>
-																	p
-																		.replace(
-																			new RegExp(
-																				url.replace(
-																					/[.*+?^${}()|[\]\\]/g,
-																					"\\$&",
-																				),
-																				"g",
-																			),
-																			"",
-																		)
-																		.replace(/\s+/g, " ")
-																		.trim(),
-																);
-															}}
-															style={{
-																background: "none",
-																border: "none",
-																cursor: "pointer",
-																padding: 0,
-																display: "flex",
-																color: T.muted,
-																flexShrink: 0,
-															}}
-														>
-															<svg
-																width={12}
-																height={12}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2}
-															>
-																<path d="M18 6L6 18M6 6l12 12" />
-															</svg>
-														</motion.button>
-													</motion.div>
-												))}
-											</div>
-										);
-									})()}
-									<textarea
-										value={agentPrompt}
-										onChange={(e) => setAgentPrompt(e.target.value)}
-										onKeyDown={(e) =>
-											e.key === "Enter" &&
-											!e.shiftKey &&
-											(e.preventDefault(), handleAgentSend())
-										}
-										placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
-										rows={4}
-										disabled={!reduxUser || agentLoading}
-										className="w-full bg-zinc-50 border border-zinc-200 rounded-xl bg-transparent px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
-									/>
-									<div className="flex gap-2 items-center justify-between px-2 py-1 bg-amber-50/20">
-										<div className="text-xs text-zinc-700">
-											Create tables, newsletter, infographics and models
-										</div>
-										<div
-											style={{ display: "flex", alignItems: "center", gap: 8 }}
-										>
-											{/* Circular credits progress */}
-											{(() => {
-												const limit =
-													credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
-												const remaining =
-													credits?.plan === "pro"
-														? limit
-														: Math.max(0, credits?.remaining ?? limit);
-												const pct = limit > 0 ? remaining / limit : 0;
-												const r = 14;
-												const circ = 2 * Math.PI * r;
-												const dash = pct * circ;
-												const strokeCol =
-													pct > 0.3
-														? T.warm
-														: pct > 0.1
-															? "#D97706"
-															: "#DC2626";
-												return (
-													<div
-														style={{
-															display: "flex",
-															alignItems: "center",
-															gap: 4,
-														}}
-													>
-														<svg
-															width={24}
-															height={24}
-															viewBox="0 0 36 36"
-															style={{ transform: "rotate(-90deg)" }}
-														>
-															<circle
-																cx={18}
-																cy={18}
-																r={r}
-																fill="none"
-																stroke={T.border}
-																strokeWidth={4}
-															/>
-															<circle
-																cx={18}
-																cy={18}
-																r={r}
-																fill="none"
-																stroke={strokeCol}
-																strokeWidth={4}
-																strokeDasharray={`${dash} ${circ}`}
-																strokeLinecap="round"
-																style={{
-																	transition: "stroke-dasharray 0.3s ease",
-																}}
-															/>
-														</svg>
-														<span
-															style={{
-																fontSize: 12,
-																fontWeight: 600,
-																color: T.muted,
-															}}
-														>
-															{credits?.plan === "pro"
-																? "Pro"
-																: `${remaining.toFixed(1)}/${limit}`}
-														</span>
-													</div>
-												);
-											})()}
-											{/* Small send / stop button */}
-											<motion.button
-												onClick={
-													agentLoading ? handleAgentCancel : handleAgentSend
-												}
-												disabled={
-													!reduxUser || (!agentLoading && !agentPrompt.trim())
-												}
-												whileHover={
-													agentLoading || (agentPrompt.trim() && reduxUser)
-														? { scale: 1.05 }
-														: {}
-												}
-												whileTap={{ scale: 0.95 }}
-												title={agentLoading ? "Stop" : "Send"}
-												style={{
-													width: 32,
-													height: 32,
-													borderRadius: 8,
-													background: agentLoading
-														? "#FEE2E2"
-														: agentPrompt.trim() && reduxUser
-															? T.accent
-															: T.border,
-													color: agentLoading
-														? "#DC2626"
-														: agentPrompt.trim() && reduxUser
-															? "white"
-															: T.muted,
-													border: "none",
-													cursor:
-														!reduxUser || (!agentLoading && !agentPrompt.trim())
-															? "not-allowed"
-															: "pointer",
-													display: "flex",
-													alignItems: "center",
-													justifyContent: "center",
-													flexShrink: 0,
-												}}
-											>
-												{agentLoading ? (
-													<Icon
-														d={Icons.stop}
-														size={14}
-														stroke="currentColor"
-														fill="currentColor"
-													/>
-												) : (
-													<Icon
-														d={Icons.send}
-														size={14}
-														stroke="currentColor"
-														fill="none"
-													/>
-												)}
-											</motion.button>
-										</div>
-									</div>
-								</div>
-
-								{agentError && (
-									<motion.div
-										initial={{ opacity: 0, y: 4 }}
-										animate={{ opacity: 1, y: 0 }}
-										style={{
-											padding: "12px 16px",
-											background: "#FEF2F2",
-											border: "1px solid #FECACA",
-											borderRadius: 10,
-											fontSize: 13,
-											color: "#DC2626",
-										}}
-									>
-										{agentError}
-									</motion.div>
-								)}
-
-								{/* InkAgent output card — below Send button */}
-								{(agentRunSteps.length > 0 ||
-									agentCompletedTasks.length > 0 ||
-									agentThinking ||
-									agentLoading) && (
-									<motion.div
-										ref={agentOutputRef}
-										initial={{ opacity: 0, y: -8 }}
-										animate={{ opacity: 1, y: 0 }}
-										style={{
-											background: T.surface,
-											border: `1px solid ${T.border}`,
-											borderRadius: 14,
-											padding: 20,
-											boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-										}}
-									>
-										<p
-											style={{
-												fontSize: 15,
-												fontWeight: 700,
-												color: T.accent,
-												marginBottom: 16,
-												display: "flex",
-												alignItems: "center",
-												gap: 8,
-											}}
-										>
-											<span style={{ color: T.warm }}>✦</span> InkAgent
-										</p>
-										{agentRunPrompt && (
-											<div
-												style={{
-													marginBottom: 14,
-													padding: "10px 12px",
-													background: T.base,
-													border: `1px solid ${T.border}`,
-													borderRadius: 10,
-												}}
-											>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														textTransform: "uppercase",
-														letterSpacing: "0.06em",
-														color: T.muted,
-														marginBottom: 6,
-													}}
-												>
-													Your prompt
-												</p>
-												<p
-													style={{
-														fontSize: 13,
-														lineHeight: 1.5,
-														color: T.accent,
-														maxHeight: 80,
-														overflowY: "auto",
-														whiteSpace: "pre-wrap",
-														wordBreak: "break-word",
-													}}
-												>
-													{agentRunPrompt}
-												</p>
-											</div>
-										)}
-										{agentThinking && (
-											<div
-												style={{
-													background: T.base,
-													border: `1px solid ${T.border}`,
-													borderRadius: 10,
-													padding: "14px 16px",
-													marginBottom: 16,
-													fontSize: 13,
-													lineHeight: 1.6,
-													color: T.muted,
-													maxHeight: 120,
-													overflowY: "auto",
-												}}
-											>
-												{agentThinking}
-											</div>
-										)}
-										{agentRunSteps.length > 0 && (
-											<div
-												style={{
-													display: "flex",
-													flexDirection: "column",
-													gap: 12,
-													marginBottom: agentCompletedTasks.length > 0 ? 16 : 0,
-												}}
-											>
-												{agentRunSteps.map((step, i) => (
-													<div key={i}>
-														<div
-															style={{
-																display: "flex",
-																alignItems: "center",
-																justifyContent: "space-between",
-																gap: 12,
-															}}
-														>
-															<span
-																style={{
-																	fontSize: 13,
-																	color: T.accent,
-																	fontWeight: 500,
-																}}
-															>
-																{step.label}
-															</span>
-															{step.status === "loading" && (
-																<motion.span
-																	animate={{ rotate: 360 }}
-																	transition={{
-																		duration: 0.9,
-																		repeat: Infinity,
-																		ease: "linear",
-																	}}
-																>
-																	<Icon
-																		d={Icons.refresh}
-																		size={14}
-																		stroke={T.warm}
-																	/>
-																</motion.span>
-															)}
-															{step.status === "done" && (
-																<span
-																	style={{
-																		fontSize: 14,
-																		color: "#16A34A",
-																		fontWeight: 700,
-																	}}
-																>
-																	✓
-																</span>
-															)}
-															{step.status === "error" && (
-																<span
-																	style={{
-																		fontSize: 14,
-																		color: "#DC2626",
-																		fontWeight: 700,
-																	}}
-																>
-																	✗
-																</span>
-															)}
-														</div>
-														{step.output && step.status !== "loading" && (
-															<div
-																style={{
-																	marginTop: 8,
-																	padding: "12px 14px",
-																	background: T.base,
-																	border: `1px solid ${T.border}`,
-																	borderRadius: 10,
-																	fontSize: 12,
-																	lineHeight: 1.6,
-																	color: T.accent,
-																	whiteSpace: "pre-wrap",
-																	wordBreak: "break-word",
-																}}
-															>
-																{formatTaskOutputDisplay(step)}
-															</div>
-														)}
-													</div>
-												))}
-											</div>
-										)}
-										{agentCompletedTasks.length > 0 && (
-											<>
-												<p
-													style={{
-														fontSize: 12,
-														color: T.muted,
-														marginBottom: 12,
-														fontWeight: 600,
-													}}
-												>
-													Created {agentCompletedTasks.length} asset
-													{agentCompletedTasks.length !== 1 ? "s" : ""}
-												</p>
-												<div
-													style={{
-														display: "flex",
-														flexDirection: "column",
-														gap: 8,
-													}}
-												>
-													{agentCompletedTasks.map((t, i) => (
-														<motion.a
-															key={i}
-															href={t.path}
-															onClick={(e) => {
-																e.preventDefault();
-																router.push(t.path);
-															}}
-															whileHover={{ x: 2, scale: 1.01 }}
-															whileTap={{ scale: 0.99 }}
-															style={{
-																display: "flex",
-																alignItems: "center",
-																justifyContent: "space-between",
-																padding: "12px 14px",
-																background: T.base,
-																border: `1px solid ${T.border}`,
-																borderRadius: 10,
-																textDecoration: "none",
-																color: T.accent,
-																fontSize: 13,
-																fontWeight: 600,
-															}}
-														>
-															<span
-																style={{
-																	display: "flex",
-																	alignItems: "center",
-																	gap: 8,
-																}}
-															>
-																<span style={{ fontSize: 14 }}>
-																	{t.type === "newsletter"
-																		? "📧"
-																		: t.type === "linkedin"
-																			? "💼"
-																			: t.type === "blog_post"
-																				? "📝"
-																				: t.type === "twitter_thread"
-																					? "🐦"
-																					: t.type === "email_digest"
-																						? "📬"
-																						: t.type === "table"
-																							? "📊"
-																							: t.type === "infographics"
-																								? "📊"
-																								: t.type === "landing_page"
-																									? "🌐"
-																									: t.type === "image_gallery"
-																										? "🖼️"
-																										: "📄"}
-																</span>
-																<span>
-																	{t.type === "newsletter"
-																		? "Newsletter"
-																		: t.type === "linkedin"
-																			? "LinkedIn"
-																			: t.type === "blog_post"
-																				? "Article"
-																				: t.type === "twitter_thread"
-																					? "Thread"
-																					: t.type === "email_digest"
-																						? "Digest"
-																						: t.type === "table"
-																							? "Table"
-																							: t.type === "infographics"
-																								? "Infographics"
-																								: t.type === "landing_page"
-																									? "Landing Page"
-																									: t.type === "image_gallery"
-																										? "Gallery"
-																										: "Scrape"}
-																	{t.label ? ` · ${t.label}` : ""}
-																</span>
-															</span>
-															<span
-																style={{
-																	fontSize: 12,
-																	color: T.warm,
-																	fontWeight: 700,
-																}}
-															>
-																Open →
-															</span>
-														</motion.a>
-													))}
-												</div>
-											</>
-										)}
-									</motion.div>
-								)}
-
-								{/* Try a suggestion — hidden when loading or assets generated */}
-								{!agentLoading && agentCompletedTasks.length === 0 && (
-									<div
-										style={{
-											display: "flex",
-											flexDirection: "column",
-											gap: 12,
-											width: "100%",
-										}}
-									>
-										<label
-											style={{
-												fontSize: 12,
-												fontWeight: 700,
-												textTransform: "uppercase",
-												letterSpacing: "0.08em",
-												color: T.muted,
-											}}
-										>
-											Try a suggestion
-										</label>
-										<div
-											style={{
-												display: "flex",
-												flexDirection: "column",
-												gap: 8,
-											}}
-										>
-											{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
-												<motion.button
-													key={i}
-													whileHover={{ scale: 1.005, x: 4 }}
-													whileTap={{ scale: 0.995 }}
-													onClick={() => setAgentPrompt(s)}
-													style={{
-														width: "100%",
-														padding: "12px 16px",
-														borderRadius: 10,
-														fontSize: 13,
-														fontWeight: 500,
-														cursor: "pointer",
-														border: `1.5px solid ${T.border}`,
-														background: T.surface,
-														color: T.accent,
-														textAlign: "left",
-														lineHeight: 1.5,
-													}}
-												>
-													{s}
-												</motion.button>
-											))}
-										</div>
-									</div>
-								)}
+								<GenerateAssetPanel
+									variant="app"
+									theme={T}
+									reduxUser={reduxUser}
+									credits={credits}
+									creditRemaining={creditRemaining}
+									queryClient={queryClient}
+									router={router}
+									onLogin={() => setLoginModalOpen(true)}
+									presets={PRESETS}
+									promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
+									showFormatControls
+									format={format}
+									setFormat={setFormat}
+									style={style}
+									setStyle={setStyle}
+									FORMATS={FORMATS}
+									STYLES={STYLES}
+								/>
 							</motion.div>
 						)}
 
@@ -2717,46 +1376,6 @@ export default function inkgestApp() {
 						{/* ── AI MODE — existing form ── */}
 						{draftMode === "ai" && (
 							<>
-								{/* Preset chips */}
-								<div style={{ marginBottom: 16 }}>
-									<label
-										style={{
-											display: "block",
-											fontSize: 12,
-											fontWeight: 700,
-											textTransform: "uppercase",
-											letterSpacing: "0.08em",
-											color: T.muted,
-											marginBottom: 8,
-										}}
-									>
-										Try with
-									</label>
-									<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-										{PRESETS.map((p) => (
-											<motion.button
-												key={p.label}
-												whileHover={{ scale: 1.03 }}
-												whileTap={{ scale: 0.97 }}
-												onClick={() => applyPreset(p)}
-												style={{
-													padding: "6px 12px",
-													borderRadius: 9,
-													fontSize: 12,
-													fontWeight: 600,
-													cursor: "pointer",
-													border: `1.5px solid ${T.border}`,
-													background: T.surface,
-													color: T.accent,
-													transition: "all 0.15s",
-												}}
-											>
-												{p.label}
-											</motion.button>
-										))}
-									</div>
-								</div>
-
 								{/* Add URL input */}
 								<div style={{ marginBottom: 12 }}>
 									<label
@@ -3036,7 +1655,7 @@ export default function inkgestApp() {
 									</motion.button>
 								) : (
 									<motion.button
-										onClick={handleAgentSend}
+										onClick={handleDraftGenerate}
 										disabled={generating}
 										whileHover={
 											!generating
