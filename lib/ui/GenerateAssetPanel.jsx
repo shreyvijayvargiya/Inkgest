@@ -45,6 +45,8 @@ export default function GenerateAssetPanel({
 	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const [internalFormat, setInternalFormat] = useState("substack");
 	const [internalStyle, setInternalStyle] = useState("casual");
+	/** Same URL + prompt + type, repeated API calls (max 5). */
+	const [variantCount, setVariantCount] = useState(1);
 
 	const format = formatProp ?? internalFormat;
 	const style = styleProp ?? internalStyle;
@@ -63,6 +65,7 @@ export default function GenerateAssetPanel({
 		prompt,
 		onLogin,
 		creditRemaining,
+		variantCount,
 	});
 
 	const showFormatStyle = Boolean(showFormatControls && FORMATS && STYLES);
@@ -372,6 +375,56 @@ export default function GenerateAssetPanel({
 						)}
 					</AnimatePresence>
 				</div>
+
+				<div
+					style={{
+						minWidth: 160,
+						width: "100%",
+						maxWidth: 200,
+					}}
+				>
+					<label
+						style={{
+							display: "block",
+							fontSize: 11,
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.08em",
+							color: T.muted,
+							marginBottom: 8,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						Copies (max 5)
+					</label>
+					<select
+						value={variantCount}
+						onChange={(e) =>
+							setVariantCount(
+								Math.min(5, Math.max(1, Number(e.target.value) || 1)),
+							)
+						}
+						disabled={gen.loading}
+						style={{
+							width: "100%",
+							padding: "12px 14px",
+							borderRadius: 12,
+							border: `1.5px solid ${T.border}`,
+							background: isApp ? T.surface : T.base,
+							color: T.accent,
+							fontSize: 14,
+							fontWeight: 600,
+							cursor: gen.loading ? "not-allowed" : "pointer",
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						{[1, 2, 3, 4, 5].map((n) => (
+							<option key={n} value={n}>
+								{n} — same asset ×{n}
+							</option>
+						))}
+					</select>
+				</div>
 			</div>
 
 			<div
@@ -406,7 +459,11 @@ export default function GenerateAssetPanel({
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						{gen.loading ? "Generating…" : "Generate"}
+						{gen.loading
+							? "Generating…"
+							: variantCount > 1
+								? `Generate ×${variantCount}`
+								: "Generate"}
 					</motion.button>
 					{gen.loading && (
 						<motion.button
@@ -463,7 +520,10 @@ export default function GenerateAssetPanel({
 				</motion.div>
 			)}
 
-			{(gen.loading || gen.streamed || gen.completedTasks.length > 0) && (
+			{(gen.loading ||
+				gen.streamed ||
+				gen.completedTasks.length > 0 ||
+				(Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1)) && (
 				<motion.div
 					initial={{ opacity: 0, y: 6 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -504,88 +564,242 @@ export default function GenerateAssetPanel({
 								: ""}
 						</p>
 					)}
-					{gen.loading && !gen.streamed && (
-						<p style={{ fontSize: 13, color: T.muted }}>
-							Working on your asset…
-						</p>
-					)}
-					{gen.streamed && (
-						<pre
+
+					{Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1 ? (
+						<div
 							style={{
-								fontSize: 12,
-								lineHeight: 1.55,
-								color: T.accent,
-								whiteSpace: "pre-wrap",
-								wordBreak: "break-word",
-								maxHeight: 320,
-								overflow: "auto",
-								margin: 0,
-								padding: 12,
-								background: T.base,
-								borderRadius: 10,
-								border: `1px solid ${T.border}`,
-								fontFamily: "ui-monospace, monospace",
+								display: "flex",
+								flexDirection: "column",
+								gap: 20,
 							}}
 						>
-							{gen.streamed}
-						</pre>
-					)}
-					{gen.completedTasks.length > 0 && (
-						<div style={{ marginTop: 14 }}>
-							<p
-								style={{
-									fontSize: 12,
-									color: T.muted,
-									marginBottom: 10,
-									fontWeight: 600,
-								}}
-							>
-								Open in editor
-							</p>
-							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-								{gen.completedTasks.map((t, i) => (
-									<motion.a
-										key={`${t.id}-${i}`}
-										href={t.path}
-										onClick={(e) => {
-											e.preventDefault();
-											router.push(t.path);
-										}}
-										whileHover={{ x: 2, scale: 1.01 }}
-										whileTap={{ scale: 0.99 }}
+							{gen.slotOutputs.map((slot, idx) => (
+								<div
+									key={idx}
+									style={{
+										padding: 14,
+										borderRadius: 12,
+										border: `1px solid ${T.border}`,
+										background: T.base,
+									}}
+								>
+									<p
 										style={{
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "space-between",
-											padding: "12px 14px",
-											background: T.base,
-											border: `1px solid ${T.border}`,
-											borderRadius: 10,
-											textDecoration: "none",
+											fontSize: 12,
+											fontWeight: 700,
 											color: T.accent,
-											fontSize: 13,
-											fontWeight: 600,
-											cursor: "pointer",
+											marginBottom: 10,
 										}}
 									>
-										<span
-											style={{ display: "flex", alignItems: "center", gap: 8 }}
+										Copy {slot.slot ?? idx + 1} of {gen.slotOutputs.length}
+									</p>
+									{slot.error && (
+										<p
+											style={{
+												fontSize: 12,
+												color: slot.error === "Skipped" ? T.muted : "#DC2626",
+												marginBottom: 8,
+											}}
 										>
-											<span>{taskEmojiForType(t.type)}</span>
-											<span>
-												{taskTitleForType(t.type)}
-												{t.label ? ` · ${t.label}` : ""}
-											</span>
-										</span>
-										<span
-											style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}
+											{slot.error}
+										</p>
+									)}
+									{slot.loading && !slot.streamed && !slot.error && (
+										<p style={{ fontSize: 13, color: T.muted }}>
+											Working on this copy…
+										</p>
+									)}
+									{Boolean(slot.streamed) && (
+										<pre
+											style={{
+												fontSize: 12,
+												lineHeight: 1.55,
+												color: T.accent,
+												whiteSpace: "pre-wrap",
+												wordBreak: "break-word",
+												maxHeight: 240,
+												overflow: "auto",
+												margin: "0 0 12px 0",
+												padding: 12,
+												background: T.surface,
+												borderRadius: 10,
+												border: `1px solid ${T.border}`,
+												fontFamily: "ui-monospace, monospace",
+											}}
 										>
-											Open →
-										</span>
-									</motion.a>
-								))}
-							</div>
+											{slot.streamed}
+										</pre>
+									)}
+									{slot.completedTasks?.length > 0 && (
+										<div>
+											<p
+												style={{
+													fontSize: 11,
+													color: T.muted,
+													marginBottom: 8,
+													fontWeight: 600,
+												}}
+											>
+												Open in editor
+											</p>
+											<div
+												style={{
+													display: "flex",
+													flexDirection: "column",
+													gap: 8,
+												}}
+											>
+												{slot.completedTasks.map((t, i) => (
+													<motion.a
+														key={`${t.id}-${i}`}
+														href={t.path}
+														onClick={(e) => {
+															e.preventDefault();
+															router.push(t.path);
+														}}
+														whileHover={{ x: 2, scale: 1.01 }}
+														whileTap={{ scale: 0.99 }}
+														style={{
+															display: "flex",
+															alignItems: "center",
+															justifyContent: "space-between",
+															padding: "10px 12px",
+															background: T.surface,
+															border: `1px solid ${T.border}`,
+															borderRadius: 10,
+															textDecoration: "none",
+															color: T.accent,
+															fontSize: 13,
+															fontWeight: 600,
+															cursor: "pointer",
+														}}
+													>
+														<span
+															style={{
+																display: "flex",
+																alignItems: "center",
+																gap: 8,
+															}}
+														>
+															<span>{taskEmojiForType(t.type)}</span>
+															<span>
+																{taskTitleForType(t.type)}
+																{t.label ? ` · ${t.label}` : ""}
+															</span>
+														</span>
+														<span
+															style={{
+																fontSize: 12,
+																color: T.warm,
+																fontWeight: 700,
+															}}
+														>
+															Open →
+														</span>
+													</motion.a>
+												))}
+											</div>
+										</div>
+									)}
+								</div>
+							))}
 						</div>
+					) : (
+						<>
+							{gen.loading && !gen.streamed && (
+								<p style={{ fontSize: 13, color: T.muted }}>
+									Working on your asset…
+								</p>
+							)}
+							{gen.streamed && (
+								<pre
+									style={{
+										fontSize: 12,
+										lineHeight: 1.55,
+										color: T.accent,
+										whiteSpace: "pre-wrap",
+										wordBreak: "break-word",
+										maxHeight: 320,
+										overflow: "auto",
+										margin: 0,
+										padding: 12,
+										background: T.base,
+										borderRadius: 10,
+										border: `1px solid ${T.border}`,
+										fontFamily: "ui-monospace, monospace",
+									}}
+								>
+									{gen.streamed}
+								</pre>
+							)}
+							{gen.completedTasks.length > 0 && (
+								<div style={{ marginTop: 14 }}>
+									<p
+										style={{
+											fontSize: 12,
+											color: T.muted,
+											marginBottom: 10,
+											fontWeight: 600,
+										}}
+									>
+										Open in editor
+									</p>
+									<div
+										style={{ display: "flex", flexDirection: "column", gap: 8 }}
+									>
+										{gen.completedTasks.map((t, i) => (
+											<motion.a
+												key={`${t.id}-${i}`}
+												href={t.path}
+												onClick={(e) => {
+													e.preventDefault();
+													router.push(t.path);
+												}}
+												whileHover={{ x: 2, scale: 1.01 }}
+												whileTap={{ scale: 0.99 }}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "space-between",
+													padding: "12px 14px",
+													background: T.base,
+													border: `1px solid ${T.border}`,
+													borderRadius: 10,
+													textDecoration: "none",
+													color: T.accent,
+													fontSize: 13,
+													fontWeight: 600,
+													cursor: "pointer",
+												}}
+											>
+												<span
+													style={{
+														display: "flex",
+														alignItems: "center",
+														gap: 8,
+													}}
+												>
+													<span>{taskEmojiForType(t.type)}</span>
+													<span>
+														{taskTitleForType(t.type)}
+														{t.label ? ` · ${t.label}` : ""}
+													</span>
+												</span>
+												<span
+													style={{
+														fontSize: 12,
+														color: T.warm,
+														fontWeight: 700,
+													}}
+												>
+													Open →
+												</span>
+											</motion.a>
+										))}
+									</div>
+								</div>
+							)}
+						</>
 					)}
 				</motion.div>
 			)}
