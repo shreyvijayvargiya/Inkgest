@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllPostsMeta } from "../../lib/blog/loadPosts";
 import Footer from "../../app/components/Footer";
+import BlogBanner from "../../lib/blog/BlogBanner";
 
 export default function BlogIndex({ posts }) {
 	return (
@@ -35,11 +36,7 @@ export default function BlogIndex({ posts }) {
 							<article className="group h-full flex flex-col rounded-2xl border border-[#E8E4DC] bg-white/80 overflow-hidden shadow-sm hover:shadow-md hover:border-[#D4CFC4] transition-all duration-300">
 								<Link href={`/blog/${post.slug}`} className="block shrink-0">
 									<div className="aspect-[16/10] bg-[#F0ECE5] relative overflow-hidden">
-										<img
-											src={post.banner}
-											alt=""
-											className="w-full h-full object-cover opacity-95 group-hover:scale-[1.02] transition-transform duration-500"
-										/>
+										<BlogBanner banner={post.banner} variant="card" />
 									</div>
 								</Link>
 								<div className="p-5 sm:p-6 flex flex-col flex-1">
