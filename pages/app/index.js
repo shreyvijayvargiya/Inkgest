@@ -1061,8 +1061,8 @@ export default function inkgestApp() {
 							flexDirection: "column",
 							minHeight: 0,
 							overflow: "auto",
-							padding: "32px 40px",
-							maxWidth: 720,
+							padding: "32px clamp(24px, 4vw, 48px)",
+							maxWidth: 980,
 							width: "100%",
 							margin: "0 auto",
 						}}

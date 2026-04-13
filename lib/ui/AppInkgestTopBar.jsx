@@ -104,9 +104,9 @@ export default function AppInkgestTopBar({
 
 			<div style={{ width: 1, height: 20, background: T.border }} />
 
-			{showFormCanvasNav && (
+			{/* {showFormCanvasNav && (
 				<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-					{["form", "canvas"].map((tab) => (
+					{["form"].map((tab) => (
 						<motion.button
 							key={tab}
 							type="button"
@@ -134,7 +134,7 @@ export default function AppInkgestTopBar({
 						</motion.button>
 					))}
 				</div>
-			)}
+			)} */}
 
 			<div style={{ flex: 1 }} />
 
@@ -196,18 +196,6 @@ export default function AppInkgestTopBar({
 										: `0/${FREE_CREDIT_LIMIT}`}
 								</span>
 							</span>
-							{credits?.renewsAt && (
-								<span
-									style={{
-										fontSize: 11,
-										color: T.muted,
-										fontWeight: 500,
-										whiteSpace: "nowrap",
-									}}
-								>
-									Renew at {formatRenewalDate(credits.renewsAt)}
-								</span>
-							)}
 						</>
 					)}
 					<motion.button

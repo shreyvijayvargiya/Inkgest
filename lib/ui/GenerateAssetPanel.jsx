@@ -1,9 +1,18 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import {
+	Link2,
+	Camera,
+	FileText,
+	BarChart2,
+	Mail,
+	Table,
+	LayoutTemplate,
+	Code2,
+} from "lucide-react";
 import { useGenerateAsset } from "../hooks/useGenerateAsset";
 import {
-	GENERATE_ASSET_TYPES,
+	GENERATE_PANEL_TYPES,
 	taskEmojiForType,
 	taskTitleForType,
 } from "../config/generateAssets";
@@ -15,6 +24,152 @@ function normalizePromptSuggestion(s) {
 		urls: Array.isArray(s.urls) ? s.urls : [],
 		prompt: s.prompt ?? "",
 	};
+}
+
+/** Map preset / legacy API types onto the curated panel. */
+function coercePanelAssetType(t) {
+	if (!t || typeof t !== "string") return "blog";
+	if (GENERATE_PANEL_TYPES.some((x) => x.value === t)) return t;
+	const m = {
+		substack: "newsletter",
+		twitter: "blog",
+		linkedin: "blog",
+		article: "blog",
+		email: "newsletter",
+	};
+	return m[t] || "blog";
+}
+
+/** Lucide icon per panel type — compact tab row */
+const PANEL_TAB_ICONS = {
+	scrape: Link2,
+	"image-gallery": Camera,
+	blog: FileText,
+	infographics: BarChart2,
+	newsletter: Mail,
+	table: Table,
+	"landing-page": LayoutTemplate,
+	react: Code2,
+};
+
+/** Circular credits remaining (or Pro ∞) — SVG ring */
+function CreditsRing({ T, credits, creditRemaining }) {
+	const isPro = credits?.plan === "pro";
+	const limit = Math.max(1, Number(credits?.creditsLimit) || FREE_CREDIT_LIMIT);
+	let remaining;
+	if (isPro) {
+		remaining = limit;
+	} else {
+		const r = credits?.remaining;
+		remaining =
+			typeof r === "number"
+				? Math.max(0, r)
+				: Math.max(0, Number(creditRemaining) || 0);
+	}
+	const frac = isPro ? 1 : Math.min(1, remaining / limit);
+	const low = !isPro && frac < 0.12;
+	const size = 58;
+	const stroke = 4;
+	const cx = size / 2;
+	const cy = size / 2;
+	const radius = (size - stroke) / 2 - 1;
+	const circumference = 2 * Math.PI * radius;
+	const dashOffset = circumference * (1 - frac);
+	const strokeColor = low ? "#EF4444" : isPro ? T.accent : T.warm;
+	const centerLabel = isPro
+		? "∞"
+		: Math.abs(remaining - Math.round(remaining)) < 0.05
+			? String(Math.round(remaining))
+			: remaining.toFixed(1);
+
+	const ariaLabel = isPro
+		? "Pro plan, unlimited credits"
+		: `${remaining} credits remaining out of ${limit}`;
+
+	return (
+		<div
+			role="img"
+			aria-label={ariaLabel}
+			style={{
+				position: "relative",
+				width: size,
+				height: size,
+				flexShrink: 0,
+			}}
+			title={
+				isPro
+					? "Pro — unlimited credits"
+					: `${remaining} of ${limit} credits left this period`
+			}
+		>
+			<svg
+				width={size}
+				height={size}
+				viewBox={`0 0 ${size} ${size}`}
+				style={{ transform: "rotate(-90deg)" }}
+				aria-hidden
+			>
+				<circle
+					cx={cx}
+					cy={cy}
+					r={radius}
+					fill="none"
+					stroke={T.border}
+					strokeWidth={stroke}
+				/>
+				<circle
+					cx={cx}
+					cy={cy}
+					r={radius}
+					fill="none"
+					stroke={strokeColor}
+					strokeWidth={stroke}
+					strokeLinecap="round"
+					strokeDasharray={circumference}
+					strokeDashoffset={dashOffset}
+					style={{
+						transition: "stroke-dashoffset 0.45s ease, stroke 0.2s ease",
+					}}
+				/>
+			</svg>
+			<div
+				style={{
+					position: "absolute",
+					inset: 0,
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "center",
+					flexDirection: "column",
+					pointerEvents: "none",
+				}}
+			>
+				<span
+					style={{
+						fontSize: isPro ? 17 : 13,
+						fontWeight: 800,
+						color: T.accent,
+						fontFamily: "'Outfit', sans-serif",
+						lineHeight: 1,
+					}}
+				>
+					{centerLabel}
+				</span>
+				<span
+					style={{
+						fontSize: 8,
+						fontWeight: 700,
+						color: T.muted,
+						textTransform: "uppercase",
+						letterSpacing: "0.08em",
+						marginTop: 2,
+						fontFamily: "'Outfit', sans-serif",
+					}}
+				>
+					{isPro ? "Pro" : "left"}
+				</span>
+			</div>
+		</div>
+	);
 }
 
 /**
@@ -41,8 +196,7 @@ export default function GenerateAssetPanel({
 }) {
 	const [urlInputs, setUrlInputs] = useState([""]);
 	const [prompt, setPrompt] = useState("");
-	const [assetType, setAssetType] = useState("newsletter");
-	const [dropdownOpen, setDropdownOpen] = useState(false);
+	const [assetType, setAssetType] = useState("blog");
 	const [internalFormat, setInternalFormat] = useState("substack");
 	const [internalStyle, setInternalStyle] = useState("casual");
 	/** Same URL + prompt + type, repeated API calls (max 5). */
@@ -70,9 +224,13 @@ export default function GenerateAssetPanel({
 
 	const showFormatStyle = Boolean(showFormatControls && FORMATS && STYLES);
 
-	const selectedLabel =
-		GENERATE_ASSET_TYPES.find((x) => x.value === assetType)?.label ??
-		"Asset type";
+	const selectedType = useMemo(
+		() =>
+			GENERATE_PANEL_TYPES.find((x) => x.value === assetType) ??
+			GENERATE_PANEL_TYPES[2],
+		[assetType],
+	);
+	const selectedLabel = selectedType.label;
 
 	const isApp = variant === "app";
 
@@ -80,7 +238,7 @@ export default function GenerateAssetPanel({
 		if (p.urls?.length) setUrlInputs([...p.urls]);
 		else setUrlInputs([""]);
 		setPrompt(p.prompt || "");
-		if (p.assetType) setAssetType(p.assetType);
+		if (p.assetType) setAssetType(coercePanelAssetType(p.assetType));
 	};
 
 	const applySuggestion = (s) => {
@@ -94,8 +252,8 @@ export default function GenerateAssetPanel({
 		? {
 				background: T.surface,
 				border: `1.5px solid ${T.border}`,
-				borderRadius: 11,
-				padding: "10px 12px",
+				borderRadius: 12,
+				padding: "12px 14px",
 				fontSize: 14,
 				color: T.accent,
 				outline: "none",
@@ -105,8 +263,8 @@ export default function GenerateAssetPanel({
 		: {
 				background: T.base,
 				border: `1px solid ${T.border}`,
-				borderRadius: 10,
-				padding: "10px 12px",
+				borderRadius: 12,
+				padding: "12px 14px",
 				fontSize: 14,
 				color: T.accent,
 				outline: "none",
@@ -115,58 +273,195 @@ export default function GenerateAssetPanel({
 				fontFamily: "'Outfit', sans-serif",
 			};
 
+	const mainCardStyle = isApp
+		? {
+				width: "100%",
+				background: T.surface,
+				border: `1px solid ${T.border}`,
+				borderRadius: 22,
+				boxShadow:
+					"0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -12px rgba(15, 23, 42, 0.1)",
+				padding: "clamp(22px, 3vw, 36px) clamp(20px, 3vw, 40px)",
+				boxSizing: "border-box",
+			}
+		: {
+				width: "100%",
+				background: T.surface,
+				border: `1px solid ${T.border}`,
+				borderRadius: 22,
+				boxShadow:
+					"0 1px 2px rgba(15, 23, 42, 0.04), 0 24px 48px -12px rgba(15, 23, 42, 0.12)",
+				padding: "clamp(24px, 4vw, 40px) clamp(22px, 3.5vw, 44px)",
+				boxSizing: "border-box",
+			};
+
+	const suggestionsCardStyle = {
+		width: "100%",
+		background: T.surface,
+		border: `1px solid ${T.border}`,
+		borderRadius: 22,
+		boxShadow:
+			"0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -12px rgba(15, 23, 42, 0.1)",
+		padding: "clamp(20px, 3vw, 28px) clamp(20px, 3vw, 40px)",
+		boxSizing: "border-box",
+	};
+
 	return (
 		<div
-			style={
-				isApp
-					? {
-							display: "flex",
-							flexDirection: "column",
-							gap: 20,
-							width: "100%",
-						}
-					: {}
-			}
+			style={{
+				width: "100%",
+				display: "flex",
+				flexDirection: "column",
+				gap: 20,
+			}}
 		>
-			<p
+			<div
 				style={{
-					fontSize: 15,
-					fontWeight: 700,
-					color: T.accent,
-					marginBottom: 4,
 					display: "flex",
-					alignItems: "center",
-					gap: 8,
-					fontFamily: "'Outfit', sans-serif",
+					flexDirection: "column",
+					gap: 0,
+					...mainCardStyle,
 				}}
 			>
-				<span style={{ color: T.warm }}>✦</span> Create an asset
-			</p>
-			<p
+			<header
 				style={{
-					fontSize: 13,
-					color: T.muted,
-					marginBottom: 16,
-					fontFamily: "'Outfit', sans-serif",
+					paddingBottom: 22,
+					marginBottom: 24,
+					borderBottom: `1px solid ${T.border}`,
 				}}
 			>
-				Add source URLs, describe your angle, and pick what to generate.
-			</p>
+				<p
+					className="text-2xl font-bold text-warm md:text-3xl"
+					style={{ marginBottom: 10, letterSpacing: "-0.02em" }}
+				>
+					<span style={{ color: T.warm }}>✦</span> Create an asset
+				</p>
+				<p
+					style={{
+						color: T.muted,
+						lineHeight: 1.6,
+						maxWidth: 640,
+						fontSize: 15,
+						fontFamily: "'Outfit', sans-serif",
+					}}
+				>
+					Paste links, add a short brief (optional for most types), then pick an
+					output — each option turns URLs into something you can ship.
+				</p>
+			</header>
+
+			<section style={{ width: "100%", marginBottom: 28 }}>
+				<label
+					style={{
+						display: "block",
+						fontSize: 11,
+						fontWeight: 700,
+						textTransform: "uppercase",
+						letterSpacing: "0.1em",
+						color: T.muted,
+						marginBottom: 12,
+						fontFamily: "'Outfit', sans-serif",
+					}}
+				>
+					Output type
+				</label>
+				<div
+					role="tablist"
+					aria-label="Asset output type"
+					className="flex flex-nowrap gap-0.5 overflow-x-auto"
+					style={{
+						padding: 4,
+						borderRadius: 14,
+						border: `1px solid ${T.border}`,
+						background: T.base,
+						scrollbarWidth: "thin",
+						WebkitOverflowScrolling: "touch",
+					}}
+				>
+					{GENERATE_PANEL_TYPES.map((opt) => {
+						const active = assetType === opt.value;
+						const Icon = PANEL_TAB_ICONS[opt.value] || FileText;
+						return (
+							<motion.button
+								key={opt.value}
+								type="button"
+								role="tab"
+								aria-selected={active}
+								whileHover={gen.loading ? {} : { scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								onClick={() => setAssetType(opt.value)}
+								disabled={gen.loading}
+								style={{
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+									gap: 7,
+									padding: "8px 12px",
+									minHeight: 36,
+									borderRadius: 10,
+									border: "none",
+									background: active ? T.surface : "transparent",
+									color: active ? T.accent : T.muted,
+									cursor: gen.loading ? "not-allowed" : "pointer",
+									flexShrink: 0,
+									boxShadow: active
+										? "0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)"
+										: "none",
+									transition: "background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								<Icon size={15} strokeWidth={2} aria-hidden className="flex-shrink-0" />
+								<span
+									style={{
+										fontSize: 12,
+										fontWeight: active ? 700 : 600,
+										whiteSpace: "nowrap",
+										lineHeight: 1.2,
+									}}
+								>
+									{opt.label}
+								</span>
+							</motion.button>
+						);
+					})}
+				</div>
+				<div
+					style={{
+						marginTop: 14,
+						padding: "14px 18px",
+						borderRadius: 14,
+						background: T.base,
+						border: `1px solid ${T.border}`,
+						fontSize: 13,
+						lineHeight: 1.55,
+						color: T.muted,
+						fontFamily: "'Outfit', sans-serif",
+					}}
+				>
+					<strong style={{ color: T.accent, fontWeight: 700 }}>
+						{selectedLabel}
+					</strong>
+					{" — "}
+					{selectedType.hint}
+				</div>
+			</section>
 
 			<div
-				className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end justify-start"
-				style={{ width: "100%" }}
+				style={{
+					width: "100%",
+					display: "flex",
+					flexDirection: "column",
+					gap: 22,
+				}}
 			>
-				<div
-					className="flex flex-col gap-2 min-w-0 md:flex-1"
-					style={{ minWidth: isApp ? 200 : 180 }}
-				>
+				<div className="flex min-w-0 flex-col gap-2">
 					<label
 						style={{
 							fontSize: 11,
 							fontWeight: 700,
 							textTransform: "uppercase",
-							letterSpacing: "0.08em",
+							letterSpacing: "0.1em",
 							color: T.muted,
 							fontFamily: "'Outfit', sans-serif",
 						}}
@@ -232,14 +527,14 @@ export default function GenerateAssetPanel({
 					</motion.button>
 				</div>
 
-				<div className="w-full" style={{ minWidth: isApp ? 220 : 200 }}>
+				<div className="w-full min-w-0">
 					<label
 						style={{
 							display: "block",
 							fontSize: 11,
 							fontWeight: 700,
 							textTransform: "uppercase",
-							letterSpacing: "0.08em",
+							letterSpacing: "0.1em",
 							color: T.muted,
 							marginBottom: 8,
 							fontFamily: "'Outfit', sans-serif",
@@ -268,192 +563,121 @@ export default function GenerateAssetPanel({
 					/>
 				</div>
 
-				<div
-					style={{
-						position: "relative",
-						minWidth: 200,
-						width: "100%",
-						maxWidth: 280,
-					}}
-				>
-					<label
-						style={{
-							display: "block",
-							fontSize: 11,
-							fontWeight: 700,
-							textTransform: "uppercase",
-							letterSpacing: "0.08em",
-							color: T.muted,
-							marginBottom: 8,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Asset type
-					</label>
-					<motion.button
-						type="button"
-						whileTap={{ scale: 0.99 }}
-						onClick={() => setDropdownOpen((o) => !o)}
-						disabled={gen.loading}
-						style={{
-							width: "100%",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "space-between",
-							gap: 8,
-							padding: "12px 14px",
-							borderRadius: 12,
-							border: `1.5px solid ${T.border}`,
-							background: isApp ? T.surface : T.base,
-							color: T.accent,
-							fontSize: 14,
-							fontWeight: 600,
-							cursor: gen.loading ? "not-allowed" : "pointer",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						<span>{selectedLabel}</span>
-						<motion.span
-							animate={{ rotate: dropdownOpen ? 180 : 0 }}
-							transition={{ duration: 0.2 }}
+				{assetType !== "scrape" && (
+					<div style={{ minWidth: 0, maxWidth: 280 }}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "uppercase",
+								letterSpacing: "0.1em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Outfit', sans-serif",
+							}}
 						>
-							<ChevronDown size={18} strokeWidth={2} />
-						</motion.span>
-					</motion.button>
-					<AnimatePresence>
-						{dropdownOpen && (
-							<motion.div
-								initial={{ opacity: 0, y: -6, height: 0 }}
-								animate={{ opacity: 1, y: 0, height: "auto" }}
-								exit={{ opacity: 0, y: -4, height: 0 }}
-								transition={{ duration: 0.2 }}
-								style={{
-									position: "absolute",
-									zIndex: 40,
-									left: 0,
-									right: 0,
-									top: "100%",
-									marginTop: 6,
-									overflow: "hidden",
-									borderRadius: 12,
-									border: `1px solid ${T.border}`,
-									background: isApp ? T.surface : T.surface,
-									boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-								}}
-							>
-								<div style={{ maxHeight: 280, overflowY: "auto" }}>
-									{GENERATE_ASSET_TYPES.map((opt) => (
-										<button
-											key={opt.value}
-											type="button"
-											onClick={() => {
-												setAssetType(opt.value);
-												setDropdownOpen(false);
-											}}
-											style={{
-												display: "block",
-												width: "100%",
-												textAlign: "left",
-												padding: "10px 14px",
-												fontSize: 13,
-												fontWeight: assetType === opt.value ? 700 : 500,
-												background:
-													assetType === opt.value
-														? `${T.warm}18`
-														: "transparent",
-												color: T.accent,
-												border: "none",
-												cursor: "pointer",
-												fontFamily: "'Outfit', sans-serif",
-											}}
-										>
-											{opt.label}
-										</button>
-									))}
-								</div>
-							</motion.div>
-						)}
-					</AnimatePresence>
-				</div>
-
-				<div
-					style={{
-						minWidth: 160,
-						width: "100%",
-						maxWidth: 200,
-					}}
-				>
-					<label
-						style={{
-							display: "block",
-							fontSize: 11,
-							fontWeight: 700,
-							textTransform: "uppercase",
-							letterSpacing: "0.08em",
-							color: T.muted,
-							marginBottom: 8,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Copies (max 5)
-					</label>
-					<select
-						value={variantCount}
-						onChange={(e) =>
-							setVariantCount(
-								Math.min(5, Math.max(1, Number(e.target.value) || 1)),
-							)
-						}
-						disabled={gen.loading}
-						style={{
-							width: "100%",
-							padding: "12px 14px",
-							borderRadius: 12,
-							border: `1.5px solid ${T.border}`,
-							background: isApp ? T.surface : T.base,
-							color: T.accent,
-							fontSize: 14,
-							fontWeight: 600,
-							cursor: gen.loading ? "not-allowed" : "pointer",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						{[1, 2, 3, 4, 5].map((n) => (
-							<option key={n} value={n}>
-								{n} — same asset ×{n}
-							</option>
-						))}
-					</select>
-				</div>
+							Copies (max 5)
+						</label>
+						<select
+							value={variantCount}
+							onChange={(e) =>
+								setVariantCount(
+									Math.min(5, Math.max(1, Number(e.target.value) || 1)),
+								)
+							}
+							disabled={gen.loading}
+							style={{
+								width: "100%",
+								padding: "12px 14px",
+								borderRadius: 12,
+								border: `1.5px solid ${T.border}`,
+								background: isApp ? T.surface : T.base,
+								color: T.accent,
+								fontSize: 14,
+								fontWeight: 600,
+								cursor: gen.loading ? "not-allowed" : "pointer",
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{[1, 2, 3, 4, 5].map((n) => (
+								<option key={n} value={n}>
+									{n} — same asset ×{n}
+								</option>
+							))}
+						</select>
+					</div>
+				)}
 			</div>
 
 			<div
 				style={{
 					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: 12,
-					flexWrap: "wrap",
-					marginTop: 8,
+					alignItems: "stretch",
+					gap: 16,
+					width: "100%",
+					marginTop: 28,
+					paddingTop: 22,
+					borderTop: `1px solid ${T.border}`,
 				}}
 			>
+				{reduxUser && credits && (
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							alignItems: "center",
+							justifyContent: "center",
+							gap: 6,
+						}}
+					>
+						<CreditsRing
+							T={T}
+							credits={credits}
+							creditRemaining={creditRemaining}
+						/>
+						<span
+							style={{
+								fontSize: 10,
+								fontWeight: 600,
+								color: T.muted,
+								textAlign: "center",
+								maxWidth: 72,
+								lineHeight: 1.3,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							{credits?.plan === "pro"
+								? "Unlimited"
+								: `of ${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
+						</span>
+					</div>
+				)}
 				<div
-					style={{ display: "flex", gap: 8, justifyContent: "space-between" }}
+					style={{
+						flex: 1,
+						minWidth: 0,
+						display: "flex",
+						flexDirection: "column",
+						gap: 10,
+						justifyContent: "center",
+					}}
 				>
 					<motion.button
 						type="button"
-						whileHover={gen.canSubmit && !gen.loading ? { scale: 1.02 } : {}}
-						whileTap={{ scale: 0.98 }}
+						whileHover={gen.canSubmit && !gen.loading ? { scale: 1.01 } : {}}
+						whileTap={{ scale: 0.99 }}
 						onClick={gen.loading ? gen.cancel : gen.handleGenerate}
 						disabled={!gen.loading && !gen.canSubmit}
 						style={{
-							padding: "12px 22px",
-							borderRadius: 12,
+							width: "100%",
+							padding: "15px 20px",
+							borderRadius: 14,
 							border: "none",
 							background: gen.loading || !gen.canSubmit ? T.border : T.accent,
 							color: gen.loading || !gen.canSubmit ? T.muted : "white",
 							fontWeight: 700,
-							fontSize: 14,
+							fontSize: 15,
 							cursor:
 								!gen.canSubmit && !gen.loading ? "not-allowed" : "pointer",
 							fontFamily: "'Outfit', sans-serif",
@@ -468,11 +692,12 @@ export default function GenerateAssetPanel({
 					{gen.loading && (
 						<motion.button
 							type="button"
-							whileTap={{ scale: 0.95 }}
+							whileTap={{ scale: 0.98 }}
 							onClick={gen.cancel}
 							style={{
-								padding: "10px 16px",
-								borderRadius: 10,
+								width: "100%",
+								padding: "12px 16px",
+								borderRadius: 12,
 								border: `1px solid ${T.border}`,
 								background: "#FEE2E2",
 								color: "#DC2626",
@@ -486,20 +711,6 @@ export default function GenerateAssetPanel({
 						</motion.button>
 					)}
 				</div>
-				{reduxUser && credits && (
-					<span
-						style={{
-							fontSize: 12,
-							fontWeight: 600,
-							color: T.muted,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						{credits?.plan === "pro"
-							? "Pro"
-							: `${Math.max(0, credits?.remaining ?? FREE_CREDIT_LIMIT).toFixed(1)}/${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
-					</span>
-				)}
 			</div>
 
 			{gen.error && (
@@ -507,10 +718,11 @@ export default function GenerateAssetPanel({
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					style={{
-						padding: "12px 14px",
+						marginTop: 20,
+						padding: "14px 18px",
 						background: "#FEF2F2",
 						border: "1px solid #FECACA",
-						borderRadius: 10,
+						borderRadius: 14,
 						fontSize: 13,
 						color: "#DC2626",
 						fontFamily: "'Outfit', sans-serif",
@@ -528,11 +740,11 @@ export default function GenerateAssetPanel({
 					initial={{ opacity: 0, y: 6 }}
 					animate={{ opacity: 1, y: 0 }}
 					style={{
-						marginTop: 8,
-						padding: 18,
-						background: T.surface,
+						marginTop: 24,
+						padding: 22,
+						background: T.base,
 						border: `1px solid ${T.border}`,
-						borderRadius: 14,
+						borderRadius: 16,
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
@@ -803,26 +1015,27 @@ export default function GenerateAssetPanel({
 					)}
 				</motion.div>
 			)}
+			</div>
 
 			{!gen.loading &&
 				gen.completedTasks.length === 0 &&
 				promptSuggestions.length > 0 && (
-					<div style={{ marginTop: 8 }}>
+					<div style={suggestionsCardStyle}>
 						<label
 							style={{
 								display: "block",
 								fontSize: 11,
 								fontWeight: 700,
 								textTransform: "uppercase",
-								letterSpacing: "0.08em",
+								letterSpacing: "0.1em",
 								color: T.muted,
-								marginBottom: 8,
+								marginBottom: 12,
 								fontFamily: "'Outfit', sans-serif",
 							}}
 						>
 							Try a suggestion
 						</label>
-						<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+						<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 							{promptSuggestions.map((raw, i) => {
 								const s = normalizePromptSuggestion(raw);
 								return (
@@ -834,13 +1047,13 @@ export default function GenerateAssetPanel({
 										onClick={() => applySuggestion(raw)}
 										style={{
 											width: "100%",
-											padding: "12px 16px",
-											borderRadius: 10,
+											padding: "14px 18px",
+											borderRadius: 12,
 											fontSize: 13,
 											fontWeight: 500,
 											cursor: "pointer",
-											border: `1.5px solid ${T.border}`,
-											background: isApp ? T.surface : T.base,
+											border: `1px solid ${T.border}`,
+											background: T.base,
 											color: T.accent,
 											textAlign: "left",
 											lineHeight: 1.5,

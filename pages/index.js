@@ -320,7 +320,7 @@ function Hero() {
 
 			<motion.div
 				style={{ y }}
-				className="relative max-w-5xl mx-auto px-6 text-center"
+				className="relative max-w-6xl mx-auto px-6 text-center"
 			>
 				<a
 					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto p-2 mb-4 border border-amber-200 rounded-full flex gap-2 items-center"
@@ -373,13 +373,9 @@ function Hero() {
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
 					style={{
-						maxWidth: 640,
+						maxWidth: 940,
+						width: "100%",
 						margin: "0 auto",
-						background: T.surface,
-						borderRadius: 16,
-						border: `1px solid ${T.border}`,
-						boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-						padding: "28px 24px",
 						textAlign: "left",
 					}}
 				>
