@@ -104,6 +104,45 @@ const AGENT_PROMPT_SUGGESTIONS = [
 	},
 ];
 
+const LANDING_AI_FEATURES = [
+	{
+		title: "AI Blog Generator",
+		description:
+			"Turn one or many source URLs into a structured blog draft with clear sections and a publish-ready flow.",
+		icon: "📝",
+	},
+	{
+		title: "AI Newsletter Creator",
+		description:
+			"Generate concise newsletter issues with hooks, scannable sections, and CTA-friendly writing.",
+		icon: "📧",
+	},
+	{
+		title: "AI URL to Infographics",
+		description:
+			"Convert long-form sources into visual infographic points and clean, presentation-ready summaries.",
+		icon: "📊",
+	},
+	{
+		title: "AI Table Creator",
+		description:
+			"Extract key comparisons and data from content into readable rows and columns instantly.",
+		icon: "🧮",
+	},
+	{
+		title: "AI Landing Page Generator",
+		description:
+			"Create a full landing page structure from your URLs, including hero copy, sections, and CTA blocks.",
+		icon: "🚀",
+	},
+	{
+		title: "AI React / HTML Output",
+		description:
+			"Generate implementation-ready HTML or React-oriented output to speed up your next build.",
+		icon: "⚛️",
+	},
+];
+
 /* ── Reusable fade-up on scroll ── */
 function FadeUp({ children, delay = 0, className = "" }) {
 	const ref = useRef(null);
@@ -363,8 +402,8 @@ function Hero() {
 					className="max-w-2xl mx-auto"
 				>
 					Paste a URL, describe your angle. Get a structured newsletter, blog,
-					infographic, linkedin post, tweets ready to edit and publish — in
-					under 60 seconds.
+					infographics, tables, and landing page drafts ready to edit and
+					publish — in under 60 seconds.
 				</motion.p>
 
 				{/* Generate asset — direct Hono /generate/:type (see NEXT_PUBLIC_INKGEST_GENERATE_URL) */}
@@ -380,7 +419,7 @@ function Hero() {
 					}}
 				>
 					<GenerateAssetPanel
-						variant="landing"
+						variant="app"
 						theme={T}
 						reduxUser={reduxUser}
 						credits={credits}
@@ -440,6 +479,117 @@ function Hero() {
 	);
 }
 
+function AIFeaturesSection() {
+	return (
+		<section
+			id="features"
+			style={{
+				padding: "96px 24px",
+				background: T.base,
+				borderTop: `1px solid ${T.border}`,
+				borderBottom: `1px solid ${T.border}`,
+			}}
+		>
+			<div className="max-w-6xl mx-auto">
+				<FadeUp>
+					<p
+						style={{
+							fontSize: 12,
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.1em",
+							color: T.warm,
+							marginBottom: 10,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						AI Features
+					</p>
+					<h2
+						style={{
+							fontFamily: "'Outfit', sans-serif",
+							fontSize: "clamp(34px,4vw,50px)",
+							color: T.accent,
+							lineHeight: 1.12,
+							marginBottom: 14,
+							letterSpacing: "-0.4px",
+						}}
+					>
+						Built for modern content workflows.
+					</h2>
+					<p
+						style={{
+							fontSize: 17,
+							color: T.muted,
+							lineHeight: 1.65,
+							maxWidth: 680,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						Go from URL to blog posts, newsletters, infographics, tables, and
+						landing pages with one clean generation flow.
+					</p>
+				</FadeUp>
+
+				<div
+					style={{
+						display: "grid",
+						gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+						gap: 16,
+						marginTop: 40,
+					}}
+				>
+					{LANDING_AI_FEATURES.map((f, i) => (
+						<FadeUp key={f.title} delay={i * 0.06}>
+							<motion.div
+								whileHover={{ y: -4, boxShadow: "0 14px 34px rgba(0,0,0,0.09)" }}
+								style={{
+									background: T.surface,
+									border: `1px solid ${T.border}`,
+									borderRadius: 14,
+									padding: "18px 18px 16px",
+									height: "100%",
+								}}
+							>
+								<div
+									style={{
+										fontSize: 20,
+										marginBottom: 10,
+										lineHeight: 1,
+									}}
+								>
+									{f.icon}
+								</div>
+								<h3
+									style={{
+										fontSize: 16,
+										fontWeight: 700,
+										color: T.accent,
+										marginBottom: 8,
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{f.title}
+								</h3>
+								<p
+									style={{
+										fontSize: 13.5,
+										lineHeight: 1.6,
+										color: T.muted,
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{f.description}
+								</p>
+							</motion.div>
+						</FadeUp>
+					))}
+				</div>
+			</div>
+		</section>
+	);
+}
+
 /* ── Features bento grid ── */
 const FEATURES = [
 	{
@@ -472,7 +622,7 @@ const FEATURES = [
 function Features() {
 	return (
 		<section
-			id="features"
+			id="product-showcase"
 			style={{
 				padding: "96px 24px",
 				background: "white",
@@ -493,7 +643,7 @@ function Features() {
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						Features
+						Product showcase
 					</p>
 					<h2
 						style={{
@@ -505,9 +655,9 @@ function Features() {
 							letterSpacing: "-0.5px",
 						}}
 					>
-						Everything you need
+						See the product in action
 						<br />
-						to write faster.
+						across your workflow.
 					</h2>
 					<p
 						style={{
@@ -518,8 +668,8 @@ function Features() {
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						From AI drafts to infographics, themes, and a powerful editor — all
-						in one place.
+						From generation to editing and visualization, every screen is built
+						for fast publishing.
 					</p>
 				</FadeUp>
 
@@ -1561,7 +1711,7 @@ function FAQ() {
 					>
 						Anything else?{" "}
 						<a
-							href="mailto:hello@inkgest.app"
+							href="mailto:shreyvijayvargiya26@gmail.com"
 							style={{ color: T.accent, textDecoration: "underline" }}
 						>
 							Drop us an email.
@@ -1655,6 +1805,7 @@ export default function inkgestLanding() {
 			<FontLink />
 			<Nav />
 			<Hero />
+			<AIFeaturesSection />
 			<Features />
 			<HowItWorks />
 			<StatsStrip />
