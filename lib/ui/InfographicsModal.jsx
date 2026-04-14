@@ -23,6 +23,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { assetRef } from "../api/userAssets";
+import {
+	INKGEST_AGENT_URL,
+	inkgestAgentRequestHeaders,
+} from "../config/agent";
+import { deductCredits } from "../api/deductCredits";
 
 /* ─── Builds a fully self-contained HTML file from a card's rendered DOM ─── */
 function wrapStandaloneHTML(innerHTML, igType = "") {
@@ -1347,9 +1352,9 @@ export default function InfographicsModal({
 			}
 
 			try {
-				const res = await fetch("/api/agent/inkagent", {
+				const res = await fetch(INKGEST_AGENT_URL, {
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
+					headers: inkgestAgentRequestHeaders(userId),
 					body: JSON.stringify({ content, title, idToken, excludeTypes }),
 				});
 				clearInterval(stepTimer.current);
@@ -1358,6 +1363,9 @@ export default function InfographicsModal({
 				if (!res.ok) throw new Error(data.error || "Generation failed");
 
 				const newBatch = data.infographics || [];
+				if (newBatch.length > 0) {
+					deductCredits(idToken, 1);
+				}
 				if (isMore) {
 					setBatches((prev) => [...prev, newBatch]);
 				} else {
