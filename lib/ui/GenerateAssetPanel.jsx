@@ -326,8 +326,6 @@ export default function GenerateAssetPanel({
 			<header
 				style={{
 					paddingBottom: 22,
-					marginBottom: 24,
-					borderBottom: `1px solid ${T.border}`,
 				}}
 			>
 				<p
@@ -336,18 +334,7 @@ export default function GenerateAssetPanel({
 				>
 					<span style={{ color: T.warm }}>✦</span> Create an asset
 				</p>
-				<p
-					style={{
-						color: T.muted,
-						lineHeight: 1.6,
-						maxWidth: 640,
-						fontSize: 15,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					Paste links, add a short brief (optional for most types), then pick an
-					output — each option turns URLs into something you can ship.
-				</p>
+				
 			</header>
 
 			<section style={{ width: "100%", marginBottom: 28 }}>
@@ -426,25 +413,7 @@ export default function GenerateAssetPanel({
 						);
 					})}
 				</div>
-				<div
-					style={{
-						marginTop: 14,
-						padding: "14px 18px",
-						borderRadius: 14,
-						background: T.base,
-						border: `1px solid ${T.border}`,
-						fontSize: 13,
-						lineHeight: 1.55,
-						color: T.muted,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					<strong style={{ color: T.accent, fontWeight: 700 }}>
-						{selectedLabel}
-					</strong>
-					{" — "}
-					{selectedType.hint}
-				</div>
+				
 			</section>
 
 			<div
@@ -563,51 +532,7 @@ export default function GenerateAssetPanel({
 					/>
 				</div>
 
-				{assetType !== "scrape" && (
-					<div style={{ minWidth: 0, maxWidth: 280 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.1em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Copies (max 5)
-						</label>
-						<select
-							value={variantCount}
-							onChange={(e) =>
-								setVariantCount(
-									Math.min(5, Math.max(1, Number(e.target.value) || 1)),
-								)
-							}
-							disabled={gen.loading}
-							style={{
-								width: "100%",
-								padding: "12px 14px",
-								borderRadius: 12,
-								border: `1.5px solid ${T.border}`,
-								background: isApp ? T.surface : T.base,
-								color: T.accent,
-								fontSize: 14,
-								fontWeight: 600,
-								cursor: gen.loading ? "not-allowed" : "pointer",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{[1, 2, 3, 4, 5].map((n) => (
-								<option key={n} value={n}>
-									{n} — same asset ×{n}
-								</option>
-							))}
-						</select>
-					</div>
-				)}
+				
 			</div>
 
 			<div
@@ -616,9 +541,6 @@ export default function GenerateAssetPanel({
 					alignItems: "stretch",
 					gap: 16,
 					width: "100%",
-					marginTop: 28,
-					paddingTop: 22,
-					borderTop: `1px solid ${T.border}`,
 				}}
 			>
 				{reduxUser && credits && (
@@ -1017,75 +939,7 @@ export default function GenerateAssetPanel({
 			)}
 			</div>
 
-			{!gen.loading &&
-				gen.completedTasks.length === 0 &&
-				promptSuggestions.length > 0 && (
-					<div style={suggestionsCardStyle}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.1em",
-								color: T.muted,
-								marginBottom: 12,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Try a suggestion
-						</label>
-						<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-							{promptSuggestions.map((raw, i) => {
-								const s = normalizePromptSuggestion(raw);
-								return (
-									<motion.button
-										key={i}
-										type="button"
-										whileHover={{ scale: 1.005, x: 4 }}
-										whileTap={{ scale: 0.995 }}
-										onClick={() => applySuggestion(raw)}
-										style={{
-											width: "100%",
-											padding: "14px 18px",
-											borderRadius: 12,
-											fontSize: 13,
-											fontWeight: 500,
-											cursor: "pointer",
-											border: `1px solid ${T.border}`,
-											background: T.base,
-											color: T.accent,
-											textAlign: "left",
-											lineHeight: 1.5,
-											fontFamily: "'Outfit', sans-serif",
-										}}
-									>
-										{s.urls.length > 0 && (
-											<div
-												style={{
-													fontSize: 11,
-													fontWeight: 500,
-													color: T.muted,
-													wordBreak: "break-all",
-													marginBottom: 6,
-													lineHeight: 1.45,
-												}}
-											>
-												{s.urls.map((u, j) => (
-													<span key={j}>
-														{j > 0 ? " · " : ""}
-														{u}
-													</span>
-												))}
-											</div>
-										)}
-										<div style={{ fontWeight: 600 }}>{s.prompt}</div>
-									</motion.button>
-								);
-							})}
-						</div>
-					</div>
-				)}
+			
 		</div>
 	);
 }
