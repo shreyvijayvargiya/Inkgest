@@ -21,7 +21,6 @@ import {
 } from "../../lib/utils/credits";
 import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
-import { deductCredits } from "../../lib/api/deductCredits";
 import SimpleBuilderTab from "../../lib/ui/SimpleBuilderTab";
 import GenerateAssetPanel from "../../lib/ui/GenerateAssetPanel";
 import { persistGenerateResponse } from "../../lib/utils/persistGenerateResponse";
@@ -757,7 +756,6 @@ export default function inkgestApp() {
 				queryClient,
 			});
 			if (tasks.length > 0) {
-				deductCredits(idToken, 1);
 				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 				if (tasks[0]?.path) router.push(tasks[0].path);
 			}
@@ -921,7 +919,7 @@ export default function inkgestApp() {
 															fontSize: 10,
 															fontWeight: 700,
 															color: T.muted,
-															textTransform: "uppercase",
+															textTransform: "",
 															letterSpacing: "0.1em",
 															margin: "0 4px 8px",
 														}}
@@ -1149,7 +1147,6 @@ export default function inkgestApp() {
 									variant="app"
 									theme={T}
 									reduxUser={reduxUser}
-									credits={credits}
 									creditRemaining={creditRemaining}
 									queryClient={queryClient}
 									router={router}
@@ -1183,7 +1180,7 @@ export default function inkgestApp() {
 												display: "block",
 												fontSize: 12,
 												fontWeight: 700,
-												textTransform: "uppercase",
+												textTransform: "",
 												letterSpacing: "0.08em",
 												color: T.muted,
 												marginBottom: 8,
@@ -1301,7 +1298,7 @@ export default function inkgestApp() {
 												display: "block",
 												fontSize: 12,
 												fontWeight: 700,
-												textTransform: "uppercase",
+												textTransform: "",
 												letterSpacing: "0.08em",
 												color: T.muted,
 												marginBottom: 8,
@@ -1383,7 +1380,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -1458,7 +1455,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -1548,7 +1545,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -1591,7 +1588,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -1866,7 +1863,7 @@ export default function inkgestApp() {
 											style={{
 												fontSize: 12,
 												fontWeight: 700,
-												textTransform: "uppercase",
+												textTransform: "",
 												letterSpacing: "0.08em",
 												color: T.warm,
 												marginBottom: 12,

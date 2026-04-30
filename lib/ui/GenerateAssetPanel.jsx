@@ -16,7 +16,6 @@ import {
 	taskEmojiForType,
 	taskTitleForType,
 } from "../config/generateAssets";
-import { FREE_CREDIT_LIMIT } from "../utils/credits";
 
 function normalizePromptSuggestion(s) {
 	if (typeof s === "string") return { urls: [], prompt: s };
@@ -26,19 +25,6 @@ function normalizePromptSuggestion(s) {
 	};
 }
 
-/** Map preset / legacy API types onto the curated panel. */
-function coercePanelAssetType(t) {
-	if (!t || typeof t !== "string") return "blog";
-	if (GENERATE_PANEL_TYPES.some((x) => x.value === t)) return t;
-	const m = {
-		substack: "newsletter",
-		twitter: "blog",
-		linkedin: "blog",
-		article: "blog",
-		email: "newsletter",
-	};
-	return m[t] || "blog";
-}
 
 /** Lucide icon per panel type — compact tab row */
 const PANEL_TAB_ICONS = {
@@ -52,134 +38,13 @@ const PANEL_TAB_ICONS = {
 	react: Code2,
 };
 
-/** Circular credits remaining (or Pro ∞) — SVG ring */
-function CreditsRing({ T, credits, creditRemaining }) {
-	const isPro = credits?.plan === "pro";
-	const limit = Math.max(1, Number(credits?.creditsLimit) || FREE_CREDIT_LIMIT);
-	let remaining;
-	if (isPro) {
-		remaining = limit;
-	} else {
-		const r = credits?.remaining;
-		remaining =
-			typeof r === "number"
-				? Math.max(0, r)
-				: Math.max(0, Number(creditRemaining) || 0);
-	}
-	const frac = isPro ? 1 : Math.min(1, remaining / limit);
-	const low = !isPro && frac < 0.12;
-	const size = 58;
-	const stroke = 4;
-	const cx = size / 2;
-	const cy = size / 2;
-	const radius = (size - stroke) / 2 - 1;
-	const circumference = 2 * Math.PI * radius;
-	const dashOffset = circumference * (1 - frac);
-	const strokeColor = low ? "#EF4444" : isPro ? T.accent : T.warm;
-	const centerLabel = isPro
-		? "∞"
-		: Math.abs(remaining - Math.round(remaining)) < 0.05
-			? String(Math.round(remaining))
-			: remaining.toFixed(1);
-
-	const ariaLabel = isPro
-		? "Pro plan, unlimited credits"
-		: `${remaining} credits remaining out of ${limit}`;
-
-	return (
-		<div
-			role="img"
-			aria-label={ariaLabel}
-			style={{
-				position: "relative",
-				width: size,
-				height: size,
-				flexShrink: 0,
-			}}
-			title={
-				isPro
-					? "Pro — unlimited credits"
-					: `${remaining} of ${limit} credits left this period`
-			}
-		>
-			<svg
-				width={size}
-				height={size}
-				viewBox={`0 0 ${size} ${size}`}
-				style={{ transform: "rotate(-90deg)" }}
-				aria-hidden
-			>
-				<circle
-					cx={cx}
-					cy={cy}
-					r={radius}
-					fill="none"
-					stroke={T.border}
-					strokeWidth={stroke}
-				/>
-				<circle
-					cx={cx}
-					cy={cy}
-					r={radius}
-					fill="none"
-					stroke={strokeColor}
-					strokeWidth={stroke}
-					strokeLinecap="round"
-					strokeDasharray={circumference}
-					strokeDashoffset={dashOffset}
-					style={{
-						transition: "stroke-dashoffset 0.45s ease, stroke 0.2s ease",
-					}}
-				/>
-			</svg>
-			<div
-				style={{
-					position: "absolute",
-					inset: 0,
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "center",
-					flexDirection: "column",
-					pointerEvents: "none",
-				}}
-			>
-				<span
-					style={{
-						fontSize: isPro ? 17 : 13,
-						fontWeight: 800,
-						color: T.accent,
-						fontFamily: "'Outfit', sans-serif",
-						lineHeight: 1,
-					}}
-				>
-					{centerLabel}
-				</span>
-				<span
-					style={{
-						fontSize: 8,
-						fontWeight: 700,
-						color: T.muted,
-						textTransform: "uppercase",
-						letterSpacing: "0.08em",
-						marginTop: 2,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					{isPro ? "Pro" : "left"}
-				</span>
-			</div>
-		</div>
-	);
-}
-
 /**
- * URLs + prompt + asset type → Hono POST /generate/:type (Bearer token), stream preview, persist + Open.
+ * URLs + prompt + asset type → POST /api/generate/:type (or scrape), stream preview, persist + Open.
  */
 export default function GenerateAssetPanel({
 	variant = "landing",
 	theme: T,
 	reduxUser,
-	credits,
 	creditRemaining = 0,
 	queryClient,
 	router,
@@ -234,13 +99,7 @@ export default function GenerateAssetPanel({
 
 	const isApp = variant === "app";
 
-	const applyPreset = (p) => {
-		if (p.urls?.length) setUrlInputs([...p.urls]);
-		else setUrlInputs([""]);
-		setPrompt(p.prompt || "");
-		if (p.assetType) setAssetType(coercePanelAssetType(p.assetType));
-	};
-
+	
 	const applySuggestion = (s) => {
 		const n = normalizePromptSuggestion(s);
 		if (n.urls.length) setUrlInputs([...n.urls]);
@@ -327,7 +186,6 @@ export default function GenerateAssetPanel({
 				style={{
 					paddingBottom: 22,
 					marginBottom: 24,
-					borderBottom: `1px solid ${T.border}`,
 				}}
 			>
 				<p
@@ -356,7 +214,7 @@ export default function GenerateAssetPanel({
 						display: "block",
 						fontSize: 11,
 						fontWeight: 700,
-						textTransform: "uppercase",
+						textTransform: "",
 						letterSpacing: "0.1em",
 						color: T.muted,
 						marginBottom: 12,
@@ -460,7 +318,7 @@ export default function GenerateAssetPanel({
 						style={{
 							fontSize: 11,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.muted,
 							fontFamily: "'Outfit', sans-serif",
@@ -533,7 +391,7 @@ export default function GenerateAssetPanel({
 							display: "block",
 							fontSize: 11,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.muted,
 							marginBottom: 8,
@@ -563,51 +421,7 @@ export default function GenerateAssetPanel({
 					/>
 				</div>
 
-				{assetType !== "scrape" && (
-					<div style={{ minWidth: 0, maxWidth: 280 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.1em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Copies (max 5)
-						</label>
-						<select
-							value={variantCount}
-							onChange={(e) =>
-								setVariantCount(
-									Math.min(5, Math.max(1, Number(e.target.value) || 1)),
-								)
-							}
-							disabled={gen.loading}
-							style={{
-								width: "100%",
-								padding: "12px 14px",
-								borderRadius: 12,
-								border: `1.5px solid ${T.border}`,
-								background: isApp ? T.surface : T.base,
-								color: T.accent,
-								fontSize: 14,
-								fontWeight: 600,
-								cursor: gen.loading ? "not-allowed" : "pointer",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{[1, 2, 3, 4, 5].map((n) => (
-								<option key={n} value={n}>
-									{n} — same asset ×{n}
-								</option>
-							))}
-						</select>
-					</div>
-				)}
+				
 			</div>
 
 			<div
@@ -616,43 +430,8 @@ export default function GenerateAssetPanel({
 					alignItems: "stretch",
 					gap: 16,
 					width: "100%",
-					marginTop: 28,
-					paddingTop: 22,
-					borderTop: `1px solid ${T.border}`,
 				}}
 			>
-				{reduxUser && credits && (
-					<div
-						style={{
-							display: "flex",
-							flexDirection: "column",
-							alignItems: "center",
-							justifyContent: "center",
-							gap: 6,
-						}}
-					>
-						<CreditsRing
-							T={T}
-							credits={credits}
-							creditRemaining={creditRemaining}
-						/>
-						<span
-							style={{
-								fontSize: 10,
-								fontWeight: 600,
-								color: T.muted,
-								textAlign: "center",
-								maxWidth: 72,
-								lineHeight: 1.3,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{credits?.plan === "pro"
-								? "Unlimited"
-								: `of ${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
-						</span>
-					</div>
-				)}
 				<div
 					style={{
 						flex: 1,
@@ -1026,7 +805,7 @@ export default function GenerateAssetPanel({
 								display: "block",
 								fontSize: 11,
 								fontWeight: 700,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.1em",
 								color: T.muted,
 								marginBottom: 12,

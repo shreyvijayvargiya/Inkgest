@@ -367,7 +367,7 @@ function Hero() {
 					under 60 seconds.
 				</motion.p>
 
-				{/* Generate asset — direct Hono /generate/:type (see NEXT_PUBLIC_INKGEST_GENERATE_URL) */}
+				{/* Generate asset — POST /api/generate/:type (proxied to Hono; INKGEST_GENERATE_URL on server) */}
 				<motion.div
 					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -383,7 +383,6 @@ function Hero() {
 						variant="landing"
 						theme={T}
 						reduxUser={reduxUser}
-						credits={credits}
 						creditRemaining={creditRemaining}
 						queryClient={null}
 						router={router}
@@ -486,7 +485,7 @@ function Features() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
@@ -610,7 +609,7 @@ function Features() {
 										style={{
 											fontSize: 11,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.warm,
 											fontFamily: "'Outfit', sans-serif",
@@ -676,7 +675,7 @@ function HowItWorks() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
@@ -874,7 +873,7 @@ function Testimonials() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
@@ -1029,7 +1028,7 @@ function Pricing() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							textAlign: "center",
@@ -1093,7 +1092,7 @@ function Pricing() {
 								style={{
 									fontSize: 12,
 									fontWeight: 700,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.08em",
 									color: T.muted,
 									marginBottom: 10,
@@ -1186,7 +1185,7 @@ function Pricing() {
 								style={{
 									fontSize: 12,
 									fontWeight: 700,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.08em",
 									color: "rgba(255,255,255,0.5)",
 									marginBottom: 10,
@@ -1301,7 +1300,7 @@ function OpenSource() {
 								style={{
 									fontSize: 12,
 									fontWeight: 700,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.1em",
 									color: T.warm,
 									marginBottom: 10,
@@ -1530,7 +1529,7 @@ function FAQ() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,

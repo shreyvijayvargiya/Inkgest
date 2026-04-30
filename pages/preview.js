@@ -148,7 +148,7 @@ const genTitle = (type, prompt) => {
 	const short = prompt
 		.replace(/^(write|create|make|generate|build|give me)\s+(a|an)?\s*/i, "")
 		.trim();
-	const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+	const cap = (s) => s.charAt(0).to() + s.slice(1);
 	const labels = {
 		blog: "Blog:",
 		newsletter: "Newsletter:",
@@ -274,7 +274,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 									fontSize: 11,
 									fontFamily: "'Courier New',monospace",
 									color: cfg.color,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: 2,
 									marginBottom: 3,
 								}}
@@ -333,7 +333,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 										fontSize: 9,
 										fontFamily: "'Courier New',monospace",
 										color: cfg.color,
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: 2.5,
 									}}
 								>
@@ -372,7 +372,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 										fontSize: 8.5,
 										fontFamily: "'Courier New',monospace",
 										color: "rgba(255,255,255,0.3)",
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: 1.8,
 										marginBottom: 5,
 									}}
@@ -435,7 +435,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 										fontSize: 8.5,
 										fontFamily: "'Courier New',monospace",
 										color: "rgba(255,255,255,0.3)",
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: 1.8,
 										marginBottom: 5,
 									}}
@@ -694,7 +694,7 @@ function NodeCard({
 							fontSize: 9,
 							fontFamily: "'Courier New',monospace",
 							color: cfg.color,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: 2.5,
 							opacity: 0.9,
 						}}
@@ -873,7 +873,7 @@ function SidePanel({
 								fontSize: 9,
 								fontFamily: "'Courier New',monospace",
 								color: cfg.color,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: 2.5,
 							}}
 						>
@@ -943,7 +943,7 @@ function SidePanel({
 						fontSize: 8.5,
 						fontFamily: "'Courier New',monospace",
 						color: "rgba(255,255,255,0.2)",
-						textTransform: "uppercase",
+						textTransform: "",
 						letterSpacing: 2.5,
 						marginBottom: 9,
 					}}
@@ -1723,7 +1723,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 						fontSize: 8.5,
 						fontFamily: "'Courier New',monospace",
 						color: cfg.color,
-						textTransform: "uppercase",
+						textTransform: "",
 						letterSpacing: 2.2,
 					}}
 				>
@@ -2048,7 +2048,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 							fontSize: 8.5,
 							fontFamily: "'Courier New',monospace",
 							color: "rgba(255,255,255,0.2)",
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: 2,
 							marginBottom: 10,
 						}}
@@ -2098,7 +2098,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 							fontSize: 8.5,
 							fontFamily: "'Courier New',monospace",
 							color: "rgba(255,255,255,0.2)",
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: 2,
 							marginBottom: 9,
 						}}

@@ -74,7 +74,7 @@ export default function BlogPost({ post, jsonLd, shareUrl }) {
 							{post.tags.map((tag) => (
 								<span
 									key={tag}
-									className="text-[11px] uppercase tracking-wide px-2.5 py-1 rounded-md bg-[#F0ECE5] text-[#6A655E]"
+									className="text-[11px]  tracking-wide px-2.5 py-1 rounded-md bg-[#F0ECE5] text-[#6A655E]"
 								>
 									{tag}
 								</span>

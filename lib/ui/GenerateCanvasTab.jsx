@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { auth } from "../config/firebase";
 import { requestGenerate } from "../api/generateClient";
 import { persistGenerateResponse } from "../utils/persistGenerateResponse";
-import { deductCredits } from "../api/deductCredits";
 import { taskTitleForType } from "../config/generateAssets";
 import {
 	mergeCanvasNodesFromAssets,
@@ -284,7 +283,7 @@ function NodeCard({
 							fontSize: 10,
 							fontWeight: 700,
 							color: cfg.color,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.12em",
 						}}
 					>
@@ -309,7 +308,7 @@ function NodeCard({
 								fontSize: 8,
 								fontWeight: 800,
 								color: T.warm,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.14em",
 								flexShrink: 0,
 							}}
@@ -582,7 +581,7 @@ function SidePanel({
 								fontSize: 10,
 								fontWeight: 700,
 								color: cfg.color,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.12em",
 							}}
 						>
@@ -594,7 +593,7 @@ function SidePanel({
 									fontSize: 8,
 									fontWeight: 800,
 									color: T.warm,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.12em",
 								}}
 							>
@@ -760,7 +759,7 @@ function SidePanel({
 								fontSize: 10,
 								fontWeight: 700,
 								color: T.muted,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.08em",
 								marginBottom: 6,
 							}}
@@ -781,7 +780,7 @@ function SidePanel({
 								fontSize: 10,
 								fontWeight: 700,
 								color: T.muted,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.08em",
 								marginTop: 12,
 								marginBottom: 6,
@@ -844,7 +843,7 @@ function SidePanel({
 										fontSize: 9,
 										fontWeight: 700,
 										color: T.muted,
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: "0.1em",
 										marginBottom: 8,
 									}}
@@ -878,7 +877,7 @@ function SidePanel({
 									fontSize: 9,
 									fontWeight: 700,
 									color: T.warm,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.1em",
 									marginBottom: 10,
 								}}
@@ -909,7 +908,7 @@ function SidePanel({
 								fontSize: 9,
 								fontWeight: 700,
 								color: T.muted,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.1em",
 								marginBottom: 8,
 							}}
@@ -1407,7 +1406,6 @@ export default function GenerateCanvasTab({
 				});
 
 				if (tasks.length > 0) {
-					deductCredits(idToken, 1);
 					if (reduxUser?.uid && queryClient) {
 						queueMicrotask(() => {
 							queryClient.invalidateQueries({
@@ -2213,7 +2211,7 @@ export default function GenerateCanvasTab({
 							fontSize: 11,
 							fontWeight: 700,
 							color: T.muted,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.08em",
 							marginBottom: 12,
 						}}
