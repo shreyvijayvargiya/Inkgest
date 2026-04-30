@@ -318,7 +318,7 @@ const PricingPage = () => {
 										style={{
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.1em",
 											color: "rgba(255,255,255,0.35)",
 											marginBottom: 16,
@@ -527,7 +527,7 @@ const PricingPage = () => {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 14,
@@ -584,7 +584,7 @@ const PricingPage = () => {
 									style={{
 										fontSize: 11,
 										fontWeight: 700,
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: "0.08em",
 										color: "rgba(255,255,255,0.5)",
 										marginBottom: 8,
@@ -736,7 +736,7 @@ const PricingPage = () => {
 									style={{
 										fontSize: 12,
 										fontWeight: 700,
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: "0.08em",
 										color: plan.popular ? "rgba(255,255,255,0.5)" : T.muted,
 										marginBottom: 6,
@@ -1054,7 +1054,7 @@ const PricingPage = () => {
 							style={{
 								fontSize: 12,
 								fontWeight: 700,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.08em",
 								color: T.warm,
 								marginBottom: 20,
