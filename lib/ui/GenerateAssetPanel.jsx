@@ -16,7 +16,6 @@ import {
 	taskEmojiForType,
 	taskTitleForType,
 } from "../config/generateAssets";
-import { FREE_CREDIT_LIMIT } from "../utils/credits";
 
 function normalizePromptSuggestion(s) {
 	if (typeof s === "string") return { urls: [], prompt: s };
@@ -26,19 +25,6 @@ function normalizePromptSuggestion(s) {
 	};
 }
 
-/** Map preset / legacy API types onto the curated panel. */
-function coercePanelAssetType(t) {
-	if (!t || typeof t !== "string") return "blog";
-	if (GENERATE_PANEL_TYPES.some((x) => x.value === t)) return t;
-	const m = {
-		substack: "newsletter",
-		twitter: "blog",
-		linkedin: "blog",
-		article: "blog",
-		email: "newsletter",
-	};
-	return m[t] || "blog";
-}
 
 /** Lucide icon per panel type — compact tab row */
 const PANEL_TAB_ICONS = {
@@ -52,134 +38,13 @@ const PANEL_TAB_ICONS = {
 	react: Code2,
 };
 
-/** Circular credits remaining (or Pro ∞) — SVG ring */
-function CreditsRing({ T, credits, creditRemaining }) {
-	const isPro = credits?.plan === "pro";
-	const limit = Math.max(1, Number(credits?.creditsLimit) || FREE_CREDIT_LIMIT);
-	let remaining;
-	if (isPro) {
-		remaining = limit;
-	} else {
-		const r = credits?.remaining;
-		remaining =
-			typeof r === "number"
-				? Math.max(0, r)
-				: Math.max(0, Number(creditRemaining) || 0);
-	}
-	const frac = isPro ? 1 : Math.min(1, remaining / limit);
-	const low = !isPro && frac < 0.12;
-	const size = 58;
-	const stroke = 4;
-	const cx = size / 2;
-	const cy = size / 2;
-	const radius = (size - stroke) / 2 - 1;
-	const circumference = 2 * Math.PI * radius;
-	const dashOffset = circumference * (1 - frac);
-	const strokeColor = low ? "#EF4444" : isPro ? T.accent : T.warm;
-	const centerLabel = isPro
-		? "∞"
-		: Math.abs(remaining - Math.round(remaining)) < 0.05
-			? String(Math.round(remaining))
-			: remaining.toFixed(1);
-
-	const ariaLabel = isPro
-		? "Pro plan, unlimited credits"
-		: `${remaining} credits remaining out of ${limit}`;
-
-	return (
-		<div
-			role="img"
-			aria-label={ariaLabel}
-			style={{
-				position: "relative",
-				width: size,
-				height: size,
-				flexShrink: 0,
-			}}
-			title={
-				isPro
-					? "Pro — unlimited credits"
-					: `${remaining} of ${limit} credits left this period`
-			}
-		>
-			<svg
-				width={size}
-				height={size}
-				viewBox={`0 0 ${size} ${size}`}
-				style={{ transform: "rotate(-90deg)" }}
-				aria-hidden
-			>
-				<circle
-					cx={cx}
-					cy={cy}
-					r={radius}
-					fill="none"
-					stroke={T.border}
-					strokeWidth={stroke}
-				/>
-				<circle
-					cx={cx}
-					cy={cy}
-					r={radius}
-					fill="none"
-					stroke={strokeColor}
-					strokeWidth={stroke}
-					strokeLinecap="round"
-					strokeDasharray={circumference}
-					strokeDashoffset={dashOffset}
-					style={{
-						transition: "stroke-dashoffset 0.45s ease, stroke 0.2s ease",
-					}}
-				/>
-			</svg>
-			<div
-				style={{
-					position: "absolute",
-					inset: 0,
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "center",
-					flexDirection: "column",
-					pointerEvents: "none",
-				}}
-			>
-				<span
-					style={{
-						fontSize: isPro ? 17 : 13,
-						fontWeight: 800,
-						color: T.accent,
-						fontFamily: "'Outfit', sans-serif",
-						lineHeight: 1,
-					}}
-				>
-					{centerLabel}
-				</span>
-				<span
-					style={{
-						fontSize: 8,
-						fontWeight: 700,
-						color: T.muted,
-						textTransform: "uppercase",
-						letterSpacing: "0.08em",
-						marginTop: 2,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					{isPro ? "Pro" : "left"}
-				</span>
-			</div>
-		</div>
-	);
-}
-
 /**
- * URLs + prompt + asset type → Hono POST /generate/:type (Bearer token), stream preview, persist + Open.
+ * URLs + prompt + asset type → POST /api/generate/:type (or scrape), stream preview, persist + Open.
  */
 export default function GenerateAssetPanel({
 	variant = "landing",
 	theme: T,
 	reduxUser,
-	credits,
 	creditRemaining = 0,
 	queryClient,
 	router,
@@ -234,13 +99,7 @@ export default function GenerateAssetPanel({
 
 	const isApp = variant === "app";
 
-	const applyPreset = (p) => {
-		if (p.urls?.length) setUrlInputs([...p.urls]);
-		else setUrlInputs([""]);
-		setPrompt(p.prompt || "");
-		if (p.assetType) setAssetType(coercePanelAssetType(p.assetType));
-	};
-
+	
 	const applySuggestion = (s) => {
 		const n = normalizePromptSuggestion(s);
 		if (n.urls.length) setUrlInputs([...n.urls]);
@@ -326,36 +185,33 @@ export default function GenerateAssetPanel({
 			<header
 				style={{
 					paddingBottom: 22,
+					marginBottom: 24,
 				}}
 			>
 				<p
 					className="text-2xl font-bold text-warm md:text-3xl"
 					style={{ marginBottom: 10, letterSpacing: "-0.02em" }}
 				>
-					<span style={{ color: T.warm }}>✦</span> Create an asset
+					<span style={{ color: T.warm }}>✦</span> Create Blogs
 				</p>
-				
-			</header>
-
-			<section style={{ width: "100%", marginBottom: 28 }}>
-				<label
+				<p
 					style={{
-						display: "block",
-						fontSize: 11,
-						fontWeight: 700,
-						textTransform: "uppercase",
-						letterSpacing: "0.1em",
 						color: T.muted,
-						marginBottom: 12,
+						lineHeight: 1.6,
+						maxWidth: 640,
+						fontSize: 15,
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
-					Output type
-				</label>
+					Paste links, add a short brief to create your blog post
+				</p>
+			</header>
+
+			<section style={{ width: "100%", marginBottom: 28 }}>
 				<div
 					role="tablist"
 					aria-label="Asset output type"
-					className="flex flex-nowrap gap-0.5 overflow-x-auto"
+					className="flex flex-nowrap gap-0.5 overflow-x-auto w-fit"
 					style={{
 						padding: 4,
 						borderRadius: 14,
@@ -429,7 +285,7 @@ export default function GenerateAssetPanel({
 						style={{
 							fontSize: 11,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.muted,
 							fontFamily: "'Outfit', sans-serif",
@@ -502,7 +358,7 @@ export default function GenerateAssetPanel({
 							display: "block",
 							fontSize: 11,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.muted,
 							marginBottom: 8,
@@ -543,38 +399,6 @@ export default function GenerateAssetPanel({
 					width: "100%",
 				}}
 			>
-				{reduxUser && credits && (
-					<div
-						style={{
-							display: "flex",
-							flexDirection: "column",
-							alignItems: "center",
-							justifyContent: "center",
-							gap: 6,
-						}}
-					>
-						<CreditsRing
-							T={T}
-							credits={credits}
-							creditRemaining={creditRemaining}
-						/>
-						<span
-							style={{
-								fontSize: 10,
-								fontWeight: 600,
-								color: T.muted,
-								textAlign: "center",
-								maxWidth: 72,
-								lineHeight: 1.3,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{credits?.plan === "pro"
-								? "Unlimited"
-								: `of ${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
-						</span>
-					</div>
-				)}
 				<div
 					style={{
 						flex: 1,
@@ -842,7 +666,7 @@ export default function GenerateAssetPanel({
 						<>
 							{gen.loading && !gen.streamed && (
 								<p style={{ fontSize: 13, color: T.muted }}>
-									Working on your asset…
+									Working on your blog/newsletter...
 								</p>
 							)}
 							{gen.streamed && (
@@ -939,7 +763,75 @@ export default function GenerateAssetPanel({
 			)}
 			</div>
 
-			
+			{!gen.loading &&
+				gen.completedTasks.length === 0 &&
+				promptSuggestions.length > 0 && (
+					<div style={suggestionsCardStyle}>
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "",
+								letterSpacing: "0.1em",
+								color: T.muted,
+								marginBottom: 12,
+								fontFamily: "'Outfit', sans-serif",
+							}}
+						>
+							Try a suggestion
+						</label>
+						<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+							{promptSuggestions.map((raw, i) => {
+								const s = normalizePromptSuggestion(raw);
+								return (
+									<motion.button
+										key={i}
+										type="button"
+										whileHover={{ scale: 1.005, x: 4 }}
+										whileTap={{ scale: 0.995 }}
+										onClick={() => applySuggestion(raw)}
+										style={{
+											width: "100%",
+											padding: "14px 18px",
+											borderRadius: 12,
+											fontSize: 13,
+											fontWeight: 500,
+											cursor: "pointer",
+											border: `1px solid ${T.border}`,
+											background: T.base,
+											color: T.accent,
+											textAlign: "left",
+											lineHeight: 1.5,
+											fontFamily: "'Outfit', sans-serif",
+										}}
+									>
+										{s.urls.length > 0 && (
+											<div
+												style={{
+													fontSize: 11,
+													fontWeight: 500,
+													color: T.muted,
+													wordBreak: "break-all",
+													marginBottom: 6,
+													lineHeight: 1.45,
+												}}
+											>
+												{s.urls.map((u, j) => (
+													<span key={j}>
+														{j > 0 ? " · " : ""}
+														{u}
+													</span>
+												))}
+											</div>
+										)}
+										<div style={{ fontWeight: 600 }}>{s.prompt}</div>
+									</motion.button>
+								);
+							})}
+						</div>
+					</div>
+				)}
 		</div>
 	);
 }

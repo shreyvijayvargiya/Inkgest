@@ -539,7 +539,7 @@ export default function AIChatSidebar({
 									>
 										<p style={{
 											fontSize: 10.5, fontWeight: 700,
-											textTransform: "uppercase", letterSpacing: "0.1em",
+											textTransform: "", letterSpacing: "0.1em",
 											color: "#B0AAA3", marginBottom: 8,
 										}}>
 											Try asking…

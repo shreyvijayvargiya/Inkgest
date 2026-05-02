@@ -153,7 +153,7 @@ function DonutChart({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -336,7 +336,7 @@ function BarChart({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -458,7 +458,7 @@ function StepFlow({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -570,7 +570,7 @@ function ComparisonCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: accent(data),
 					marginBottom: 6,
@@ -649,7 +649,7 @@ function ComparisonCard({ data }) {
 									fontSize: 12,
 									fontWeight: 700,
 									color: col.iconColor,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.06em",
 								}}
 							>
@@ -729,7 +729,7 @@ function StatCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 14,
@@ -864,7 +864,7 @@ function TimelineCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1000,7 +1000,7 @@ function ProgressCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1099,7 +1099,7 @@ function MetricGridCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1244,7 +1244,7 @@ function BatchDivider({ number }) {
 					fontSize: 11,
 					fontWeight: 700,
 					color: D.muted,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					whiteSpace: "nowrap",
 				}}

@@ -147,7 +147,7 @@ const THEMES = {
 			"max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Inter',sans-serif;",
 		h1: "font-family:'Inter',sans-serif;font-size:30px;color:#FFFFFF;line-height:1.2;margin:0 0 16px;font-weight:600;",
 		h2: "font-family:'Inter',sans-serif;font-size:20px;color:#D4D4D4;line-height:1.3;margin:32px 0 12px;font-weight:500;border-bottom:1px solid #222222;padding-bottom:8px;",
-		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;",
+		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:;letter-spacing:0.06em;",
 		p: "font-size:15px;line-height:1.9;color:#A8A8A8;margin:0 0 14px;",
 		blockquote:
 			"border-left:3px solid #7C7CFF;padding:4px 0 4px 20px;color:#666666;font-style:italic;margin:20px 0;",
@@ -239,7 +239,7 @@ const THEMES = {
 			"max-width:740px;margin:0 auto;padding:48px 56px;background:#F8F9FA;font-family:'IBM Plex Sans',sans-serif;",
 		h1: "font-family:'IBM Plex Serif',serif;font-size:32px;color:#1A1F2E;line-height:1.2;margin:0 0 16px;font-weight:600;",
 		h2: "font-family:'IBM Plex Serif',serif;font-size:21px;color:#1A1F2E;line-height:1.35;margin:32px 0 12px;font-weight:600;border-bottom:2px solid #E5E7EB;padding-bottom:8px;",
-		h3: "font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:#1A1F2E;margin:22px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;",
+		h3: "font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:#1A1F2E;margin:22px 0 8px;font-weight:600;text-transform:;letter-spacing:0.05em;",
 		p: "font-size:16px;line-height:1.8;color:#374151;margin:0 0 14px;",
 		blockquote:
 			"border-left:4px solid #3B82F6;background:#EFF6FF;padding:12px 20px;color:#1D4ED8;margin:24px 0;font-style:italic;",
@@ -307,7 +307,7 @@ const THEMES = {
 			"max-width:720px;margin:0 auto;padding:56px 60px;background:#FFFFFF;font-family:'Figtree',sans-serif;",
 		h1: "font-family:'Playfair Display',serif;font-size:38px;color:#1D3461;line-height:1.15;margin:0 0 18px;font-weight:700;",
 		h2: "font-family:'Playfair Display',serif;font-size:24px;color:#1D3461;line-height:1.3;margin:36px 0 14px;font-weight:400;",
-		h3: "font-family:'Figtree',sans-serif;font-size:12px;color:#8899AA;margin:24px 0 8px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;",
+		h3: "font-family:'Figtree',sans-serif;font-size:12px;color:#8899AA;margin:24px 0 8px;font-weight:600;letter-spacing:0.08em;text-transform:;",
 		p: "font-size:16px;line-height:1.9;color:#444B58;margin:0 0 16px;",
 		blockquote:
 			"border-left:4px solid #1D3461;padding:8px 0 8px 24px;color:#8899AA;font-family:'Playfair Display',serif;font-style:italic;font-size:18px;margin:28px 0;",
@@ -376,7 +376,7 @@ const THEMES = {
 			"max-width:740px;margin:0 auto;padding:48px 56px;background:#F5F5F5;font-family:'Roboto',sans-serif;",
 		h1: "font-family:'Bebas Neue',sans-serif;font-size:56px;color:#111111;line-height:1.0;margin:0 0 20px;letter-spacing:0.03em;",
 		h2: "font-family:'Bebas Neue',sans-serif;font-size:30px;color:#DC2626;line-height:1.1;margin:32px 0 14px;letter-spacing:0.05em;",
-		h3: "font-family:'Roboto',sans-serif;font-size:12px;color:#111111;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;",
+		h3: "font-family:'Roboto',sans-serif;font-size:12px;color:#111111;margin:22px 0 8px;font-weight:500;text-transform:;letter-spacing:0.1em;",
 		p: "font-size:16px;line-height:1.8;color:#333333;margin:0 0 14px;",
 		blockquote:
 			"border-left:6px solid #DC2626;padding:12px 24px;background:#FFFFFF;color:#666666;font-size:20px;font-style:italic;margin:24px 0;",
@@ -741,7 +741,7 @@ const LANG_OPTIONS = [
 
 function makeCalloutHtml(type, text = "") {
 	const c = CALLOUT_CONFIGS[type] || CALLOUT_CONFIGS.info;
-	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
+	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
 }
 
 function makeCodeBlockHtml(
@@ -751,9 +751,9 @@ function makeCodeBlockHtml(
 	const lang = language.toLowerCase().trim() || "text";
 	const opts = LANG_OPTIONS.map(
 		(l) =>
-			`<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).toUpperCase() + l.slice(1)}</option>`,
+			`<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).to() + l.slice(1)}</option>`,
 	).join("");
-	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
+	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
 }
 
 function makeButtonBlockHtml(text = "Click here →", href = "#") {
@@ -2068,7 +2068,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "0 0 8px",
 													}}
@@ -2109,7 +2109,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "12px 0 8px",
 													}}
@@ -2235,7 +2235,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														padding: "3px 8px 6px",
 														margin: 0,
@@ -2324,7 +2324,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														padding: "3px 8px 6px",
 														margin: 0,
@@ -2884,7 +2884,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "0 0 6px 4px",
 													}}
@@ -2957,7 +2957,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "0 0 6px 4px",
 													}}
@@ -3313,42 +3313,7 @@ export default function DraftPage() {
 									Themes
 								</motion.button>
 
-								{/* Infographics button */}
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => setInfographicsOpen(true)}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 5,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "5px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.accent,
-										cursor: "pointer",
-									}}
-								>
-									{/* Bar chart icon */}
-									<svg
-										width={12}
-										height={12}
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke={T.accent}
-										strokeWidth={2}
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<line x1="18" y1="20" x2="18" y2="10" />
-										<line x1="12" y1="20" x2="12" y2="4" />
-										<line x1="6" y1="20" x2="6" y2="14" />
-									</svg>
-									Infographics
-								</motion.button>
+								
 
 								{/* AI Chat button */}
 								<motion.button
