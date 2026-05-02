@@ -217,7 +217,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 		? "You've used all your free credits this month"
 		: "Almost out of free credits";
 	const sub = out
-		? `Upgrade to Pro for unlimited access — $9/mo`
+		? `Upgrade  — $20/mo`
 		: `${(creditsLimit - creditsUsed).toFixed(2)} credits left. Upgrade to Pro before you run out.`;
 
 	return (
@@ -230,6 +230,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 				borderRadius: 10,
 				padding: "12px 16px",
 				marginBottom: 16,
+				flexWrap: "wrap",
 			}}
 		>
 			<div
@@ -238,6 +239,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 					alignItems: "center",
 					justifyContent: "space-between",
 					gap: 12,
+					flexWrap: "wrap",
 				}}
 			>
 				<div>
@@ -276,7 +278,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 						whiteSpace: "nowrap",
 					}}
 				>
-					Upgrade $9/mo →
+					Upgrade $20/mo →
 				</motion.button>
 			</div>
 		</motion.div>
@@ -1142,6 +1144,7 @@ export default function inkgestApp() {
 									marginBottom: 24,
 									width: "100%",
 								}}
+								className="max-w-5xl mx-auto"
 							>
 								<GenerateAssetPanel
 									variant="app"

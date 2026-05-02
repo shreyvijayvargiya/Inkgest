@@ -412,11 +412,11 @@ function Hero() {
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
 					style={{
-						maxWidth: 940,
 						width: "100%",
 						margin: "0 auto",
 						textAlign: "left",
 					}}
+					className="max-w-5xl mx-auto"
 				>
 					<GenerateAssetPanel
 						variant="app"

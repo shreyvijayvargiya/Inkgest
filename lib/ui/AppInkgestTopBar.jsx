@@ -35,13 +35,10 @@ export default function AppInkgestTopBar({
 	credits,
 	creditRemaining,
 	FREE_CREDIT_LIMIT,
-	formatRenewalDate,
 	router,
 	sidebarOpen,
 	onSidebarToggle,
 	showSidebarToggle = true,
-	showFormCanvasNav = false,
-	formCanvasActive = "form",
 	onLogin,
 }) {
 	return (
@@ -58,6 +55,23 @@ export default function AppInkgestTopBar({
 				zIndex: 50,
 			}}
 		>
+			{reduxUser && showSidebarToggle && (
+				<motion.button
+					type="button"
+					whileHover={{ background: "#F0ECE5" }}
+					whileTap={{ scale: 0.93 }}
+					onClick={onSidebarToggle}
+					style={{
+						background: "transparent",
+						border: "none",
+						borderRadius: 8,
+						padding: "6px 8px",
+						cursor: "pointer",
+					}}
+				>
+					<Icon d={sidebarOpen ? Icons.chevronL : Icons.chevronR} size={16} />
+				</motion.button>
+			)}
 			<a
 				href="/"
 				style={{
@@ -84,59 +98,10 @@ export default function AppInkgestTopBar({
 				inkgest
 			</a>
 
-			{reduxUser && showSidebarToggle && (
-				<motion.button
-					type="button"
-					whileHover={{ background: "#F0ECE5" }}
-					whileTap={{ scale: 0.93 }}
-					onClick={onSidebarToggle}
-					style={{
-						background: "transparent",
-						border: "none",
-						borderRadius: 8,
-						padding: "6px 8px",
-						cursor: "pointer",
-					}}
-				>
-					<Icon d={sidebarOpen ? Icons.chevronL : Icons.chevronR} size={16} />
-				</motion.button>
-			)}
+			
 
 			<div style={{ width: 1, height: 20, background: T.border }} />
-
-			{/* {showFormCanvasNav && (
-				<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-					{["form"].map((tab) => (
-						<motion.button
-							key={tab}
-							type="button"
-							whileTap={{ scale: 0.98 }}
-							onClick={() =>
-								tab === "form"
-									? router.push("/app")
-									: router.push("/app/canvas")
-							}
-							style={{
-								padding: "6px 12px",
-								borderRadius: 8,
-								border: `1px solid ${
-									formCanvasActive === tab ? T.warm : T.border
-								}`,
-								background:
-									formCanvasActive === tab ? T.warmBg : T.surface,
-								color: formCanvasActive === tab ? T.accent : T.muted,
-								fontSize: 12,
-								fontWeight: formCanvasActive === tab ? 700 : 600,
-								cursor: "pointer",
-							}}
-						>
-							{tab === "form" ? "Form" : "Canvas"}
-						</motion.button>
-					))}
-				</div>
-			)} */}
-
-			<div style={{ flex: 1 }} />
+			<div style={{ flex: 1 }} className="hidden md:block" />
 
 			<motion.button
 				type="button"

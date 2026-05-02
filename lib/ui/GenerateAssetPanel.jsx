@@ -184,15 +184,14 @@ export default function GenerateAssetPanel({
 			>
 			<header
 				style={{
-					paddingBottom: 22,
-					marginBottom: 24,
+					paddingBottom: 10,
 				}}
 			>
 				<p
 					className="text-2xl font-bold text-warm md:text-3xl"
-					style={{ marginBottom: 10, letterSpacing: "-0.02em" }}
+					style={{ marginBottom: 5, letterSpacing: "-0.02em" }}
 				>
-					<span style={{ color: T.warm }}>✦</span> Create Blogs
+					<span style={{ color: T.warm }}>✦</span> Create {selectedLabel}
 				</p>
 				<p
 					style={{
@@ -203,7 +202,7 @@ export default function GenerateAssetPanel({
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
-					Paste links, add a short brief to create your blog post
+					Paste links, add a short brief to create your {selectedLabel} post
 				</p>
 			</header>
 
