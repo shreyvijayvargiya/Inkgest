@@ -19,7 +19,7 @@ import {
 	FREE_CREDIT_LIMIT,
 	formatRenewalDate,
 } from "../../lib/utils/credits";
-import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
+import { validateUrl } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
 import SimpleBuilderTab from "../../lib/ui/SimpleBuilderTab";
 import GenerateAssetPanel from "../../lib/ui/GenerateAssetPanel";

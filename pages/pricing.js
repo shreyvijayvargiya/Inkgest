@@ -15,6 +15,7 @@ import {
 } from "../lib/utils/cookies";
 import { onAuthStateChange } from "../lib/api/auth";
 import { toast } from "sonner";
+import { FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -108,20 +109,35 @@ const PricingPage = () => {
 			period: "month",
 			description: "Try inkgest with no commitment",
 			features: [
-				"50 credits / month",
+				`${FREE_CREDIT_LIMIT} credits free for first month`,
 				"AI Draft / Newsletter — 1 credit",
 				"URL Scrape — 1 credit",
 				"AI Chat message — ¼ credit",
-				"Table Creator — 2 credits",
-				"Blank drafts free, always",
 			],
 			popular: false,
 			type: "free",
 		},
 		{
 			id: "06d78a3d-29d8-485d-b4bb-c43a9f57ccbb",
+			name: "Starter",
+			price: "$20",
+			period: "month",
+			description: "Unlimited credits for serious creators",
+			features: [
+				"50 credits every month",
+				"All content formats",
+				"Multiple URL sources per draft",
+				"AI Chat with all models",
+				"Themes, Infographics & Table Creator",
+				"Priority support",
+			],
+			popular: false,
+			type: "subscription",
+		},
+		{
+			id: "b9cdf090-c86b-41e1-b7ea-c1908d78c01b",
 			name: "Pro",
-			price: "$9",
+			price: "$49",
 			period: "month",
 			description: "Unlimited credits for serious creators",
 			features: [
@@ -682,14 +698,7 @@ const PricingPage = () => {
 
 				{/* ── PLAN CARDS ── */}
 				<div
-					style={{
-						maxWidth: 760,
-						margin: "0 auto",
-						padding: "0 24px 80px",
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-						gap: 20,
-					}}
+					className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto"
 				>
 					{plans.map((plan, idx) => (
 						<motion.div
@@ -997,30 +1006,12 @@ const PricingPage = () => {
 						flexDirection: "column",
 						alignItems: "center",
 						justifyContent: "center",
-						gap: 12,
+						gap: 2,
 						marginBottom: 48,
 						textAlign: "center",
 					}}
 				>
-					<a
-						href="https://polar.sh"
-						target="_blank"
-						rel="noopener noreferrer"
-						style={{
-							fontSize: 12,
-							fontWeight: 600,
-							color: T.muted,
-							textDecoration: "none",
-							display: "inline-flex",
-							alignItems: "center",
-							gap: 6,
-							transition: "color 0.15s",
-						}}
-						onMouseEnter={(e) => (e.currentTarget.style.color = T.warm)}
-						onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
-					>
-						Powered by polar.sh
-					</a>
+					<br />
 					<div
 						style={{
 							display: "flex",
@@ -1065,7 +1056,7 @@ const PricingPage = () => {
 						{[
 							[
 								"What counts as a credit?",
-								"AI Draft, Newsletter, Infographics = 1 credit. URL Scrape = 1 credit. Table Creator = 2 credits. AI Chat message = ¼ credit. Blank drafts are free.",
+								"AI Draft, Newsletter = 1 credit, URL Scrape = 1 creditAI Chat message = ¼ credit. Blank drafts are free.",
 							],
 							[
 								"Does the free plan renew monthly?",
@@ -1073,7 +1064,7 @@ const PricingPage = () => {
 							],
 							[
 								"Can I cancel anytime?",
-								"Absolutely. Pro subscriptions can be cancelled at any time with no penalty.",
+								"Absolutely. Starter and Pro subscriptions can be cancelled at any time with no penalty.",
 							],
 						].map(([q, a]) => (
 							<div key={q} style={{ marginBottom: 18 }}>

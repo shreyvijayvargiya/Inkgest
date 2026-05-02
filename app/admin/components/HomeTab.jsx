@@ -88,7 +88,7 @@ const HomeTab = ({ onNavigate }) => {
 	const formatCurrency = (amount, currency = "usd") => {
 		return new Intl.NumberFormat("en-US", {
 			style: "currency",
-			currency: currency.to(),
+			currency: currency || "usd",
 		}).format(amount / 100);
 	};
 
@@ -700,7 +700,7 @@ const HomeTab = ({ onNavigate }) => {
 										<div key={u.id || i} className="p-4 hover:bg-zinc-50 transition-all group flex items-center justify-between">
 											<div className="flex items-center gap-3">
 												<div className="w-10 h-10 rounded-2xl bg-zinc-100 flex items-center justify-center text-zinc-600 font-bold border border-zinc-200 group-hover:bg-white transition-colors">
-													{u.email?.substring(0, 1).to() || "U"}
+													{u?.email?.substring(0, 1) || "U"}
 												</div>
 												<div className="flex flex-col">
 													<span className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">

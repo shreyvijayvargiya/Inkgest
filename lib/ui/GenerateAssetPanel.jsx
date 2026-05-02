@@ -192,7 +192,7 @@ export default function GenerateAssetPanel({
 					className="text-2xl font-bold text-warm md:text-3xl"
 					style={{ marginBottom: 10, letterSpacing: "-0.02em" }}
 				>
-					<span style={{ color: T.warm }}>✦</span> Create an asset
+					<span style={{ color: T.warm }}>✦</span> Create Blogs
 				</p>
 				<p
 					style={{
@@ -203,30 +203,15 @@ export default function GenerateAssetPanel({
 						fontFamily: "'Outfit', sans-serif",
 					}}
 				>
-					Paste links, add a short brief (optional for most types), then pick an
-					output — each option turns URLs into something you can ship.
+					Paste links, add a short brief to create your blog post
 				</p>
 			</header>
 
 			<section style={{ width: "100%", marginBottom: 28 }}>
-				<label
-					style={{
-						display: "block",
-						fontSize: 11,
-						fontWeight: 700,
-						textTransform: "",
-						letterSpacing: "0.1em",
-						color: T.muted,
-						marginBottom: 12,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					Output type
-				</label>
 				<div
 					role="tablist"
 					aria-label="Asset output type"
-					className="flex flex-nowrap gap-0.5 overflow-x-auto"
+					className="flex flex-nowrap gap-0.5 overflow-x-auto w-fit"
 					style={{
 						padding: 4,
 						borderRadius: 14,
@@ -284,25 +269,7 @@ export default function GenerateAssetPanel({
 						);
 					})}
 				</div>
-				<div
-					style={{
-						marginTop: 14,
-						padding: "14px 18px",
-						borderRadius: 14,
-						background: T.base,
-						border: `1px solid ${T.border}`,
-						fontSize: 13,
-						lineHeight: 1.55,
-						color: T.muted,
-						fontFamily: "'Outfit', sans-serif",
-					}}
-				>
-					<strong style={{ color: T.accent, fontWeight: 700 }}>
-						{selectedLabel}
-					</strong>
-					{" — "}
-					{selectedType.hint}
-				</div>
+				
 			</section>
 
 			<div
@@ -699,7 +666,7 @@ export default function GenerateAssetPanel({
 						<>
 							{gen.loading && !gen.streamed && (
 								<p style={{ fontSize: 13, color: T.muted }}>
-									Working on your asset…
+									Working on your blog/newsletter...
 								</p>
 							)}
 							{gen.streamed && (
