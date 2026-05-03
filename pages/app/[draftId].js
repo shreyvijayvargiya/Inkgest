@@ -4,7 +4,9 @@ import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
+import DraftExportModal from "../../lib/ui/DraftExportModal";
 import InfographicsModal from "../../lib/ui/InfographicsModal";
+import { Upload } from "lucide-react";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
 import TableView from "../../lib/ui/TableView";
 import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
@@ -838,6 +840,7 @@ export default function DraftPage() {
 	const [saved, setSaved] = useState(false);
 	const [wordCount, setWordCount] = useState(0);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
+	const [exportModalOpen, setExportModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
 	const [copiedTheme, setCopiedTheme] = useState(null);
@@ -1836,7 +1839,7 @@ export default function DraftPage() {
 													cursor: "pointer",
 												}}
 											>
-												Create with InkAgent →
+												Create new draft →
 											</motion.button>
 										</motion.div>
 									) : (
@@ -2624,6 +2627,28 @@ export default function DraftPage() {
 								>
 									<Icon d={Icons.eye} size={13} stroke={T.muted} />
 									Preview
+								</motion.button>
+								<motion.button
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.96 }}
+									onClick={() => setExportModalOpen(true)}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 6,
+										background: T.base,
+										border: `1px solid ${T.border}`,
+										borderRadius: 8,
+										padding: "6px 12px",
+										fontSize: 12,
+										fontWeight: 600,
+										color: T.muted,
+										cursor: "pointer",
+										transition: "all 0.18s",
+									}}
+								>
+									<Upload size={13} strokeWidth={2} color={T.muted} />
+									Export
 								</motion.button>
 								<motion.button
 									whileHover={{
@@ -4121,6 +4146,25 @@ export default function DraftPage() {
 					countWords();
 				}}
 			/>
+
+			{draft && draftId && reduxUser?.uid && (
+				<DraftExportModal
+					open={exportModalOpen}
+					onClose={() => setExportModalOpen(false)}
+					theme={T}
+					draftId={draftId}
+					userId={reduxUser.uid}
+					assetSource={docData?.source || "assets"}
+					composioExportLinks={draft?.composioExportLinks}
+					getExportPayload={() => ({
+						title:
+							titleRef.current?.innerText?.trim() ||
+							draft?.title ||
+							"Untitled draft",
+						html: editorRef.current?.innerHTML || draft?.body || "",
+					})}
+				/>
+			)}
 		</div>
 	);
 }
