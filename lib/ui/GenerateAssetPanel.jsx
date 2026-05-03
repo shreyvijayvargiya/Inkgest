@@ -39,7 +39,7 @@ const PANEL_TAB_ICONS = {
 };
 
 /**
- * URLs + prompt + asset type → POST /api/generate/:type (or scrape), stream preview, persist + Open.
+ * URLs + prompt + asset type → POST /generate/:type (or scrape), stream preview, persist + Open.
  */
 export default function GenerateAssetPanel({
 	variant = "landing",

@@ -406,7 +406,7 @@ function Hero() {
 					publish — in under 60 seconds.
 				</motion.p>
 
-				{/* Generate asset — POST /api/generate/:type (proxied to Hono; INKGEST_GENERATE_URL on server) */}
+				{/* Generate asset — POST /generate/:type (proxied to Hono; INKGEST_GENERATE_URL on server) */}
 				<motion.div
 					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
