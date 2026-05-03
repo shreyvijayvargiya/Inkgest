@@ -1,5 +1,5 @@
 /**
- * POST /api/generate/[type]
+ * POST /generate/[type]
  * Proxies to Hono POST /generate/:type. Uses idToken in JSON body like /api/scrape/url
  * (verify → rate limit → validate → deduct credit → upstream).
  */
