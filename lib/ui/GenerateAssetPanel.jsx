@@ -165,6 +165,7 @@ export default function GenerateAssetPanel({
 		boxSizing: "border-box",
 	};
 
+
 	return (
 		<div
 			style={{
