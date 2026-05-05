@@ -23,6 +23,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { assetRef } from "../api/userAssets";
+import {
+	INKGEST_AGENT_URL,
+	inkgestAgentRequestHeaders,
+} from "../config/agent";
+import { deductCredits } from "../api/deductCredits";
 
 /* ─── Builds a fully self-contained HTML file from a card's rendered DOM ─── */
 function wrapStandaloneHTML(innerHTML, igType = "") {
@@ -148,7 +153,7 @@ function DonutChart({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -331,7 +336,7 @@ function BarChart({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -453,7 +458,7 @@ function StepFlow({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -565,7 +570,7 @@ function ComparisonCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: accent(data),
 					marginBottom: 6,
@@ -644,7 +649,7 @@ function ComparisonCard({ data }) {
 									fontSize: 12,
 									fontWeight: 700,
 									color: col.iconColor,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.06em",
 								}}
 							>
@@ -724,7 +729,7 @@ function StatCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 14,
@@ -859,7 +864,7 @@ function TimelineCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -995,7 +1000,7 @@ function ProgressCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1094,7 +1099,7 @@ function MetricGridCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1239,7 +1244,7 @@ function BatchDivider({ number }) {
 					fontSize: 11,
 					fontWeight: 700,
 					color: D.muted,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					whiteSpace: "nowrap",
 				}}
@@ -1347,9 +1352,9 @@ export default function InfographicsModal({
 			}
 
 			try {
-				const res = await fetch("/api/agent/inkagent", {
+				const res = await fetch(INKGEST_AGENT_URL, {
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
+					headers: inkgestAgentRequestHeaders(userId),
 					body: JSON.stringify({ content, title, idToken, excludeTypes }),
 				});
 				clearInterval(stepTimer.current);
@@ -1358,6 +1363,9 @@ export default function InfographicsModal({
 				if (!res.ok) throw new Error(data.error || "Generation failed");
 
 				const newBatch = data.infographics || [];
+				if (newBatch.length > 0) {
+					deductCredits(idToken, 1);
+				}
 				if (isMore) {
 					setBatches((prev) => [...prev, newBatch]);
 				} else {

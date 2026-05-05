@@ -252,7 +252,7 @@ const PaymentsTab = ({ queryClient }) => {
 	const formatCurrency = (amount, currency = "usd") => {
 		return new Intl.NumberFormat("en-US", {
 			style: "currency",
-			currency: currency.toUpperCase(),
+			currency: currency.to(),
 		}).format(amount / 100);
 	};
 

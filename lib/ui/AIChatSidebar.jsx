@@ -10,13 +10,28 @@
  *   editorRef       ref    — contentEditable ref from the parent editor
  *   draftContent    string — current editor innerHTML (passed to AI as context)
  *   draftTitle      string — draft title (context)
- *   userId          string — Firebase UID (not used directly, auth via idToken)
+ *   userId          string — Firebase UID for agent tools / cache (falls back to auth)
+ *   onAgentDraftCreated  fn?(draftId: string) — after agent approves creating a draft
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { auth } from "../config/firebase";
-import { getUserCredits, FREE_CREDIT_LIMIT } from "../utils/credits";
+import { getUserCredits } from "../utils/credits";
+import { useInkgestScrape } from "../hooks/useInkgestScrape";
+import {
+	listAssets,
+	createDraft,
+	getAsset,
+} from "../api/userAssets";
+import {
+	AIChatSidebarAgentBar,
+	CHAT_MODE_ASK,
+	CHAT_MODE_AGENT,
+} from "./AIChatSidebarAgentBar";
+import { searchAssetsWithFuse } from "../agent/searchUserAssetsWithFuse";
+import { buildAgentDraftRecord } from "../agent/buildAgentDraftRecord";
 
 /* ─── Inline CSS for chat prose and cursor animation ─── */
 const ChatStyles = () => (
@@ -34,6 +49,9 @@ const ChatStyles = () => (
     .ai-chat-prose code { background:#F0ECE5;border:1px solid #E8E4DC;border-radius:4px;padding:1px 5px;font-size:11.5px;color:#C17B2F;font-family:monospace; }
     .ai-chat-prose blockquote { border-left:2px solid #C17B2F;padding:2px 0 2px 12px;margin:8px 0; }
     .ai-chat-prose blockquote p { color:#7A7570;font-style:italic; }
+    .ai-chat-prose a.ai-chat-src-link { color:#C17B2F;font-weight:600;text-decoration:none;border-bottom:1px solid #E8CFB0;padding-bottom:1px;}
+    .ai-chat-prose a.ai-chat-src-link:hover { opacity: 0.9; border-bottom-color: #C17B2F; }
+    .ai-chat-prose pre { overflow:auto;max-height:220px;background:#FAF9F7;border-radius:10px;font-size:12px;padding:12px;line-height:1.55;border:1px solid #EDE9E2;color:#433F3C;white-space:pre-wrap;word-break:break-word;margin:10px 0; }
     @keyframes ai-blink { 0%,100%{opacity:1} 50%{opacity:0} }
     .ai-stream-cursor { display:inline-block;width:2px;height:12px;background:#C17B2F;border-radius:1px;margin-left:2px;vertical-align:middle;animation:ai-blink 0.85s ease-in-out infinite; }
     ::-webkit-scrollbar { width:4px; }
@@ -42,6 +60,26 @@ const ChatStyles = () => (
     ::-webkit-scrollbar-thumb:hover { background:#C17B2F; }
   `}</style>
 );
+
+const RAW_URL_SPLIT_RE = /(https?:\/\/[^\s]+)/g;
+
+function extractHost(u) {
+	try {
+		return new URL(u).hostname;
+	} catch {
+		return u || "";
+	}
+}
+
+/** Link bare https URLs only (avoids breaking existing HTML from prior transforms). */
+function linkifyBareUrls(s) {
+	if (/<a\s/i.test(s)) return s;
+	return s.replace(
+		/\b(https?:\/\/[^\s<]+)/g,
+		(u) =>
+			`<a href="${u}" target="_blank" rel="noopener noreferrer" class="ai-chat-src-link">${u}</a>`,
+	);
+}
 
 /* ─── Markdown → display HTML (for chat bubbles) ─── */
 function md(text = "") {
@@ -64,19 +102,175 @@ function md(text = "") {
 			out.push(`<h1>${l.replace(/^# /, "")}</h1>`);
 		} else if (/^> /.test(raw)) {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<blockquote><p>${l.slice(2)}</p></blockquote>`);
+			out.push(`<blockquote><p>${linkifyBareUrls(l.slice(2))}</p></blockquote>`);
 		} else if (/^- /.test(raw)) {
 			if (!ul) { out.push("<ul>"); ul = true; }
-			out.push(`<li>${l.slice(2)}</li>`);
+			out.push(`<li>${linkifyBareUrls(l.slice(2))}</li>`);
 		} else if (!raw.trim()) {
 			if (ul) { out.push("</ul>"); ul = false; }
 		} else {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<p>${l}</p>`);
+			out.push(`<p>${linkifyBareUrls(l)}</p>`);
 		}
 	}
 	if (ul) out.push("</ul>");
 	return out.join("");
+}
+
+function UserMessageWithLinks({ text }) {
+	const parts = String(text || "").split(RAW_URL_SPLIT_RE);
+	return (
+		 <>
+			{parts.map((part, i) =>
+				/^https?:\/\//.test(part) ? (
+					<a
+						key={i}
+						href={part}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="ai-chat-src-link"
+						style={{ wordBreak: "break-all" }}
+					>
+						{part}
+					</a>
+				) : (
+					<span key={i}>{part}</span>
+				),
+			)}
+		</>
+	);
+}
+
+const SCRAPE_PREVIEW_LEN = 4500;
+/** Content body scroll zone for scraped markdown (scrollbar hidden via globals). */
+const SCRAPED_BODY_MAX_HEIGHT_PX = 300;
+
+/** Overlay sidebar: drag handle can widen panel by up to this many px (max = default + this). */
+const AI_CHAT_OVERLAY_W_DEFAULT = 390;
+const AI_CHAT_OVERLAY_DRAG_MAX_EXTRA_PX = 300;
+const AI_CHAT_OVERLAY_W_MIN = 280;
+const AI_CHAT_OVERLAY_W_MAX =
+	AI_CHAT_OVERLAY_W_DEFAULT + AI_CHAT_OVERLAY_DRAG_MAX_EXTRA_PX;
+/** Resize grip height — matches Tailwind h-24 (6rem → 96px). */
+const AI_CHAT_RESIZE_HANDLE_H = 96;
+
+function ScrapedSourcesPanel({ sources }) {
+	const [tab, setTab] = useState(0);
+	if (!sources?.length) return null;
+	const safeTab = Math.min(tab, sources.length - 1);
+	const cur = sources[safeTab];
+	const title = cur.title || cur.url || "Source";
+	const body = cur.error
+		? `Scrape failed: ${cur.error}`
+		: (cur.markdown || "").slice(0, SCRAPE_PREVIEW_LEN) +
+			((cur.markdown || "").length > SCRAPE_PREVIEW_LEN ? "\n\n…" : "");
+
+	return (
+		<div
+			style={{
+				marginBottom: 10,
+				borderRadius: 10,
+				border: "1px solid #EAD9BF",
+				background: "linear-gradient(180deg, #FFFDF8 0%, #FDF8F4 100%)",
+				overflow: "hidden",
+			}}
+		>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					padding: "8px 10px",
+					borderBottom: "1px solid #EDE4D6",
+					background: "#FFFFFF95",
+				}}
+			>
+				<span style={{ fontSize: 11, fontWeight: 700, color: "#78350F" }}>
+					Scraped content
+				</span>
+				<span style={{ fontSize: 10.5, color: "#B08B5F" }}>
+					Inkgest API · {sources.length} page{sources.length === 1 ? "" : "s"}
+				</span>
+			</div>
+
+			{sources.length > 1 && (
+				<div
+					style={{
+						display: "flex",
+						flexWrap: "wrap",
+						gap: 5,
+						padding: "8px 10px",
+						borderBottom: "1px solid #EDE4D6",
+					}}
+				>
+					{sources.map((s, i) => {
+						const label = s.title?.trim?.() ? s.title.slice(0, 36) + (s.title.length > 36 ? "…" : "") : extractHost(s.url || "");
+						const active = safeTab === i;
+						return (
+							<button
+								type="button"
+								key={`${s.url}-${i}`}
+								onClick={() => setTab(i)}
+								style={{
+									border: `1px solid ${active ? "#C17B2F" : "#E8E4DC"}`,
+									background: active ? "#C17B2F15" : "#FFFFFF",
+									color: active ? "#92400E" : "#5A5550",
+									borderRadius: 8,
+									padding: "4px 9px",
+									fontSize: 11,
+									fontWeight: 600,
+									cursor: "pointer",
+									maxWidth: "100%",
+									overflow: "hidden",
+									textOverflow: "ellipsis",
+									whiteSpace: "nowrap",
+								}}
+							>
+								{label || `Page ${i + 1}`}
+							</button>
+						);
+					})}
+				</div>
+			)}
+
+			<div style={{ padding: "10px 12px" }}>
+				{cur.url && (
+					<a
+						href={cur.url}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="ai-chat-src-link"
+						style={{
+							fontSize: 11.5,
+							fontWeight: 600,
+							display: "inline-block",
+							marginBottom: 8,
+							wordBreak: "break-all",
+						}}
+					>
+						{cur.url}
+					</a>
+				)}
+				<p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>
+					{title}
+				</p>
+				<pre
+					className="hidescrollbar"
+					style={{
+						margin: 0,
+						maxHeight: SCRAPED_BODY_MAX_HEIGHT_PX,
+						overflowY: "auto",
+						whiteSpace: "pre-wrap",
+						wordBreak: "break-word",
+						lineHeight: 1.55,
+						fontFamily: "'SF Mono','Monaco','Inconsolata','Fira Mono', monospace",
+						fontSize: 12,
+						color: "#433F3C",
+					}}
+				>{body}</pre>
+			</div>
+		</div>
+	);
 }
 
 /* ─── Markdown → editor-safe HTML with light-theme inline styles ─── */
@@ -217,10 +411,13 @@ export default function AIChatSidebar({
 	selectionContext = "",
 	onClearSelectionContext,
 	asPanel = false,
+	userId: userIdProp = "",
+	onAgentDraftCreated,
 }) {
 	const [messages, setMessages] = useState([{
 		id: "w0", role: "assistant", done: true,
-		content: "I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. When you like a response hit **Insert**, **Append**, or **Replace** to push it straight into your editor.",
+		content:
+			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** and I can scrape it via the Inkgest API and summarise or draft from the real page content. When you like a response hit **Insert**, **Append**, or **Replace** to push it straight into your editor.",
 	}]);
 	const [input, setInput]         = useState("");
 	const [streaming, setStreaming]   = useState(false);
@@ -228,10 +425,41 @@ export default function AIChatSidebar({
 	const [toast, setToast]          = useState("");
 	const [model, setModel]          = useState(MODELS[0]);
 	const [modelOpen, setModelOpen]  = useState(false);
+	const [agentModeOpen, setAgentModeOpen] = useState(false);
+	const [chatMode, setChatMode]     = useState(CHAT_MODE_ASK);
+	const [followUpOpenFor, setFollowUpOpenFor] = useState(null);
+	const [approvingForMsgId, setApprovingForMsgId] = useState(null);
+	const [overlayWidth, setOverlayWidth] = useState(AI_CHAT_OVERLAY_W_DEFAULT);
 	const [credits, setCredits]      = useState(null);
 	const bottomRef = useRef(null);
 	const taRef     = useRef(null);
 	const abortRef  = useRef(null);
+	const { scrapeOne, scrapeMany } = useInkgestScrape();
+	const queryClient = useQueryClient();
+	const effectiveUserId =
+		userIdProp || auth.currentUser?.uid || "";
+
+	const { data: agentAssets = [] } = useQuery({
+		queryKey: ["assets", effectiveUserId],
+		queryFn: () => listAssets(effectiveUserId),
+		enabled:
+			open &&
+			Boolean(effectiveUserId) &&
+			chatMode === CHAT_MODE_AGENT,
+		staleTime: 45_000,
+	});
+
+	const createAgentDraftMutation = useMutation({
+		mutationFn: async ({ uid, draft }) => {
+			if (!uid) throw new Error("Sign in required.");
+			const { id } = await createDraft(uid, draft);
+			return id;
+		},
+		onSuccess: (_, vars) => {
+			if (vars?.uid)
+				queryClient.invalidateQueries({ queryKey: ["assets", vars.uid] });
+		},
+	});
 
 	/* Load / refresh credits */
 	const refreshCredits = useCallback(() => {
@@ -284,7 +512,7 @@ export default function AIChatSidebar({
 		setTimeout(() => setCopiedId(null), 2000);
 	};
 
-	/* ── Send a message (streaming SSE) ── */
+	/* ── Send a message (streaming SSE + optional scrape tool rounds via OpenRouter) ── */
 	const send = useCallback(async (override) => {
 		const text = (override ?? input).trim();
 		if (!text || streaming) return;
@@ -294,14 +522,22 @@ export default function AIChatSidebar({
 
 		setMessages(prev => [
 			...prev,
-			{ id: uid, role: "user",      done: true,  content: text },
-			{ id: aid, role: "assistant", done: false, content: "" },
+			{ id: uid, role: "user", done: true, content: text },
+			{
+				id: aid,
+				role: "assistant",
+				done: false,
+				content: "",
+				scrapeSources: [],
+				agentTrace: [],
+			},
 		]);
 		setInput("");
 		setStreaming(true);
 
-		/* Build history — inject draft + selection context */
-		const recentHistory = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+		const recentHistory = messages
+			.slice(-10)
+			.map(m => ({ role: m.role, content: m.content || "" }));
 		const plainContext = draftContent
 			? draftContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500)
 			: "";
@@ -309,93 +545,509 @@ export default function AIChatSidebar({
 			? selectionContext.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800)
 			: "";
 		let contextPrefix = "";
+		if (chatMode === CHAT_MODE_AGENT) {
+			contextPrefix +=
+				"[Assistant mode: Agent — workspace search, read saved drafts/tables, scrape links, and propose new drafts for user approval.]\n\n";
+		}
 		if (plainContext) contextPrefix += `[Editor context — current draft: "${plainContext}"]\n\n`;
 		if (selectionPlain) contextPrefix += `[User-selected text for focus: "${selectionPlain}"]\n\n`;
 
-		const history = [
+		let thread = [
 			...recentHistory,
 			{ role: "user", content: contextPrefix + text },
 		];
 
+		const mergeSource = (prev, row) => {
+			const u = row.url || "";
+			const rest = prev.filter(s => (s.url || "") !== u);
+			return [...rest, row];
+		};
+
+		let aggregatedSources = [];
+
 		abortRef.current = new AbortController();
+
+		const consumeSseOnce = async (res, displayPrefix) => {
+			const reader = res.body?.getReader();
+			if (!reader) return { roundText: "", tool_calls: null };
+			const decoder = new TextDecoder();
+			let buffer = "";
+			let roundText = "";
+			let tool_calls = null;
+			const joinPrefix = (suffix) => {
+				if (displayPrefix && suffix) return `${displayPrefix}\n\n${suffix}`;
+				return `${displayPrefix || ""}${suffix}`;
+			};
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() ?? "";
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (!trimmed.startsWith("data: ")) continue;
+					const payload = trimmed.slice(6);
+					if (payload === "[DONE]") continue;
+					try {
+						const parsed = JSON.parse(payload);
+						if (parsed.error) throw new Error(parsed.error);
+						if (parsed.delta) {
+							roundText += parsed.delta;
+							const snap = joinPrefix(roundText);
+							setMessages(prev =>
+								prev.map(m =>
+									m.id === aid ? { ...m, content: snap } : m,
+								),
+							);
+						}
+						if (parsed.tool_calls)
+							tool_calls = parsed.tool_calls;
+					} catch (e) {
+						if (
+							e?.message === "Unexpected end of JSON input" ||
+							String(e.message || e).includes("Unexpected end of JSON")
+						)
+							continue;
+						throw e;
+					}
+				}
+			}
+			return { roundText, tool_calls };
+		};
+
+		let assistantCombined = "";
 
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
 
-			const res = await fetch("/api/chat/message", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ messages: history, idToken, model: model.id }),
-				signal: abortRef.current.signal,
-			});
+			const MAX_ROUNDS = 6;
 
-			if (!res.ok) {
-				const errData = await res.json().catch(() => ({}));
-				throw new Error(errData.error || `Error ${res.status}`);
-			}
+			for (let round = 0; round < MAX_ROUNDS; round++) {
+				const res = await fetch("/api/chat/message", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						messages: thread,
+						idToken,
+						model: model.id,
+						chatMode,
+					}),
+					signal: abortRef.current.signal,
+				});
 
-			/* Parse SSE stream */
-			const reader  = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-			let accumulated = "";
-
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split("\n");
-				buffer = lines.pop() ?? "";
-
-				for (const line of lines) {
-					const trimmed = line.trim();
-					if (!trimmed.startsWith("data: ")) continue;
-					const payload = trimmed.slice(6);
-					if (payload === "[DONE]") break;
-
-					try {
-						const parsed = JSON.parse(payload);
-						if (parsed.error) throw new Error(parsed.error);
-						const delta = parsed.delta || "";
-						accumulated += delta;
-						const snap = accumulated;
-						setMessages(prev =>
-							prev.map(m => m.id === aid ? { ...m, content: snap } : m),
-						);
-					} catch (parseErr) {
-						if (parseErr.message !== "Unexpected end of JSON input") throw parseErr;
-					}
+				if (!res.ok) {
+					const errData = await res.json().catch(() => ({}));
+					throw new Error(errData.error || `Error ${res.status}`);
 				}
+
+				const { roundText, tool_calls } = await consumeSseOnce(res, assistantCombined);
+
+				if (roundText.trim()) {
+					assistantCombined = assistantCombined
+						? `${assistantCombined}\n\n${roundText}`
+						: roundText;
+				}
+
+				if (!tool_calls?.length) break;
+
+				const normalised = tool_calls.map((tc, i) => ({
+					id: tc.id || `call_${round}_${i}`,
+					type: tc.type || "function",
+					function: {
+						name: tc.function?.name || "",
+						arguments: tc.function?.arguments || "{}",
+					},
+				}));
+
+				thread = [
+					...thread,
+					{
+						role: "assistant",
+						content: roundText || "",
+						tool_calls: normalised,
+					},
+				];
+
+				const traceBatch = [];
+				let proposalThisRound = null;
+				let haltAfterTools = false;
+
+				const toolMsgs = [];
+				for (let i = 0; i < normalised.length; i++) {
+					const tc = normalised[i];
+					const name = tc.function.name;
+					let args = {};
+					try {
+						args = JSON.parse(tc.function.arguments || "{}");
+					} catch {
+						args = {};
+					}
+					let payload;
+					try {
+						if (name === "scrape_url") {
+							const data = await scrapeOne.mutateAsync(args.url);
+							const row = {
+								url: data.url,
+								title: data.title,
+								markdown: data.markdown,
+							};
+							aggregatedSources = mergeSource(aggregatedSources, row);
+							payload = JSON.stringify({
+								ok: true,
+								url: data.url,
+								title: data.title,
+								markdown: data.markdown.slice(0, 100_000),
+							});
+						} else if (name === "scrape_urls") {
+							const urls = Array.isArray(args.urls)
+								? args.urls.slice(0, 15)
+								: [];
+							const rows = await scrapeMany.mutateAsync(urls);
+							for (const row of rows)
+								aggregatedSources = mergeSource(aggregatedSources, row);
+							payload = JSON.stringify({
+								ok: true,
+								results: rows.map(r => ({
+									url: r.url,
+									title: r.title,
+									error: r.error,
+									markdown: (r.markdown || "").slice(0, 80_000),
+								})),
+							});
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "search_user_assets"
+						) {
+							const hits = searchAssetsWithFuse(
+								agentAssets || [],
+								args.query ?? "",
+								12,
+							);
+							traceBatch.push({
+								title: `Workspace search`,
+								sub: String(args.query ?? "").slice(0, 120),
+								lines:
+									hits.length > 0
+										? hits.map(
+												h =>
+													`${h.title} (${h.type}) · /app/${h.id}`,
+											)
+										: ["No matching drafts or tables."],
+							});
+							payload = JSON.stringify({
+								ok: true,
+								count: hits.length,
+								results: hits,
+							});
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "read_user_asset"
+						) {
+							const assetId = args.asset_id;
+							const got =
+								assetId && effectiveUserId
+									? await getAsset(effectiveUserId, assetId)
+									: null;
+							if (!got) {
+								traceBatch.push({
+									title: "Read asset",
+									sub: assetId || "—",
+									lines: ["Not found or inaccessible."],
+								});
+								payload = JSON.stringify({
+									ok: false,
+									error: "Asset not found",
+								});
+							} else if (got.type === "draft") {
+								const b = String(got.doc.body ?? "");
+								traceBatch.push({
+									title: `Read draft`,
+									sub: got.doc.title || assetId,
+									lines: [
+										b.slice(0, 560) +
+											(b.length > 560 ? "… (truncated in chat)" : ""),
+									],
+								});
+								payload = JSON.stringify({
+									ok: true,
+									type: "draft",
+									title: got.doc.title || "",
+									body: b.slice(0, 24_000),
+								});
+							} else if (got.type === "table") {
+								const cols = Array.isArray(got.doc.columns)
+									? got.doc.columns.map(c =>
+											typeof c === "object"
+												? c.header ?? c.title ?? "?"
+												: c,
+										)
+									: [];
+								const n = (got.doc.rows ?? []).length;
+								traceBatch.push({
+									title: `Read table`,
+									sub: got.doc.title || assetId,
+									lines: [`${cols.slice(0, 24).join(" · ")} — ${n} rows`],
+								});
+								payload = JSON.stringify({
+									ok: true,
+									type: "table",
+									title: got.doc.title || "",
+									columns: cols,
+									rowCount: n,
+								});
+							} else {
+								traceBatch.push({
+									title: `Read (${got.type})`,
+									sub: got.doc?.title ?? assetId ?? "",
+									lines: ["Metadata only — expand in app."],
+								});
+								payload = JSON.stringify({
+									ok: true,
+									type: got.type,
+								});
+							}
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "propose_create_draft"
+						) {
+							proposalThisRound = {
+								title: String(args.title || "").trim() || "New draft",
+								bodyMarkdown: String(args.bodyMarkdown || ""),
+							};
+							haltAfterTools = true;
+							payload = JSON.stringify({
+								ok: true,
+								status: "awaiting_user_approval_in_ui",
+							});
+						} else {
+							payload = JSON.stringify({
+								ok: false,
+								error: `Unknown tool: ${name}`,
+							});
+						}
+					} catch (e) {
+						if (name === "scrape_url" && args.url) {
+							aggregatedSources = mergeSource(aggregatedSources, {
+								url: String(args.url),
+								title: "",
+								markdown: "",
+								error: e?.message || "Scrape failed",
+							});
+						}
+						if (chatMode === CHAT_MODE_AGENT) {
+							traceBatch.push({
+								title: `Tool error: ${name}`,
+								sub: "",
+								lines: [String(e?.message || "Tool failed")],
+							});
+						}
+						payload = JSON.stringify({
+							ok: false,
+							error: e?.message || "Tool failed",
+						});
+					}
+					toolMsgs.push({
+						role: "tool",
+						tool_call_id: tc.id,
+						content: payload,
+					});
+				}
+				thread = [...thread, ...toolMsgs];
+
+				setMessages(prev =>
+					prev.map(m =>
+						m.id === aid
+							? {
+									...m,
+									scrapeSources: [...aggregatedSources],
+									...(traceBatch.length > 0
+										? {
+												agentTrace: [...(m.agentTrace || []), ...traceBatch],
+											}
+										: {}),
+									...(proposalThisRound
+										? {
+												draftProposal: {
+													...proposalThisRound,
+													resolved: null,
+												},
+											}
+										: {}),
+							  }
+							: m,
+					),
+				);
+
+				if (haltAfterTools) break;
 			}
 
 			setMessages(prev =>
-				prev.map(m => m.id === aid ? { ...m, done: true } : m),
+				prev.map(m =>
+					m.id === aid
+						? {
+								...m,
+								done: true,
+								content:
+									m.content ||
+									assistantCombined ||
+									"No response.",
+								scrapeSources: [...aggregatedSources],
+						  }
+						: m,
+				),
 			);
 		} catch (err) {
 			if (err.name === "AbortError") {
 				setMessages(prev =>
-					prev.map(m => m.id === aid
-						? { ...m, done: true, content: m.content || "_Stopped._" }
-						: m),
+					prev.map(m =>
+						m.id === aid
+							? {
+									...m,
+									done: true,
+									content: m.content || "_Stopped._",
+									scrapeSources: [...aggregatedSources],
+							  }
+							: m,
+					),
 				);
 			} else {
 				setMessages(prev =>
-					prev.map(m => m.id === aid
-						? { ...m, done: true, content: `_Error: ${err.message}_` }
-						: m),
+					prev.map(m =>
+						m.id === aid
+							? {
+									...m,
+									done: true,
+									content: `_Error: ${err.message}_`,
+									scrapeSources: [...aggregatedSources],
+							  }
+							: m,
+					),
 				);
 			}
-	} finally {
-		setStreaming(false);
-		refreshCredits();
-	}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [input, streaming, messages, draftContent]);
+		} finally {
+			setStreaming(false);
+			refreshCredits();
+		}
+	}, [
+		input,
+		streaming,
+		messages,
+		draftContent,
+		model.id,
+		selectionContext,
+		scrapeOne,
+		scrapeMany,
+		refreshCredits,
+		chatMode,
+		effectiveUserId,
+		agentAssets,
+	]);
+
+	const approveDraftProposal = useCallback(
+		async (msg) => {
+			const p = msg?.draftProposal;
+			if (!p || p.resolved) return;
+			const uid = effectiveUserId;
+			if (!uid) {
+				showToast("Sign in required to save a draft.");
+				return;
+			}
+			setApprovingForMsgId(msg.id);
+			try {
+				const draft = buildAgentDraftRecord({
+					title: p.title,
+					bodyMarkdown: p.bodyMarkdown,
+					prompt: "",
+				});
+				const newId = await createAgentDraftMutation.mutateAsync({
+					uid,
+					draft,
+				});
+				setMessages((prev) =>
+					prev.map((m) =>
+						m.id === msg.id && m.draftProposal
+							? {
+									...m,
+									draftProposal: {
+										...m.draftProposal,
+										resolved: "approved",
+										createdId: newId,
+									},
+							  }
+							: m,
+					),
+				);
+				showToast("✓ Draft saved to your library");
+				onAgentDraftCreated?.(newId);
+			} catch (e) {
+				showToast(e?.message || "Could not create draft");
+			} finally {
+				setApprovingForMsgId(null);
+			}
+		},
+		[
+			effectiveUserId,
+			createAgentDraftMutation,
+			onAgentDraftCreated,
+		],
+	);
+
+	const declineDraftProposal = useCallback((msgId) => {
+		setMessages((prev) =>
+			prev.map((m) =>
+				m.id === msgId && m.draftProposal
+					? {
+							...m,
+							draftProposal: {
+								...m.draftProposal,
+								resolved: "declined",
+							},
+					  }
+					: m,
+			),
+		);
+	}, []);
 
 	const stop  = () => abortRef.current?.abort();
 	const onKey = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+
+	const onResizeOverlayPointerDown = useCallback((e) => {
+		if (asPanel) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const el = e.currentTarget;
+		try {
+			el.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+		const startX = e.clientX;
+		const startW = overlayWidth;
+		const onMove = (ev) => {
+			const next = Math.round(
+				Math.min(
+					AI_CHAT_OVERLAY_W_MAX,
+					Math.max(AI_CHAT_OVERLAY_W_MIN, startW + (startX - ev.clientX)),
+				),
+			);
+			setOverlayWidth(next);
+		};
+		const onUp = (ev) => {
+			try {
+				if (ev.pointerId != null) el.releasePointerCapture(ev.pointerId);
+			} catch {
+				/* ignore */
+			}
+			el.removeEventListener("pointermove", onMove);
+			el.removeEventListener("pointerup", onUp);
+			el.removeEventListener("pointercancel", onUp);
+		};
+		el.addEventListener("pointermove", onMove);
+		el.addEventListener("pointerup", onUp);
+		el.addEventListener("pointercancel", onUp);
+	}, [asPanel, overlayWidth]);
 
 	const panelStyle = asPanel
 		? {
@@ -413,13 +1065,13 @@ export default function AIChatSidebar({
 				right: 0,
 				top: 0,
 				bottom: 0,
-				width: 390,
+				width: overlayWidth,
 				background: "#FFFFFF",
 				borderLeft: "1px solid #E8E4DC",
 				display: "flex",
 				flexDirection: "column",
 				zIndex: 150,
-				overflow: "hidden",
+				overflow: "visible",
 				boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
 				fontFamily: "'Outfit', sans-serif",
 			};
@@ -459,12 +1111,59 @@ export default function AIChatSidebar({
 									? { duration: 0.28, ease: [0.16, 1, 0.3, 1] }
 									: { type: "spring", damping: 28, stiffness: 300 }
 							}
-							onClick={() => modelOpen && setModelOpen(false)}
+							onClick={() => {
+								if (modelOpen) setModelOpen(false);
+								if (followUpOpenFor) setFollowUpOpenFor(null);
+								if (agentModeOpen) setAgentModeOpen(false);
+							}}
 							style={{
 								...panelStyle,
-								...(asPanel ? { minWidth: 0, overflow: "hidden" } : {}),
+								...(asPanel
+									? { minWidth: 0, overflow: "hidden" }
+									: { overflow: "visible" }),
 							}}
 						>
+							{!asPanel && (
+								<div
+									role="separator"
+									aria-orientation="vertical"
+									aria-label="Resize AI chat sidebar"
+									aria-valuenow={overlayWidth}
+									aria-valuemin={AI_CHAT_OVERLAY_W_MIN}
+									aria-valuemax={AI_CHAT_OVERLAY_W_MAX}
+									onPointerDown={onResizeOverlayPointerDown}
+									onClick={(e) => e.stopPropagation()}
+									style={{
+										position: "absolute",
+										left: 0,
+										top: "50%",
+										transform: "translateY(-50%)",
+										width: 14,
+										height: AI_CHAT_RESIZE_HANDLE_H,
+										borderRadius: "0 7px 7px 0",
+										background:
+											"linear-gradient(90deg, #DDD9D3 0%, #E8E4DC 40%, #EEEAE4 100%)",
+										border: "1px solid #CEC8BF",
+										borderLeft: "none",
+										boxShadow:
+											"inset 0 1px 0 rgba(255,255,255,0.55), 2px 0 6px rgba(0,0,0,0.06)",
+										cursor: "ew-resize",
+										zIndex: 200,
+										touchAction: "none",
+										boxSizing: "border-box",
+									}}
+								/>
+							)}
+							<div
+								style={{
+									flex: 1,
+									display: "flex",
+									flexDirection: "column",
+									minHeight: 0,
+									overflow: "hidden",
+									width: "100%",
+								}}
+							>
 							{/* ── Header ── */}
 							<div style={{
 								padding: "13px 15px",
@@ -539,7 +1238,7 @@ export default function AIChatSidebar({
 									>
 										<p style={{
 											fontSize: 10.5, fontWeight: 700,
-											textTransform: "uppercase", letterSpacing: "0.1em",
+											textTransform: "", letterSpacing: "0.1em",
 											color: "#B0AAA3", marginBottom: 8,
 										}}>
 											Try asking…
@@ -597,12 +1296,12 @@ export default function AIChatSidebar({
 														border: "1px solid #C17B2F28",
 														borderRadius: "12px 12px 3px 12px",
 														padding: "9px 12px",
-													}}>
+													}} className="ai-chat-prose">
 														<p style={{
 															fontSize: 13, color: "#3A3530",
 															lineHeight: 1.7, whiteSpace: "pre-wrap", margin: 0,
 														}}>
-															{msg.content}
+															<UserMessageWithLinks text={msg.content} />
 														</p>
 													</div>
 												</div>
@@ -629,6 +1328,63 @@ export default function AIChatSidebar({
 															padding: "10px 12px",
 															marginBottom: msg.done && !["w0", "w1"].includes(msg.id) ? 7 : 0,
 														}}>
+															{msg.scrapeSources?.length > 0 && (
+																<ScrapedSourcesPanel sources={msg.scrapeSources} />
+															)}
+															{msg.agentTrace?.length > 0 && (
+																<div style={{ marginBottom: 10 }}>
+																	{msg.agentTrace.map((t, i) => (
+																		<div
+																			key={`${msg.id}-at-${i}`}
+																			style={{
+																				border: "1px solid #E8E4DC",
+																				borderRadius: 9,
+																				padding: "8px 10px",
+																				marginBottom: 6,
+																				background: "#FAFAF8",
+																			}}
+																		>
+																			<p
+																				style={{
+																					fontSize: 10,
+																					fontWeight: 700,
+																					color: "#78350F",
+																					margin: "0 0 4px",
+																					letterSpacing: "0.04em",
+																					textTransform: "uppercase",
+																				}}
+																			>
+																				{t.title}
+																			</p>
+																			{t.sub ? (
+																				<p
+																					style={{
+																						fontSize: 11,
+																						color: "#7A7570",
+																						margin: "0 0 6px",
+																					}}
+																				>
+																					{t.sub}
+																				</p>
+																			) : null}
+																			{t.lines?.map((line, j) => (
+																				<p
+																					key={j}
+																					style={{
+																						fontSize: 11,
+																						lineHeight: 1.55,
+																						color: "#5A5550",
+																						margin: "0 0 3px",
+																						wordBreak: "break-word",
+																					}}
+																				>
+																					{line}
+																				</p>
+																			))}
+																		</div>
+																	))}
+																</div>
+															)}
 															{msg.content ? (
 																<>
 																	<div
@@ -649,6 +1405,131 @@ export default function AIChatSidebar({
 																		/>
 																	))}
 																</div>
+															)}
+															{msg.draftProposal?.resolved === "approved" && (
+																<p style={{
+																	fontSize: 11,
+																	color: "#4A7C59",
+																	margin: "10px 0 0",
+																	fontWeight: 600,
+																}}>
+																	✓ Draft saved
+																	{msg.draftProposal.createdId ? (
+																		<>
+																			{" · "}
+																			<a
+																				href={`/app/${msg.draftProposal.createdId}`}
+																				style={{
+																					color: "#C17B2F",
+																					fontWeight: 700,
+																					textDecoration: "none",
+																				}}
+																			>
+																				Open in app
+																			</a>
+																		</>
+																	) : null}
+																</p>
+															)}
+															{msg.draftProposal && msg.draftProposal.resolved == null && msg.done && (
+																<div
+																	onClick={(e) => e.stopPropagation()}
+																	style={{
+																		marginTop: 10,
+																		padding: "10px 11px",
+																		border: "1px solid #E8CFB0",
+																		borderRadius: 10,
+																		background: "#FFFCF7",
+																	}}
+																>
+																	<p style={{
+																		fontSize: 11,
+																		fontWeight: 700,
+																		color: "#78350F",
+																		margin: "0 0 6px",
+																	}}>
+																		Save as new draft?
+																	</p>
+																	<p style={{
+																		fontSize: 12,
+																		fontWeight: 600,
+																		color: "#1A1A1A",
+																		margin: "0 0 10px",
+																		lineHeight: 1.4,
+																	}}>
+																		{msg.draftProposal.title}
+																	</p>
+																	<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+																		<motion.button
+																			type="button"
+																			whileHover={{ scale: 1.03 }}
+																			whileTap={{ scale: 0.97 }}
+																			disabled={
+																				approvingForMsgId === msg.id ||
+																				createAgentDraftMutation.isPending
+																			}
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				approveDraftProposal(msg);
+																			}}
+																			style={{
+																				background: "linear-gradient(135deg,#C17B2F,#CF8B38)",
+																				border: "none",
+																				borderRadius: 8,
+																				padding: "6px 14px",
+																				fontSize: 12,
+																				fontWeight: 700,
+																				color: "white",
+																				cursor:
+																					approvingForMsgId === msg.id ||
+																					createAgentDraftMutation.isPending
+																						? "wait"
+																						: "pointer",
+																				opacity:
+																					approvingForMsgId === msg.id ||
+																					createAgentDraftMutation.isPending
+																						? 0.7
+																						: 1,
+																			}}
+																		>
+																			{approvingForMsgId === msg.id ? "Saving…" : "Approve"}
+																		</motion.button>
+																		<motion.button
+																			type="button"
+																			whileHover={{ background: "#F0ECE5" }}
+																			whileTap={{ scale: 0.97 }}
+																			disabled={approvingForMsgId === msg.id}
+																			onClick={(e) => {
+																				e.stopPropagation();
+																				declineDraftProposal(msg.id);
+																			}}
+																			style={{
+																				background: "#FFFFFF",
+																				border: "1px solid #E8E4DC",
+																				borderRadius: 8,
+																				padding: "6px 14px",
+																				fontSize: 12,
+																				fontWeight: 600,
+																				color: "#5A5550",
+																				cursor:
+																					approvingForMsgId === msg.id
+																						? "wait"
+																						: "pointer",
+																			}}
+																		>
+																			Decline
+																		</motion.button>
+																	</div>
+																</div>
+															)}
+															{msg.draftProposal?.resolved === "declined" && (
+																<p style={{
+																	fontSize: 11,
+																	color: "#A8A29C",
+																	margin: "8px 0 0",
+																}}>
+																	Cancelled · draft not saved
+																</p>
 															)}
 														</div>
 
@@ -685,27 +1566,127 @@ export default function AIChatSidebar({
 															</motion.div>
 														)}
 
-														{/* Follow-up suggestion chips */}
+														{/* Follow-ups — dropdown (motion.div) */}
 														{msg.done && !["w0", "w1"].includes(msg.id) && (
-															<div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-																{FOLLOWUPS.map(f => (
-																	<motion.button
-																		key={f}
-																		whileHover={{ borderColor: "#C17B2F55", color: "#C17B2F" }}
-																		whileTap={{ scale: 0.93 }}
-																		onClick={() => send(f)}
-																		style={{
-																			background: "none",
-																			border: "1px dashed #DDD9D3",
-																			borderRadius: 6, padding: "3px 8px",
-																			fontSize: 11, color: "#A8A29C",
-																			cursor: "pointer", transition: "all 0.14s",
-																		}}
+															<motion.div
+																style={{
+																	position: "relative",
+																	marginTop: 2,
+																	alignSelf: "flex-start",
+																}}
+																onClick={(e) => e.stopPropagation()}
+															>
+																<motion.button
+																	type="button"
+																	whileHover={{ background: "#F0ECE5", borderColor: "#C17B2F44" }}
+																	whileTap={{ scale: 0.97 }}
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		setFollowUpOpenFor((v) => (v === msg.id ? null : msg.id));
+																	}}
+																	style={{
+																		display: "inline-flex",
+																		alignItems: "center",
+																		gap: 5,
+																		background: "#F7F5F0",
+																		border: "1px dashed #DDD9D3",
+																		borderRadius: 8,
+																		padding: "5px 10px",
+																		fontSize: 11,
+																		fontWeight: 600,
+																		color: "#7A7570",
+																		cursor: "pointer",
+																		transition: "all 0.14s",
+																	}}
+																>
+																	Refine reply
+																	<motion.span
+																		animate={{ rotate: followUpOpenFor === msg.id ? 180 : 0 }}
+																		transition={{ duration: 0.18 }}
+																		style={{ display: "flex" }}
 																	>
-																		{f}
-																	</motion.button>
-																))}
-															</div>
+																		<Ic d={PATHS.chevron} size={11} col="#7A7570" sw={2} />
+																	</motion.span>
+																</motion.button>
+
+																<AnimatePresence>
+																	{followUpOpenFor === msg.id && (
+																		<motion.div
+																			initial={{ opacity: 0, y: 6, scale: 0.96 }}
+																			animate={{ opacity: 1, y: 0, scale: 1 }}
+																			exit={{ opacity: 0, y: 6, scale: 0.96 }}
+																			transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+																			style={{
+																				position: "absolute",
+																				bottom: "calc(100% + 6px)",
+																				top: "auto",
+																				left: 0,
+																				right: 0,
+																				minWidth: 200,
+																				zIndex: 30,
+																				background: "#FFFFFF",
+																				border: "1px solid #E8E4DC",
+																				borderRadius: 11,
+																				boxShadow:
+																					"0 10px 30px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.04)",
+																				overflow: "hidden",
+																			}}
+																		>
+																			<p
+																				style={{
+																					margin: 0,
+																					padding: "8px 11px",
+																					fontSize: 10,
+																					fontWeight: 700,
+																					letterSpacing: "0.04em",
+																					textTransform: "uppercase",
+																					color: "#B0AAA3",
+																					borderBottom: "1px solid #F0ECE5",
+																				}}
+																			>
+																				Try asking
+																			</p>
+																			{FOLLOWUPS.map((f, i) => (
+																				<motion.button
+																					key={f}
+																					type="button"
+																					initial={{ opacity: 0, x: -4 }}
+																					animate={{
+																						opacity: 1,
+																						x: 0,
+																						transition: { delay: i * 0.02 },
+																					}}
+																					whileHover={{ background: "#F7F5F0", x: 1 }}
+																					whileTap={{ scale: 0.99 }}
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						setFollowUpOpenFor(null);
+																						send(f);
+																					}}
+																					style={{
+																						display: "block",
+																						width: "100%",
+																						border: "none",
+																						borderBottom:
+																							i < FOLLOWUPS.length - 1
+																								? "1px solid #F0ECE5"
+																								: "none",
+																						background: "#FFFFFF",
+																						padding: "10px 12px",
+																						fontSize: 12,
+																						fontWeight: 500,
+																						color: "#5A5550",
+																						cursor: "pointer",
+																						textAlign: "left",
+																					}}
+																				>
+																					{f}
+																				</motion.button>
+																			))}
+																		</motion.div>
+																	)}
+																</AnimatePresence>
+															</motion.div>
 														)}
 													</div>
 												</div>
@@ -794,7 +1775,11 @@ export default function AIChatSidebar({
 										value={input}
 										onChange={e => setInput(e.target.value)}
 										onKeyDown={onKey}
-										placeholder="Write, rewrite, expand, brainstorm… (Enter to send)"
+										placeholder={
+											chatMode === CHAT_MODE_AGENT
+												? "Agent mode: find drafts, read notes, scrape links, or propose a new draft…"
+												: "Write, rewrite, expand, brainstorm… (Enter to send)"
+										}
 										rows={2}
 										style={{
 											width: "100%", background: "none",
@@ -824,11 +1809,26 @@ export default function AIChatSidebar({
 										</p>
 
 										<div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-
+											<AIChatSidebarAgentBar
+												mode={chatMode}
+												onModeChange={(m) => {
+													setChatMode(m);
+													setModelOpen(false);
+												}}
+												modeOpen={agentModeOpen}
+												onModeOpenChange={(v) => {
+													setAgentModeOpen(v);
+													if (v) setModelOpen(false);
+												}}
+												disabled={streaming}
+											/>
 											{/* ── Model selector ── */}
 											<div style={{ position: "relative" }}>
 												<motion.button
-													onClick={() => setModelOpen(v => !v)}
+													onClick={() => {
+														setModelOpen((v) => !v);
+														setAgentModeOpen(false);
+													}}
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.95 }}
 													title="Select model"
@@ -1016,6 +2016,7 @@ export default function AIChatSidebar({
 									)}
 								</div>
 							)}
+							</div>
 						</motion.div>
 
 						{/* ── Toast notification ── */}

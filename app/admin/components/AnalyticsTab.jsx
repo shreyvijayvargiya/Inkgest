@@ -547,7 +547,7 @@ const AnalyticsTab = () => {
 										{tab}
 									</button>
 								))}
-								<div className="ml-auto px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+								<div className="ml-auto px-4 py-3 text-xs font-semibold text-zinc-400  tracking-wider">
 									Visitors
 								</div>
 							</div>
@@ -600,7 +600,7 @@ const AnalyticsTab = () => {
 										{tab}
 									</button>
 								))}
-								<div className="ml-auto px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+								<div className="ml-auto px-4 py-3 text-xs font-semibold text-zinc-400  tracking-wider">
 									Visitors
 								</div>
 							</div>

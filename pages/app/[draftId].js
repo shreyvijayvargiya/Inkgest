@@ -10,6 +10,12 @@ import TableView from "../../lib/ui/TableView";
 import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
 import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
 import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
+import {
+	listAssets,
+	getAsset,
+	deleteAsset,
+	assetRef,
+} from "../../lib/api/userAssets";
 import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
 
@@ -31,8 +37,6 @@ const FontLink = () => (
 );
 
 const T = getTheme();
-
-const FREE_LIMIT = 40;
 
 const getDateFromFirestore = (val) => {
 	if (!val) return null;
@@ -143,7 +147,7 @@ const THEMES = {
 			"max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Inter',sans-serif;",
 		h1: "font-family:'Inter',sans-serif;font-size:30px;color:#FFFFFF;line-height:1.2;margin:0 0 16px;font-weight:600;",
 		h2: "font-family:'Inter',sans-serif;font-size:20px;color:#D4D4D4;line-height:1.3;margin:32px 0 12px;font-weight:500;border-bottom:1px solid #222222;padding-bottom:8px;",
-		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;",
+		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:;letter-spacing:0.06em;",
 		p: "font-size:15px;line-height:1.9;color:#A8A8A8;margin:0 0 14px;",
 		blockquote:
 			"border-left:3px solid #7C7CFF;padding:4px 0 4px 20px;color:#666666;font-style:italic;margin:20px 0;",
@@ -235,7 +239,7 @@ const THEMES = {
 			"max-width:740px;margin:0 auto;padding:48px 56px;background:#F8F9FA;font-family:'IBM Plex Sans',sans-serif;",
 		h1: "font-family:'IBM Plex Serif',serif;font-size:32px;color:#1A1F2E;line-height:1.2;margin:0 0 16px;font-weight:600;",
 		h2: "font-family:'IBM Plex Serif',serif;font-size:21px;color:#1A1F2E;line-height:1.35;margin:32px 0 12px;font-weight:600;border-bottom:2px solid #E5E7EB;padding-bottom:8px;",
-		h3: "font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:#1A1F2E;margin:22px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;",
+		h3: "font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:#1A1F2E;margin:22px 0 8px;font-weight:600;text-transform:;letter-spacing:0.05em;",
 		p: "font-size:16px;line-height:1.8;color:#374151;margin:0 0 14px;",
 		blockquote:
 			"border-left:4px solid #3B82F6;background:#EFF6FF;padding:12px 20px;color:#1D4ED8;margin:24px 0;font-style:italic;",
@@ -303,7 +307,7 @@ const THEMES = {
 			"max-width:720px;margin:0 auto;padding:56px 60px;background:#FFFFFF;font-family:'Figtree',sans-serif;",
 		h1: "font-family:'Playfair Display',serif;font-size:38px;color:#1D3461;line-height:1.15;margin:0 0 18px;font-weight:700;",
 		h2: "font-family:'Playfair Display',serif;font-size:24px;color:#1D3461;line-height:1.3;margin:36px 0 14px;font-weight:400;",
-		h3: "font-family:'Figtree',sans-serif;font-size:12px;color:#8899AA;margin:24px 0 8px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;",
+		h3: "font-family:'Figtree',sans-serif;font-size:12px;color:#8899AA;margin:24px 0 8px;font-weight:600;letter-spacing:0.08em;text-transform:;",
 		p: "font-size:16px;line-height:1.9;color:#444B58;margin:0 0 16px;",
 		blockquote:
 			"border-left:4px solid #1D3461;padding:8px 0 8px 24px;color:#8899AA;font-family:'Playfair Display',serif;font-style:italic;font-size:18px;margin:28px 0;",
@@ -372,7 +376,7 @@ const THEMES = {
 			"max-width:740px;margin:0 auto;padding:48px 56px;background:#F5F5F5;font-family:'Roboto',sans-serif;",
 		h1: "font-family:'Bebas Neue',sans-serif;font-size:56px;color:#111111;line-height:1.0;margin:0 0 20px;letter-spacing:0.03em;",
 		h2: "font-family:'Bebas Neue',sans-serif;font-size:30px;color:#DC2626;line-height:1.1;margin:32px 0 14px;letter-spacing:0.05em;",
-		h3: "font-family:'Roboto',sans-serif;font-size:12px;color:#111111;margin:22px 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;",
+		h3: "font-family:'Roboto',sans-serif;font-size:12px;color:#111111;margin:22px 0 8px;font-weight:500;text-transform:;letter-spacing:0.1em;",
 		p: "font-size:16px;line-height:1.8;color:#333333;margin:0 0 14px;",
 		blockquote:
 			"border-left:6px solid #DC2626;padding:12px 24px;background:#FFFFFF;color:#666666;font-size:20px;font-style:italic;margin:24px 0;",
@@ -737,7 +741,7 @@ const LANG_OPTIONS = [
 
 function makeCalloutHtml(type, text = "") {
 	const c = CALLOUT_CONFIGS[type] || CALLOUT_CONFIGS.info;
-	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
+	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
 }
 
 function makeCodeBlockHtml(
@@ -747,9 +751,9 @@ function makeCodeBlockHtml(
 	const lang = language.toLowerCase().trim() || "text";
 	const opts = LANG_OPTIONS.map(
 		(l) =>
-			`<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).toUpperCase() + l.slice(1)}</option>`,
+			`<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).to() + l.slice(1)}</option>`,
 	).join("");
-	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
+	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
 }
 
 function makeButtonBlockHtml(text = "Click here →", href = "#") {
@@ -895,17 +899,44 @@ export default function DraftPage() {
 			router.replace("/app");
 			return null;
 		},
-		enabled: !!draftId && !!reduxUser,
+		enabled: !!router.isReady && !!draftId && !!reduxUser,
 		staleTime: 5 * 60 * 1000,
 		retry: false,
 	});
 
-	const draft = docData?.type === "draft" ? docData.doc : null;
-	const tableDoc = docData?.type === "table" ? docData.doc : null;
-	const infographicsDoc = docData?.type === "infographics" ? docData.doc : null;
-	const landingPageDoc = docData?.type === "landing_page" ? docData.doc : null;
+	/* Resolve doc by type; fallback: infer from structure when type missing/wrong */
+	const doc = docData?.doc;
+	const docType = docData?.type;
+	const draft =
+		(docType === "draft" || docType === "blog")
+			? doc
+			: (!docType && doc?.body != null)
+				? doc
+				: null;
+	const tableDoc =
+		docType === "table"
+			? doc
+			: !docType && Array.isArray(doc?.columns)
+				? doc
+				: null;
+	const infographicsDoc =
+		docType === "infographics"
+			? doc
+			: !docType && Array.isArray(doc?.infographics) && doc.infographics.length > 0
+				? doc
+				: null;
+	const landingPageDoc =
+		docType === "landing_page"
+			? doc
+			: !docType && (doc?.html || doc?.url)
+				? doc
+				: null;
 	const imageGalleryDoc =
-		docData?.type === "image_gallery" ? docData.doc : null;
+		docType === "image_gallery"
+			? doc
+			: !docType && Array.isArray(doc?.images) && doc.images.length > 0
+				? doc
+				: null;
 
 	useEffect(() => {
 		if (tableDoc) {
@@ -922,9 +953,20 @@ export default function DraftPage() {
 		}
 	}, [draftId, tableDoc?.id]);
 
+	/* Derive table data synchronously so content shows on first render (no useEffect delay) */
+	const tableDataForView = tableDoc
+		? localTableData ?? {
+				title: tableDoc.title,
+				description: tableDoc.description,
+				columns: tableDoc.columns || [],
+				rows: tableDoc.rows || [],
+				sourceUrls: tableDoc.sourceUrls || [],
+				prompt: tableDoc.prompt || "",
+			}
+		: null;
+
 	/* Dynamic usage for navbar pill (drafts limit — kept for sidebar logic) */
 	const used = drafts.filter((d) => isThisMonth(d.createdAt)).length;
-	const remaining = Math.max(0, FREE_LIMIT - used);
 
 	/* Credits for free users (10/month) */
 	const [credits, setCredits] = useState(null);
@@ -1343,9 +1385,8 @@ export default function DraftPage() {
 				item?.source ||
 				(isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
-			queryClient.setQueryData(["assets", reduxUser?.uid], (old = []) =>
-				old.filter((d) => d.id !== deleteConfirm),
-			);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser?.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
 			if (deleteConfirm === draftId) {
 				router.push("/app");
 			}
@@ -1390,7 +1431,9 @@ export default function DraftPage() {
 		(docData?.type === "table" ? docData.doc : null) ||
 		(docData?.type === "infographics" ? docData.doc : null) ||
 		(docData?.type === "landing_page" ? docData.doc : null) ||
-		(docData?.type === "image_gallery" ? docData.doc : null);
+		(docData?.type === "image_gallery" ? docData.doc : null) ||
+		/* Fallback: doc exists but type unknown — treat as draft if has body */
+		(docData?.doc?.body != null ? docData.doc : null);
 	const sourceUrl = Array.isArray(asset?.urls)
 		? asset.urls[0] || ""
 		: Array.isArray(asset?.sourceUrls)
@@ -1775,7 +1818,26 @@ export default function DraftPage() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
+											<p style={{ fontSize: 13, marginBottom: 12 }}>
+												No inkgest found
+											</p>
+											<motion.button
+												whileHover={{ scale: 1.02 }}
+												whileTap={{ scale: 0.98 }}
+												onClick={() => router.push("/app")}
+												style={{
+													fontSize: 12,
+													fontWeight: 600,
+													color: T.warm,
+													background: "transparent",
+													border: `1px solid ${T.border}`,
+													borderRadius: 8,
+													padding: "8px 14px",
+													cursor: "pointer",
+												}}
+											>
+												Create New →
+											</motion.button>
 										</motion.div>
 									) : (
 										filtered.map((d) => (
@@ -1894,13 +1956,13 @@ export default function DraftPage() {
 						minWidth: 0,
 					}}
 				>
-					{loadingDraft &&
+					{((!router.isReady || loadingDraft) &&
 						!draft &&
 						!tableDoc &&
 						!infographicsDoc &&
 						!landingPageDoc &&
 						!imageGalleryDoc &&
-						draftId && (
+						draftId) && (
 							<div
 								style={{
 									flex: 1,
@@ -2006,7 +2068,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "0 0 8px",
 													}}
@@ -2047,7 +2109,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "12px 0 8px",
 													}}
@@ -2173,7 +2235,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														padding: "3px 8px 6px",
 														margin: 0,
@@ -2262,7 +2324,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														padding: "3px 8px 6px",
 														margin: 0,
@@ -2822,7 +2884,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "0 0 6px 4px",
 													}}
@@ -2895,7 +2957,7 @@ export default function DraftPage() {
 														fontSize: 10,
 														fontWeight: 700,
 														color: "#B0AAA3",
-														textTransform: "uppercase",
+														textTransform: "",
 														letterSpacing: "0.1em",
 														margin: "0 0 6px 4px",
 													}}
@@ -3251,42 +3313,7 @@ export default function DraftPage() {
 									Themes
 								</motion.button>
 
-								{/* Infographics button */}
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => setInfographicsOpen(true)}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 5,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "5px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.accent,
-										cursor: "pointer",
-									}}
-								>
-									{/* Bar chart icon */}
-									<svg
-										width={12}
-										height={12}
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke={T.accent}
-										strokeWidth={2}
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<line x1="18" y1="20" x2="18" y2="10" />
-										<line x1="12" y1="20" x2="12" y2="4" />
-										<line x1="6" y1="20" x2="6" y2="14" />
-									</svg>
-									Infographics
-								</motion.button>
+								
 
 								{/* AI Chat button */}
 								<motion.button
@@ -3348,7 +3375,7 @@ export default function DraftPage() {
 							</div>
 						</motion.div>
 					)}
-					{tableDoc && localTableData && (
+					{tableDoc && tableDataForView && (
 						<motion.div
 							key={`table-${draftId}`}
 							initial={{ opacity: 0 }}
@@ -3373,7 +3400,7 @@ export default function DraftPage() {
 							>
 								<TableView
 									tableId={draftId}
-									tableData={localTableData}
+									tableData={tableDataForView}
 									setTableData={setLocalTableData}
 									reduxUser={reduxUser}
 									tableDocRef={
@@ -3404,11 +3431,9 @@ export default function DraftPage() {
 								assetId={draftId}
 								docSource={docData?.source || "assets"}
 								onUpdate={() =>
-									queryClient.invalidateQueries([
-										"doc",
-										draftId,
-										reduxUser?.uid,
-									])
+									queryClient.invalidateQueries({
+										queryKey: ["doc", draftId, reduxUser?.uid],
+									})
 								}
 							/>
 						</motion.div>
@@ -3459,6 +3484,9 @@ export default function DraftPage() {
 					draftContent={editorRef.current?.innerHTML || draft?.body || ""}
 					draftTitle={draft?.title || "Draft"}
 					userId={reduxUser?.uid || ""}
+					onAgentDraftCreated={(newDraftId) =>
+						router.push(`/app/${newDraftId}`)
+					}
 					selectionContext={selectionContext}
 					asPanel
 				/>

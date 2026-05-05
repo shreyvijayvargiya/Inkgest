@@ -1,21 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import { db, auth } from "../../lib/config/firebase";
-import {
-	collection,
-	addDoc,
-	getDocs,
-	deleteDoc,
-	doc,
-	query,
-	orderBy,
-	where,
-	serverTimestamp,
-} from "firebase/firestore";
 import {
 	listAssets,
 	createDraft,
@@ -30,9 +19,14 @@ import {
 	FREE_CREDIT_LIMIT,
 	formatRenewalDate,
 } from "../../lib/utils/credits";
-import { validateUrl, validateUrls } from "../../lib/utils/urlAllowlist";
+import { validateUrl } from "../../lib/utils/urlAllowlist";
 import { getTheme } from "../../lib/utils/theme";
-import { inferFormatFromPrompt } from "../../lib/prompts/newsletter";
+import SimpleBuilderTab from "../../lib/ui/SimpleBuilderTab";
+import GenerateAssetPanel from "../../lib/ui/GenerateAssetPanel";
+import { persistGenerateResponse } from "../../lib/utils/persistGenerateResponse";
+import { requestGenerate } from "../../lib/api/generateClient";
+import { listCanvasProjects } from "../../lib/api/canvasProjects";
+import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -115,6 +109,8 @@ const Icons = {
 		"M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3 M8 12h8",
 	settings:
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+	send: "M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z",
+	stop: "M6 6h12v12H6z",
 };
 
 /* ─── Prefill presets (URLs + prompt) ─── */
@@ -145,28 +141,51 @@ const PRESETS = [
 	},
 ];
 
-/* ─── InkAgent loader messages (rotate while loading) ─── */
-const AGENT_LOADING_MSGS = [
-	"InkAgent thinking…",
-	"InkAgent analysing your request…",
-	"InkAgent browsing & finding content…",
-	"InkAgent creating newsletter…",
-	"InkAgent building table…",
-	"InkAgent preparing content…",
-];
-
-/* ─── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ─── */
+/* ─── Prompt suggestions for generate panel (URL + short prompt) ─── */
 const AGENT_PROMPT_SUGGESTIONS = [
-	"Find Hacker News latest news and create a summary of the top stories.",
-	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
-	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
-	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
-	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
-	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
-	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
-	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
-	"Find top news from India and create a realistic table — headlines, source, key points.",
-	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
+	{
+		urls: ["https://news.ycombinator.com"],
+		prompt: "Top 5 front-page stories as a dev newsletter.",
+	},
+	{
+		urls: ["https://news.ycombinator.com/newest"],
+		prompt: "Newest posts — quick bullets, no fluff.",
+	},
+	{
+		urls: ["https://blog.ycombinator.com"],
+		prompt: "YC blog themes this week; casual digest.",
+	},
+	{
+		urls: ["https://www.ycombinator.com/companies"],
+		prompt: "Portfolio snapshot; one tight paragraph.",
+	},
+	{
+		urls: ["https://blog.x.com"],
+		prompt: "Engineering blog — concise takeaways for builders.",
+	},
+	{
+		urls: ["https://www.thehindu.com/sci-tech/technology/"],
+		prompt: "India tech headlines; neutral newsletter tone.",
+	},
+	{
+		urls: ["https://indianexpress.com/section/technology/"],
+		prompt: "Short digest with Indian policy + startup angle.",
+	},
+	{
+		urls: [
+			"https://economictimes.indiatimes.com/tech",
+			"https://www.moneycontrol.com/news/technology/",
+		],
+		prompt: "India business + tech roundup; table OK.",
+	},
+	{
+		urls: ["https://www.livemint.com/technology"],
+		prompt: "Mint tech picks; professional LinkedIn style.",
+	},
+	{
+		urls: ["https://www.ndtv.com/topic/tech-news"],
+		prompt: "National tech news summary; general audience.",
+	},
 ];
 
 /* ─── Format / Style config (mirrors API) ─── */
@@ -198,7 +217,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 		? "You've used all your free credits this month"
 		: "Almost out of free credits";
 	const sub = out
-		? `Upgrade to Pro for unlimited access — $9/mo`
+		? `Upgrade  — $20/mo`
 		: `${(creditsLimit - creditsUsed).toFixed(2)} credits left. Upgrade to Pro before you run out.`;
 
 	return (
@@ -211,6 +230,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 				borderRadius: 10,
 				padding: "12px 16px",
 				marginBottom: 16,
+				flexWrap: "wrap",
 			}}
 		>
 			<div
@@ -219,6 +239,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 					alignItems: "center",
 					justifyContent: "space-between",
 					gap: 12,
+					flexWrap: "wrap",
 				}}
 			>
 				<div>
@@ -257,7 +278,7 @@ function UpgradeBanner({ credits, onUpgrade }) {
 						whiteSpace: "nowrap",
 					}}
 				>
-					Upgrade $9/mo →
+					Upgrade $20/mo →
 				</motion.button>
 			</div>
 		</motion.div>
@@ -274,7 +295,36 @@ const SIDEBAR_ASSET_LABELS = {
 };
 
 /* ─── Item card in sidebar (drafts + tables + assets) ─── */
-function SidebarItemCard({ item, active, onClick, onDelete }) {
+function groupSidebarByProject(items, projects) {
+	if (!projects?.length)
+		return [{ id: "_all", name: "All assets", items }];
+	const out = [];
+	const seen = new Set();
+	for (const p of projects) {
+		const ids = new Set(p.assetIds || []);
+		const projItems = items.filter((i) => ids.has(i.id));
+		projItems.forEach((i) => seen.add(i.id));
+		if (projItems.length > 0)
+			out.push({
+				id: p.id,
+				name: p.name || "Project",
+				items: projItems,
+			});
+	}
+	const loose = items.filter((i) => !seen.has(i.id));
+	if (loose.length > 0)
+		out.push({ id: "_unassigned", name: "Unassigned", items: loose });
+	return out.length > 0
+		? out
+		: [{ id: "_all", name: "All assets", items }];
+}
+
+function SidebarItemCard({
+	item,
+	active,
+	onClick,
+	onDelete,
+}) {
 	const [hovering, setHovering] = useState(false);
 	const isAssetWithDesc = [
 		"table",
@@ -394,28 +444,37 @@ function SidebarItemCard({ item, active, onClick, onDelete }) {
 				</div>
 				<AnimatePresence>
 					{hovering && (
-						<motion.button
-							initial={{ opacity: 0, scale: 0.8 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.8 }}
-							onClick={(e) => {
-								e.stopPropagation();
-								onDelete(item.id);
-							}}
+						<div
 							style={{
-								background: "none",
-								border: "none",
-								cursor: "pointer",
-								padding: 4,
-								borderRadius: 6,
+								display: "flex",
+								alignItems: "center",
+								gap: 2,
 								flexShrink: 0,
-								color: "#EF4444",
-								transition: "background 0.15s",
 							}}
-							whileHover={{ background: "#FEE2E2" }}
 						>
-							<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-						</motion.button>
+							<motion.button
+								initial={{ opacity: 0, scale: 0.8 }}
+								animate={{ opacity: 1, scale: 1 }}
+								exit={{ opacity: 0, scale: 0.8 }}
+								onClick={(e) => {
+									e.stopPropagation();
+									onDelete(item.id);
+								}}
+								style={{
+									background: "none",
+									border: "none",
+									cursor: "pointer",
+									padding: 4,
+									borderRadius: 6,
+									flexShrink: 0,
+									color: "#EF4444",
+									transition: "background 0.15s",
+								}}
+								whileHover={{ background: "#FEE2E2" }}
+							>
+								<Icon d={Icons.trash} size={14} stroke="#EF4444" />
+							</motion.button>
+						</div>
 					)}
 				</AnimatePresence>
 			</div>
@@ -430,7 +489,6 @@ export default function inkgestApp() {
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const pendingGenerateRef = useRef(false);
 
-	const [drafts, setDrafts] = useState([]);
 	const [search, setSearch] = useState("");
 	const [urls, setUrls] = useState([""]);
 	const [newUrlInput, setNewUrlInput] = useState("");
@@ -443,21 +501,12 @@ export default function inkgestApp() {
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
-	const [draftMode, setDraftMode] = useState("agent"); // "ai" | "scrape" | "blank" | "agent"
+	const [draftMode, setDraftMode] = useState("agent"); // "simple" | "agent" | "ai" | "scrape" | "blank"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
 	const [credits, setCredits] = useState(null); // { plan, creditsUsed, creditsLimit, remaining }
 
-	// InkAgent state
-	const [agentPrompt, setAgentPrompt] = useState("");
-	const [agentRunSteps, setAgentRunSteps] = useState([]); // [{ label, status: 'loading'|'done'|'error' }]
-	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
-	const [agentLoading, setAgentLoading] = useState(false);
-	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
-	const [agentError, setAgentError] = useState(null);
-	const [agentThinking, setAgentThinking] = useState(""); // Streaming "thinking" text from SSE
-	const agentOutputRef = useRef(null);
 
 	/* Derived helpers — single unified credit pool */
 	const creditRemaining = credits
@@ -469,60 +518,26 @@ export default function inkgestApp() {
 	const llmRemaining = creditRemaining;
 	const scrapeRemaining = creditRemaining;
 
-	/* Cycle InkAgent loading messages — only when we have a single placeholder step */
-	useEffect(() => {
-		if (!agentLoading) return;
-		setAgentLoadingMsg(AGENT_LOADING_MSGS[0]);
-		let idx = 0;
-		const iv = setInterval(() => {
-			idx = (idx + 1) % AGENT_LOADING_MSGS.length;
-			const msg = AGENT_LOADING_MSGS[idx];
-			setAgentLoadingMsg(msg);
-			setAgentRunSteps((prev) => {
-				// Don't overwrite when we have multiple steps (from suggestedTasks)
-				if (prev.length !== 1 || prev[0]?.status !== "loading") return prev;
-				return [{ label: msg, status: "loading" }];
-			});
-		}, 2500);
-		return () => clearInterval(iv);
-	}, [agentLoading]);
+	/* Load drafts, tables, and other assets via React Query (shared with draftId page) */
+	const { data: items = [], isLoading: assetsLoading } = useQuery({
+		queryKey: ["assets", reduxUser?.uid],
+		queryFn: () => listAssets(reduxUser.uid),
+		enabled: !!reduxUser,
+		staleTime: 2 * 60 * 1000,
+	});
 
-	/* Scroll InkAgent output into view when thinking/steps appear */
-	useEffect(() => {
-		if ((agentThinking || agentRunSteps.length > 0) && agentOutputRef.current) {
-			agentOutputRef.current.scrollIntoView({
-				behavior: "smooth",
-				block: "nearest",
-			});
-		}
-	}, [agentThinking, agentRunSteps.length]);
+	const { data: canvasProjects = [] } = useQuery({
+		queryKey: ["canvasProjects", reduxUser?.uid],
+		queryFn: () => listCanvasProjects(reduxUser.uid),
+		enabled: !!reduxUser,
+		staleTime: 60 * 1000,
+	});
 
-	/* Load drafts, tables, and other assets per user from Firestore */
-	const [tables, setTables] = useState([]);
-	const [otherAssets, setOtherAssets] = useState([]);
-	useEffect(() => {
-		if (!reduxUser) {
-			setDrafts([]);
-			setTables([]);
-			setOtherAssets([]);
-			return;
-		}
-		const load = async () => {
-			try {
-				const items = await listAssets(reduxUser.uid);
-				setDrafts(items.filter((i) => i.type === "draft"));
-				setTables(items.filter((i) => i.type === "table"));
-				setOtherAssets(
-					items.filter((i) =>
-						["infographics", "landing_page", "image_gallery"].includes(i.type),
-					),
-				);
-			} catch (e) {
-				console.error("Failed to load assets", e);
-			}
-		};
-		load();
-	}, [reduxUser]);
+	const drafts = items.filter((i) => i.type === "draft");
+	const tables = items.filter((i) => i.type === "table");
+	const otherAssets = items.filter((i) =>
+		["infographics", "landing_page", "image_gallery"].includes(i.type),
+	);
 
 	const sidebarItems = [...drafts, ...tables, ...otherAssets].sort((a, b) => {
 		const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
@@ -585,6 +600,11 @@ export default function inkgestApp() {
 		);
 	});
 
+	const sidebarGrouped = useMemo(
+		() => groupSidebarByProject(filtered, canvasProjects),
+		[filtered, canvasProjects],
+	);
+
 	const applyPreset = (p) => {
 		setUrls(p.urls.length ? p.urls : [""]);
 		setPrompt(p.prompt);
@@ -606,15 +626,8 @@ export default function inkgestApp() {
 		const source = item?.source || (isAssetType ? "assets" : "drafts");
 		try {
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
-			if (item?.type === "table") {
-				setTables((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			} else if (
-				["infographics", "landing_page", "image_gallery"].includes(item?.type)
-			) {
-				setOtherAssets((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			} else {
-				setDrafts((prev) => prev.filter((d) => d.id !== deleteConfirm));
-			}
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
@@ -693,16 +706,7 @@ export default function inkgestApp() {
 				tag: "Scraped",
 			};
 			const { id } = await createDraft(reduxUser.uid, draft);
-			setDrafts((prev) => [
-				{
-					id,
-					type: "draft",
-					...draft,
-					createdAt: new Date(),
-					source: "assets",
-				},
-				...prev,
-			]);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 			setScrapeUrl("");
 			// Refresh credits counter
 			if (reduxUser)
@@ -718,53 +722,11 @@ export default function inkgestApp() {
 		}
 	};
 
-	/* Get step label from executed task */
-	const getAgentStepLabel = (task) => {
-		if (task.type === "scrape") {
-			const url = task.urls?.[0] || task.sourceUrls?.[0];
-			const host = url
-				? (() => {
-						try {
-							return new URL(url).hostname;
-						} catch {
-							return url.slice(0, 30);
-						}
-					})()
-				: "";
-			return host ? `Browsing ${host}…` : task.label || "Browsing…";
-		}
-		if (task.type === "newsletter")
-			return task.label || "Writing newsletter draft…";
-		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
-		if (task.type === "blog_post") return task.label || "Writing blog post…";
-		if (task.type === "twitter_thread") return task.label || "Creating thread…";
-		if (task.type === "email_digest") return task.label || "Creating digest…";
-		if (task.type === "table") return task.label || "Creating table…";
-		if (
-			task.type === "infographics" ||
-			task.type === "infographics-svg-generator"
-		)
-			return task.label || "Creating infographics…";
-		if (
-			task.type === "landing_page" ||
-			task.type === "landing-page" ||
-			task.type === "landing-page-generator"
-		)
-			return task.label || "Creating landing page…";
-		if (
-			task.type === "image_gallery" ||
-			task.type === "image-gallery" ||
-			task.type === "image-gallery-generator" ||
-			task.type === "image-gallery-creator"
-		)
-			return task.label || "Creating image gallery…";
-		return task.label || "Processing…";
-	};
-
-	/* InkAgent: stream SSE from API, show real-time task progress */
-	const handleAgentSend = async () => {
-		const promptText = agentPrompt.trim();
-		if (!promptText || agentLoading) return;
+	const handleDraftGenerate = async () => {
+		const cleanUrls = urls
+			.map((u) => u.trim())
+			.filter((u) => /^https?:\/\//i.test(u));
+		if (!prompt.trim() && cleanUrls.length === 0) return;
 		if (!reduxUser) {
 			setLoginModalOpen(true);
 			return;
@@ -773,477 +735,41 @@ export default function inkgestApp() {
 			router.push("/pricing");
 			return;
 		}
-		setAgentLoading(true);
-		setAgentError(null);
-		setAgentCompletedTasks([]);
-		setAgentThinking("");
-		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
-		setAgentPrompt("");
+		setGenerating(true);
+		setGenerateError(null);
 		try {
 			const idToken = await auth.currentUser?.getIdToken();
 			if (!idToken) throw new Error("Session expired. Please sign in again.");
-			const res = await fetch("/api/agent/inkagent", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ prompt: promptText, idToken }),
+			const { data } = await requestGenerate({
+				type: "newsletter",
+				idToken,
+				urls: cleanUrls,
+				prompt: prompt.trim(),
+				format,
+				style,
 			});
-			if (!res.ok) {
-				const errData = await res.json().catch(() => ({}));
-				throw new Error(errData.error || "Agent failed");
+			const tasks = await persistGenerateResponse({
+				uid: reduxUser.uid,
+				generateType: "newsletter",
+				data,
+				prompt: prompt.trim(),
+				urlList: cleanUrls,
+				format,
+				queryClient,
+			});
+			if (tasks.length > 0) {
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+				if (tasks[0]?.path) router.push(tasks[0].path);
 			}
-			const contentType = res.headers.get("content-type") || "";
-			if (!contentType.includes("text/event-stream")) {
-				const data = await res.json();
-				if (data.executed?.length > 0) {
-					setAgentRunSteps(
-						data.executed.map((t) => ({
-							label: getAgentStepLabel(t),
-							status: "done",
-						})),
-					);
-					await processAgentExecuted(data.executed, promptText);
-				} else {
-					setAgentRunSteps([
-						{ label: data.message || "Done.", status: "done" },
-					]);
-				}
-				if (reduxUser)
-					getUserCredits(reduxUser.uid)
-						.then(setCredits)
-						.catch(() => {});
-				return;
-			}
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
-				const parts = buffer.split("\n\n");
-				buffer = parts.pop() || "";
-				for (const part of parts) {
-					const line = part.trim();
-					if (!line.startsWith("data: ")) continue;
-					const jsonStr = line.slice(6);
-					if (!jsonStr) continue;
-					let data;
-					try {
-						data = JSON.parse(jsonStr);
-					} catch {
-						continue;
-					}
-					if (data.type === "thinking") {
-						const text =
-							data.thinking ??
-							data.reasoning ??
-							data.content ??
-							data.text ??
-							data.output ??
-							"";
-						if (text)
-							setAgentThinking((prev) =>
-								prev
-									? prev + "\n\n" + String(text).trim()
-									: String(text).trim(),
-							);
-					} else if (data.type === "start") {
-						const thinkingText =
-							data.thinking ??
-							data.reasoning ??
-							data.thought ??
-							data.agent_thought ??
-							data.content ??
-							data.message ??
-							data.text ??
-							data.output ??
-							"";
-						setAgentThinking(
-							thinkingText
-								? String(thinkingText).trim()
-								: (data.message || "Processing your request…").trim(),
-						);
-						const tasks = data.suggestedTasks || [];
-						setAgentRunSteps(
-							tasks.length > 0
-								? tasks.map((t) => ({
-										label: t.label || t.taskLabel || "Task",
-										status: "loading",
-									}))
-								: [
-										{
-											label: data.message || "Running tasks…",
-											status: "loading",
-										},
-									],
-						);
-					} else if (data.type === "task") {
-						const idx = data.index ?? 0;
-						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
-						const status = data.success ? "done" : "error";
-						setAgentRunSteps((prev) => {
-							const next = [...prev];
-							while (next.length <= idx)
-								next.push({
-									label: `Task ${next.length + 1}`,
-									status: "loading",
-								});
-							next[idx] = { label, status };
-							return next;
-						});
-					} else if (data.type === "end") {
-						setAgentThinking("");
-						const executed = data.executed || [];
-						if (executed.length > 0) {
-							await processAgentExecuted(executed, promptText);
-						} else {
-							setAgentRunSteps((prev) =>
-								prev.map((s) => ({
-									...s,
-									status: s.status === "loading" ? "done" : s.status,
-								})),
-							);
-						}
-						const creditsUsed = data.creditsUsed;
-						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
-							fetch("/api/agent/inkagent", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ idToken, creditsUsed }),
-							}).catch(() => {});
-						}
-						if (reduxUser)
-							getUserCredits(reduxUser.uid)
-								.then(setCredits)
-								.catch(() => {});
-					}
-				}
-			}
-			if (buffer.trim()) {
-				const line = buffer.trim();
-				if (line.startsWith("data: ")) {
-					try {
-						const data = JSON.parse(line.slice(6));
-						if (data.type === "end") {
-							if ((data.executed || []).length > 0)
-								await processAgentExecuted(data.executed, promptText);
-							const creditsUsed = data.creditsUsed;
-							if (
-								typeof creditsUsed === "number" &&
-								creditsUsed > 0 &&
-								idToken
-							) {
-								fetch("/api/agent/inkagent", {
-									method: "POST",
-									headers: { "Content-Type": "application/json" },
-									body: JSON.stringify({ idToken, creditsUsed }),
-								}).catch(() => {});
-							}
-						}
-						if (reduxUser)
-							getUserCredits(reduxUser.uid)
-								.then(setCredits)
-								.catch(() => {});
-					} catch {
-						// ignore
-					}
-				}
-			}
+			if (reduxUser)
+				getUserCredits(reduxUser.uid).then(setCredits).catch(() => {});
 		} catch (e) {
-			const errMsg = e?.message || "Agent failed";
-			setAgentError(errMsg);
-			setAgentRunSteps([{ label: errMsg, status: "error" }]);
+			setGenerateError(e?.message || "Something went wrong");
 		} finally {
-			setAgentLoading(false);
+			setGenerating(false);
 		}
 	};
 
-	const processAgentExecuted = async (executed, userPrompt = "") => {
-		const newTasks = [];
-		const inferred = inferFormatFromPrompt(userPrompt);
-		const CONTENT_TYPES = [
-			"newsletter",
-			"linkedin",
-			"blog_post",
-			"twitter_thread",
-			"email_digest",
-		];
-		for (const task of executed) {
-			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
-			if (isContentDraft) {
-				const lines = (task.content || "").split("\n");
-				const titleLine = lines.find(
-					(l) => l.startsWith("# ") || l.startsWith("## "),
-				);
-				const title = titleLine
-					? titleLine.replace(/^#+\s*/, "").trim()
-					: task.label || "Draft";
-				const bodyText = lines
-					.filter((l) => !l.match(/^#{1,6}\s/))
-					.join(" ")
-					.replace(/[*_`]/g, "")
-					.replace(/\s+/g, " ")
-					.trim();
-				const tag = task.formatLabel || inferred.label;
-				const format = task.params?.format || inferred.format;
-				const draft = {
-					title,
-					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
-					body: task.content,
-					urls: task.params?.urls || [],
-					prompt: userPrompt || "",
-					words: task.content.trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					tag,
-					format,
-				};
-				const { id } = await createDraft(reduxUser.uid, draft);
-				setDrafts((prev) => [
-					{
-						id,
-						type: "draft",
-						...draft,
-						createdAt: new Date(),
-						source: "assets",
-					},
-					...prev,
-				]);
-				newTasks.push({
-					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (task.type === "scrape" && task.content) {
-				const draft = {
-					title: task.title || "Scraped",
-					preview: (task.content || "").slice(0, 180),
-					body: task.content || "",
-					urls: task.urls || [],
-					prompt: userPrompt || "",
-					images: task.images || [],
-					words: (task.content || "").trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					tag: "Scraped",
-				};
-				const { id } = await createDraft(reduxUser.uid, draft);
-				setDrafts((prev) => [
-					{
-						id,
-						type: "draft",
-						...draft,
-						createdAt: new Date(),
-						source: "assets",
-					},
-					...prev,
-				]);
-				newTasks.push({
-					type: "scrape",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (task.type === "table" && task.columns) {
-				const { id } = await createTable(reduxUser.uid, {
-					title: task.title || "Generated Table",
-					description: task.description || "",
-					columns: task.columns || [],
-					rows: task.rows || [],
-					sourceUrls: task.sourceUrls || [],
-					prompt: userPrompt || "",
-				});
-				setTables((prev) => [
-					{
-						id,
-						type: "table",
-						title: task.title || "Generated Table",
-						description: task.description || "",
-						createdAt: new Date(),
-						date: new Date().toLocaleDateString("en-US", {
-							weekday: "short",
-							month: "short",
-							day: "numeric",
-						}),
-						source: "assets",
-					},
-					...prev,
-				]);
-				newTasks.push({
-					type: "table",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				task.type === "infographics" ||
-				task.type === "infographics-svg-generator"
-			) {
-				let infographics = task.infographics ?? task.result?.infographics ?? [];
-				if (!Array.isArray(infographics) && typeof task.content === "string") {
-					try {
-						infographics = JSON.parse(task.content);
-					} catch {
-						infographics = [];
-					}
-				}
-				if (!Array.isArray(infographics) || infographics.length === 0) continue;
-				const { id } = await createInfographicsAsset(reduxUser.uid, {
-					title: task.title || "Infographics",
-					description: task.description || "",
-					prompt: userPrompt || "",
-					infographics,
-				});
-				const item = {
-					id,
-					type: "infographics",
-					title: task.title || "Infographics",
-					description: task.description || "",
-					createdAt: new Date(),
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					source: "assets",
-				};
-				setOtherAssets((prev) => [item, ...prev]);
-				newTasks.push({
-					type: "infographics",
-					label: task.label || "Infographics",
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				(task.type === "landing_page" ||
-					task.type === "landing-page" ||
-					task.type === "landing-page-generator") &&
-				(task.html ||
-					task.result?.html ||
-					task.result?.result?.html ||
-					task.url ||
-					task.result?.url ||
-					(typeof task.content === "string" &&
-						task.content.trim().startsWith("<")))
-			) {
-				const html =
-					task.html ??
-					task.result?.html ??
-					task.result?.result?.html ??
-					(typeof task.content === "string" &&
-					task.content.trim().startsWith("<")
-						? task.content
-						: "") ??
-					"";
-				const url =
-					task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
-				if (!html && !url) continue;
-				const { id } = await createLandingPageAsset(reduxUser.uid, {
-					title: task.title || "Landing Page",
-					description: task.description || "",
-					html,
-					url,
-				});
-				const item = {
-					id,
-					type: "landing_page",
-					title: task.title || "Landing Page",
-					description: task.description || "",
-					createdAt: new Date(),
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					source: "assets",
-				};
-				setOtherAssets((prev) => [item, ...prev]);
-				newTasks.push({
-					type: "landing_page",
-					label: task.label || "Landing Page",
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				task.type === "image_gallery" ||
-				task.type === "image-gallery" ||
-				task.type === "image-gallery-generator" ||
-				task.type === "image-gallery-creator"
-			) {
-				let images =
-					task.images ??
-					task.result?.images ??
-					task.result?.data ??
-					task.result?.result?.images ??
-					[];
-				if (!Array.isArray(images) && typeof task.content === "string") {
-					try {
-						const parsed = JSON.parse(task.content);
-						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
-					} catch {
-						images = [];
-					}
-				}
-				if (
-					!Array.isArray(images) &&
-					typeof task.result?.content === "string"
-				) {
-					try {
-						const parsed = JSON.parse(task.result.content);
-						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
-					} catch {
-						// keep existing images
-					}
-				}
-				// Normalize: allow { url }, { src }, or plain string URLs
-				images = Array.isArray(images)
-					? images
-							.map((img) => (typeof img === "string" ? { url: img } : img))
-							.filter((img) => img?.url || img?.src)
-					: [];
-				if (images.length === 0) continue;
-				const { id } = await createImageGalleryAsset(reduxUser.uid, {
-					title: task.title || "Image Gallery",
-					description: task.description || "",
-					images,
-				});
-				const item = {
-					id,
-					type: "image_gallery",
-					title: task.title || "Image Gallery",
-					description: task.description || "",
-					createdAt: new Date(),
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					source: "assets",
-				};
-				setOtherAssets((prev) => [item, ...prev]);
-				newTasks.push({
-					type: "image_gallery",
-					label: task.label || "Gallery",
-					id,
-					path: `/app/${id}`,
-				});
-			}
-		}
-		setAgentCompletedTasks((prev) => [...newTasks, ...prev]);
-		if (newTasks.length > 0 && reduxUser?.uid) {
-			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
-			queryClient.invalidateQueries({ queryKey: ["doc"] });
-		}
-	};
-
-	/* Create a blank draft and open it */
 	const handleBlank = async () => {
 		if (!reduxUser) {
 			setLoginModalOpen(true);
@@ -1266,10 +792,7 @@ export default function inkgestApp() {
 			tag: "Draft",
 		};
 		const { id } = await createDraft(reduxUser.uid, draft);
-		setDrafts((prev) => [
-			{ id, type: "draft", ...draft, createdAt: new Date(), source: "assets" },
-			...prev,
-		]);
+		queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 		setBlankTitle("");
 		router.push(`/app/${id}`);
 	};
@@ -1287,230 +810,25 @@ export default function inkgestApp() {
 		>
 			<FontLink />
 
-			{/* ── TOP BAR ── */}
-			<div
-				style={{
-					height: 56,
-					background: T.surface,
-					borderBottom: `1px solid ${T.border}`,
-					display: "flex",
-					alignItems: "center",
-					padding: "0 20px",
-					gap: 12,
-					flexShrink: 0,
-					zIndex: 50,
-				}}
-			>
-				{/* Logo */}
-				<a
-					href="/"
-					style={{
-						fontFamily: "",
-						fontSize: 20,
-						color: T.accent,
-						textDecoration: "none",
-						display: "flex",
-						alignItems: "center",
-						gap: 7,
-						flexShrink: 0,
-						marginRight: 8,
-					}}
-				>
-					<motion.span
-						whileHover={{ scale: 1.3 }}
-						style={{
-							width: 8,
-							height: 8,
-							borderRadius: "50%",
-							background: T.warm,
-							display: "inline-block",
-						}}
-					/>
-					inkgest
-				</a>
-
-				{/* Sidebar toggle — only when logged in */}
-				{reduxUser && (
-					<motion.button
-						whileHover={{ background: "#F0ECE5" }}
-						whileTap={{ scale: 0.93 }}
-						onClick={() => setSidebarOpen((s) => !s)}
-						style={{
-							background: "transparent",
-							border: "none",
-							borderRadius: 8,
-							padding: "6px 8px",
-							cursor: "pointer",
-						}}
-					>
-						<Icon d={sidebarOpen ? Icons.chevronL : Icons.chevronR} size={16} />
-					</motion.button>
-				)}
-
-				<div style={{ width: 1, height: 20, background: T.border }} />
-
-				{/* Credits pill */}
-				{reduxUser && (
-					<div
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-							marginLeft: 4,
-							background: T.base,
-							border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
-							borderRadius: 100,
-							padding: "4px 14px",
-						}}
-					>
-						{credits?.plan === "pro" ? (
-							<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
-								∞ Pro
-							</span>
-						) : (
-							<>
-								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-									Credits{" "}
-									<span
-										style={{
-											fontWeight: 700,
-											color: creditRemaining === 0 ? "#EF4444" : T.accent,
-										}}
-									>
-										{credits
-											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
-											: `0/${FREE_CREDIT_LIMIT}`}
-									</span>
-								</span>
-								{credits?.renewsAt && (
-									<span
-										style={{
-											fontSize: 11,
-											color: T.muted,
-											fontWeight: 500,
-											whiteSpace: "nowrap",
-										}}
-									>
-										Renew at {formatRenewalDate(credits.renewsAt)}
-									</span>
-								)}
-							</>
-						)}
-						<motion.button
-							whileHover={{ scale: 1.04 }}
-							whileTap={{ scale: 0.97 }}
-							onClick={() => router.push("/pricing")}
-							style={{
-								background: T.accent,
-								color: "white",
-								border: "none",
-								padding: "3px 10px",
-								borderRadius: 100,
-								fontSize: 11,
-								fontWeight: 700,
-								cursor: "pointer",
-							}}
-						>
-							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
-						</motion.button>
-					</div>
-				)}
-				{!reduxUser && (
-					<div
-						className="sm:hidden md:flex"
-						style={{
-							alignItems: "center",
-							gap: 8,
-							marginLeft: 4,
-							background: T.base,
-							border: `1px solid ${T.border}`,
-							borderRadius: 100,
-							padding: "4px 12px",
-						}}
-					>
-						<span style={{ fontSize: 12, color: T.muted, fontWeight: 600 }}>
-							{FREE_CREDIT_LIMIT} Credits
-						</span>
-					</div>
-				)}
-
-				<div style={{ flex: 1 }} />
-
-				{/* New draft button */}
-				<motion.button
-					whileHover={{
-						scale: 1.03,
-						y: -1,
-						boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-					}}
-					whileTap={{ scale: 0.97 }}
-					onClick={() => router.push("/app")}
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 6,
-						background: T.accent,
-						color: "white",
-						border: "none",
-						padding: "7px 16px",
-						borderRadius: 9,
-						fontSize: 13,
-						fontWeight: 600,
-						cursor: "pointer",
-					}}
-				>
-					<Icon d={Icons.plus} size={14} stroke="white" />{" "}
-					<span className="md:block hidden">New draft</span>
-				</motion.button>
-
-				{/* User avatar / login */}
-				<motion.button
-					whileHover={{ scale: 1.08 }}
-					whileTap={{ scale: 0.95 }}
-					onClick={() => setLoginModalOpen(true)}
-					style={{
-						background: "none",
-						border: "none",
-						padding: 0,
-						cursor: "pointer",
-						borderRadius: "50%",
-					}}
-				>
-					{reduxUser?.photoURL ? (
-						<img
-							src={reduxUser.photoURL}
-							alt={reduxUser.displayName || "User"}
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								objectFit: "cover",
-								border: `2px solid ${T.border}`,
-								display: "block",
-							}}
-						/>
-					) : (
-						<div
-							style={{
-								width: 34,
-								height: 34,
-								borderRadius: "50%",
-								background: T.border,
-								border: `2px solid ${T.border}`,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-							}}
-						>
-							<Icon d={Icons.login} size={16} stroke={T.muted} />
-						</div>
-					)}
-				</motion.button>
-				<LoginModal
-					isOpen={loginModalOpen}
-					onClose={() => setLoginModalOpen(false)}
-				/>
-			</div>
+			<AppInkgestTopBar
+				T={T}
+				reduxUser={reduxUser}
+				credits={credits}
+				creditRemaining={creditRemaining}
+				FREE_CREDIT_LIMIT={FREE_CREDIT_LIMIT}
+				formatRenewalDate={formatRenewalDate}
+				router={router}
+				sidebarOpen={sidebarOpen}
+				onSidebarToggle={() => setSidebarOpen((s) => !s)}
+				showSidebarToggle={!!reduxUser}
+				showFormCanvasNav={draftMode === "agent"}
+				formCanvasActive="form"
+				onLogin={() => setLoginModalOpen(true)}
+			/>
+			<LoginModal
+				isOpen={loginModalOpen}
+				onClose={() => setLoginModalOpen(false)}
+			/>
 
 			{/* ── MAIN BODY ── */}
 			<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -1587,22 +905,46 @@ export default function inkgestApp() {
 											}}
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13 }}>No drafts or tables found</p>
+											<p style={{ fontSize: 13, marginBottom: 12 }}>
+												No drafts or tables found
+											</p>
+											<p style={{ fontSize: 12, color: T.muted }}>
+												Use InkAgent above to create your first draft
+											</p>
 										</motion.div>
 									) : (
-										filtered.map((item) => (
-											<SidebarItemCard
-												key={item.id}
-												item={item}
-												active={false}
-												onClick={() => router.push(`/app/${item.id}`)}
-												onDelete={handleDelete}
-											/>
+										sidebarGrouped.map((section) => (
+											<div key={section.id} style={{ marginBottom: 14 }}>
+												{sidebarGrouped.length > 1 && (
+													<p
+														style={{
+															fontSize: 10,
+															fontWeight: 700,
+															color: T.muted,
+															textTransform: "",
+															letterSpacing: "0.1em",
+															margin: "0 4px 8px",
+														}}
+													>
+														{section.name}
+													</p>
+												)}
+												{section.items.map((item) => (
+													<SidebarItemCard
+														key={item.id}
+														item={item}
+														active={false}
+														onClick={() =>
+															router.push(`/app/${item.id}`)
+														}
+														onDelete={handleDelete}
+													/>
+												))}
+											</div>
 										))
 									)}
 								</AnimatePresence>
 							</div>
-
 							{/* Sidebar footer */}
 							<div
 								style={{
@@ -1696,13 +1038,16 @@ export default function inkgestApp() {
 					)}
 				</AnimatePresence>
 
-				{/* ── RIGHT PANEL — Generator only ── */}
+				{/* ── MAIN — Generator (pushes right when drafts sidebar open) ── */}
 				<div
 					style={{
 						flex: 1,
 						display: "flex",
 						flexDirection: "column",
 						overflow: "hidden",
+						minWidth: 0,
+						marginLeft: reduxUser && sidebarOpen ? 280 : 0,
+						transition: "margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
 					}}
 				>
 					<motion.div
@@ -1712,27 +1057,16 @@ export default function inkgestApp() {
 						transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
 						style={{
 							flex: 1,
-							overflowY: "auto",
-							padding: "32px 40px",
-							maxWidth: 720,
+							display: "flex",
+							flexDirection: "column",
+							minHeight: 0,
+							overflow: "auto",
+							padding: "32px clamp(24px, 4vw, 48px)",
+							maxWidth: 980,
 							width: "100%",
 							margin: "0 auto",
 						}}
 					>
-						{/* ── Page heading ── */}
-						<div style={{ marginBottom: 24 }}>
-							<h1
-								style={{
-									fontFamily: "",
-									fontSize: 32,
-									color: T.accent,
-									letterSpacing: "-0.5px",
-								}}
-							>
-								New draft
-							</h1>
-						</div>
-
 						{/* Not logged in info banner */}
 						{!reduxUser && (
 							<motion.div
@@ -1789,7 +1123,15 @@ export default function inkgestApp() {
 							onUpgrade={() => router.push("/pricing")}
 						/>
 
-						{/* ── INKAGENT MODE ── */}
+						{draftMode === "simple" && (
+							<SimpleBuilderTab
+								userId={reduxUser?.uid}
+								theme={T}
+								onLoginRequired={() => setLoginModalOpen(true)}
+							/>
+						)}
+
+						{/* ── Generate asset (form) — canvas lives at /app/canvas ── */}
 						{draftMode === "agent" && (
 							<motion.div
 								key="agent-form"
@@ -1802,582 +1144,26 @@ export default function inkgestApp() {
 									marginBottom: 24,
 									width: "100%",
 								}}
+								className="max-w-5xl mx-auto"
 							>
-								{/* Input section — URL chips + textarea attached */}
-								<div className="flex flex-col gap-0 border border-zinc-200 rounded-xl overflow-hidden bg-zinc-50">
-									{/* URL chips parsed from prompt — above textarea */}
-									{(() => {
-										const fullUrlRegex = /https?:\/\/[^\s]+/g;
-										const bareDomainRegex =
-											/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog|to|me|info|edu|gov)\b/gi;
-										const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
-											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
-											.filter(Boolean);
-										const bareDomains = (
-											agentPrompt.match(bareDomainRegex) || []
-										)
-											.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
-											.filter(Boolean);
-										const unique = [
-											...new Set([
-												...fullUrls,
-												...bareDomains.filter(
-													(b) =>
-														!fullUrls.some(
-															(f) =>
-																f.includes(b) || f.includes(`https://${b}`),
-														),
-												),
-											]),
-										].filter(Boolean);
-										if (unique.length === 0) return null;
-										return (
-											<div
-												style={{
-													display: "flex",
-													flexWrap: "wrap",
-													gap: 8,
-													padding: "12px 16px",
-													borderBottom: `1px solid ${T.border}`,
-													background: T.base,
-												}}
-											>
-												{unique.map((url, i) => (
-													<motion.div
-														key={`${url}-${i}`}
-														initial={{ opacity: 0, scale: 0.9 }}
-														animate={{ opacity: 1, scale: 1 }}
-														style={{
-															display: "flex",
-															alignItems: "center",
-															gap: 6,
-															padding: "6px 10px",
-															background: T.surface,
-															border: `1px solid ${T.border}`,
-															borderRadius: 8,
-															fontSize: 12,
-															color: T.accent,
-															maxWidth: 220,
-															overflow: "hidden",
-															textOverflow: "ellipsis",
-															whiteSpace: "nowrap",
-														}}
-													>
-														<span
-															style={{
-																flex: 1,
-																overflow: "hidden",
-																textOverflow: "ellipsis",
-															}}
-														>
-															{url}
-														</span>
-														<motion.button
-															whileHover={{ scale: 1.1 }}
-															whileTap={{ scale: 0.9 }}
-															onClick={() => {
-																setAgentPrompt((p) =>
-																	p
-																		.replace(
-																			new RegExp(
-																				url.replace(
-																					/[.*+?^${}()|[\]\\]/g,
-																					"\\$&",
-																				),
-																				"g",
-																			),
-																			"",
-																		)
-																		.replace(/\s+/g, " ")
-																		.trim(),
-																);
-															}}
-															style={{
-																background: "none",
-																border: "none",
-																cursor: "pointer",
-																padding: 0,
-																display: "flex",
-																color: T.muted,
-																flexShrink: 0,
-															}}
-														>
-															<svg
-																width={12}
-																height={12}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2}
-															>
-																<path d="M18 6L6 18M6 6l12 12" />
-															</svg>
-														</motion.button>
-													</motion.div>
-												))}
-											</div>
-										);
-									})()}
-									<textarea
-										value={agentPrompt}
-										onChange={(e) => setAgentPrompt(e.target.value)}
-										onKeyDown={(e) =>
-											e.key === "Enter" &&
-											!e.shiftKey &&
-											(e.preventDefault(), handleAgentSend())
-										}
-										placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
-										rows={4}
-										disabled={!reduxUser || agentLoading}
-										className="w-full bg-zinc-50 border border-zinc-200 rounded-xl bg-transparent px-2 py-1 text-sm text-zinc-700 resize-vertical outline-none leading-relaxed"
-									/>
-									<div className="flex gap-2 items-center justify-between px-2 py-1  bg-amber-50/20">
-										<div className="text-xs text-zinc-700">
-											Create tables, newsletter, infographics and models
-										</div>
-										{/* Circular credits progress — justify-end */}
-										<div
-											style={{ display: "flex", justifyContent: "flex-end" }}
-										>
-											{(() => {
-												const limit =
-													credits?.creditsLimit ?? FREE_CREDIT_LIMIT;
-												const remaining =
-													credits?.plan === "pro"
-														? limit
-														: Math.max(0, credits?.remaining ?? limit);
-												const pct = limit > 0 ? remaining / limit : 0;
-												const r = 14;
-												const circ = 2 * Math.PI * r;
-												const dash = pct * circ;
-												const strokeCol =
-													pct > 0.3
-														? T.warm
-														: pct > 0.1
-															? "#D97706"
-															: "#DC2626";
-												return (
-													<div
-														style={{
-															display: "flex",
-															alignItems: "center",
-															gap: 4,
-														}}
-													>
-														<svg
-															width={24}
-															height={24}
-															viewBox="0 0 36 36"
-															style={{ transform: "rotate(-90deg)" }}
-														>
-															<circle
-																cx={18}
-																cy={18}
-																r={r}
-																fill="none"
-																stroke={T.border}
-																strokeWidth={4}
-															/>
-															<circle
-																cx={18}
-																cy={18}
-																r={r}
-																fill="none"
-																stroke={strokeCol}
-																strokeWidth={4}
-																strokeDasharray={`${dash} ${circ}`}
-																strokeLinecap="round"
-																style={{
-																	transition: "stroke-dasharray 0.3s ease",
-																}}
-															/>
-														</svg>
-														<span
-															style={{
-																fontSize: 12,
-																fontWeight: 600,
-																color: T.muted,
-															}}
-														>
-															{credits?.plan === "pro"
-																? "Pro"
-																: `${remaining.toFixed(1)}/${limit}`}
-														</span>
-													</div>
-												);
-											})()}
-										</div>
-									</div>
-								</div>
-								<div
-									style={{
-										display: "flex",
-										flexDirection: "column",
-										gap: 12,
-									}}
-								>
-									<motion.button
-										onClick={handleAgentSend}
-										disabled={agentLoading || !agentPrompt.trim() || !reduxUser}
-										whileHover={
-											!agentLoading && agentPrompt.trim()
-												? { scale: 1.02, y: -1 }
-												: {}
-										}
-										whileTap={!agentLoading ? { scale: 0.97 } : {}}
-										style={{
-											width: "100%",
-											background:
-												agentLoading || !agentPrompt.trim() || !reduxUser
-													? "#E8E4DC"
-													: T.accent,
-											color:
-												agentLoading || !agentPrompt.trim() || !reduxUser
-													? T.muted
-													: "white",
-											border: "none",
-											padding: "15px",
-											borderRadius: 12,
-											fontSize: 16,
-											fontWeight: 700,
-											cursor:
-												agentLoading || !reduxUser ? "not-allowed" : "pointer",
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											gap: 10,
-										}}
-									>
-										{agentLoading ? (
-											<>
-												<motion.span
-													animate={{ rotate: 360 }}
-													transition={{
-														duration: 0.9,
-														repeat: Infinity,
-														ease: "linear",
-													}}
-												>
-													<Icon d={Icons.refresh} size={18} stroke={T.muted} />
-												</motion.span>
-												{agentLoadingMsg}
-											</>
-										) : !reduxUser ? (
-											"Sign in to use AI Agent"
-										) : (
-											<>
-												<Icon
-													d={Icons.zap}
-													size={18}
-													stroke="white"
-													fill="white"
-												/>
-												Send to InkAgent
-											</>
-										)}
-									</motion.button>
-								</div>
-
-								{agentError && (
-									<motion.div
-										initial={{ opacity: 0, y: 4 }}
-										animate={{ opacity: 1, y: 0 }}
-										style={{
-											padding: "12px 16px",
-											background: "#FEF2F2",
-											border: "1px solid #FECACA",
-											borderRadius: 10,
-											fontSize: 13,
-											color: "#DC2626",
-										}}
-									>
-										{agentError}
-									</motion.div>
-								)}
-
-								{/* InkAgent output card — below Send button */}
-								{(agentRunSteps.length > 0 ||
-									agentCompletedTasks.length > 0 ||
-									agentThinking) && (
-									<motion.div
-										ref={agentOutputRef}
-										initial={{ opacity: 0, y: -8 }}
-										animate={{ opacity: 1, y: 0 }}
-										style={{
-											background: T.surface,
-											border: `1px solid ${T.border}`,
-											borderRadius: 14,
-											padding: 20,
-											boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-										}}
-									>
-										<p
-											style={{
-												fontSize: 15,
-												fontWeight: 700,
-												color: T.accent,
-												marginBottom: 16,
-												display: "flex",
-												alignItems: "center",
-												gap: 8,
-											}}
-										>
-											<span style={{ color: T.warm }}>✦</span> InkAgent
-										</p>
-										{agentThinking && (
-											<div
-												style={{
-													background: T.base,
-													border: `1px solid ${T.border}`,
-													borderRadius: 10,
-													padding: "14px 16px",
-													marginBottom: 16,
-													fontSize: 13,
-													lineHeight: 1.6,
-													color: T.muted,
-													maxHeight: 120,
-													overflowY: "auto",
-												}}
-											>
-												{agentThinking}
-											</div>
-										)}
-										{agentRunSteps.length > 0 && (
-											<div
-												style={{
-													display: "flex",
-													flexDirection: "column",
-													gap: 10,
-													marginBottom: agentCompletedTasks.length > 0 ? 16 : 0,
-												}}
-											>
-												{agentRunSteps.map((step, i) => (
-													<div
-														key={i}
-														style={{
-															display: "flex",
-															alignItems: "center",
-															justifyContent: "space-between",
-															gap: 12,
-														}}
-													>
-														<span
-															style={{
-																fontSize: 13,
-																color: T.accent,
-																fontWeight: 500,
-															}}
-														>
-															{step.label}
-														</span>
-														{step.status === "loading" && (
-															<motion.span
-																animate={{ rotate: 360 }}
-																transition={{
-																	duration: 0.9,
-																	repeat: Infinity,
-																	ease: "linear",
-																}}
-															>
-																<Icon
-																	d={Icons.refresh}
-																	size={14}
-																	stroke={T.warm}
-																/>
-															</motion.span>
-														)}
-														{step.status === "done" && (
-															<span
-																style={{
-																	fontSize: 14,
-																	color: "#16A34A",
-																	fontWeight: 700,
-																}}
-															>
-																✓
-															</span>
-														)}
-														{step.status === "error" && (
-															<span
-																style={{
-																	fontSize: 14,
-																	color: "#DC2626",
-																	fontWeight: 700,
-																}}
-															>
-																✗
-															</span>
-														)}
-													</div>
-												))}
-											</div>
-										)}
-										{agentCompletedTasks.length > 0 && (
-											<>
-												<p
-													style={{
-														fontSize: 12,
-														color: T.muted,
-														marginBottom: 12,
-														fontWeight: 600,
-													}}
-												>
-													Created {agentCompletedTasks.length} asset
-													{agentCompletedTasks.length !== 1 ? "s" : ""}
-												</p>
-												<div
-													style={{
-														display: "flex",
-														flexDirection: "column",
-														gap: 8,
-													}}
-												>
-													{agentCompletedTasks.map((t, i) => (
-														<motion.a
-															key={i}
-															href={t.path}
-															onClick={(e) => {
-																e.preventDefault();
-																router.push(t.path);
-															}}
-															whileHover={{ x: 2, scale: 1.01 }}
-															whileTap={{ scale: 0.99 }}
-															style={{
-																display: "flex",
-																alignItems: "center",
-																justifyContent: "space-between",
-																padding: "12px 14px",
-																background: T.base,
-																border: `1px solid ${T.border}`,
-																borderRadius: 10,
-																textDecoration: "none",
-																color: T.accent,
-																fontSize: 13,
-																fontWeight: 600,
-															}}
-														>
-															<span
-																style={{
-																	display: "flex",
-																	alignItems: "center",
-																	gap: 8,
-																}}
-															>
-																<span style={{ fontSize: 14 }}>
-																	{t.type === "newsletter"
-																		? "📧"
-																		: t.type === "linkedin"
-																			? "💼"
-																			: t.type === "blog_post"
-																				? "📝"
-																				: t.type === "twitter_thread"
-																					? "🐦"
-																					: t.type === "email_digest"
-																						? "📬"
-																						: t.type === "table"
-																							? "📊"
-																							: t.type === "infographics"
-																								? "📊"
-																								: t.type === "landing_page"
-																									? "🌐"
-																									: t.type === "image_gallery"
-																										? "🖼️"
-																										: "📄"}
-																</span>
-																<span>
-																	{t.type === "newsletter"
-																		? "Newsletter"
-																		: t.type === "linkedin"
-																			? "LinkedIn"
-																			: t.type === "blog_post"
-																				? "Blog"
-																				: t.type === "twitter_thread"
-																					? "Thread"
-																					: t.type === "email_digest"
-																						? "Digest"
-																						: t.type === "table"
-																							? "Table"
-																							: t.type === "infographics"
-																								? "Infographics"
-																								: t.type === "landing_page"
-																									? "Landing Page"
-																									: t.type === "image_gallery"
-																										? "Gallery"
-																										: "Scrape"}
-																	: {t.label}
-																</span>
-															</span>
-															<span
-																style={{
-																	fontSize: 12,
-																	color: T.warm,
-																	fontWeight: 700,
-																}}
-															>
-																Open →
-															</span>
-														</motion.a>
-													))}
-												</div>
-											</>
-										)}
-									</motion.div>
-								)}
-
-								{/* Try a suggestion — hidden when loading or assets generated */}
-								{!agentLoading && agentCompletedTasks.length === 0 && (
-									<div
-										style={{
-											display: "flex",
-											flexDirection: "column",
-											gap: 12,
-											width: "100%",
-										}}
-									>
-										<label
-											style={{
-												fontSize: 12,
-												fontWeight: 700,
-												textTransform: "uppercase",
-												letterSpacing: "0.08em",
-												color: T.muted,
-											}}
-										>
-											Try a suggestion
-										</label>
-										<div
-											style={{
-												display: "flex",
-												flexDirection: "column",
-												gap: 8,
-											}}
-										>
-											{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
-												<motion.button
-													key={i}
-													whileHover={{ scale: 1.005, x: 4 }}
-													whileTap={{ scale: 0.995 }}
-													onClick={() => setAgentPrompt(s)}
-													style={{
-														width: "100%",
-														padding: "12px 16px",
-														borderRadius: 10,
-														fontSize: 13,
-														fontWeight: 500,
-														cursor: "pointer",
-														border: `1.5px solid ${T.border}`,
-														background: T.surface,
-														color: T.accent,
-														textAlign: "left",
-														lineHeight: 1.5,
-													}}
-												>
-													{s}
-												</motion.button>
-											))}
-										</div>
-									</div>
-								)}
+								<GenerateAssetPanel
+									variant="app"
+									theme={T}
+									reduxUser={reduxUser}
+									creditRemaining={creditRemaining}
+									queryClient={queryClient}
+									router={router}
+									onLogin={() => setLoginModalOpen(true)}
+									presets={PRESETS}
+									promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
+									showFormatControls
+									format={format}
+									setFormat={setFormat}
+									style={style}
+									setStyle={setStyle}
+									FORMATS={FORMATS}
+									STYLES={STYLES}
+								/>
 							</motion.div>
 						)}
 
@@ -2397,7 +1183,7 @@ export default function inkgestApp() {
 												display: "block",
 												fontSize: 12,
 												fontWeight: 700,
-												textTransform: "uppercase",
+												textTransform: "",
 												letterSpacing: "0.08em",
 												color: T.muted,
 												marginBottom: 8,
@@ -2515,7 +1301,7 @@ export default function inkgestApp() {
 												display: "block",
 												fontSize: 12,
 												fontWeight: 700,
-												textTransform: "uppercase",
+												textTransform: "",
 												letterSpacing: "0.08em",
 												color: T.muted,
 												marginBottom: 8,
@@ -2590,46 +1376,6 @@ export default function inkgestApp() {
 						{/* ── AI MODE — existing form ── */}
 						{draftMode === "ai" && (
 							<>
-								{/* Preset chips */}
-								<div style={{ marginBottom: 16 }}>
-									<label
-										style={{
-											display: "block",
-											fontSize: 12,
-											fontWeight: 700,
-											textTransform: "uppercase",
-											letterSpacing: "0.08em",
-											color: T.muted,
-											marginBottom: 8,
-										}}
-									>
-										Try with
-									</label>
-									<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-										{PRESETS.map((p) => (
-											<motion.button
-												key={p.label}
-												whileHover={{ scale: 1.03 }}
-												whileTap={{ scale: 0.97 }}
-												onClick={() => applyPreset(p)}
-												style={{
-													padding: "6px 12px",
-													borderRadius: 9,
-													fontSize: 12,
-													fontWeight: 600,
-													cursor: "pointer",
-													border: `1.5px solid ${T.border}`,
-													background: T.surface,
-													color: T.accent,
-													transition: "all 0.15s",
-												}}
-											>
-												{p.label}
-											</motion.button>
-										))}
-									</div>
-								</div>
-
 								{/* Add URL input */}
 								<div style={{ marginBottom: 12 }}>
 									<label
@@ -2637,7 +1383,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -2712,7 +1458,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -2802,7 +1548,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -2845,7 +1591,7 @@ export default function inkgestApp() {
 											display: "block",
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.muted,
 											marginBottom: 8,
@@ -2909,7 +1655,7 @@ export default function inkgestApp() {
 									</motion.button>
 								) : (
 									<motion.button
-										onClick={handleAgentSend}
+										onClick={handleDraftGenerate}
 										disabled={generating}
 										whileHover={
 											!generating
@@ -3120,7 +1866,7 @@ export default function inkgestApp() {
 											style={{
 												fontSize: 12,
 												fontWeight: 700,
-												textTransform: "uppercase",
+												textTransform: "",
 												letterSpacing: "0.08em",
 												color: T.warm,
 												marginBottom: 12,

@@ -9,19 +9,11 @@ import {
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import LoginModal from "../lib/ui/LoginModal";
-import { auth } from "../lib/config/firebase";
-import {
-	createDraft,
-	createTable,
-	createInfographicsAsset,
-	createLandingPageAsset,
-	createImageGalleryAsset,
-} from "../lib/api/userAssets";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
-import { validateUrls } from "../lib/utils/urlAllowlist";
 import { getTheme } from "../lib/utils/theme";
-import { inferFormatFromPrompt } from "../lib/prompts/newsletter";
 import { SparkleIcon } from "lucide-react";
+import Footer from "../app/components/Footer";
+import GenerateAssetPanel from "../lib/ui/GenerateAssetPanel";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -65,18 +57,90 @@ const PRESETS = [
 	},
 ];
 
-/* ── InkAgent prompt suggestions — browser work: find, browse, summarize, create content ── */
+/* ── InkAgent prompt suggestions — URL + short prompt per row (GenerateAssetPanel) ── */
 const AGENT_PROMPT_SUGGESTIONS = [
-	"Find Hacker News latest news and create a summary of the top stories.",
-	"Create a summary from the top news articles from India — give me options for blog, newsletter, or table format.",
-	"Find https://news.ycombinator.com latest and turn the top 5 into a newsletter for developers.",
-	"Browse https://www.producthunt.com and create a table comparing today's top launches — name, tagline, category.",
-	"Find the top tech news from India and give me format options: blog post, newsletter, or comparison table.",
-	"Get the latest from Hacker News — summarize and suggest: blog, newsletter, or table for sharing.",
-	"Find https://techcrunch.com latest startup news and create a digest. Give options for blog, newsletter, or table.",
-	"Browse https://www.producthunt.com and turn top launches into a LinkedIn post. Practical takeaways, under 300 words.",
-	"Find top news from India and create a realistic table — headlines, source, key points.",
-	"Get Hacker News front page, summarize top 5, and offer blog, newsletter, or table output.",
+	{
+		urls: ["https://news.ycombinator.com"],
+		prompt: "Top 5 front-page stories as a dev newsletter.",
+	},
+	{
+		urls: ["https://news.ycombinator.com/newest"],
+		prompt: "Newest posts — quick bullets, no fluff.",
+	},
+	{
+		urls: ["https://blog.ycombinator.com"],
+		prompt: "YC blog themes this week; casual digest.",
+	},
+	{
+		urls: ["https://www.ycombinator.com/companies"],
+		prompt: "Portfolio snapshot; one tight paragraph.",
+	},
+	{
+		urls: ["https://blog.x.com"],
+		prompt: "Engineering blog — concise takeaways for builders.",
+	},
+	{
+		urls: ["https://www.thehindu.com/sci-tech/technology/"],
+		prompt: "India tech headlines; neutral newsletter tone.",
+	},
+	{
+		urls: ["https://indianexpress.com/section/technology/"],
+		prompt: "Short digest with Indian policy + startup angle.",
+	},
+	{
+		urls: [
+			"https://economictimes.indiatimes.com/tech",
+			"https://www.moneycontrol.com/news/technology/",
+		],
+		prompt: "India business + tech roundup; table OK.",
+	},
+	{
+		urls: ["https://www.livemint.com/technology"],
+		prompt: "Mint tech picks; professional LinkedIn style.",
+	},
+	{
+		urls: ["https://www.ndtv.com/topic/tech-news"],
+		prompt: "National tech news summary; general audience.",
+	},
+];
+
+const LANDING_AI_FEATURES = [
+	{
+		title: "AI Blog Generator",
+		description:
+			"Turn one or many source URLs into a structured blog draft with clear sections and a publish-ready flow.",
+		icon: "📝",
+	},
+	{
+		title: "AI Newsletter Creator",
+		description:
+			"Generate concise newsletter issues with hooks, scannable sections, and CTA-friendly writing.",
+		icon: "📧",
+	},
+	{
+		title: "AI URL to Infographics",
+		description:
+			"Convert long-form sources into visual infographic points and clean, presentation-ready summaries.",
+		icon: "📊",
+	},
+	{
+		title: "AI Table Creator",
+		description:
+			"Extract key comparisons and data from content into readable rows and columns instantly.",
+		icon: "🧮",
+	},
+	{
+		title: "AI Landing Page Generator",
+		description:
+			"Create a full landing page structure from your URLs, including hero copy, sections, and CTA blocks.",
+		icon: "🚀",
+	},
+	{
+		title: "AI React / HTML Output",
+		description:
+			"Generate implementation-ready HTML or React-oriented output to speed up your next build.",
+		icon: "⚛️",
+	},
 ];
 
 /* ── Reusable fade-up on scroll ── */
@@ -151,10 +215,14 @@ function Nav() {
 
 					{/* Links */}
 					<div className="hidden md:flex items-center gap-8">
-						{["Features", "How it works", "Pricing", "FAQ"].map((l) => (
+						{["Features", "Blog", "How it works", "Pricing", "FAQ"].map((l) => (
 							<a
 								key={l}
-								href={`#${l.toLowerCase().replace(/ /g, "-")}`}
+								href={
+									l.toLowerCase().replace(/ /g, "-") === "blog"
+										? "/blog"
+										: `#${l.toLowerCase().replace(/ /g, "-")}`
+								}
 								className="no-underline text-sm font-medium transition-colors"
 								style={{ color: T.muted, fontFamily: "'Outfit', sans-serif" }}
 								onMouseEnter={(e) => (e.target.style.color = T.accent)}
@@ -209,35 +277,20 @@ function Hero() {
 	const router = useRouter();
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const heroRef = useRef(null);
-	const pendingGenerateRef = useRef(false);
-	const pendingAgentRef = useRef(false);
-
-	const [loginModalOpen, setLoginModalOpen] = useState(false);
-	const [credits, setCredits] = useState(null);
-
-	// InkAgent state
-	const [agentPrompt, setAgentPrompt] = useState("");
-	const [agentLoading, setAgentLoading] = useState(false);
-	const [agentError, setAgentError] = useState(null);
-	const [agentRunSteps, setAgentRunSteps] = useState([]);
-	const [agentCompletedTasks, setAgentCompletedTasks] = useState([]);
-	const [agentLoadingMsg, setAgentLoadingMsg] = useState("InkAgent thinking…");
-	const [agentThinking, setAgentThinking] = useState("");
-
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
 		offset: ["start start", "end start"],
 	});
 	const y = useTransform(scrollYProgress, [0, 1], [0, 80]);
-	const opacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
 
-	const applyPreset = (p) => {
-		const urlPart =
-			p.urls?.length && p.urls[0]
-				? `\n\nSource: ${p.urls.join(", ")}`
-				: "";
-		setAgentPrompt(`${p.prompt}${urlPart}`);
-	};
+	const [loginModalOpen, setLoginModalOpen] = useState(false);
+	const [credits, setCredits] = useState(null);
+
+	const creditRemaining = credits
+		? credits.plan === "pro"
+			? Infinity
+			: Math.max(0, credits.remaining ?? FREE_CREDIT_LIMIT)
+		: FREE_CREDIT_LIMIT;
 
 	/* Load credits when user is logged in */
 	useEffect(() => {
@@ -249,476 +302,6 @@ function Hero() {
 			.then(setCredits)
 			.catch(() => setCredits(null));
 	}, [reduxUser]);
-
-	useEffect(() => {
-		if (reduxUser && pendingAgentRef.current && agentPrompt.trim()) {
-			pendingAgentRef.current = false;
-			handleAgentSend();
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [reduxUser]);
-
-	/* Cycle InkAgent loading messages while loading */
-	useEffect(() => {
-		if (!agentLoading) return;
-		const msgs = [
-			"InkAgent thinking…",
-			"InkAgent analysing your request…",
-			"InkAgent browsing & finding content…",
-			"InkAgent creating newsletter…",
-			"InkAgent building table…",
-			"InkAgent preparing content…",
-		];
-		let i = 0;
-		setAgentLoadingMsg(msgs[0]);
-		const iv = setInterval(() => {
-			i = (i + 1) % msgs.length;
-			setAgentLoadingMsg(msgs[i]);
-		}, 2500);
-		return () => clearInterval(iv);
-	}, [agentLoading]);
-
-	const getAgentStepLabel = (task) => {
-		if (task.type === "scrape") {
-			const url = task.urls?.[0] || task.sourceUrls?.[0];
-			const host = url
-				? (() => {
-						try {
-							return new URL(url).hostname;
-						} catch {
-							return url.slice(0, 30);
-						}
-					})()
-				: "";
-			return host ? `Browsing ${host}…` : task.label || "Browsing…";
-		}
-		if (task.type === "newsletter")
-			return task.label || "Writing newsletter draft…";
-		if (task.type === "linkedin") return task.label || "Writing LinkedIn post…";
-		if (task.type === "blog_post") return task.label || "Writing blog post…";
-		if (task.type === "twitter_thread") return task.label || "Creating thread…";
-		if (task.type === "email_digest") return task.label || "Creating digest…";
-		if (task.type === "table") return task.label || "Creating table…";
-		return task.label || "Processing…";
-	};
-
-	const processAgentExecuted = async (executed, userPrompt = "") => {
-		const newTasks = [];
-		const inferred = inferFormatFromPrompt(userPrompt);
-		const CONTENT_TYPES = [
-			"newsletter",
-			"linkedin",
-			"blog_post",
-			"twitter_thread",
-			"email_digest",
-		];
-		for (const task of executed) {
-			const isContentDraft = CONTENT_TYPES.includes(task.type) && task.content;
-			if (isContentDraft) {
-				const lines = (task.content || "").split("\n");
-				const titleLine = lines.find(
-					(l) => l.startsWith("# ") || l.startsWith("## "),
-				);
-				const title = titleLine
-					? titleLine.replace(/^#+\s*/, "").trim()
-					: task.label || "Draft";
-				const bodyText = lines
-					.filter((l) => !l.match(/^#{1,6}\s/))
-					.join(" ")
-					.replace(/[*_`]/g, "")
-					.replace(/\s+/g, " ")
-					.trim();
-				const tag = task.formatLabel || inferred.label;
-				const format = task.params?.format || inferred.format;
-				const draft = {
-					title,
-					preview: bodyText.slice(0, 180) + (bodyText.length > 180 ? "…" : ""),
-					body: task.content,
-					urls: task.params?.urls || [],
-					prompt: userPrompt || "",
-					words: task.content.trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					tag,
-					format,
-				};
-				const { id } = await createDraft(reduxUser.uid, draft);
-				newTasks.push({
-					type: CONTENT_TYPES.includes(task.type) ? task.type : "newsletter",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (task.type === "scrape" && task.content) {
-				const draft = {
-					title: task.title || "Scraped",
-					preview: (task.content || "").slice(0, 180),
-					body: task.content || "",
-					urls: task.urls || [],
-					prompt: userPrompt || "",
-					images: task.images || [],
-					words: (task.content || "").trim().split(/\s+/).length,
-					date: new Date().toLocaleDateString("en-US", {
-						weekday: "short",
-						month: "short",
-						day: "numeric",
-					}),
-					tag: "Scraped",
-				};
-				const { id } = await createDraft(reduxUser.uid, draft);
-				newTasks.push({
-					type: "scrape",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (task.type === "table" && task.columns) {
-				const { id } = await createTable(reduxUser.uid, {
-					title: task.title || "Table",
-					description: task.description || "",
-					columns: task.columns,
-					rows: task.rows || [],
-					sourceUrls: task.sourceUrls || [],
-					prompt: userPrompt || "",
-				});
-				newTasks.push({
-					type: "table",
-					label: task.label,
-					id,
-					path: `/app/${id}`,
-				});
-			} else if (
-				task.type === "infographics" ||
-				task.type === "infographics-svg-generator"
-			) {
-				let infographics = task.infographics ?? task.result?.infographics ?? [];
-				if (!Array.isArray(infographics) && typeof task.content === "string") {
-					try {
-						infographics = JSON.parse(task.content);
-					} catch {
-						infographics = [];
-					}
-				}
-				if (Array.isArray(infographics) && infographics.length > 0) {
-					const { id } = await createInfographicsAsset(reduxUser.uid, {
-						title: task.title || "Infographics",
-						description: task.description || "",
-						prompt: userPrompt || "",
-						infographics,
-					});
-					newTasks.push({
-						type: "infographics",
-						label: task.label || "Infographics",
-						id,
-						path: `/app/${id}`,
-					});
-				}
-			} else if (
-				(task.type === "landing_page" ||
-					task.type === "landing-page" ||
-					task.type === "landing-page-generator") &&
-				(task.html ||
-					task.result?.html ||
-					task.result?.result?.html ||
-					task.url ||
-					task.result?.url ||
-					(typeof task.content === "string" &&
-						task.content.trim().startsWith("<")))
-			) {
-				const html =
-					task.html ??
-					task.result?.html ??
-					task.result?.result?.html ??
-					(typeof task.content === "string" &&
-					task.content.trim().startsWith("<")
-						? task.content
-						: "") ??
-					"";
-				const url =
-					task.url ?? task.result?.url ?? task.result?.result?.url ?? "";
-				if (html || url) {
-					const { id } = await createLandingPageAsset(reduxUser.uid, {
-						title: task.title || "Landing Page",
-						description: task.description || "",
-						html,
-						url,
-					});
-					newTasks.push({
-						type: "landing_page",
-						label: task.label || "Landing Page",
-						id,
-						path: `/app/${id}`,
-					});
-				}
-			} else if (
-				task.type === "image_gallery" ||
-				task.type === "image-gallery" ||
-				task.type === "image-gallery-generator" ||
-				task.type === "image-gallery-creator"
-			) {
-				let images =
-					task.images ??
-					task.result?.images ??
-					task.result?.data ??
-					task.result?.result?.images ??
-					[];
-				if (!Array.isArray(images) && typeof task.content === "string") {
-					try {
-						const parsed = JSON.parse(task.content);
-						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
-					} catch {
-						images = [];
-					}
-				}
-				if (
-					!Array.isArray(images) &&
-					typeof task.result?.content === "string"
-				) {
-					try {
-						const parsed = JSON.parse(task.result.content);
-						images = Array.isArray(parsed) ? parsed : (parsed?.images ?? []);
-					} catch {
-						// keep existing images
-					}
-				}
-				images = Array.isArray(images)
-					? images
-							.map((img) => (typeof img === "string" ? { url: img } : img))
-							.filter((img) => img?.url || img?.src)
-					: [];
-				if (images.length > 0) {
-					const { id } = await createImageGalleryAsset(reduxUser.uid, {
-						title: task.title || "Image Gallery",
-						description: task.description || "",
-						images,
-					});
-					newTasks.push({
-						type: "image_gallery",
-						label: task.label || "Gallery",
-						id,
-						path: `/app/${id}`,
-					});
-				}
-			}
-		}
-		setAgentCompletedTasks(newTasks);
-		if (newTasks.length === 1) {
-			router.push(newTasks[0].path);
-		} else if (newTasks.length > 1) {
-			router.push("/app");
-		}
-	};
-
-	const handleAgentSend = async () => {
-		const promptText = agentPrompt.trim();
-		if (!promptText || agentLoading) return;
-		if (!reduxUser) {
-			pendingAgentRef.current = true;
-			setLoginModalOpen(true);
-			return;
-		}
-		const creds = await getUserCredits(reduxUser.uid).catch(() => null);
-		if (creds && creds.plan !== "pro" && (creds.remaining ?? 0) <= 0) {
-			router.push("/pricing");
-			return;
-		}
-		setAgentLoading(true);
-		setAgentError(null);
-		setAgentCompletedTasks([]);
-		setAgentThinking("");
-		setAgentRunSteps([{ label: agentLoadingMsg, status: "loading" }]);
-		setAgentPrompt("");
-		try {
-			const idToken = await auth.currentUser?.getIdToken();
-			if (!idToken) throw new Error("Session expired. Please sign in again.");
-			const res = await fetch("/api/agent/inkagent", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ prompt: promptText, idToken }),
-			});
-			if (!res.ok) {
-				const errData = await res.json().catch(() => ({}));
-				throw new Error(errData.error || "Agent failed");
-			}
-			const contentType = res.headers.get("content-type") || "";
-			if (!contentType.includes("text/event-stream")) {
-				const data = await res.json();
-				if (data.executed?.length > 0) {
-					setAgentRunSteps(
-						data.executed.map((t) => ({
-							label: getAgentStepLabel(t),
-							status: "done",
-						})),
-					);
-					await processAgentExecuted(data.executed, promptText);
-				} else {
-					setAgentRunSteps([
-						{ label: data.message || "Done.", status: "done" },
-					]);
-				}
-				return;
-			}
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
-				const parts = buffer.split("\n\n");
-				buffer = parts.pop() || "";
-				for (const part of parts) {
-					const line = part.trim();
-					if (!line.startsWith("data: ")) continue;
-					const jsonStr = line.slice(6);
-					if (!jsonStr) continue;
-					let data;
-					try {
-						data = JSON.parse(jsonStr);
-					} catch {
-						continue;
-					}
-					if (data.type === "thinking") {
-						const text =
-							data.thinking ??
-							data.reasoning ??
-							data.content ??
-							data.text ??
-							data.output ??
-							"";
-						if (text)
-							setAgentThinking((prev) =>
-								prev
-									? prev + "\n\n" + String(text).trim()
-									: String(text).trim(),
-							);
-					} else if (data.type === "start") {
-						const thinkingText =
-							data.thinking ??
-							data.reasoning ??
-							data.thought ??
-							data.agent_thought ??
-							data.content ??
-							data.message ??
-							data.text ??
-							data.output ??
-							"";
-						setAgentThinking(
-							thinkingText
-								? String(thinkingText).trim()
-								: (data.message || "Processing your request…").trim(),
-						);
-						const tasks = data.suggestedTasks || [];
-						setAgentRunSteps(
-							tasks.length > 0
-								? tasks.map((t) => ({
-										label: t.label || t.taskLabel || "Task",
-										status: "loading",
-									}))
-								: [
-										{
-											label: data.message || "Running tasks…",
-											status: "loading",
-										},
-									],
-						);
-					} else if (data.type === "task") {
-						const idx = data.index ?? 0;
-						const label = data.taskLabel || data.label || `Task ${idx + 1}`;
-						const status = data.success ? "done" : "error";
-						setAgentRunSteps((prev) => {
-							const next = [...prev];
-							while (next.length <= idx)
-								next.push({
-									label: `Task ${next.length + 1}`,
-									status: "loading",
-								});
-							next[idx] = { label, status };
-							return next;
-						});
-					} else if (data.type === "end") {
-						setAgentThinking("");
-						const executed = data.executed || [];
-						if (executed.length > 0) {
-							await processAgentExecuted(executed, promptText);
-						} else {
-							setAgentRunSteps((prev) =>
-								prev.map((s) => ({
-									...s,
-									status: s.status === "loading" ? "done" : s.status,
-								})),
-							);
-						}
-						const creditsUsed = data.creditsUsed;
-						if (typeof creditsUsed === "number" && creditsUsed > 0 && idToken) {
-							fetch("/api/agent/inkagent", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ idToken, creditsUsed }),
-							}).catch(() => {});
-						}
-					}
-				}
-			}
-			if (buffer.trim()) {
-				const line = buffer.trim();
-				if (line.startsWith("data: ")) {
-					try {
-						const data = JSON.parse(line.slice(6));
-						if (data.type === "end") {
-							if ((data.executed || []).length > 0)
-								await processAgentExecuted(data.executed, promptText);
-							const creditsUsed = data.creditsUsed;
-							if (
-								typeof creditsUsed === "number" &&
-								creditsUsed > 0 &&
-								idToken
-							) {
-								fetch("/api/agent/inkagent", {
-									method: "POST",
-									headers: { "Content-Type": "application/json" },
-									body: JSON.stringify({ idToken, creditsUsed }),
-								}).catch(() => {});
-							}
-						}
-					} catch {
-						// ignore
-					}
-				}
-			}
-		} catch (e) {
-			const errMsg = e?.message || "Agent failed";
-			setAgentError(errMsg);
-			setAgentRunSteps([{ label: errMsg, status: "error" }]);
-		} finally {
-			setAgentLoading(false);
-		}
-	};
-
-	/* Confirm when leaving during API load */
-	useEffect(() => {
-		if (!agentLoading) return;
-		const onBeforeUnload = (e) => {
-			e.preventDefault();
-			e.returnValue = "";
-		};
-		const onRouteChange = () => {
-			if (!window.confirm("Generation in progress. Leave anyway?")) {
-				router.events.emit("routeChangeError");
-				throw "Route change aborted.";
-			}
-		};
-		window.addEventListener("beforeunload", onBeforeUnload);
-		router.events.on("routeChangeStart", onRouteChange);
-		return () => {
-			window.removeEventListener("beforeunload", onBeforeUnload);
-			router.events.off("routeChangeStart", onRouteChange);
-		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [agentLoading]);
 
 	const texts = [
 		"Scrape content from URL turn into newsletter",
@@ -776,7 +359,7 @@ function Hero() {
 
 			<motion.div
 				style={{ y }}
-				className="relative max-w-5xl mx-auto px-6 text-center"
+				className="relative max-w-2xl mx-auto px-6 text-center"
 			>
 				<a
 					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto p-2 mb-4 border border-amber-200 rounded-full flex gap-2 items-center"
@@ -819,460 +402,33 @@ function Hero() {
 					className="max-w-2xl mx-auto"
 				>
 					Paste a URL, describe your angle. Get a structured newsletter, blog,
-					infographic, linkedin post, tweets ready to edit and publish — in
-					under 60 seconds.
+					infographics, tables, and landing page drafts ready to edit and
+					publish — in under 60 seconds.
 				</motion.p>
 
-				{/* Agentic form — same as /app page, uses /api/agent/inkagent */}
+				{/* Generate asset — POST /generate/:type (proxied to Hono; INKGEST_GENERATE_URL on server) */}
 				<motion.div
 					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
 					style={{
-						maxWidth: 640,
+						width: "100%",
 						margin: "0 auto",
-						background: T.surface,
-						borderRadius: 16,
-						border: `1px solid ${T.border}`,
-						boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-						padding: "28px 24px",
 						textAlign: "left",
 					}}
+					className="max-w-5xl mx-auto"
 				>
-					<p
-						style={{
-							fontSize: 15,
-							fontWeight: 700,
-							color: T.accent,
-							marginBottom: 8,
-							display: "flex",
-							alignItems: "center",
-							gap: 8,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						<span style={{ color: T.warm }}>✦</span> InkAgent
-					</p>
-					<p
-						style={{
-							fontSize: 13,
-							color: T.muted,
-							marginBottom: 16,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						One prompt: scrape URLs, create newsletters, tables, or blog posts.
-					</p>
-
-					{/* Preset chips */}
-					<div style={{ marginBottom: 14 }}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "uppercase",
-								letterSpacing: "0.08em",
-								color: T.muted,
-								marginBottom: 8,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Try with
-						</label>
-						<div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-							{PRESETS.map((p) => (
-								<motion.button
-									key={p.label}
-									whileHover={{ scale: 1.03 }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => applyPreset(p)}
-									style={{
-										padding: "6px 12px",
-										borderRadius: 8,
-										fontSize: 12,
-										fontWeight: 600,
-										cursor: "pointer",
-										border: `1.5px solid ${T.border}`,
-										background: T.base,
-										color: T.accent,
-										fontFamily: "'Outfit', sans-serif",
-										transition: "all 0.15s",
-									}}
-								>
-									{p.label}
-								</motion.button>
-							))}
-						</div>
-					</div>
-
-					{/* URL chips + textarea (agentic form like /app) */}
-					<div
-						style={{
-							display: "flex",
-							flexDirection: "column",
-							gap: 0,
-							border: `1px solid ${T.border}`,
-							borderRadius: 12,
-							overflow: "hidden",
-							background: T.base,
-						}}
-					>
-						{(() => {
-							const fullUrlRegex = /https?:\/\/[^\s]+/g;
-							const bareDomainRegex =
-								/\b(?:[\w-]+\.)+(?:com|dev|org|io|net|co|app|blog|to|me|info|edu|gov)\b/gi;
-							const fullUrls = (agentPrompt.match(fullUrlRegex) || [])
-								.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
-								.filter(Boolean);
-							const bareDomains = (
-								agentPrompt.match(bareDomainRegex) || []
-							)
-								.map((u) => u.replace(/[.,;:!?)\]]+$/, "").trim())
-								.filter(Boolean);
-							const unique = [
-								...new Set([
-									...fullUrls,
-									...bareDomains.filter(
-										(b) =>
-											!fullUrls.some(
-												(f) =>
-													f.includes(b) || f.includes(`https://${b}`),
-											),
-									),
-								]),
-							].filter(Boolean);
-							if (unique.length === 0) return null;
-							return (
-								<div
-									style={{
-										display: "flex",
-										flexWrap: "wrap",
-										gap: 8,
-										padding: "12px 16px",
-										borderBottom: `1px solid ${T.border}`,
-										background: T.base,
-									}}
-								>
-									{unique.map((url, i) => (
-										<motion.div
-											key={`${url}-${i}`}
-											initial={{ opacity: 0, scale: 0.9 }}
-											animate={{ opacity: 1, scale: 1 }}
-											style={{
-												display: "flex",
-												alignItems: "center",
-												gap: 6,
-												padding: "6px 10px",
-												background: T.surface,
-												border: `1px solid ${T.border}`,
-												borderRadius: 8,
-												fontSize: 12,
-												color: T.accent,
-												maxWidth: 220,
-												overflow: "hidden",
-												textOverflow: "ellipsis",
-												whiteSpace: "nowrap",
-											}}
-										>
-											<span
-												style={{
-													flex: 1,
-													overflow: "hidden",
-													textOverflow: "ellipsis",
-												}}
-											>
-												{url}
-											</span>
-											<motion.button
-												whileHover={{ scale: 1.1 }}
-												whileTap={{ scale: 0.9 }}
-												onClick={() => {
-													setAgentPrompt((p) =>
-														p
-															.replace(
-																new RegExp(
-																	url.replace(
-																		/[.*+?^${}()|[\]\\]/g,
-																		"\\$&",
-																	),
-																	"g",
-																),
-																"",
-															)
-															.replace(/\s+/g, " ")
-															.trim(),
-													);
-												}}
-												style={{
-													background: "none",
-													border: "none",
-													cursor: "pointer",
-													padding: 0,
-													display: "flex",
-													color: T.muted,
-													flexShrink: 0,
-												}}
-											>
-												<svg
-													width={12}
-													height={12}
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth={2}
-												>
-													<path d="M18 6L6 18M6 6l12 12" />
-												</svg>
-											</motion.button>
-										</motion.div>
-									))}
-								</div>
-							);
-						})()}
-						<textarea
-							value={agentPrompt}
-							onChange={(e) => setAgentPrompt(e.target.value)}
-							onKeyDown={(e) =>
-								e.key === "Enter" &&
-								!e.shiftKey &&
-								(e.preventDefault(), handleAgentSend())
-							}
-							placeholder="e.g. Scrape https://example.com and turn it into a newsletter for founders. Or: Create a table from this product comparison page https://..."
-							rows={4}
-							disabled={agentLoading}
-							style={{
-								width: "100%",
-								background: "transparent",
-								border: "none",
-								borderRadius: 0,
-								padding: "14px 16px",
-								fontSize: 14,
-								color: T.accent,
-								resize: "vertical",
-								outline: "none",
-								lineHeight: 1.6,
-								transition: "border-color 0.2s",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-							onFocus={(e) => (e.target.style.outline = "none")}
-						/>
-						<div
-							style={{
-								display: "flex",
-								gap: 8,
-								alignItems: "center",
-								justifyContent: "space-between",
-								padding: "10px 16px",
-								background: "rgba(254, 243, 226, 0.3)",
-								borderTop: `1px solid ${T.border}`,
-							}}
-						>
-							<span
-								style={{
-									fontSize: 12,
-									color: T.muted,
-									fontFamily: "'Outfit', sans-serif",
-								}}
-							>
-								Create tables, newsletter, infographics and more
-							</span>
-							{reduxUser && credits && (
-								<span
-									style={{
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.muted,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{credits?.plan === "pro"
-									? "Pro"
-									: `${Math.max(0, credits?.remaining ?? FREE_CREDIT_LIMIT).toFixed(1)}/${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
-								</span>
-							)}
-						</div>
-					</div>
-
-					<motion.button
-						onClick={handleAgentSend}
-						disabled={agentLoading || !agentPrompt.trim()}
-						whileHover={
-							!agentLoading && agentPrompt.trim()
-								? {
-										scale: 1.02,
-										y: -1,
-										boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-									}
-								: {}
-						}
-						whileTap={!agentLoading ? { scale: 0.97 } : {}}
-						style={{
-							width: "100%",
-							marginTop: 16,
-							background:
-								agentLoading || !agentPrompt.trim() ? "#E8E4DC" : T.accent,
-							color: agentLoading || !agentPrompt.trim() ? T.muted : "white",
-							border: "none",
-							padding: "14px",
-							borderRadius: 12,
-							fontSize: 15,
-							fontWeight: 700,
-							cursor: agentLoading ? "not-allowed" : "pointer",
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							gap: 10,
-							transition: "all 0.2s",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						{agentLoading ? (
-							<>
-								<motion.span
-									animate={{ rotate: 360 }}
-									transition={{
-										duration: 0.9,
-										repeat: Infinity,
-										ease: "linear",
-									}}
-									style={{ display: "inline-flex" }}
-								>
-									↻
-								</motion.span>
-								{agentLoadingMsg}
-							</>
-						) : !reduxUser ? (
-							<>Sign in & use InkAgent →</>
-						) : (
-							<>Send to InkAgent →</>
-						)}
-					</motion.button>
-
-					{agentThinking && (
-						<motion.div
-							initial={{ opacity: 0, y: 4 }}
-							animate={{ opacity: 1, y: 0 }}
-							style={{
-								marginTop: 12,
-								padding: "12px 14px",
-								background: T.base,
-								border: `1px solid ${T.border}`,
-								borderRadius: 10,
-								fontSize: 13,
-								lineHeight: 1.6,
-								color: T.muted,
-								maxHeight: 100,
-								overflowY: "auto",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{agentThinking}
-						</motion.div>
-					)}
-					{agentError && (
-						<motion.div
-							initial={{ opacity: 0, y: 4 }}
-							animate={{ opacity: 1, y: 0 }}
-							style={{
-								marginTop: 12,
-								padding: "10px 14px",
-								background: "#FEF2F2",
-								border: "1px solid #FECACA",
-								borderRadius: 10,
-								fontSize: 13,
-								color: "#DC2626",
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{agentError}
-						</motion.div>
-					)}
-					{agentRunSteps.length > 0 && (
-						<motion.div
-							initial={{ opacity: 0, y: 4 }}
-							animate={{ opacity: 1, y: 0 }}
-							style={{
-								marginTop: 12,
-								padding: "12px 14px",
-								background: T.base,
-								border: `1px solid ${T.border}`,
-								borderRadius: 10,
-								fontSize: 13,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							{agentRunSteps.map((s, i) => (
-								<div
-									key={i}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 8,
-										marginBottom: i < agentRunSteps.length - 1 ? 6 : 0,
-									}}
-								>
-									<span
-										style={{
-											color:
-												s.status === "done"
-													? "#22C55E"
-													: s.status === "error"
-														? "#DC2626"
-														: T.warm,
-										}}
-									>
-										{s.status === "loading" ? "↻" : s.status === "done" ? "✓" : "✗"}
-									</span>
-									<span style={{ color: T.muted }}>{s.label}</span>
-								</div>
-							))}
-						</motion.div>
-					)}
-					{!agentLoading && agentCompletedTasks.length === 0 && (
-						<div style={{ marginTop: 18 }}>
-							<label
-								style={{
-									display: "block",
-									fontSize: 11,
-									fontWeight: 700,
-									textTransform: "uppercase",
-									letterSpacing: "0.08em",
-									color: T.muted,
-									marginBottom: 8,
-									fontFamily: "'Outfit', sans-serif",
-								}}
-							>
-								Try a suggestion
-							</label>
-							<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-								{AGENT_PROMPT_SUGGESTIONS.map((s, i) => (
-									<motion.button
-										key={i}
-										whileHover={{ scale: 1.005, x: 4 }}
-										whileTap={{ scale: 0.995 }}
-										onClick={() => setAgentPrompt(s)}
-										style={{
-											width: "100%",
-											padding: "12px 16px",
-											borderRadius: 10,
-											fontSize: 13,
-											fontWeight: 500,
-											cursor: "pointer",
-											border: `1.5px solid ${T.border}`,
-											background: T.base,
-											color: T.accent,
-											textAlign: "left",
-											lineHeight: 1.5,
-											fontFamily: "'Outfit', sans-serif",
-										}}
-									>
-										{s}
-									</motion.button>
-								))}
-							</div>
-						</div>
-					)}
+					<GenerateAssetPanel
+						variant="app"
+						theme={T}
+						reduxUser={reduxUser}
+						creditRemaining={creditRemaining}
+						queryClient={null}
+						router={router}
+						onLogin={() => setLoginModalOpen(true)}
+						presets={PRESETS}
+						promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
+					/>
 				</motion.div>
 
 				<motion.p
@@ -1322,6 +478,117 @@ function Hero() {
 	);
 }
 
+function AIFeaturesSection() {
+	return (
+		<section
+			id="features"
+			style={{
+				padding: "96px 24px",
+				background: T.base,
+				borderTop: `1px solid ${T.border}`,
+				borderBottom: `1px solid ${T.border}`,
+			}}
+		>
+			<div className="max-w-6xl mx-auto">
+				<FadeUp>
+					<p
+						style={{
+							fontSize: 12,
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.1em",
+							color: T.warm,
+							marginBottom: 10,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						AI Features
+					</p>
+					<h2
+						style={{
+							fontFamily: "'Outfit', sans-serif",
+							fontSize: "clamp(34px,4vw,50px)",
+							color: T.accent,
+							lineHeight: 1.12,
+							marginBottom: 14,
+							letterSpacing: "-0.4px",
+						}}
+					>
+						Built for modern content workflows.
+					</h2>
+					<p
+						style={{
+							fontSize: 17,
+							color: T.muted,
+							lineHeight: 1.65,
+							maxWidth: 680,
+							fontFamily: "'Outfit', sans-serif",
+						}}
+					>
+						Go from URL to blog posts, newsletters, infographics, tables, and
+						landing pages with one clean generation flow.
+					</p>
+				</FadeUp>
+
+				<div
+					style={{
+						display: "grid",
+						gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+						gap: 16,
+						marginTop: 40,
+					}}
+				>
+					{LANDING_AI_FEATURES.map((f, i) => (
+						<FadeUp key={f.title} delay={i * 0.06}>
+							<motion.div
+								whileHover={{ y: -4, boxShadow: "0 14px 34px rgba(0,0,0,0.09)" }}
+								style={{
+									background: T.surface,
+									border: `1px solid ${T.border}`,
+									borderRadius: 14,
+									padding: "18px 18px 16px",
+									height: "100%",
+								}}
+							>
+								<div
+									style={{
+										fontSize: 20,
+										marginBottom: 10,
+										lineHeight: 1,
+									}}
+								>
+									{f.icon}
+								</div>
+								<h3
+									style={{
+										fontSize: 16,
+										fontWeight: 700,
+										color: T.accent,
+										marginBottom: 8,
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{f.title}
+								</h3>
+								<p
+									style={{
+										fontSize: 13.5,
+										lineHeight: 1.6,
+										color: T.muted,
+										fontFamily: "'Outfit', sans-serif",
+									}}
+								>
+									{f.description}
+								</p>
+							</motion.div>
+						</FadeUp>
+					))}
+				</div>
+			</div>
+		</section>
+	);
+}
+
 /* ── Features bento grid ── */
 const FEATURES = [
 	{
@@ -1354,7 +621,7 @@ const FEATURES = [
 function Features() {
 	return (
 		<section
-			id="features"
+			id="product-showcase"
 			style={{
 				padding: "96px 24px",
 				background: "white",
@@ -1368,14 +635,14 @@ function Features() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						Features
+						Product showcase
 					</p>
 					<h2
 						style={{
@@ -1387,9 +654,9 @@ function Features() {
 							letterSpacing: "-0.5px",
 						}}
 					>
-						Everything you need
+						See the product in action
 						<br />
-						to write faster.
+						across your workflow.
 					</h2>
 					<p
 						style={{
@@ -1400,8 +667,8 @@ function Features() {
 							fontFamily: "'Outfit', sans-serif",
 						}}
 					>
-						From AI drafts to infographics, themes, and a powerful editor — all
-						in one place.
+						From generation to editing and visualization, every screen is built
+						for fast publishing.
 					</p>
 				</FadeUp>
 
@@ -1492,7 +759,7 @@ function Features() {
 										style={{
 											fontSize: 11,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.warm,
 											fontFamily: "'Outfit', sans-serif",
@@ -1558,7 +825,7 @@ function HowItWorks() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
@@ -1719,180 +986,28 @@ function StatsStrip() {
 	);
 }
 
-/* ── Testimonials ── */
-function Testimonials() {
-	const cards = [
-		{
-			quote:
-				"I publish every Tuesday. Research used to take 90 minutes. Now I paste two URLs, describe my angle, and I have a solid draft in under a minute.",
-			highlight: "Cut my writing time by 40%.",
-			name: "Aisha K.",
-			role: "Founder Newsletter · 4,200 subscribers",
-			img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=76&h=76&fit=crop&crop=face",
-		},
-		{
-			quote:
-				"Other AI writers give you generic slop. inkgest actually reads the source and writes something specific and usable.",
-			highlight: "First draft needed maybe 20% editing.",
-			name: "Marcus T.",
-			role: "B2B Content Strategist",
-			img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=76&h=76&fit=crop&crop=face",
-		},
-		{
-			quote:
-				"Honestly I was skeptical. Tried it once as a joke and ended up using the output almost verbatim.",
-			highlight: "Saved me two hours on a deadline day.",
-			name: "Priya S.",
-			role: "Indie blogger · 12K monthly readers",
-			img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=76&h=76&fit=crop&crop=face",
-		},
-	];
-
-	return (
-		<section style={{ padding: "96px 24px", background: T.base }}>
-			<div className="max-w-6xl mx-auto">
-				<FadeUp>
-					<p
-						style={{
-							fontSize: 12,
-							fontWeight: 700,
-							textTransform: "uppercase",
-							letterSpacing: "0.1em",
-							color: T.warm,
-							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Early users
-					</p>
-					<h2
-						style={{
-							fontFamily: "'Outfit', sans-serif",
-							fontSize: "clamp(36px,4vw,54px)",
-							color: T.accent,
-							lineHeight: 1.1,
-							letterSpacing: "-0.5px",
-						}}
-					>
-						Writers who tried it
-						<br />
-						<em style={{ color: T.warm }}>didn't go back.</em>
-					</h2>
-				</FadeUp>
-
-				<div
-					style={{
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))",
-						gap: 20,
-						marginTop: 52,
-					}}
-				>
-					{cards.map((c, i) => (
-						<FadeUp key={c.name} delay={i * 0.12}>
-							<motion.div
-								whileHover={{
-									y: -5,
-									boxShadow: "0 16px 48px rgba(0,0,0,0.10)",
-								}}
-								style={{
-									background: T.surface,
-									border: `1px solid ${T.border}`,
-									borderRadius: 14,
-									padding: "28px",
-									height: "100%",
-									display: "flex",
-									flexDirection: "column",
-									boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-									cursor: "default",
-								}}
-							>
-								<div
-									style={{
-										color: T.warm,
-										fontSize: 14,
-										letterSpacing: 2,
-										marginBottom: 14,
-									}}
-								>
-									★★★★★
-								</div>
-								<p
-									style={{
-										fontSize: 14,
-										color: "#4A4540",
-										lineHeight: 1.75,
-										marginBottom: 18,
-										flex: 1,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									"{c.quote}{" "}
-									<strong style={{ color: T.accent }}>{c.highlight}</strong>"
-								</p>
-								<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-									<img
-										src={c.img}
-										alt={c.name}
-										style={{
-											width: 38,
-											height: 38,
-											borderRadius: "50%",
-											objectFit: "cover",
-										}}
-									/>
-									<div>
-										<div
-											style={{
-												fontSize: 13,
-												fontWeight: 700,
-												color: T.accent,
-												fontFamily: "'Outfit', sans-serif",
-											}}
-										>
-											{c.name}
-										</div>
-										<div
-											style={{
-												fontSize: 12,
-												color: T.muted,
-												fontFamily: "'Outfit', sans-serif",
-											}}
-										>
-											{c.role}
-										</div>
-									</div>
-								</div>
-							</motion.div>
-						</FadeUp>
-					))}
-				</div>
-			</div>
-		</section>
-	);
-}
-
 /* ── Pricing ── */
 function Pricing() {
 	const free = [
-		"10 credits every month",
+		"50 credits every month",
 		"Full editor access",
 		"Copy to clipboard",
 		"Save up to 3 drafts",
 		"Google login",
+	];
+	const starter = [
+		"50 credits every month",
+		"All content formats",
+		"Multiple URL sources per draft",
+		"AI Chat with all models",
+		"Priority support",
 	];
 	const pro = [
 		"100 credits every month",
 		"All content formats",
 		"Multiple URL sources per draft",
 		"AI Chat with all models",
-		"Themes, Infographics & Table Creator",
 		"Priority support",
-		"Unlimited saved drafts",
-		"Full editor + formatting",
-		"Draft history",
-		"Priority generation speed",
-		"Cancel anytime",
 	];
 
 	const router = useRouter();
@@ -1911,7 +1026,7 @@ function Pricing() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							textAlign: "center",
@@ -1948,14 +1063,7 @@ function Pricing() {
 				</FadeUp>
 
 				<div
-					style={{
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-						gap: 20,
-						margin: "auto",
-						marginTop: 52,
-						maxWidth: 680,
-					}}
+					className="lg:grid-cols-3 grid-cols-1 grid items-center justify-center gap-4 my-10"
 				>
 					{/* Free */}
 					<FadeUp delay={0.1}>
@@ -1975,7 +1083,7 @@ function Pricing() {
 								style={{
 									fontSize: 12,
 									fontWeight: 700,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.08em",
 									color: T.muted,
 									marginBottom: 10,
@@ -2047,6 +1155,71 @@ function Pricing() {
 						</motion.div>
 					</FadeUp>
 
+					{/* Starter */}
+					<FadeUp delay={0.2}>
+						<motion.div
+							whileHover={{ y: -4, boxShadow: "0 16px 48px rgba(0,0,0,0.10)" }}
+							style={{
+								background: T.base,
+								border: `1.5px solid ${T.border}`,
+								borderRadius: 16,
+								padding: "34px 30px",
+								height: "100%",
+								display: "flex",
+								flexDirection: "column",
+							}}
+						>
+							<p
+								style={{
+									fontSize: 12,
+									fontWeight: 700,
+									textTransform: "",
+									letterSpacing: "0.08em",
+									color: T.muted,
+									marginBottom: 10,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Starter
+							</p>
+							<div
+								style={{
+									fontFamily: "'Outfit', sans-serif",
+									fontSize: 52,
+									color: T.accent,
+									lineHeight: 1,
+								}}
+							>
+								$20
+							</div>
+							<p
+								style={{
+									fontSize: 14,
+									color: T.muted,
+									margin: "10px 0 24px",
+									lineHeight: 1.6,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Unlimited credits for serious creators
+							</p>
+							<ul style={{ listStyle: "none", marginBottom: 28, flex: 1 }}>
+								{starter.map((f) => (
+									<li key={f} style={{ fontSize: 13.5, color: T.muted, padding: "8px 0", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 9, fontFamily: "'Outfit', sans-serif" }}>
+										<span style={{ color: T.warm, fontWeight: 700 }}>✓</span> {f}
+									</li>
+								))}
+							</ul>
+							<motion.a
+								href="/login"
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.97 }}
+								style={{ display: "block", textAlign: "center", background: T.accent, color: "white", padding: "13px", borderRadius: 10, fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "'Outfit', sans-serif" }}
+							>
+								Start for free →
+							</motion.a>
+						</motion.div>
+					</FadeUp>
 					{/* Pro */}
 					<FadeUp delay={0.2}>
 						<motion.div
@@ -2068,7 +1241,7 @@ function Pricing() {
 								style={{
 									fontSize: 12,
 									fontWeight: 700,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.08em",
 									color: "rgba(255,255,255,0.5)",
 									marginBottom: 10,
@@ -2085,7 +1258,7 @@ function Pricing() {
 									lineHeight: 1,
 								}}
 							>
-								$9
+								$40
 								<span
 									style={{
 										fontSize: 18,
@@ -2183,7 +1356,7 @@ function OpenSource() {
 								style={{
 									fontSize: 12,
 									fontWeight: 700,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.1em",
 									color: T.warm,
 									marginBottom: 10,
@@ -2412,7 +1585,7 @@ function FAQ() {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
@@ -2443,7 +1616,7 @@ function FAQ() {
 					>
 						Anything else?{" "}
 						<a
-							href="mailto:hello@inkgest.app"
+							href="mailto:shreyvijayvargiya26@gmail.com"
 							style={{ color: T.accent, textDecoration: "underline" }}
 						>
 							Drop us an email.
@@ -2520,149 +1693,6 @@ function FAQ() {
 	);
 }
 
-/* ── Footer ── */
-function Footer() {
-	return (
-		<footer style={{ background: T.accent, padding: "56px 24px 36px" }}>
-			<div className="max-w-6xl mx-auto">
-				<div
-					style={{
-						display: "flex",
-						alignItems: "flex-start",
-						justifyContent: "space-between",
-						marginBottom: 48,
-						gap: 40,
-						flexWrap: "wrap",
-					}}
-				>
-					<div>
-						<div
-							style={{
-								fontFamily: "'Outfit', sans-serif",
-								fontSize: 24,
-								color: "white",
-								display: "flex",
-								alignItems: "center",
-								gap: 8,
-								marginBottom: 10,
-							}}
-						>
-							<span
-								style={{
-									width: 8,
-									height: 8,
-									borderRadius: "50%",
-									background: T.warm,
-									display: "inline-block",
-								}}
-							/>
-							inkgest
-						</div>
-						<p
-							style={{
-								fontSize: 13,
-								color: "rgba(255,255,255,0.4)",
-								maxWidth: 200,
-								lineHeight: 1.6,
-								fontFamily: "'Outfit', sans-serif",
-							}}
-						>
-							Turn any URL into a newsletter, email, or blog post, infographics
-							etc
-						</p>
-					</div>
-					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
-						{[
-							{
-								title: "Connect",
-								links: [
-									"https://x.com/treyvijay",
-									"mailto:shreyvijayvargiya26@gmail.com",
-								],
-							},
-						].map((col) => (
-							<div key={col.title}>
-								<p
-									style={{
-										fontSize: 12,
-										fontWeight: 700,
-										textTransform: "uppercase",
-										letterSpacing: "0.1em",
-										color: "rgba(255,255,255,0.35)",
-										marginBottom: 16,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{col.title}
-								</p>
-								{col.links.map((l) => (
-									<a
-										key={l}
-										href={l}
-										style={{
-											display: "block",
-											fontSize: 14,
-											color: "rgba(255,255,255,0.6)",
-											textDecoration: "none",
-											marginBottom: 10,
-											fontFamily: "'Outfit', sans-serif",
-											transition: "color 0.2s",
-										}}
-										onMouseEnter={(e) => (e.target.style.color = "white")}
-										onMouseLeave={(e) =>
-											(e.target.style.color = "rgba(255,255,255,0.6)")
-										}
-									>
-										{l}
-									</a>
-								))}
-							</div>
-						))}
-					</div>
-				</div>
-				<div
-					style={{
-						borderTop: "1px solid rgba(255,255,255,0.1)",
-						paddingTop: 28,
-						display: "flex",
-						justifyContent: "space-between",
-						flexWrap: "wrap",
-						gap: 12,
-					}}
-				>
-					<span
-						style={{
-							fontSize: 13,
-							color: "rgba(255,255,255,0.3)",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						© 2025 inkgest. All rights reserved.
-					</span>
-					<span
-						style={{
-							fontSize: 13,
-							color: "rgba(255,255,255,0.3)",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Made for writers who publish on a deadline. Built using{" "}
-						<a
-							href="https://buildsaas.dev"
-							target="_blank"
-							className="text-orange-500"
-							style={{ color: T.surface }}
-							rel="noopener noreferrer"
-						>
-							Buildsaas
-						</a>
-					</span>
-				</div>
-			</div>
-		</footer>
-	);
-}
-
 /* ── Root ── */
 export default function inkgestLanding() {
 	const { user } = useSelector((state) => state?.user);
@@ -2680,6 +1710,7 @@ export default function inkgestLanding() {
 			<FontLink />
 			<Nav />
 			<Hero />
+			<AIFeaturesSection />
 			<Features />
 			<HowItWorks />
 			<StatsStrip />

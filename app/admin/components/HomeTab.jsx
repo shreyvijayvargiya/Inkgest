@@ -88,7 +88,7 @@ const HomeTab = ({ onNavigate }) => {
 	const formatCurrency = (amount, currency = "usd") => {
 		return new Intl.NumberFormat("en-US", {
 			style: "currency",
-			currency: currency.toUpperCase(),
+			currency: currency || "usd",
 		}).format(amount / 100);
 	};
 
@@ -326,7 +326,7 @@ const HomeTab = ({ onNavigate }) => {
 											<p className="text-xs font-bold text-zinc-900 leading-none">
 												{alert.count} {alert.label}{alert.count > 1 ? "s" : ""}
 											</p>
-											<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1 group-hover:text-zinc-600 transition-colors">Attention Required</p>
+											<p className="text-[10px] font-bold text-zinc-400  tracking-widest mt-1 group-hover:text-zinc-600 transition-colors">Attention Required</p>
 										</div>
 										<ArrowRight className="w-3.5 h-3.5 text-zinc-300 group-hover:text-zinc-900 transition-colors" />
 									</motion.div>
@@ -336,7 +336,7 @@ const HomeTab = ({ onNavigate }) => {
 					)}
 					<div className="h-10 w-px bg-zinc-100 mx-2" />
 					<div className="flex flex-col items-end">
-						<div className="flex items-center gap-2 text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">
+						<div className="flex items-center gap-2 text-[10px] font-black text-zinc-400  tracking-[0.2em]">
 							<div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
 							Live System Status
 						</div>
@@ -368,7 +368,7 @@ const HomeTab = ({ onNavigate }) => {
 							</div>
 							<div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-50 rounded-full border border-zinc-100">
 								<TrendingUp className="w-3 h-3 text-emerald-500" />
-								<span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">+12%</span>
+								<span className="text-[10px] font-bold text-zinc-600  tracking-wider">+12%</span>
 							</div>
 						</div>
 
@@ -377,7 +377,7 @@ const HomeTab = ({ onNavigate }) => {
 								{metric.value}
 							</p>
 							<div className="flex items-center justify-between">
-								<p className="text-xs font-medium text-zinc-500 uppercase tracking-widest">{metric.title}</p>
+								<p className="text-xs font-medium text-zinc-500  tracking-widest">{metric.title}</p>
 								<p className="text-[10px] font-medium text-zinc-400">{metric.subtitle}</p>
 							</div>
 						</div>
@@ -460,7 +460,7 @@ const HomeTab = ({ onNavigate }) => {
 											<Activity className="w-4 h-4 text-zinc-600" />
 											Content Activity
 										</h3>
-										<div className="flex items-center gap-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+										<div className="flex items-center gap-4 text-[10px] font-bold text-zinc-400  tracking-widest">
 											<div className="flex items-center gap-1.5">
 												<div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
 												Blogs
@@ -475,7 +475,7 @@ const HomeTab = ({ onNavigate }) => {
 										<div className="h-64 flex items-center justify-center text-zinc-500">
 											<div className="flex flex-col items-center gap-3">
 												<div className="w-8 h-8 border-4 border-zinc-200 border-t-zinc-900 rounded-full animate-spin" />
-												<span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Syncing Data...</span>
+												<span className="text-xs font-bold  tracking-widest text-zinc-400">Syncing Data...</span>
 											</div>
 										</div>
 									) : (
@@ -563,15 +563,15 @@ const HomeTab = ({ onNavigate }) => {
 										<div className="grid grid-cols-3 gap-2">
 											<div className="p-3 rounded-2xl bg-zinc-50 text-center">
 												<p className="text-lg font-black text-zinc-900">{contentStats.blogs.total}</p>
-												<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total</p>
+												<p className="text-[10px] font-bold text-zinc-400  tracking-widest">Total</p>
 											</div>
 											<div className="p-3 rounded-2xl bg-zinc-50 text-center border border-zinc-100">
 												<p className="text-lg font-black text-emerald-600">{contentStats.blogs.published}</p>
-												<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Live</p>
+												<p className="text-[10px] font-bold text-zinc-400  tracking-widest">Live</p>
 											</div>
 											<div className="p-3 rounded-2xl bg-zinc-50 text-center">
 												<p className="text-lg font-black text-zinc-400">{contentStats.blogs.draft}</p>
-												<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Draft</p>
+												<p className="text-[10px] font-bold text-zinc-400  tracking-widest">Draft</p>
 											</div>
 										</div>
 									</div>
@@ -593,15 +593,15 @@ const HomeTab = ({ onNavigate }) => {
 										<div className="grid grid-cols-3 gap-2">
 											<div className="p-3 rounded-2xl bg-zinc-50 text-center">
 												<p className="text-lg font-black text-zinc-900">{contentStats.emails.total}</p>
-												<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total</p>
+												<p className="text-[10px] font-bold text-zinc-400  tracking-widest">Total</p>
 											</div>
 											<div className="p-3 rounded-2xl bg-zinc-50 text-center border border-zinc-100">
 												<p className="text-lg font-black text-emerald-600">{contentStats.emails.published}</p>
-												<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Sent</p>
+												<p className="text-[10px] font-bold text-zinc-400  tracking-widest">Sent</p>
 											</div>
 											<div className="p-3 rounded-2xl bg-zinc-50 text-center">
 												<p className="text-lg font-black text-zinc-400">{contentStats.emails.draft}</p>
-												<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Draft</p>
+												<p className="text-[10px] font-bold text-zinc-400  tracking-widest">Draft</p>
 											</div>
 										</div>
 									</div>
@@ -625,7 +625,7 @@ const HomeTab = ({ onNavigate }) => {
 										</div>
 										<button
 											onClick={() => onNavigate?.("messages")}
-											className="px-4 py-2 text-[10px] font-bold bg-zinc-50 hover:bg-zinc-100 text-zinc-900 rounded-xl transition-all border border-zinc-200 uppercase tracking-widest"
+											className="px-4 py-2 text-[10px] font-bold bg-zinc-50 hover:bg-zinc-100 text-zinc-900 rounded-xl transition-all border border-zinc-200  tracking-widest"
 										>
 											Open Inbox
 										</button>
@@ -633,7 +633,7 @@ const HomeTab = ({ onNavigate }) => {
 									{messagesLoading ? (
 										<div className="text-center py-20">
 											<div className="inline-block w-6 h-6 border-2 border-zinc-200 border-t-zinc-900 rounded-full animate-spin mb-4" />
-											<p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Checking Messages...</p>
+											<p className="text-xs font-bold text-zinc-400  tracking-widest">Checking Messages...</p>
 										</div>
 									) : recentMessages.length === 0 ? (
 										<div className="text-center py-20 bg-zinc-50 rounded-2xl border border-dashed border-zinc-200">
@@ -657,7 +657,7 @@ const HomeTab = ({ onNavigate }) => {
 															<p className="text-xs text-zinc-500 mt-1 line-clamp-1 font-medium">
 																{message.subject || message.message}
 															</p>
-															<p className="text-[10px] text-zinc-400 mt-2 font-bold uppercase tracking-widest group-hover:text-zinc-600">
+															<p className="text-[10px] text-zinc-400 mt-2 font-bold  tracking-widest group-hover:text-zinc-600">
 																{formatDate(message.createdAt)}
 															</p>
 														</div>
@@ -679,7 +679,7 @@ const HomeTab = ({ onNavigate }) => {
 						<div className="flex items-center justify-between">
 							<div>
 								<h3 className="text-base font-bold text-zinc-900">Recent Users</h3>
-								<p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-0.5">Community update</p>
+								<p className="text-[10px] font-bold text-zinc-400  tracking-widest mt-0.5">Community update</p>
 							</div>
 							<button
 								onClick={() => onNavigate?.("users")}
@@ -700,20 +700,20 @@ const HomeTab = ({ onNavigate }) => {
 										<div key={u.id || i} className="p-4 hover:bg-zinc-50 transition-all group flex items-center justify-between">
 											<div className="flex items-center gap-3">
 												<div className="w-10 h-10 rounded-2xl bg-zinc-100 flex items-center justify-center text-zinc-600 font-bold border border-zinc-200 group-hover:bg-white transition-colors">
-													{u.email?.substring(0, 1).toUpperCase() || "U"}
+													{u?.email?.substring(0, 1) || "U"}
 												</div>
 												<div className="flex flex-col">
 													<span className="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
 														{u.username || "Anonymous"}
 													</span>
-													<span className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${u.role === "admin" ? "text-zinc-900" : "text-zinc-400"
+													<span className={`text-[10px] font-bold  tracking-widest mt-0.5 ${u.role === "admin" ? "text-zinc-900" : "text-zinc-400"
 														}`}>
 														{u.role || "user"}
 													</span>
 												</div>
 											</div>
 											<div className="flex flex-col items-end">
-												<span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+												<span className="text-[10px] font-bold text-zinc-400  tracking-widest">
 													{formatDate(u.createdAt)}
 												</span>
 												<button
@@ -727,7 +727,7 @@ const HomeTab = ({ onNavigate }) => {
 									))}
 									<button
 										onClick={() => onNavigate?.("users")}
-										className="w-full p-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest hover:text-zinc-900 transition-colors bg-zinc-50/50"
+										className="w-full p-4 text-[10px] font-bold text-zinc-400  tracking-widest hover:text-zinc-900 transition-colors bg-zinc-50/50"
 									>
 										Show all registration data
 									</button>
