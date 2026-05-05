@@ -139,6 +139,12 @@ export default function Footer() {
 					</span>
 				</div>
 			</div>
+			<div className="flex items-center justify-between gap-2 my-4 max-w-6xl mx-auto border-t border-white/10 pt-4">
+				<p className="text-sm text-white">Listed/Features on</p>
+				<div className="flex items-center gap-2">
+					<a href="https://startupfa.me/s/inkgest?utm_source=inkgest.com" target="_blank"><img src="https://startupfa.me/badges/featured/default-small.webp" alt="Inkgest - Featured on Startup Fame" width="224" height="36" /></a>
+				</div>
+			</div>
 		</footer>
 	);
 }

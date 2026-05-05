@@ -1819,7 +1819,7 @@ export default function DraftPage() {
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
 											<p style={{ fontSize: 13, marginBottom: 12 }}>
-												No drafts or tables found
+												No inkgest found
 											</p>
 											<motion.button
 												whileHover={{ scale: 1.02 }}
@@ -1836,7 +1836,7 @@ export default function DraftPage() {
 													cursor: "pointer",
 												}}
 											>
-												Create with InkAgent →
+												Create New →
 											</motion.button>
 										</motion.div>
 									) : (
@@ -3484,6 +3484,9 @@ export default function DraftPage() {
 					draftContent={editorRef.current?.innerHTML || draft?.body || ""}
 					draftTitle={draft?.title || "Draft"}
 					userId={reduxUser?.uid || ""}
+					onAgentDraftCreated={(newDraftId) =>
+						router.push(`/app/${newDraftId}`)
+					}
 					selectionContext={selectionContext}
 					asPanel
 				/>

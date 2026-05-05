@@ -359,7 +359,7 @@ function Hero() {
 
 			<motion.div
 				style={{ y }}
-				className="relative max-w-6xl mx-auto px-6 text-center"
+				className="relative max-w-2xl mx-auto px-6 text-center"
 			>
 				<a
 					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto p-2 mb-4 border border-amber-200 rounded-full flex gap-2 items-center"
@@ -986,159 +986,6 @@ function StatsStrip() {
 	);
 }
 
-/* ── Testimonials ── */
-function Testimonials() {
-	const cards = [
-		{
-			quote:
-				"I publish every Tuesday. Research used to take 90 minutes. Now I paste two URLs, describe my angle, and I have a solid draft in under a minute.",
-			highlight: "Cut my writing time by 40%.",
-			name: "Aisha K.",
-			role: "Founder Newsletter · 4,200 subscribers",
-			img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=76&h=76&fit=crop&crop=face",
-		},
-		{
-			quote:
-				"Other AI writers give you generic slop. inkgest actually reads the source and writes something specific and usable.",
-			highlight: "First draft needed maybe 20% editing.",
-			name: "Marcus T.",
-			role: "B2B Content Strategist",
-			img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=76&h=76&fit=crop&crop=face",
-		},
-		{
-			quote:
-				"Honestly I was skeptical. Tried it once as a joke and ended up using the output almost verbatim.",
-			highlight: "Saved me two hours on a deadline day.",
-			name: "Priya S.",
-			role: "Indie blogger · 12K monthly readers",
-			img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=76&h=76&fit=crop&crop=face",
-		},
-	];
-
-	return (
-		<section style={{ padding: "96px 24px", background: T.base }}>
-			<div className="max-w-6xl mx-auto">
-				<FadeUp>
-					<p
-						style={{
-							fontSize: 12,
-							fontWeight: 700,
-							textTransform: "",
-							letterSpacing: "0.1em",
-							color: T.warm,
-							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Early users
-					</p>
-					<h2
-						style={{
-							fontFamily: "'Outfit', sans-serif",
-							fontSize: "clamp(36px,4vw,54px)",
-							color: T.accent,
-							lineHeight: 1.1,
-							letterSpacing: "-0.5px",
-						}}
-					>
-						Writers who tried it
-						<br />
-						<em style={{ color: T.warm }}>didn't go back.</em>
-					</h2>
-				</FadeUp>
-
-				<div
-					style={{
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))",
-						gap: 20,
-						marginTop: 52,
-					}}
-				>
-					{cards.map((c, i) => (
-						<FadeUp key={c.name} delay={i * 0.12}>
-							<motion.div
-								whileHover={{
-									y: -5,
-									boxShadow: "0 16px 48px rgba(0,0,0,0.10)",
-								}}
-								style={{
-									background: T.surface,
-									border: `1px solid ${T.border}`,
-									borderRadius: 14,
-									padding: "28px",
-									height: "100%",
-									display: "flex",
-									flexDirection: "column",
-									boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-									cursor: "default",
-								}}
-							>
-								<div
-									style={{
-										color: T.warm,
-										fontSize: 14,
-										letterSpacing: 2,
-										marginBottom: 14,
-									}}
-								>
-									★★★★★
-								</div>
-								<p
-									style={{
-										fontSize: 14,
-										color: "#4A4540",
-										lineHeight: 1.75,
-										marginBottom: 18,
-										flex: 1,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									"{c.quote}{" "}
-									<strong style={{ color: T.accent }}>{c.highlight}</strong>"
-								</p>
-								<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-									<img
-										src={c.img}
-										alt={c.name}
-										style={{
-											width: 38,
-											height: 38,
-											borderRadius: "50%",
-											objectFit: "cover",
-										}}
-									/>
-									<div>
-										<div
-											style={{
-												fontSize: 13,
-												fontWeight: 700,
-												color: T.accent,
-												fontFamily: "'Outfit', sans-serif",
-											}}
-										>
-											{c.name}
-										</div>
-										<div
-											style={{
-												fontSize: 12,
-												color: T.muted,
-												fontFamily: "'Outfit', sans-serif",
-											}}
-										>
-											{c.role}
-										</div>
-									</div>
-								</div>
-							</motion.div>
-						</FadeUp>
-					))}
-				</div>
-			</div>
-		</section>
-	);
-}
-
 /* ── Pricing ── */
 function Pricing() {
 	const free = [
@@ -1148,18 +995,19 @@ function Pricing() {
 		"Save up to 3 drafts",
 		"Google login",
 	];
+	const starter = [
+		"50 credits every month",
+		"All content formats",
+		"Multiple URL sources per draft",
+		"AI Chat with all models",
+		"Priority support",
+	];
 	const pro = [
 		"100 credits every month",
 		"All content formats",
 		"Multiple URL sources per draft",
 		"AI Chat with all models",
-		"Themes, Infographics & Table Creator",
 		"Priority support",
-		"Unlimited saved drafts",
-		"Full editor + formatting",
-		"Draft history",
-		"Priority generation speed",
-		"Cancel anytime",
 	];
 
 	const router = useRouter();
@@ -1215,14 +1063,7 @@ function Pricing() {
 				</FadeUp>
 
 				<div
-					style={{
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-						gap: 20,
-						margin: "auto",
-						marginTop: 52,
-						maxWidth: 680,
-					}}
+					className="lg:grid-cols-3 grid-cols-1 grid items-center justify-center gap-4 my-10"
 				>
 					{/* Free */}
 					<FadeUp delay={0.1}>
@@ -1314,6 +1155,71 @@ function Pricing() {
 						</motion.div>
 					</FadeUp>
 
+					{/* Starter */}
+					<FadeUp delay={0.2}>
+						<motion.div
+							whileHover={{ y: -4, boxShadow: "0 16px 48px rgba(0,0,0,0.10)" }}
+							style={{
+								background: T.base,
+								border: `1.5px solid ${T.border}`,
+								borderRadius: 16,
+								padding: "34px 30px",
+								height: "100%",
+								display: "flex",
+								flexDirection: "column",
+							}}
+						>
+							<p
+								style={{
+									fontSize: 12,
+									fontWeight: 700,
+									textTransform: "",
+									letterSpacing: "0.08em",
+									color: T.muted,
+									marginBottom: 10,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Starter
+							</p>
+							<div
+								style={{
+									fontFamily: "'Outfit', sans-serif",
+									fontSize: 52,
+									color: T.accent,
+									lineHeight: 1,
+								}}
+							>
+								$20
+							</div>
+							<p
+								style={{
+									fontSize: 14,
+									color: T.muted,
+									margin: "10px 0 24px",
+									lineHeight: 1.6,
+									fontFamily: "'Outfit', sans-serif",
+								}}
+							>
+								Unlimited credits for serious creators
+							</p>
+							<ul style={{ listStyle: "none", marginBottom: 28, flex: 1 }}>
+								{starter.map((f) => (
+									<li key={f} style={{ fontSize: 13.5, color: T.muted, padding: "8px 0", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 9, fontFamily: "'Outfit', sans-serif" }}>
+										<span style={{ color: T.warm, fontWeight: 700 }}>✓</span> {f}
+									</li>
+								))}
+							</ul>
+							<motion.a
+								href="/login"
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.97 }}
+								style={{ display: "block", textAlign: "center", background: T.accent, color: "white", padding: "13px", borderRadius: 10, fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "'Outfit', sans-serif" }}
+							>
+								Start for free →
+							</motion.a>
+						</motion.div>
+					</FadeUp>
 					{/* Pro */}
 					<FadeUp delay={0.2}>
 						<motion.div
@@ -1352,7 +1258,7 @@ function Pricing() {
 									lineHeight: 1,
 								}}
 							>
-								$9
+								$40
 								<span
 									style={{
 										fontSize: 18,
