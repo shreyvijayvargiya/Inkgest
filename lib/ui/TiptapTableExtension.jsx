@@ -432,7 +432,7 @@ const TableComponent = ({
 									{currentRows[0].map((cell, cellIndex) => (
 										<th
 											key={cell.id || cellIndex}
-											className="border border-zinc-200 px-3 py-2 bg-zinc-100 font-semibold text-left"
+											className="border border-zinc-200 px-3 py-2 bg-zinc-50 font-semibold text-left text-zinc-800"
 											style={{ minWidth: "100px" }}
 										>
 											<input

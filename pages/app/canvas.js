@@ -64,7 +64,7 @@ export default function AppCanvasPage() {
 				display: "flex",
 				flexDirection: "column",
 				background: T.base,
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 				overflow: "hidden",
 			}}
 		>

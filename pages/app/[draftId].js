@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import {
+	useState,
+	useRef,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+} from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
@@ -13,11 +20,16 @@ import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
 import {
 	listAssets,
 	getAsset,
+	updateAsset,
 	deleteAsset,
 	assetRef,
 } from "../../lib/api/userAssets";
+import { uploadFile } from "../../lib/api/upload";
+import { uploadInlineImagesToUploadThing } from "../../lib/fileUpload";
 import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
+import { formatInkDateLong, TiptapSlashDatePicker } from "../../lib/ui/TiptapSlashDatePicker.jsx";
+import { htmlToMarkdown } from "../../lib/utils/htmlToMarkdown";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -33,6 +45,48 @@ const FontLink = () => (
     ::-webkit-scrollbar-thumb:hover { background: #C17B2F; }
     [contenteditable]:focus { outline: none; }
     [contenteditable]:empty:before { content: attr(data-placeholder); color: #B0AAA3; pointer-events: none; }
+    details[data-block="draft-toggle"] summary::-webkit-details-marker { display: none; }
+    details[data-block="draft-toggle"] summary { list-style: none; }
+    details[data-block="draft-toggle"] summary::marker { display: none; }
+    details[data-block="draft-toggle"] [data-toggle-chevron] {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      background: rgba(193,123,47,0.12);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(0deg);
+      transition: transform 0.18s ease;
+    }
+    details[data-block="draft-toggle"] [data-toggle-chevron]::before {
+      content: "";
+      display: block;
+      width: 0;
+      height: 0;
+      border-style: solid;
+      border-width: 5px 0 5px 7px;
+      border-color: transparent transparent transparent #6B6560;
+      margin-left: 2px;
+    }
+    details[data-block="draft-toggle"][open] [data-toggle-chevron] { transform: rotate(90deg); }
+    details[data-block="draft-toggle"] [data-toggle-grip] {
+      flex-shrink: 0;
+      min-width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    details[data-block="draft-toggle"] [data-toggle-grip]::before {
+      content: "\\2026";
+      font-weight: 700;
+      color: #A8A29E;
+      font-size: 15px;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
   `}</style>
 );
 
@@ -86,6 +140,7 @@ const Icons = {
 	zap: "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
 	chevronL: "M15 18l-6-6 6-6",
 	chevronR: "M9 18l6-6-6-6",
+	chevronD: "M6 9l6 6 6-6",
 	logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
 	refresh:
 		"M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10 M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
@@ -99,9 +154,61 @@ const Icons = {
 		"M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3 M8 12h8",
 	image:
 		"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-8a2 2 0 11-4 0 2 2 0 014 0zM4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z",
+	table:
+		"M3 3h18v4H3V3zm0 8h18v4H3v-4zm0 8h18v4H3v-4z M9 3v18 M15 3v18",
+	video:
+		"M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
 	settings:
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
+
+/** Tailwind-style swatches for contenteditable selection toolbar (hex = v3 defaults). */
+const SELECTION_TEXT_COLORS = [
+	{ label: "Default", hex: "" },
+	{ label: "Slate 900", hex: "#0f172a" },
+	{ label: "Slate 600", hex: "#475569" },
+	{ label: "Zinc 800", hex: "#27272a" },
+	{ label: "Red 600", hex: "#dc2626" },
+	{ label: "Orange 600", hex: "#ea580c" },
+	{ label: "Amber 600", hex: "#d97706" },
+	{ label: "Yellow 700", hex: "#a16207" },
+	{ label: "Lime 600", hex: "#65a30d" },
+	{ label: "Green 600", hex: "#16a34a" },
+	{ label: "Emerald 600", hex: "#059669" },
+	{ label: "Teal 600", hex: "#0d9488" },
+	{ label: "Cyan 600", hex: "#0891b2" },
+	{ label: "Sky 600", hex: "#0284c7" },
+	{ label: "Blue 600", hex: "#2563eb" },
+	{ label: "Indigo 600", hex: "#4f46e5" },
+	{ label: "Violet 600", hex: "#7c3aed" },
+	{ label: "Purple 600", hex: "#9333ea" },
+	{ label: "Fuchsia 600", hex: "#c026d3" },
+	{ label: "Pink 600", hex: "#db2777" },
+	{ label: "Rose 600", hex: "#e11d48" },
+];
+
+const SELECTION_BG_COLORS = [
+	{ label: "None", hex: "clear" },
+	{ label: "Slate 100", hex: "#f1f5f9" },
+	{ label: "Slate 200", hex: "#e2e8f0" },
+	{ label: "Red 100", hex: "#fee2e2" },
+	{ label: "Orange 100", hex: "#ffedd5" },
+	{ label: "Amber 100", hex: "#fef3c7" },
+	{ label: "Yellow 100", hex: "#fef9c3" },
+	{ label: "Lime 100", hex: "#ecfccb" },
+	{ label: "Green 100", hex: "#dcfce7" },
+	{ label: "Emerald 100", hex: "#d1fae5" },
+	{ label: "Teal 100", hex: "#ccfbf1" },
+	{ label: "Cyan 100", hex: "#cffafe" },
+	{ label: "Sky 100", hex: "#e0f2fe" },
+	{ label: "Blue 100", hex: "#dbeafe" },
+	{ label: "Indigo 100", hex: "#e0e7ff" },
+	{ label: "Violet 100", hex: "#ede9fe" },
+	{ label: "Purple 100", hex: "#f3e8ff" },
+	{ label: "Fuchsia 100", hex: "#fae8ff" },
+	{ label: "Pink 100", hex: "#fce7f3" },
+	{ label: "Rose 100", hex: "#ffe4e6" },
+];
 
 /* ─── Extract a single CSS property value from a CSS string ─── */
 const parseCSSProp = (cssStr = "", prop) => {
@@ -117,7 +224,7 @@ const THEMES = {
 		palette: ["#F7F5F0", "#1A1A1A", "#C17B2F", "#7A7570"],
 		fontUrl:
 			"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
-		bodyFont: "'Outfit', sans-serif",
+		bodyFont: "'Comic', sans-serif",
 		bg: "#F7F5F0",
 		text: "#3A3530",
 		container:
@@ -413,6 +520,107 @@ const parseInlineMarkdown = (text = "") =>
 		/* strikethrough ~~…~~ */
 		.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
 
+/** Strip editor-only attributes; keep markup for preview iframe. */
+function cloneBlockHtmlForPreview(node) {
+	if (!node?.cloneNode) return "";
+	const el = node.cloneNode(true);
+	el.querySelectorAll("[contenteditable]").forEach((n) =>
+		n.removeAttribute("contenteditable"),
+	);
+	return el.outerHTML;
+}
+
+const PREVIEW_INTERACTION_SCRIPT = `(function(){
+document.addEventListener("click",function(e){
+  var raw=e.target;
+  if(!raw)return;
+  var t=raw.nodeType===1?raw:raw.parentElement;
+  if(!t||!t.closest)return;
+  var copyBtn=t.closest("[data-action=\\"copy-code\\"]");
+  if(copyBtn){
+    e.preventDefault();
+    var block=copyBtn.closest('[data-block="code"]');
+    var code=block&&block.querySelector("code");
+    if(code){
+      var txt=code.innerText||"";
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).catch(function(){});
+      }
+      var prev=copyBtn.textContent;
+      copyBtn.textContent="Copied!";
+      copyBtn.style.color="#10B981";
+      copyBtn.style.borderColor="#10B981";
+      setTimeout(function(){
+        copyBtn.textContent=prev;
+        copyBtn.style.color="";
+        copyBtn.style.borderColor="";
+      },1800);
+    }
+    return;
+  }
+  var draftTab=t.closest("[data-action=\\"draft-tab\\"]");
+  if(draftTab){
+    e.preventDefault();
+    var w=draftTab.closest('[data-block="tabs"]');
+    if(!w)return;
+    var idx=draftTab.getAttribute("data-tab-idx");
+    w.querySelectorAll("[data-draft-panel]").forEach(function(p){
+      p.style.display=p.getAttribute("data-draft-panel")===idx?"block":"none";
+    });
+    w.querySelectorAll("[data-action=\\"draft-tab\\"]").forEach(function(b){
+      var on=b.getAttribute("data-tab-idx")===idx;
+      b.style.background=on?"#fff":"transparent";
+      b.style.boxShadow=on?"0 1px 2px rgba(0,0,0,0.06)":"none";
+      b.style.fontWeight=on?"600":"500";
+      b.style.color=on?"#37352F":"#7A7570";
+    });
+    return;
+  }
+  var cgTab=t.closest("[data-action=\\"cg-tab\\"]");
+  if(cgTab){
+    e.preventDefault();
+    var cg=cgTab.closest('[data-block="code-group"]');
+    if(!cg)return;
+    var ci=cgTab.getAttribute("data-cg-idx");
+    cg.querySelectorAll("[data-cg-panel]").forEach(function(p){
+      p.style.display=p.getAttribute("data-cg-panel")===ci?"block":"none";
+    });
+    cg.querySelectorAll("[data-action=\\"cg-tab\\"]").forEach(function(b){
+      var on=b.getAttribute("data-cg-idx")===ci;
+      b.style.background=on?"#fff":"transparent";
+      b.style.fontWeight=on?"700":"600";
+      b.style.color=on?"#37352F":"#6B6560";
+    });
+  }
+});
+})();`;
+
+const PREVIEW_TOGGLE_CSS = `
+    details[data-block="draft-toggle"] summary::-webkit-details-marker { display: none; }
+    details[data-block="draft-toggle"] summary { list-style: none; }
+    details[data-block="draft-toggle"] summary::marker { display: none; }
+    details[data-block="draft-toggle"] [data-toggle-chevron] {
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: 5px;
+      background: rgba(193,123,47,0.12); display: inline-flex;
+      align-items: center; justify-content: center;
+      transform: rotate(0deg); transition: transform 0.18s ease;
+    }
+    details[data-block="draft-toggle"] [data-toggle-chevron]::before {
+      content: ""; display: block; width: 0; height: 0;
+      border-style: solid; border-width: 5px 0 5px 7px;
+      border-color: transparent transparent transparent #6B6560;
+      margin-left: 2px;
+    }
+    details[data-block="draft-toggle"][open] [data-toggle-chevron] { transform: rotate(90deg); }
+    details[data-block="draft-toggle"] [data-toggle-grip] {
+      flex-shrink: 0; min-width: 22px; height: 22px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    details[data-block="draft-toggle"] [data-toggle-grip]::before {
+      content: "\\2026"; font-weight: 700; color: #A8A29E;
+      font-size: 15px; line-height: 1; letter-spacing: 0.02em;
+    }`;
+
 /* ─── Build a complete standalone HTML document with theme applied ─── */
 function buildThemedHTML(currentHTML = "", theme, title = "") {
 	if (!currentHTML.trim()) return "";
@@ -439,29 +647,114 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 			if (tag === "h2") return `<h2 style="${theme.h2}">${inner}</h2>\n`;
 			if (tag === "h3" || tag === "h4" || tag === "h5" || tag === "h6")
 				return `<h3 style="${theme.h3}">${inner}</h3>\n`;
-			if (tag === "blockquote")
+			if (tag === "blockquote") {
+				if (node.getAttribute("data-block") === "quote")
+					return `${cloneBlockHtmlForPreview(node)}\n`;
 				return `<blockquote style="${theme.blockquote}">${inner}</blockquote>\n`;
+			}
 			if (tag === "ul" || tag === "ol") {
+				const isTask =
+					node.getAttribute("data-todo") === "true" ||
+					node.getAttribute("data-type") === "taskList";
 				const items = Array.from(node.children)
 					.filter((n) => n.nodeName?.toLowerCase() === "li")
-					.map(
-						(li) =>
-							`<li style="${theme.li}">${parseInlineMarkdown(li.innerHTML || "")}</li>`,
-					)
+					.map((li) => {
+						if (isTask) {
+							const cb = li.querySelector('input[type="checkbox"]');
+							const checked = cb?.hasAttribute("checked") || cb?.checked;
+							const clone = li.cloneNode(true);
+							const rm = clone.querySelectorAll("input");
+							rm.forEach((n) => n.remove());
+							const innerLi = parseInlineMarkdown(clone.innerHTML || "");
+							const box = checked
+								? `<input type="checkbox" checked disabled style="margin:4px 8px 0 0;flex-shrink:0"/>`
+								: `<input type="checkbox" disabled style="margin:4px 8px 0 0;flex-shrink:0"/>`;
+							return `<li style="${theme.li};list-style:none;display:flex;align-items:flex-start;padding-left:0">${box}<span style="flex:1">${innerLi}</span></li>`;
+						}
+						return `<li style="${theme.li}">${parseInlineMarkdown(li.innerHTML || "")}</li>`;
+					})
 					.join("\n");
-				return `<${tag} style="padding-left:24px;margin:0 0 14px;">${items}</${tag}>\n`;
+				const listStyle = isTask
+					? "list-style:none;padding-left:0;margin:0 0 14px;"
+					: "padding-left:24px;margin:0 0 14px;";
+				return `<${tag} style="${listStyle}">${items}</${tag}>\n`;
 			}
 			if (tag === "pre")
 				return `<pre style="background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;">${node.textContent || ""}</pre>\n`;
 			if (tag === "hr") return `<hr style="${theme.hr}"/>\n`;
+			if (
+				tag === "figure" &&
+				node.getAttribute("data-draft-image-wrap") != null
+			) {
+				const img =
+					node.querySelector("img[data-draft-img]") ||
+					node.querySelector("img");
+				if (!img) return "";
+				const src = img.getAttribute("src") || "";
+				const alt = img.getAttribute("alt") || "";
+				const capEl = node.querySelector("[data-draft-caption]");
+				const captionHtml = capEl?.innerHTML?.trim()
+					? parseInlineMarkdown(capEl.innerHTML.trim())
+					: "";
+				const allowedFit = new Set([
+					"contain",
+					"cover",
+					"fill",
+					"scale-down",
+				]);
+				const fitRaw = (img.style.objectFit || "contain")
+					.trim()
+					.toLowerCase();
+				const fit = allowedFit.has(fitRaw) ? fitRaw : "contain";
+				const frame = node.querySelector("[data-draft-image-frame]");
+				let wPart = "width:100%;max-width:100%";
+				if (frame?.style?.width) {
+					wPart = `width:${frame.style.width};max-width:100%`;
+				}
+				let imgStyle = `width:100%;height:auto;display:block;border-radius:8px;object-fit:${fit};object-position:center`;
+				const minH = (img.style.minHeight || "").trim();
+				if (minH) imgStyle += `;min-height:${minH}`;
+				else if (fit === "cover") imgStyle += ";min-height:240px";
+				const capBlock = captionHtml
+					? `<figcaption style="margin-top:10px;font-size:12px;line-height:1.5;color:#7A7570;text-align:center;max-width:520px;margin-left:auto;margin-right:auto">${captionHtml}</figcaption>`
+					: "";
+				return `<figure style="margin:20px auto;text-align:center;max-width:100%"><div style="${wPart};margin-left:auto;margin-right:auto;border-radius:8px;overflow:hidden;line-height:0"><img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}" style="${imgStyle}"/></div>${capBlock}</figure>\n`;
+			}
+			if (tag === "figure") {
+				return Array.from(node.childNodes).map(processNode).join("");
+			}
 			if (tag === "img")
 				return `<img src="${node.getAttribute("src") || ""}" alt="${node.getAttribute("alt") || ""}" style="max-width:100%;height:auto;border-radius:6px;margin:12px 0;display:block;"/>\n`;
 			if (tag === "video") {
 				const src = node.getAttribute("src") || "";
 				return `<p style="margin:16px 0"><video src="${src}" controls style="max-width:100%;border-radius:8px;display:block;"></video></p>\n`;
 			}
-			if (tag === "br" || !text) return `<br/>\n`;
-			/* p, div, section, article → paragraph (preserve inner HTML including img/video) */
+			if (tag === "iframe") {
+				const src = node.getAttribute("src") || "";
+				return `<p style="${theme.p}"><iframe src="${src}" title="Embedded content" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="" style="max-width:100%;aspect-ratio:16/9;height:auto;min-height:200px;border:0;border-radius:8px;width:100%"></iframe></p>\n`;
+			}
+			if (tag === "table") return `${node.outerHTML}\n`;
+			if (tag === "div" && node.getAttribute("data-block"))
+				return `${cloneBlockHtmlForPreview(node)}\n`;
+			if (tag === "details" && node.getAttribute("data-block") === "draft-toggle")
+				return `${cloneBlockHtmlForPreview(node)}\n`;
+			if (tag === "p") {
+				const rawInner = node.innerHTML || "";
+				if (/<iframe\b/i.test(rawInner) || /<video\b/i.test(rawInner))
+					return `<p style="${theme.p}">${rawInner}</p>\n`;
+				return `<p style="${theme.p}">${inner}</p>\n`;
+			}
+			if (tag === "div") {
+				const frag = Array.from(node.childNodes).map(processNode).join("");
+				if (frag.trim()) return frag;
+				if (!text) return "";
+				return `<p style="${theme.p}">${inner}</p>\n`;
+			}
+			if (tag === "section" || tag === "article") {
+				return Array.from(node.childNodes).map(processNode).join("");
+			}
+			if (tag === "br") return `<br/>\n`;
+			if (!text) return "";
 			return `<p style="${theme.p}">${inner}</p>\n`;
 		};
 
@@ -496,6 +789,9 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
     hr{${theme.hr}}
     blockquote{${theme.blockquote}}
     pre{background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;}
+    iframe{display:block;max-width:100%;border:0;border-radius:8px;}
+    table{border-collapse:collapse;width:100%;margin:16px 0;}
+    ${PREVIEW_TOGGLE_CSS}
   </style>
 </head>
 <body>
@@ -503,8 +799,34 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
     ${title ? `<h1 style="${theme.h1}">${title}</h1>` : ""}
     ${body}
   </div>
+  <script>${PREVIEW_INTERACTION_SCRIPT}</script>
 </body>
 </html>`;
+}
+
+/** Clipboard helper: full themed HTML as a paste-ready React component (iframe embed). */
+function buildThemedReactSnippet(currentHTML = "", themeKey, title = "") {
+	const theme = THEMES[themeKey];
+	if (!theme) return "";
+	const htmlDoc = buildThemedHTML(currentHTML, theme, title);
+	if (!htmlDoc) return "";
+	const safeTitle = title || "Newsletter";
+	return `import React from "react";
+
+const THEME_HTML_DOC = ${JSON.stringify(htmlDoc)};
+
+/** Themed newsletter — paste into any React/Next.js app. */
+export default function ThemedNewsletterEmbed() {
+  return (
+    <iframe
+      title={${JSON.stringify(safeTitle)}}
+      srcDoc={THEME_HTML_DOC}
+      style={{ width: "100%", border: 0, minHeight: "100vh", display: "block" }}
+      sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+    />
+  );
+}
+`;
 }
 
 /* ─── Asset type labels ─── */
@@ -709,7 +1031,7 @@ const CALLOUT_CONFIGS = {
 		border: "#F59E0B",
 		bg: "#FFFBEB",
 		textColor: "#92400E",
-		label: "Warning",
+		label: "Callout",
 	},
 	success: {
 		emoji: "✅",
@@ -749,9 +1071,9 @@ function makeCodeBlockHtml(
 	code = "// Your code here",
 ) {
 	const lang = language.toLowerCase().trim() || "text";
-	const opts = LANG_OPTIONS.map(
+	const opts = LANG_OPTIONS?.map(
 		(l) =>
-			`<option value="${l}" ${l === lang ? "selected" : ""}>${l.charAt(0).to() + l.slice(1)}</option>`,
+			`<option value="${l}" ${l === lang ? "selected" : ""}>${l?.charAt(0).toLowerCase() + l.slice(1)}</option>`,
 	).join("");
 	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
 }
@@ -761,6 +1083,843 @@ function makeButtonBlockHtml(text = "Click here →", href = "#") {
 }
 
 const MAX_TABS = 5;
+
+const TODO_LI_STYLE =
+	"list-style:none;margin:4px 0;display:flex;align-items:flex-start;gap:10px;line-height:1.75";
+const TODO_CHECKBOX_STYLE =
+	"margin-top:4px;flex-shrink:0;width:1em;height:1em;accent-color:#37352F";
+const TODO_UL_STYLE = "list-style:none;padding-left:0;margin:8px 0";
+
+function todoLiStructureOk(li) {
+	const strayText = [...li.childNodes].some(
+		(n) => n.nodeType === 3 && (n.textContent || "").trim().length > 0,
+	);
+	if (strayText) return false;
+	const els = [...li.children];
+	if (els.length !== 2) return false;
+	if (els[0].tagName !== "INPUT" || els[0].type !== "checkbox") return false;
+	if (els[1].tagName !== "SPAN") return false;
+	return true;
+}
+
+/** Force checkbox → label order and classnames on todo list items (contenteditable-safe). */
+function normalizeTodoLists(root) {
+	if (!root) return;
+	for (const li of root.querySelectorAll('ul[data-todo="true"] > li')) {
+		if (todoLiStructureOk(li)) {
+			li.classList.add("todo-item");
+			li.children[0].classList.add("todo-cb");
+			li.children[1].classList.add("todo-label");
+			continue;
+		}
+		const oldCb = li.querySelector("input[type=checkbox]");
+		const checked = oldCb?.checked ?? false;
+		let label = li.querySelector("span.todo-label") || li.querySelector(":scope > span");
+		let text = label ? label.textContent || "" : "";
+		for (const n of [...li.childNodes]) {
+			if (n.nodeType === 3) text += n.textContent;
+			else if (n.nodeType === 1 && n !== oldCb && n !== label) {
+				text += n.textContent || "";
+			}
+		}
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.className = "todo-cb";
+		cb.setAttribute("style", TODO_CHECKBOX_STYLE);
+		cb.checked = checked;
+		const span = document.createElement("span");
+		span.className = "todo-label";
+		span.setAttribute("style", "flex:1;min-width:0");
+		const trimmed = text
+			.replace(/\u00a0/g, " ")
+			.replace(/\s+/g, " ")
+			.trim();
+		span.textContent = trimmed.length ? trimmed : "\u00a0";
+		li.replaceChildren(cb, span);
+		li.classList.add("todo-item");
+	}
+}
+
+function getDraftBlockFromSelection(editorRoot, range) {
+	if (!editorRoot || !range) return null;
+	let n = range.commonAncestorContainer;
+	if (n.nodeType === 3) n = n.parentElement;
+	const block = n?.closest?.("p,h1,h2,h3,h4,li,blockquote,div[data-block]");
+	if (!block || !editorRoot.contains(block)) return null;
+	return block;
+}
+
+function getTextFromBlockStartToCaret(block, range) {
+	const pre = document.createRange();
+	pre.selectNodeContents(block);
+	pre.setEnd(range.endContainer, range.endOffset);
+	return pre.toString();
+}
+
+function unwrapDraftSlashQuerySpan(span) {
+	const parent = span.parentNode;
+	if (!parent) return;
+	while (span.firstChild) parent.insertBefore(span.firstChild, span);
+	parent.removeChild(span);
+}
+
+function unwrapAllDraftSlashQuerySpans(root) {
+	if (!root) return;
+	root.querySelectorAll("span[data-draft-slash-query]").forEach(unwrapDraftSlashQuerySpan);
+}
+
+function stripDraftSlashQueryFromHtmlString(html) {
+	if (!html || typeof document === "undefined") return html || "";
+	const d = document.createElement("div");
+	d.innerHTML = html;
+	unwrapAllDraftSlashQuerySpans(d);
+	return d.innerHTML;
+}
+
+function getCaretCharOffsetInBlock(block, range) {
+	if (!block || !range) return 0;
+	const pre = document.createRange();
+	pre.selectNodeContents(block);
+	pre.setEnd(range.endContainer, range.endOffset);
+	return pre.toString().length;
+}
+
+function setCaretCharOffsetInBlock(block, offset) {
+	if (!block || offset < 0) return;
+	let acc = 0;
+	let node = null;
+	let off = 0;
+	const walk = (n) => {
+		if (node) return true;
+		if (n.nodeType === Node.TEXT_NODE) {
+			const len = (n.textContent || "").length;
+			if (acc + len >= offset) {
+				node = n;
+				off = Math.min(offset - acc, len);
+				return true;
+			}
+			acc += len;
+			return false;
+		}
+		for (const c of n.childNodes) {
+			if (walk(c)) return true;
+		}
+		return false;
+	};
+	walk(block);
+	if (!node) return;
+	try {
+		const r = document.createRange();
+		r.setStart(node, off);
+		r.collapse(true);
+		const sel = window.getSelection();
+		sel.removeAllRanges();
+		sel.addRange(r);
+	} catch {
+		/* ignore */
+	}
+}
+
+/** Highlight `/query` (no spaces) so users see command mode; spans stripped before save. */
+function syncDraftSlashQueryHighlight(editorRoot) {
+	const sel = window.getSelection();
+	if (!editorRoot || !sel?.rangeCount || !sel.isCollapsed) {
+		unwrapAllDraftSlashQuerySpans(editorRoot);
+		return;
+	}
+	let range = sel.getRangeAt(0);
+	const block = getDraftBlockFromSelection(editorRoot, range);
+	if (!block) {
+		unwrapAllDraftSlashQuerySpans(editorRoot);
+		return;
+	}
+	if (
+		block.closest?.(
+			"pre, code, summary, [contenteditable='false']",
+		)
+	) {
+		unwrapAllDraftSlashQuerySpans(editorRoot);
+		return;
+	}
+
+	const caretOffset = getCaretCharOffsetInBlock(block, range);
+	const textBefore = getTextFromBlockStartToCaret(block, range);
+	const slash = matchDraftSlashQuery(textBefore);
+
+	block.querySelectorAll("span[data-draft-slash-query]").forEach(unwrapDraftSlashQuerySpan);
+
+	if (!slash) {
+		setCaretCharOffsetInBlock(block, caretOffset);
+		return;
+	}
+
+	setCaretCharOffsetInBlock(block, caretOffset);
+	if (!window.getSelection()?.rangeCount) return;
+	range = window.getSelection().getRangeAt(0);
+	const text2 = getTextFromBlockStartToCaret(block, range);
+	const slash2 = matchDraftSlashQuery(text2);
+	if (!slash2) return;
+
+	const slashLen = slash2.slashToken.length;
+	const fullLen = text2.length;
+	const startChar = fullLen - slashLen;
+	if (startChar < 0) return;
+
+	let acc = 0;
+	let startNode = null;
+	let startOffset = 0;
+	const walkStart = (node) => {
+		if (startNode) return true;
+		if (node.nodeType === Node.TEXT_NODE) {
+			const t = (node.textContent || "").length;
+			if (acc + t >= startChar) {
+				startNode = node;
+				startOffset = Math.max(0, startChar - acc);
+				return true;
+			}
+			acc += t;
+			return false;
+		}
+		for (const c of node.childNodes) {
+			if (walkStart(c)) return true;
+		}
+		return false;
+	};
+	walkStart(block);
+	if (!startNode) return;
+
+	const wrapRange = document.createRange();
+	wrapRange.setStart(startNode, startOffset);
+	wrapRange.setEnd(range.endContainer, range.endOffset);
+
+	const span = document.createElement("span");
+	span.setAttribute("data-draft-slash-query", "");
+	span.style.background = "rgba(193, 123, 47, 0.18)";
+	span.style.borderRadius = "4px";
+	span.style.padding = "0 3px";
+	span.style.boxDecorationBreak = "clone";
+	span.style.webkitBoxDecorationBreak = "clone";
+
+	try {
+		wrapRange.surroundContents(span);
+	} catch {
+		const contents = wrapRange.extractContents();
+		while (contents.firstChild) span.appendChild(contents.firstChild);
+		wrapRange.insertNode(span);
+	}
+
+	try {
+		const endR = document.createRange();
+		endR.selectNodeContents(span);
+		endR.collapse(false);
+		sel.removeAllRanges();
+		sel.addRange(endR);
+	} catch {
+		/* ignore */
+	}
+}
+
+function matchDraftSlashQuery(text) {
+	const m = text.match(/\/([^\s]*)$/);
+	if (!m) return null;
+	const slashIdx = text.length - m[0].length;
+	const prevCh = slashIdx > 0 ? text.charAt(slashIdx - 1) : "";
+	const okSlash =
+		slashIdx === 0 || /\s/.test(prevCh) || !/\w/.test(prevCh);
+	if (!okSlash) return null;
+	return { query: m[1] || "", slashToken: m[0] };
+}
+
+function deleteDraftSlashToken(block, range, slashLen) {
+	const caretOffset = getCaretCharOffsetInBlock(block, range);
+	unwrapAllDraftSlashQuerySpans(block);
+	setCaretCharOffsetInBlock(block, caretOffset);
+	const sel = window.getSelection();
+	if (!sel?.rangeCount) return;
+	range = sel.getRangeAt(0);
+
+	const pre = document.createRange();
+	pre.selectNodeContents(block);
+	pre.setEnd(range.endContainer, range.endOffset);
+	const fullLen = pre.toString().length;
+	const startChar = fullLen - slashLen;
+	if (startChar < 0) return;
+
+	let acc = 0;
+	let startNode = null;
+	let startOffset = 0;
+
+	const walk = (node) => {
+		if (startNode) return true;
+		if (node.nodeType === 3) {
+			const t = node.textContent.length;
+			if (acc + t >= startChar) {
+				startNode = node;
+				startOffset = Math.max(0, startChar - acc);
+				return true;
+			}
+			acc += t;
+			return false;
+		}
+		for (const c of node.childNodes) {
+			if (walk(c)) return true;
+		}
+		return false;
+	};
+	walk(block);
+	if (!startNode) return;
+
+	const del = document.createRange();
+	del.setStart(startNode, startOffset);
+	del.setEnd(range.endContainer, range.endOffset);
+	del.deleteContents();
+}
+
+/** Remove trailing empty paragraph TipTap-style suffix from block HTML when replacing a line. */
+function stripTrailingEmptyParagraphSuffix(html = "") {
+	return html
+		.replace(/<p>\s*<br\s*\/?>\s*<\/p>\s*$/i, "")
+		.replace(/<p>\s*&nbsp;\s*<\/p>\s*$/i, "")
+		.trim();
+}
+
+/**
+ * After deleting `/command`, if the block is empty, replace it with parsed HTML; otherwise insert at caret.
+ */
+function insertDraftRichBlock(editorEl, htmlWithOptionalTrailingP) {
+	if (!editorEl) return;
+	editorEl.focus();
+	const sel = typeof window !== "undefined" ? window.getSelection() : null;
+	if (!sel?.rangeCount) {
+		document.execCommand("insertHTML", false, htmlWithOptionalTrailingP);
+		return;
+	}
+	let range = sel.getRangeAt(0);
+	let block = getDraftBlockFromSelection(editorEl, range);
+	if (block) {
+		const text = getTextFromBlockStartToCaret(block, range);
+		const slash = matchDraftSlashQuery(text);
+		if (slash) {
+			deleteDraftSlashToken(block, range, slash.slashToken.length);
+			const sel2 = window.getSelection();
+			if (sel2?.rangeCount) {
+				range = sel2.getRangeAt(0);
+				block = getDraftBlockFromSelection(editorEl, range);
+			}
+		}
+	}
+	const remains = (block?.innerText || "")
+		.replace(/\u00a0/g, " ")
+		.replace(/\u200b/g, "")
+		.trim();
+	const tag = block?.tagName?.toLowerCase();
+	const canReplaceLine =
+		block &&
+		!remains &&
+		["p", "h1", "h2", "h3", "h4"].includes(tag) &&
+		!block.closest?.("li, td, th, blockquote");
+	if (canReplaceLine) {
+		const inner = stripTrailingEmptyParagraphSuffix(htmlWithOptionalTrailingP);
+		const container = document.createElement("div");
+		container.innerHTML = inner;
+		const parent = block.parentNode;
+		if (!parent) return;
+		const toInsert = Array.from(container.childNodes);
+		for (const n of toInsert) parent.insertBefore(n, block);
+		parent.removeChild(block);
+		const root = toInsert[0];
+		const pre =
+			root?.nodeType === 1 && root.hasAttribute?.("data-block")
+				? root.querySelector("pre[contenteditable]")
+				: null;
+		try {
+			const r = document.createRange();
+			const sel2 = window.getSelection();
+			if (!sel2) return;
+			if (pre && pre.firstChild) {
+				r.setStart(pre.firstChild, 0);
+				r.collapse(true);
+			} else if (pre) {
+				r.selectNodeContents(pre);
+				r.collapse(true);
+			} else if (root?.nodeType === 1) {
+				const ph =
+					root.querySelector(
+						"summary span[style*='flex'], [data-draft-panel] p, p",
+					) || root;
+				r.selectNodeContents(ph);
+				r.collapse(true);
+			} else {
+				r.setStart(parent, 0);
+				r.collapse(true);
+			}
+			sel2.removeAllRanges();
+			sel2.addRange(r);
+		} catch {
+			editorEl.focus();
+		}
+		return;
+	}
+	document.execCommand("insertHTML", false, htmlWithOptionalTrailingP);
+}
+
+function deleteDraftSlashFromCaret(editorEl) {
+	const sel = typeof window !== "undefined" ? window.getSelection() : null;
+	if (!editorEl || !sel?.rangeCount) return;
+	const range = sel.getRangeAt(0);
+	const block = getDraftBlockFromSelection(editorEl, range);
+	if (!block) return;
+	const text = getTextFromBlockStartToCaret(block, range);
+	const slash = matchDraftSlashQuery(text);
+	if (slash) deleteDraftSlashToken(block, range, slash.slashToken.length);
+}
+
+function youtubeIdFromUrl(raw) {
+	try {
+		const u = String(raw || "").trim();
+		if (!u) return null;
+		const tryUrl = new URL(u.includes("://") ? u : `https://${u}`);
+		const host = tryUrl.hostname.replace(/^www\./, "");
+		if (host === "youtu.be") {
+			const id = tryUrl.pathname.replace(/^\//, "").split("/")[0];
+			return id || null;
+		}
+		if (host.includes("youtube.com")) {
+			const v = tryUrl.searchParams.get("v");
+			if (v) return v;
+			const embed = tryUrl.pathname.match(/\/embed\/([^/]+)/);
+			if (embed) return embed[1];
+			const shorts = tryUrl.pathname.match(/\/shorts\/([^/]+)/);
+			if (shorts) return shorts[1];
+		}
+	} catch {
+		/* ignore */
+	}
+	return null;
+}
+
+function makeEmbedIframeHtml(videoId) {
+	if (!videoId) return "";
+	const src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`;
+	return `<p style="margin:16px 0"><iframe src="${src}" width="560" height="315" style="max-width:100%;aspect-ratio:16/9;height:auto;min-height:200px;border:0;border-radius:8px" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></p>`;
+}
+
+function escapeAttr(s) {
+	return String(s ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/</g, "&lt;");
+}
+
+/** Figure wrapper: caption, object-fit & width via ⋮ menu (editor only chrome stripped on export). */
+function makeDraftImageFigureHtml(src) {
+	const safe = escapeAttr(src);
+	const mb =
+		"display:block;width:100%;text-align:left;padding:8px 10px;border:none;background:transparent;border-radius:8px;font-size:13px;cursor:pointer;color:#37352F;font-family:inherit;font-weight:500";
+	const mh = "font-size:10px;font-weight:700;color:#B0AAA3;letter-spacing:0.06em;padding:6px 10px 4px;text-transform:uppercase";
+	const div =
+		"position:absolute;right:0;top:100%;margin-top:6px;min-width:200px;background:#fff;border:1px solid #E8E4DC;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,0.14);padding:6px;z-index:20;text-align:left";
+	return `<figure data-draft-image-wrap="true" style="margin:18px auto 14px;text-align:center;max-width:100%"><div contenteditable="false" data-draft-image-inner style="position:relative;display:inline-block;max-width:100%;vertical-align:top"><details data-draft-img-popover style="position:absolute;top:6px;right:6px;z-index:6;margin:0"><summary style="list-style:none;cursor:pointer;width:32px;height:32px;border-radius:10px;background:rgba(45,43,40,0.88);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:20px;line-height:1;user-select:none;box-shadow:0 2px 10px rgba(0,0,0,0.18)">⋮</summary><div data-draft-img-menu style="${div}"><p style="${mh}">Object fit</p><button type="button" data-draft-img-fit="contain" style="${mb}">Contain</button><button type="button" data-draft-img-fit="cover" style="${mb}">Cover</button><button type="button" data-draft-img-fit="fill" style="${mb}">Fill</button><button type="button" data-draft-img-fit="scale-down" style="${mb}">Scale down</button><div style="height:1px;background:#E8E4DC;margin:6px 4px"></div><p style="${mh}">Width</p><button type="button" data-draft-img-size="100" style="${mb}">Full width</button><button type="button" data-draft-img-size="85" style="${mb}">Large — 85%</button><button type="button" data-draft-img-size="70" style="${mb}">Medium — 70%</button><button type="button" data-draft-img-size="50" style="${mb}">Small — 50%</button></div></details><div data-draft-image-frame style="width:100%;max-width:min(100%,720px);margin:0 auto;border-radius:10px;overflow:hidden;line-height:0"><img src="${safe}" alt="" data-draft-img="" style="width:100%;height:auto;max-height:75vh;display:block;object-fit:contain;object-position:center;vertical-align:middle;border-radius:10px"/></div></div><figcaption contenteditable="true" data-draft-caption="" data-placeholder="Add a caption…" style="margin-top:10px;font-size:12px;line-height:1.45;color:#7A7570;text-align:center;max-width:520px;margin-left:auto;margin-right:auto;outline:none;min-height:1.35em"></figcaption></figure><p><br></p>`;
+}
+
+function makeSimpleTableHtml() {
+	const cell =
+		"border:1px solid #e4e4e7;padding:16px 18px;line-height:1.85;min-height:3.5em;vertical-align:top;box-sizing:border-box;font-size:inherit;color:#37352F";
+	const th =
+		cell +
+		";background:#f7f6f3;font-weight:600;text-align:left;color:#27272a";
+	return `<table style="width:100%;border-collapse:collapse;border:1px solid #e4e4e7;margin:16px 0;table-layout:fixed"><thead><tr><th style="${th}">&nbsp;</th><th style="${th}">&nbsp;</th><th style="${th}">&nbsp;</th></tr></thead><tbody><tr><td style="${cell}">&nbsp;</td><td style="${cell}">&nbsp;</td><td style="${cell}">&nbsp;</td></tr><tr><td style="${cell}">&nbsp;</td><td style="${cell}">&nbsp;</td><td style="${cell}">&nbsp;</td></tr></tbody></table><p><br></p>`;
+}
+
+function makeDraftQuoteHtml() {
+	return `<blockquote data-block="quote" style="margin:18px 0;padding:16px 20px 16px 22px;border-left:4px solid #C17B2F;background:linear-gradient(90deg,#FAF8F5 0%,#FFFFFF 72%);border-radius:0 10px 10px 0;box-shadow:0 1px 3px rgba(55,53,47,0.06)"><p style="margin:0;color:#45403A;font-size:15px;line-height:1.75;font-style:italic">Your quote goes here.</p></blockquote><p><br></p>`;
+}
+
+/** Self-contained switcher for copied HTML; pairs with PREVIEW_INTERACTION_SCRIPT in the editor. */
+const DRAFT_TAB_BUTTON_ONCLICK = `(function(btn){var w=btn.closest("[data-block=\\"tabs\\"]");if(!w)return;var i=btn.getAttribute("data-tab-idx");w.querySelectorAll("[data-draft-panel]").forEach(function(p){p.style.display=p.getAttribute("data-draft-panel")===i?"block":"none";});w.querySelectorAll("[data-action=\\"draft-tab\\"]").forEach(function(b){var on=b.getAttribute("data-tab-idx")===i;b.style.background=on?"#fff":"transparent";b.style.boxShadow=on?"0 1px 2px rgba(0,0,0,0.06)":"none";b.style.fontWeight=on?"600":"500";b.style.color=on?"#37352F":"#7A7570";});})(this)`;
+
+const DRAFT_CODEGROUP_TAB_ONCLICK = `(function(btn){var w=btn.closest("[data-block=\\"code-group\\"]");if(!w)return;var i=btn.getAttribute("data-cg-idx");w.querySelectorAll("[data-cg-panel]").forEach(function(p){p.style.display=p.getAttribute("data-cg-panel")===i?"block":"none";});w.querySelectorAll("[data-action=\\"cg-tab\\"]").forEach(function(b){var on=b.getAttribute("data-cg-idx")===i;b.style.background=on?"#fff":"transparent";b.style.fontWeight=on?"700":"600";b.style.color=on?"#37352F":"#6B6560";});})(this)`;
+
+function makeDraftDividerHtml() {
+	return `<hr style="border:none;border-top:1px solid #E8E4DC;margin:20px 0" /><p><br></p>`;
+}
+
+function makeDraftTabsHtml() {
+	return `<div data-block="tabs" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;background:#FAFAF8;overflow:hidden"><div contenteditable="false" style="display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid #E8E4DC;background:#F3EFE8;user-select:none;flex-wrap:wrap"><button type="button" data-action="draft-tab" data-tab-idx="0" onclick="${DRAFT_TAB_BUTTON_ONCLICK}" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.06);font-size:12px;font-weight:600;color:#37352F;cursor:pointer">Tab 1</button><button type="button" data-action="draft-tab" data-tab-idx="1" onclick="${DRAFT_TAB_BUTTON_ONCLICK}" style="padding:6px 12px;border:none;border-radius:8px;background:transparent;font-size:12px;font-weight:500;color:#7A7570;cursor:pointer">Tab 2</button></div><div data-draft-tab-panels><div data-draft-panel="0" style="padding:12px 14px;display:block;min-height:48px"><p><br></p></div><div data-draft-panel="1" style="padding:12px 14px;display:none;min-height:48px"><p><br></p></div></div></div><p><br></p>`;
+}
+
+function makeDraftCodeGroupHtml() {
+	const preStyle =
+		"background:#1A1A1A;margin:0;padding:16px 18px;overflow-x:auto;min-height:72px;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;color:#E8D5B0;white-space:pre-wrap;outline:none;border:none;display:block;width:100%;box-sizing:border-box";
+	return `<div data-block="code-group" style="margin:16px 0;border:1px solid #E8E4DC;border-radius:10px;overflow:hidden"><div contenteditable="false" style="display:flex;gap:4px;padding:6px 8px;background:#F0ECE5;border-bottom:1px solid #E8E4DC;user-select:none"><button type="button" data-action="cg-tab" data-cg-idx="0" onclick="${DRAFT_CODEGROUP_TAB_ONCLICK}" style="padding:5px 10px;border:none;border-radius:6px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#37352F">Snippet 1</button><button type="button" data-action="cg-tab" data-cg-idx="1" onclick="${DRAFT_CODEGROUP_TAB_ONCLICK}" style="padding:5px 10px;border:none;border-radius:6px;background:transparent;font-size:11px;font-weight:600;cursor:pointer;color:#6B6560">Snippet 2</button></div><div data-cg-panel="0" style="display:block"><pre contenteditable="true" style="${preStyle}">// Snippet 1</pre></div><div data-cg-panel="1" style="display:none"><pre contenteditable="true" style="${preStyle}">// Snippet 2</pre></div></div><p><br></p>`;
+}
+
+function makeDraftToggleHtml() {
+	return `<details data-block="draft-toggle" style="margin:16px 0;border:1px solid #E8E4DC;border-radius:10px;padding:0;overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(55,53,47,0.06)"><summary style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:#F7F5F0;color:#37352F;list-style:none;outline:none;user-select:none;-webkit-user-select:none"><span contenteditable="false" data-toggle-chevron></span><span style="flex:1;font-weight:600">Toggle</span><span contenteditable="false" data-toggle-grip title=""></span></summary><div style="padding:14px 18px 18px;border-top:1px solid #E8E4DC;background:#fff"><p style="margin:0"><br></p></div></details><p><br></p>`;
+}
+
+function draftSlashItemMatchesQuery(item, query) {
+	if (!query) return true;
+	const q = query.toLowerCase();
+	if ((item.label || "").toLowerCase().includes(q)) return true;
+	if ((item.id || "").toLowerCase().includes(q)) return true;
+	return item.keywords?.some((k) => (k || "").toLowerCase().includes(q)) ?? false;
+}
+
+function measureDraftSlashCoords(range, editorFallbackEl, editorFontSize) {
+	let rect = range.getBoundingClientRect();
+	if (
+		(rect.width === 0 && rect.height === 0) ||
+		(rect.left === 0 && rect.top === 0)
+	) {
+		const cr = range.getClientRects();
+		if (cr.length > 0) rect = cr[0];
+		else if (editorFallbackEl) {
+			const er = editorFallbackEl.getBoundingClientRect();
+			rect = {
+				left: er.left + 48,
+				top: er.top + 36,
+				width: 0,
+				height: editorFontSize * 1.75,
+				bottom: er.top + 36 + editorFontSize * 1.75,
+				right: er.left + 48,
+			};
+		}
+	}
+	return {
+		x: Math.max(12, Math.min(rect.left, window.innerWidth - 280)),
+		y: rect.bottom + 6,
+	};
+}
+
+/** Prefer the highlighted slash-query span so the menu sits below typed /filter text. */
+function measureDraftSlashMenuPosition(
+	block,
+	range,
+	editorFallbackEl,
+	editorFontSize,
+) {
+	if (!block || !range) return null;
+	const span = block.querySelector("[data-draft-slash-query]");
+	if (span) {
+		const rect = span.getBoundingClientRect();
+		return {
+			x: Math.max(12, Math.min(rect.left, window.innerWidth - 280)),
+			y: rect.bottom + 6,
+		};
+	}
+	return measureDraftSlashCoords(range, editorFallbackEl, editorFontSize);
+}
+
+/** Find enclosing <a href> for the current selection (for toolbar link field). */
+function getSelectionLinkContext(sel) {
+	if (!sel?.rangeCount) return { href: "", anchor: null, collapsed: false };
+	try {
+		const range = sel.getRangeAt(0);
+		let node = range.commonAncestorContainer;
+		if (node.nodeType === 3) node = node.parentElement;
+		const anchor = node?.closest?.("a[href]") || null;
+		return {
+			href: (anchor?.getAttribute("href") || "").trim(),
+			anchor,
+			collapsed: range.collapsed,
+		};
+	} catch {
+		return { href: "", anchor: null, collapsed: false };
+	}
+}
+
+const DRAFT_BUBBLE_INLINE = "data-draft-inline";
+
+function getDraftBubbleBlock(editorRoot, node) {
+	if (!editorRoot || !node) return null;
+	let n = node;
+	if (n.nodeType === 3) n = n.parentElement;
+	const block = n?.closest?.(
+		"p,h1,h2,h3,h4,li,blockquote,div[data-block],td,th",
+	);
+	if (!block || !editorRoot.contains(block)) return null;
+	return block;
+}
+
+function draftSelectionSpansMultipleBlocks(editorRoot, range) {
+	const a = getDraftBubbleBlock(editorRoot, range.startContainer);
+	const b = getDraftBubbleBlock(editorRoot, range.endContainer);
+	return Boolean(a && b && a !== b);
+}
+
+function unwrapDraftInlineSpan(span) {
+	const parent = span.parentNode;
+	if (!parent) return;
+	while (span.firstChild) parent.insertBefore(span.firstChild, span);
+	parent.removeChild(span);
+}
+
+/**
+ * Wrap selection in span[data-draft-inline] with explicit color / background-color
+ * so formatting wins over inherited editor styles (contenteditable color, etc.).
+ * Returns false if skipped (e.g. cross-block) so caller can fall back to execCommand.
+ */
+function applyDraftBubbleInlineStyle(editorEl, patch) {
+	const sel = typeof window !== "undefined" ? window.getSelection() : null;
+	if (!sel?.rangeCount || !editorEl) return false;
+	const range = sel.getRangeAt(0);
+	if (range.collapsed) return false;
+	if (!editorEl.contains(range.commonAncestorContainer)) return false;
+	if (draftSelectionSpansMultipleBlocks(editorEl, range)) return false;
+
+	try {
+		const frag = range.extractContents();
+		let span;
+		const first = frag.firstChild;
+		const singleOurSpan =
+			frag.childNodes.length === 1 &&
+			first?.nodeType === 1 &&
+			first.tagName === "SPAN" &&
+			first.getAttribute(DRAFT_BUBBLE_INLINE) === "";
+		if (singleOurSpan) {
+			span = first;
+		} else {
+			span = editorEl.ownerDocument.createElement("span");
+			span.setAttribute(DRAFT_BUBBLE_INLINE, "");
+			span.appendChild(frag);
+		}
+
+		if ("color" in patch) {
+			if (patch.color)
+				span.style.setProperty("color", patch.color);
+			else span.style.removeProperty("color");
+		}
+		if ("backgroundColor" in patch) {
+			if (patch.backgroundColor)
+				span.style.setProperty("background-color", patch.backgroundColor);
+			else span.style.removeProperty("background-color");
+		}
+
+		range.insertNode(span);
+
+		const hasColor = Boolean(
+			span.style.color && span.style.getPropertyValue("color") !== "",
+		);
+		const hasBg = Boolean(
+			span.style.backgroundColor &&
+				span.style.getPropertyValue("background-color") !== "",
+		);
+		if (!hasColor && !hasBg) {
+			unwrapDraftInlineSpan(span);
+			sel.removeAllRanges();
+			return true;
+		}
+
+		sel.removeAllRanges();
+		const nr = editorEl.ownerDocument.createRange();
+		nr.selectNodeContents(span);
+		sel.addRange(nr);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function execDraftForeColor(hex) {
+	try {
+		document.execCommand("styleWithCSS", false, true);
+	} catch {
+		/* ignore */
+	}
+	document.execCommand("foreColor", false, hex);
+}
+
+function execDraftHiliteColor(hex) {
+	try {
+		document.execCommand("styleWithCSS", false, true);
+	} catch {
+		/* ignore */
+	}
+	document.execCommand("hiliteColor", false, hex);
+}
+
+/** Slash menu rows (filter by query after `/`, no spaces in query). */
+const DRAFT_SLASH_BASE_ITEMS = [
+	{
+		id: "text",
+		label: "Text",
+		icon: "T",
+		section: "style",
+		keywords: ["text", "paragraph", "p", "plain", "body"],
+	},
+	{
+		id: "h1",
+		label: "Heading 1",
+		icon: "H₁",
+		section: "style",
+		keywords: ["h1", "heading", "title", "one", "1"],
+	},
+	{
+		id: "h2",
+		label: "Heading 2",
+		icon: "H₂",
+		section: "style",
+		keywords: ["h2", "heading", "two", "subtitle", "2"],
+	},
+	{
+		id: "h3",
+		label: "Heading 3",
+		icon: "H₃",
+		section: "style",
+		keywords: ["h3", "heading", "three", "3"],
+	},
+	{
+		id: "bullet",
+		label: "Bullet List",
+		icon: "list",
+		section: "style",
+		keywords: ["bullet", "ul", "unordered", "list"],
+	},
+	{
+		id: "numbered",
+		label: "Numbered List",
+		icon: "list",
+		section: "style",
+		keywords: ["numbered", "ordered", "ol", "list"],
+	},
+	{
+		id: "todo",
+		label: "To-do list",
+		icon: "☐",
+		section: "style",
+		keywords: [
+			"todo",
+			"task",
+			"check",
+			"list",
+			"checkout",
+			"checkbox",
+			"checklist",
+		],
+	},
+	{
+		id: "quote",
+		label: "Quote",
+		icon: "❝",
+		section: "style",
+		keywords: ["quote", "blockquote", "pull", "bq"],
+	},
+	{
+		id: "image",
+		label: "Image",
+		icon: "image",
+		section: "blocks",
+		keywords: ["image", "img", "photo", "picture", "upload"],
+	},
+	{
+		id: "table",
+		label: "Table",
+		icon: "table",
+		section: "blocks",
+		keywords: ["table", "grid", "rows", "sheet", "csv"],
+	},
+	{
+		id: "embed",
+		label: "Embed (YouTube)",
+		icon: "embed",
+		section: "blocks",
+		keywords: ["embed", "youtube", "video", "iframe", "movie"],
+	},
+	{
+		id: "divider",
+		label: "Divider",
+		icon: "—",
+		section: "blocks",
+		keywords: ["divider", "horizontal", "hr", "rule", "separator", "---"],
+	},
+	{
+		id: "code",
+		label: "Code block",
+		icon: "{ }",
+		section: "blocks",
+		keywords: ["code", "codeblock", "snippet", "pre", "program"],
+	},
+	{
+		id: "codeGroup",
+		label: "Code group",
+		icon: "▤",
+		section: "blocks",
+		keywords: ["codegroup", "code group", "snippets", "multi", "gist"],
+	},
+	{
+		id: "tabs",
+		label: "Tabs",
+		icon: "▦",
+		section: "blocks",
+		keywords: ["tabs", "tab", "panels", "tabgroup"],
+	},
+	{
+		id: "toggle",
+		label: "Toggle",
+		icon: "▸",
+		section: "blocks",
+		keywords: ["toggle", "details", "collapse", "accordion", "disclosure"],
+	},
+	{
+		id: "callout-info",
+		label: "Info callout",
+		icon: "ℹ️",
+		section: "blocks",
+		keywords: ["info", "information", "note", "blue", "tip"],
+	},
+	{
+		id: "callout-warning",
+		label: "Callout",
+		icon: "⚠️",
+		section: "blocks",
+		keywords: ["callout", "warning", "caution", "yellow", "attention"],
+	},
+	{
+		id: "callout-success",
+		label: "Success callout",
+		icon: "✅",
+		section: "blocks",
+		keywords: ["success", "done", "green", "check", "positive"],
+	},
+	{
+		id: "callout-danger",
+		label: "Danger callout",
+		icon: "🚨",
+		section: "blocks",
+		keywords: ["danger", "error", "red", "alert", "critical", "block"],
+	},
+	{
+		id: "date",
+		label: "Date",
+		icon: "📅",
+		section: "blocks",
+		keywords: ["date", "today", "calendar", "time"],
+	},
+];
+
+const DRAFT_SLASH_AI_KEYWORDS = ["ai", "ask", "chat", "gpt", "assistant", "magic"];
+
+function getDraftSlashFlatRows(query) {
+	const q = (query ?? "").trim().toLowerCase();
+	const rows = [];
+	const aiHit = draftSlashItemMatchesQuery(
+		{ id: "ask-ai", label: "Ask AI", keywords: DRAFT_SLASH_AI_KEYWORDS },
+		q,
+	);
+	if (aiHit) rows.push({ id: "ask-ai" });
+	for (const it of DRAFT_SLASH_BASE_ITEMS) {
+		if (it.section === "style" && draftSlashItemMatchesQuery(it, q)) {
+			rows.push({ id: it.id });
+		}
+	}
+	for (const it of DRAFT_SLASH_BASE_ITEMS) {
+		if (it.section === "blocks" && draftSlashItemMatchesQuery(it, q)) {
+			rows.push({ id: it.id });
+		}
+	}
+	return rows;
+}
 
 /* ─── Draft Page ─── */
 export default function DraftPage() {
@@ -840,7 +1999,7 @@ export default function DraftPage() {
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
-	const [copiedTheme, setCopiedTheme] = useState(null);
+	const [copiedTheme, setCopiedTheme] = useState(null); // { key, format: 'html' | 'react' }
 	const [previewTheme, setPreviewTheme] = useState("ink");
 	const [infographicsOpen, setInfographicsOpen] = useState(false);
 	const [chatOpen, setChatOpen] = useState(false);
@@ -849,17 +2008,53 @@ export default function DraftPage() {
 	const [imageUrlInput, setImageUrlInput] = useState("");
 	const [imageUploading, setImageUploading] = useState(false);
 	const [selectionDropdown, setSelectionDropdown] = useState(null);
+	const [selectionSubtool, setSelectionSubtool] = useState(null);
+	const [selectionLinkUrl, setSelectionLinkUrl] = useState("");
+	const selectionSavedRangeRef = useRef(null);
+	const selectionLinkInputRef = useRef(null);
 	const [selectionContext, setSelectionContext] = useState("");
 	const [slashCommand, setSlashCommand] = useState(null);
+	const slashCommandRef = useRef(null);
+	slashCommandRef.current = slashCommand;
+	const [slashListIndex, setSlashListIndex] = useState(0);
+	const slashListIndexRef = useRef(0);
+	slashListIndexRef.current = slashListIndex;
+	const [draftImageModalOpen, setDraftImageModalOpen] = useState(false);
+	const [draftImageModalUrl, setDraftImageModalUrl] = useState("");
+	const [draftSlashDatePickerPos, setDraftSlashDatePickerPos] = useState(null);
 	const [previewOpen, setPreviewOpen] = useState(false);
-	const [previewData, setPreviewData] = useState({ title: "", htmlDoc: "" });
+	const [previewCopied, setPreviewCopied] = useState(null);
+	const [previewExportOpen, setPreviewExportOpen] = useState(false);
+	const previewExportRef = useRef(null);
+	const [previewData, setPreviewData] = useState({
+		title: "",
+		htmlDoc: "",
+		markdown: "",
+		reactSnippet: "",
+	});
 	const [editorFont, setEditorFont] = useState("Outfit");
 	const [editorFontSize, setEditorFontSize] = useState(15);
 	const [localTableData, setLocalTableData] = useState(null);
 	const editorRef = useRef(null);
 	const titleRef = useRef(null);
 	const imageFileInputRef = useRef(null);
+	const handleSlashCommandRef = useRef(() => {});
 	const editorContainerRef = useRef(null);
+
+	useEffect(() => {
+		if (!previewExportOpen) return;
+		const onDown = (e) => {
+			if (!previewExportRef.current?.contains(e.target)) {
+				setPreviewExportOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", onDown);
+		return () => document.removeEventListener("mousedown", onDown);
+	}, [previewExportOpen]);
+
+	useEffect(() => {
+		if (!previewOpen) setPreviewExportOpen(false);
+	}, [previewOpen]);
 
 	/* All assets (drafts + tables) — from users/uid/assets or fallback to drafts+tables */
 	const { data: items = [] } = useQuery({
@@ -1014,23 +2209,139 @@ export default function DraftPage() {
 			return tok;
 		});
 
-		/* 2. Process line by line */
+		/* 2. Line grouping: lists, blockquotes, headings, paragraphs (+ inline MD) */
 		const restore = (s) => s.replace(/\x01BLK(\d+)\x01/g, (_, i) => tokens[+i]);
 
-		return text
-			.split("\n")
-			.map((line) => {
-				if (/\x01BLK\d+\x01/.test(line)) return restore(line);
-				if (line.startsWith("### "))
-					return `<h3 style="font-family:'Outfit',sans-serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px">${line.slice(4)}</h3>`;
-				if (line.startsWith("## "))
-					return `<h2 style="font-family:'Outfit',sans-serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3">${line.slice(3)}</h2>`;
-				if (line.startsWith("# "))
-					return `<h1 style="font-family:'Outfit',sans-serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2">${line.slice(2)}</h1>`;
-				if (line.trim() === "") return "<br/>";
-				return `<p style="font-size:15px;line-height:1.8;color:#3A3530;margin-bottom:4px">${line}</p>`;
-			})
-			.join("");
+		const rawLines = text.split("\n");
+		const parts = [];
+		let i = 0;
+
+		const h1Style =
+			"font-family:'Outfit',sans-serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2;font-weight:700";
+		const h2Style =
+			"font-family:'Outfit',sans-serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3;font-weight:650";
+		const h3Style =
+			"font-family:'Outfit',sans-serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px;font-weight:600";
+		const pStyle =
+			"font-size:15px;line-height:1.75;color:#37352F;margin:0 0 6px;min-height:1.4em";
+		const bqStyle =
+			"border-left:3px solid #E8E7E4;padding:4px 0 4px 14px;color:#6F6A64;margin:12px 0;font-size:15px;line-height:1.75";
+
+		while (i < rawLines.length) {
+			let line = rawLines[i];
+			if (/\x01BLK\d+\x01/.test(line)) {
+				parts.push(restore(line));
+				i++;
+				continue;
+			}
+			if (line.trim() === "") {
+				parts.push("<br/>");
+				i++;
+				continue;
+			}
+
+			if (line.startsWith("### ")) {
+				parts.push(
+					`<h3 style="${h3Style}">${parseInlineMarkdown(line.slice(4))}</h3>`,
+				);
+				i++;
+				continue;
+			}
+			if (line.startsWith("## ")) {
+				parts.push(
+					`<h2 style="${h2Style}">${parseInlineMarkdown(line.slice(3))}</h2>`,
+				);
+				i++;
+				continue;
+			}
+			if (line.startsWith("# ")) {
+				parts.push(
+					`<h1 style="${h1Style}">${parseInlineMarkdown(line.slice(2))}</h1>`,
+				);
+				i++;
+				continue;
+			}
+
+			if (/^(\*{3}|-{3}|_{3})\s*$/.test(line.trim())) {
+				parts.push(
+					'<hr style="border:none;border-top:1px solid #E8E7E4;margin:22px 0"/>',
+				);
+				i++;
+				continue;
+			}
+
+			if (line.startsWith("> ")) {
+				const bqLines = [];
+				while (i < rawLines.length && rawLines[i].startsWith("> ")) {
+					bqLines.push(rawLines[i].slice(2));
+					i++;
+				}
+				parts.push(
+					`<blockquote style="${bqStyle}">${parseInlineMarkdown(bqLines.join("<br/>"))}</blockquote>`,
+				);
+				continue;
+			}
+
+			const taskRe = /^(\s*)[-*]\s+\[([ xX])\]\s+(.*)$/;
+			if (taskRe.test(line)) {
+				const lis = [];
+				while (i < rawLines.length) {
+					const m = rawLines[i].match(taskRe);
+					if (!m) break;
+					const checked = m[2].toLowerCase() === "x";
+					const content = parseInlineMarkdown(m[3]);
+					const chk = checked ? " checked" : "";
+					lis.push(
+						`<li class="todo-item" style="list-style:none;margin:4px 0;display:flex;align-items:flex-start;gap:10px;line-height:1.75"><input type="checkbox"${chk} class="todo-cb" style="margin-top:4px;flex-shrink:0;width:1em;height:1em;accent-color:#37352F"/><span class="todo-label" style="flex:1;min-width:0">${content}</span></li>`,
+					);
+					i++;
+				}
+				parts.push(
+					`<ul data-todo="true" style="list-style:none;padding-left:0;margin:8px 0">${lis.join("")}</ul>`,
+				);
+				continue;
+			}
+
+			const ordRe = /^(\s*)\d+\.\s+(.*)$/;
+			if (ordRe.test(line)) {
+				const lis = [];
+				while (i < rawLines.length) {
+					const m = rawLines[i].match(/^(\s*)\d+\.\s+(.*)$/);
+					if (!m) break;
+					lis.push(
+						`<li style="margin:3px 0;line-height:1.75">${parseInlineMarkdown(m[2])}</li>`,
+					);
+					i++;
+				}
+				parts.push(
+					`<ol style="padding-left:28px;margin:8px 0;list-style:decimal">${lis.join("")}</ol>`,
+				);
+				continue;
+			}
+
+			const bulletRe = /^(\s*)[-*]\s+(?!\[[ xX]\])(.+)$/;
+			const bm = line.match(bulletRe);
+			if (bm) {
+				const lis = [];
+				while (i < rawLines.length) {
+					const m = rawLines[i].match(bulletRe);
+					if (!m) break;
+					lis.push(
+						`<li style="margin:3px 0;line-height:1.75">${parseInlineMarkdown(m[2])}</li>`,
+					);
+					i++;
+				}
+				parts.push(
+					`<ul style="padding-left:28px;margin:8px 0;list-style:disc">${lis.join("")}</ul>`,
+				);
+				continue;
+			}
+
+			parts.push(`<p style="${pStyle}">${parseInlineMarkdown(line)}</p>`);
+			i++;
+		}
+
+		return parts.join("");
 	};
 
 	/* Sync tabs to URL when we have draftId but no tabs query (e.g. direct link) */
@@ -1049,6 +2360,7 @@ export default function DraftPage() {
 	useEffect(() => {
 		if (editorRef.current && draft) {
 			editorRef.current.innerHTML = formatBody(draft.body || "");
+			normalizeTodoLists(editorRef.current);
 			countWords();
 		}
 	}, [draft]);
@@ -1056,6 +2368,54 @@ export default function DraftPage() {
 	const countWords = () => {
 		const text = editorRef.current?.innerText || "";
 		setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
+	};
+
+	const onEditorInput = () => {
+		normalizeTodoLists(editorRef.current);
+		syncDraftSlashQueryHighlight(editorRef.current);
+		countWords();
+		const sel = window.getSelection();
+		if (!editorRef.current || !sel?.rangeCount) {
+			setSlashCommand(null);
+			return;
+		}
+		const range = sel.getRangeAt(0);
+		const block = getDraftBlockFromSelection(editorRef.current, range);
+		if (!block) {
+			setSlashCommand(null);
+			return;
+		}
+		const text = getTextFromBlockStartToCaret(block, range);
+		const slash = matchDraftSlashQuery(text);
+		if (!slash) {
+			setSlashCommand(null);
+			return;
+		}
+		const pos = measureDraftSlashMenuPosition(
+			block,
+			range,
+			editorRef.current,
+			editorFontSize,
+		);
+		if (!pos) {
+			setSlashCommand(null);
+			return;
+		}
+		setSlashCommand({ x: pos.x, y: pos.y, query: slash.query });
+	};
+
+	const restoreEditorSelection = () => {
+		const r = selectionSavedRangeRef.current;
+		if (!r) return false;
+		try {
+			editorRef.current?.focus();
+			const s = window.getSelection();
+			s.removeAllRanges();
+			s.addRange(r.cloneRange());
+			return true;
+		} catch {
+			return false;
+		}
 	};
 
 	const handleCopy = () => {
@@ -1066,9 +2426,12 @@ export default function DraftPage() {
 	};
 
 	const handleSave = async () => {
-		if (!draftId) return;
+		if (!draftId || !reduxUser?.uid) return;
 		try {
-			const html = editorRef.current?.innerHTML || "";
+			if (editorRef.current) unwrapAllDraftSlashQuerySpans(editorRef.current);
+			let html = editorRef.current?.innerHTML || "";
+			html = await uploadInlineImagesToUploadThing(html);
+			if (editorRef.current) editorRef.current.innerHTML = html;
 			await updateAsset(
 				reduxUser.uid,
 				draftId,
@@ -1087,10 +2450,14 @@ export default function DraftPage() {
 		if (!url?.trim()) return;
 		editorRef.current?.focus();
 		if (isVideo) {
-			const html = `<p style="margin:16px 0"><video src="${url}" controls style="max-width:100%;border-radius:8px;display:block"></video></p>`;
+			const html = `<p style="margin:16px 0"><video src="${escapeAttr(url)}" controls style="max-width:100%;border-radius:8px;display:block"></video></p>`;
 			document.execCommand("insertHTML", false, html);
 		} else {
-			document.execCommand("insertImage", false, url);
+			document.execCommand(
+				"insertHTML",
+				false,
+				makeDraftImageFigureHtml(url),
+			);
 		}
 		countWords();
 		setImageUrlInput("");
@@ -1107,30 +2474,13 @@ export default function DraftPage() {
 			return;
 		}
 
-		/* Images: insert base64 immediately, then upload to Firebase in background */
+		/* Images: keep as data URL until save (UploadThing via uploadInlineImagesToUploadThing) */
 		if (isImage) {
 			const reader = new FileReader();
 			reader.onload = () => {
 				const dataUrl = reader.result;
 				insertImageOrVideo(dataUrl, false);
-				/* Upload in background and replace base64 with Firebase URL */
-				if (reduxUser?.uid) {
-					uploadFile(
-						file,
-						`users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${file.name.split(".").pop() || "png"}`,
-					)
-						.then((firebaseUrl) => {
-							const html = editorRef.current?.innerHTML || "";
-							if (html.includes(dataUrl)) {
-								editorRef.current.innerHTML = html
-									.split(dataUrl)
-									.join(firebaseUrl);
-							}
-						})
-						.catch((err) => {
-							console.error("Background upload failed:", err);
-						});
-				}
+				setDraftImageModalOpen(false);
 			};
 			reader.readAsDataURL(file);
 		} else {
@@ -1143,7 +2493,10 @@ export default function DraftPage() {
 			const ext = file.name.split(".").pop() || "mp4";
 			const path = `users/${reduxUser.uid}/drafts/${draftId || "new"}/media/${Date.now()}.${ext}`;
 			uploadFile(file, path)
-				.then((downloadUrl) => insertImageOrVideo(downloadUrl, true))
+				.then((downloadUrl) => {
+					insertImageOrVideo(downloadUrl, true);
+					setDraftImageModalOpen(false);
+				})
 				.catch((err) => {
 					console.error("Upload failed:", err);
 					alert("Upload failed. Please try again.");
@@ -1164,6 +2517,25 @@ export default function DraftPage() {
 		} catch {
 			return false;
 		}
+	};
+
+	const confirmDraftImageFromUrl = () => {
+		const raw = draftImageModalUrl.trim();
+		if (!raw) return;
+		try {
+			const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+			if (!/^https?:$/i.test(u.protocol)) {
+				alert("Only http(s) URLs are allowed.");
+				return;
+			}
+			const href = u.href;
+			insertImageOrVideo(href, isVideoUrl(href));
+		} catch {
+			alert("Invalid URL.");
+			return;
+		}
+		setDraftImageModalOpen(false);
+		setDraftImageModalUrl("");
 	};
 
 	/* ── Insert a rich block at the cursor ── */
@@ -1191,13 +2563,19 @@ export default function DraftPage() {
 		if (!el) return;
 
 		const handleClick = (e) => {
-			if (e.target.dataset?.action === "copy-code") {
+			const raw = e.target;
+			const el =
+				raw && raw.nodeType === 1
+					? raw
+					: raw?.parentElement;
+			const copyBtn = el?.closest?.('[data-action="copy-code"]');
+			if (copyBtn) {
 				e.preventDefault();
-				const block = e.target.closest('[data-block="code"]');
+				const block = copyBtn.closest('[data-block="code"]');
 				const code = block?.querySelector("code");
 				if (code) {
 					navigator.clipboard.writeText(code.innerText).catch(() => {});
-					const btn = e.target;
+					const btn = copyBtn;
 					const prev = btn.textContent;
 					btn.textContent = "Copied!";
 					btn.style.color = "#10B981";
@@ -1208,6 +2586,75 @@ export default function DraftPage() {
 						btn.style.borderColor = "";
 					}, 1800);
 				}
+				return;
+			}
+			const fitBtn = el?.closest?.("[data-draft-img-fit]");
+			if (fitBtn) {
+				e.preventDefault();
+				e.stopPropagation();
+				const fig = fitBtn.closest("[data-draft-image-wrap]");
+				const img = fig?.querySelector("img[data-draft-img]");
+				const v = fitBtn.getAttribute("data-draft-img-fit");
+				if (img && v) {
+					img.style.objectFit = v;
+					if (v === "cover" || v === "fill")
+						img.style.minHeight = "260px";
+					else img.style.minHeight = "";
+				}
+				fitBtn.closest("details")?.removeAttribute("open");
+				return;
+			}
+			const sizeBtn = el?.closest?.("[data-draft-img-size]");
+			if (sizeBtn) {
+				e.preventDefault();
+				e.stopPropagation();
+				const fig = sizeBtn.closest("[data-draft-image-wrap]");
+				const frame = fig?.querySelector("[data-draft-image-frame]");
+				const v = sizeBtn.getAttribute("data-draft-img-size");
+				if (frame && v) {
+					frame.style.width = `${v}%`;
+					frame.style.maxWidth = "100%";
+					frame.style.marginLeft = "auto";
+					frame.style.marginRight = "auto";
+				}
+				sizeBtn.closest("details")?.removeAttribute("open");
+				return;
+			}
+			const draftTabBtn = el?.closest?.('[data-action="draft-tab"]');
+			if (draftTabBtn) {
+				e.preventDefault();
+				const wrap = draftTabBtn.closest('[data-block="tabs"]');
+				if (!wrap) return;
+				const idx = draftTabBtn.getAttribute("data-tab-idx");
+				wrap.querySelectorAll("[data-draft-panel]").forEach((p) => {
+					p.style.display =
+						p.getAttribute("data-draft-panel") === idx ? "block" : "none";
+				});
+				wrap.querySelectorAll("[data-action='draft-tab']").forEach((b) => {
+					const on = b.getAttribute("data-tab-idx") === idx;
+					b.style.background = on ? "#fff" : "transparent";
+					b.style.boxShadow = on ? "0 1px 2px rgba(0,0,0,0.06)" : "none";
+					b.style.fontWeight = on ? "600" : "500";
+					b.style.color = on ? "#37352F" : "#7A7570";
+				});
+				return;
+			}
+			const cgTabBtn = el?.closest?.('[data-action="cg-tab"]');
+			if (cgTabBtn) {
+				e.preventDefault();
+				const wrap = cgTabBtn.closest('[data-block="code-group"]');
+				if (!wrap) return;
+				const idx = cgTabBtn.getAttribute("data-cg-idx");
+				wrap.querySelectorAll("[data-cg-panel]").forEach((p) => {
+					p.style.display =
+						p.getAttribute("data-cg-panel") === idx ? "block" : "none";
+				});
+				wrap.querySelectorAll("[data-action='cg-tab']").forEach((b) => {
+					const on = b.getAttribute("data-cg-idx") === idx;
+					b.style.background = on ? "#fff" : "transparent";
+					b.style.fontWeight = on ? "700" : "600";
+					b.style.color = on ? "#37352F" : "#6B6560";
+				});
 			}
 		};
 
@@ -1217,9 +2664,17 @@ export default function DraftPage() {
 			}
 		};
 
+		const onDocMouseDown = (ev) => {
+			if (ev.target.closest?.("details[data-draft-img-popover]")) return;
+			el.querySelectorAll("details[data-draft-img-popover][open]").forEach((d) => {
+				d.removeAttribute("open");
+			});
+		};
+		document.addEventListener("mousedown", onDocMouseDown);
 		el.addEventListener("click", handleClick);
 		el.addEventListener("change", handleChange);
 		return () => {
+			document.removeEventListener("mousedown", onDocMouseDown);
 			el.removeEventListener("click", handleClick);
 			el.removeEventListener("change", handleChange);
 		};
@@ -1263,8 +2718,15 @@ export default function DraftPage() {
 			const el = editorRef.current;
 			if (!el) return;
 			const sel = window.getSelection();
-			const text = sel?.toString?.()?.trim();
-			if (!text || sel.rangeCount === 0) {
+			if (!sel || sel.rangeCount === 0) {
+				setSelectionDropdown(null);
+				return;
+			}
+			const { href: linkHref, anchor: linkAnchor, collapsed } =
+				getSelectionLinkContext(sel);
+			const textTrim = sel.toString().trim();
+			const collapsedInLink = collapsed && linkAnchor;
+			if (!textTrim && !collapsedInLink) {
 				setSelectionDropdown(null);
 				return;
 			}
@@ -1277,9 +2739,15 @@ export default function DraftPage() {
 			try {
 				const range = sel.getRangeAt(0);
 				const rect = range.getBoundingClientRect();
-				if (rect.width === 0 && rect.height === 0) return;
+				if (rect.width === 0 && rect.height === 0 && !collapsedInLink) return;
+				selectionSavedRangeRef.current = range.cloneRange();
+				setSelectionSubtool(null);
+				setSelectionLinkUrl(linkHref);
+				const toolbarText =
+					textTrim ||
+					(linkAnchor ? (linkAnchor.textContent || "").trim() : "");
 				setSelectionDropdown({
-					text,
+					text: toolbarText,
 					x: Math.max(
 						8,
 						Math.min(rect.left + rect.width / 2 - 200, window.innerWidth - 420),
@@ -1311,32 +2779,163 @@ export default function DraftPage() {
 		};
 	}, [selectionDropdown]);
 
-	/* ── Slash command: close on Escape, click outside ── */
+	useEffect(() => {
+		if (!selectionDropdown) {
+			selectionSavedRangeRef.current = null;
+			setSelectionSubtool(null);
+			setSelectionLinkUrl("");
+		}
+	}, [selectionDropdown]);
+
+	useEffect(() => {
+		if (selectionSubtool !== "link") return;
+		const id = requestAnimationFrame(() => {
+			selectionLinkInputRef.current?.focus();
+		});
+		return () => cancelAnimationFrame(id);
+	}, [selectionSubtool]);
+
+	useEffect(() => {
+		if (!slashCommand) return;
+		slashListIndexRef.current = 0;
+		setSlashListIndex(0);
+	}, [slashCommand?.query]);
+
+	useLayoutEffect(() => {
+		if (!slashCommand) return;
+		const el = document.querySelector("[data-slash-active='true']");
+		el?.scrollIntoView({ block: "nearest" });
+	}, [slashCommand, slashListIndex]);
+
+	/* ── Slash command: Escape / arrows / Enter, click outside ── */
 	useEffect(() => {
 		if (!slashCommand) return;
 		const onKey = (e) => {
-			if (e.key === "Escape") setSlashCommand(null);
+			const cmd = slashCommandRef.current;
+			if (!cmd) return;
+			if (e.key === "Escape") {
+				setSlashCommand(null);
+				return;
+			}
+			const rows = getDraftSlashFlatRows(cmd.query);
+			if (rows.length === 0) return;
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				e.stopPropagation();
+				setSlashListIndex((prev) => {
+					const next = Math.min(rows.length - 1, prev + 1);
+					slashListIndexRef.current = next;
+					return next;
+				});
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				e.stopPropagation();
+				setSlashListIndex((prev) => {
+					const next = Math.max(0, prev - 1);
+					slashListIndexRef.current = next;
+					return next;
+				});
+			} else if (e.key === "Enter" && !e.isComposing) {
+				e.preventDefault();
+				e.stopPropagation();
+				const idx = Math.min(
+					slashListIndexRef.current,
+					rows.length - 1,
+				);
+				const id = rows[idx]?.id;
+				if (id) handleSlashCommandRef.current(id);
+			}
 		};
 		const close = (e) => {
 			if (!e.target.closest("[data-slash-command]")) setSlashCommand(null);
 		};
-		document.addEventListener("keydown", onKey);
+		document.addEventListener("keydown", onKey, true);
 		const t = setTimeout(
 			() => document.addEventListener("mousedown", close),
 			50,
 		);
 		return () => {
-			document.removeEventListener("keydown", onKey);
+			document.removeEventListener("keydown", onKey, true);
 			clearTimeout(t);
 			document.removeEventListener("mousedown", close);
 		};
 	}, [slashCommand]);
 
-	const handleSlashCommand = (action) => {
+	/* Draft date picker (slash / date): calendar portal, not window.prompt */
+	useEffect(() => {
+		if (!draftSlashDatePickerPos) return;
+		const onKey = (e) => {
+			if (e.key === "Escape") setDraftSlashDatePickerPos(null);
+		};
+		const onDown = (e) => {
+			if (e.target.closest?.("[data-draft-date-picker]")) return;
+			setDraftSlashDatePickerPos(null);
+		};
+		document.addEventListener("keydown", onKey);
+		const t = setTimeout(
+			() => document.addEventListener("mousedown", onDown),
+			80,
+		);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			clearTimeout(t);
+			document.removeEventListener("mousedown", onDown);
+		};
+	}, [draftSlashDatePickerPos]);
+
+	/* Draft image modal (/ image): Escape to close */
+	useEffect(() => {
+		if (!draftImageModalOpen) return;
+		const onKey = (e) => {
+			if (e.key === "Escape") {
+				setDraftImageModalOpen(false);
+				setDraftImageModalUrl("");
+			}
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [draftImageModalOpen]);
+
+	const insertDraftDateAtCursor = (d) => {
 		if (!editorRef.current) return;
 		editorRef.current.focus();
+
+		const sel = window.getSelection();
+		if (sel?.rangeCount) {
+			const range = sel.getRangeAt(0);
+			const block = getDraftBlockFromSelection(editorRef.current, range);
+			if (block) {
+				const text = getTextFromBlockStartToCaret(block, range);
+				const slash = matchDraftSlashQuery(text);
+				if (slash) {
+					deleteDraftSlashToken(block, range, slash.slashToken.length);
+				}
+			}
+		}
+
+		const label = formatInkDateLong(d);
+		if (!label) {
+			setDraftSlashDatePickerPos(null);
+			return;
+		}
+		const safe = label
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;");
+		document.execCommand(
+			"insertHTML",
+			false,
+			`<span data-ink-date style="color:#C17B2F;font-weight:600">${safe}</span>`,
+		);
+		countWords();
+		setDraftSlashDatePickerPos(null);
+		requestAnimationFrame(() => editorRef.current?.focus());
+	};
+
+	const handleSlashCommand = (action) => {
+		const sel =
+			typeof window !== "undefined" ? window.getSelection() : null;
 		if (action === "continue-writing" || action === "ask-ai") {
-			const sel = window.getSelection();
 			const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
 			let ctx = "";
 			if (range) {
@@ -1350,27 +2949,95 @@ export default function DraftPage() {
 			setSelectionContext(ctx);
 			setChatOpen(true);
 		} else if (action === "text") {
+			deleteDraftSlashFromCaret(editorRef.current);
 			document.execCommand("formatBlock", false, "p");
 		} else if (action === "h1") {
+			deleteDraftSlashFromCaret(editorRef.current);
 			document.execCommand("formatBlock", false, "h1");
 		} else if (action === "h2") {
+			deleteDraftSlashFromCaret(editorRef.current);
 			document.execCommand("formatBlock", false, "h2");
 		} else if (action === "h3") {
+			deleteDraftSlashFromCaret(editorRef.current);
 			document.execCommand("formatBlock", false, "h3");
 		} else if (action === "bullet") {
+			deleteDraftSlashFromCaret(editorRef.current);
 			document.execCommand("insertUnorderedList");
 		} else if (action === "numbered") {
+			deleteDraftSlashFromCaret(editorRef.current);
 			document.execCommand("insertOrderedList");
 		} else if (action === "todo") {
-			document.execCommand(
-				"insertHTML",
-				false,
-				'<ul data-todo="true" style="list-style:none;padding-left:0;"><li><input type="checkbox" style="margin-right:8px;vertical-align:middle"> </li></ul><p><br></p>',
+			insertDraftRichBlock(
+				editorRef.current,
+				`<ul data-todo="true" style="${TODO_UL_STYLE}"><li class="todo-item" style="${TODO_LI_STYLE}"><input type="checkbox" class="todo-cb" style="${TODO_CHECKBOX_STYLE}"/><span class="todo-label" style="flex:1;min-width:0"> </span></li></ul><p><br></p>`,
 			);
+		} else if (action === "quote") {
+			insertDraftRichBlock(editorRef.current, makeDraftQuoteHtml());
+		} else if (action === "divider") {
+			insertDraftRichBlock(
+				editorRef.current,
+				makeDraftDividerHtml().replace(/<p><br><\/p>\s*$/, ""),
+			);
+		} else if (action === "code") {
+			insertDraftRichBlock(
+				editorRef.current,
+				makeCodeBlockHtml("text", "// Your code here") + "<p><br></p>",
+			);
+		} else if (action === "codeGroup") {
+			insertDraftRichBlock(editorRef.current, makeDraftCodeGroupHtml());
+		} else if (action === "tabs") {
+			insertDraftRichBlock(editorRef.current, makeDraftTabsHtml());
+		} else if (action === "toggle") {
+			insertDraftRichBlock(editorRef.current, makeDraftToggleHtml());
+		} else if (
+			action === "callout-info" ||
+			action === "callout-warning" ||
+			action === "callout-success" ||
+			action === "callout-danger"
+		) {
+			const type = action.replace(/^callout-/, "");
+			const cfg = CALLOUT_CONFIGS[type];
+			if (cfg) {
+				insertDraftRichBlock(
+					editorRef.current,
+					makeCalloutHtml(
+						type,
+						`${cfg.label} — edit this text.`,
+					) + "<p><br></p>",
+				);
+			}
+		} else if (action === "date") {
+			const pos = slashCommand
+				? {
+						left: Math.max(
+							8,
+							Math.min(slashCommand.x, window.innerWidth - 300),
+						),
+						top: slashCommand.y + 4,
+					}
+				: { left: 80, top: 120 };
+			setDraftSlashDatePickerPos(pos);
+		} else if (action === "image") {
+			deleteDraftSlashFromCaret(editorRef.current);
+			setDraftImageModalOpen(true);
+		} else if (action === "table") {
+			insertDraftRichBlock(editorRef.current, makeSimpleTableHtml());
+		} else if (action === "embed") {
+			deleteDraftSlashFromCaret(editorRef.current);
+			const raw =
+				typeof window !== "undefined"
+					? window.prompt("Paste a YouTube link")
+					: "";
+			const id = youtubeIdFromUrl(raw);
+			if (id) {
+				document.execCommand("insertHTML", false, makeEmbedIframeHtml(id));
+			}
 		}
 		countWords();
 		setSlashCommand(null);
 	};
+
+	handleSlashCommandRef.current = handleSlashCommand;
 
 	const handleDelete = (id) => setDeleteConfirm(id);
 
@@ -1399,11 +3066,26 @@ export default function DraftPage() {
 	const handleCopyThemeHTML = (themeKey) => {
 		const theme = THEMES[themeKey];
 		if (!theme) return;
-		const html = editorRef.current?.innerHTML || draft?.body || "";
+		const html = stripDraftSlashQueryFromHtmlString(
+			editorRef.current?.innerHTML || draft?.body || "",
+		);
 		const title = draft?.title || "";
 		const output = buildThemedHTML(html, theme, title);
 		navigator.clipboard.writeText(output).catch(() => {});
-		setCopiedTheme(themeKey);
+		setCopiedTheme({ key: themeKey, format: "html" });
+		setTimeout(() => setCopiedTheme(null), 2200);
+	};
+
+	const handleCopyThemeReact = (themeKey) => {
+		if (!THEMES[themeKey]) return;
+		const html = stripDraftSlashQueryFromHtmlString(
+			editorRef.current?.innerHTML || draft?.body || "",
+		);
+		const title = draft?.title || "";
+		const snippet = buildThemedReactSnippet(html, themeKey, title);
+		if (!snippet) return;
+		navigator.clipboard.writeText(snippet).catch(() => {});
+		setCopiedTheme({ key: themeKey, format: "react" });
 		setTimeout(() => setCopiedTheme(null), 2200);
 	};
 
@@ -1448,7 +3130,7 @@ export default function DraftPage() {
 				display: "flex",
 				flexDirection: "column",
 				background: T.base,
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 				overflow: "hidden",
 			}}
 		>
@@ -2001,454 +3683,15 @@ export default function DraftPage() {
 									borderBottom: `1px solid ${T.border}`,
 									background: T.surface,
 									display: "flex",
+									justifyContent: "space-between",
 									alignItems: "center",
 									gap: 8,
 									flexShrink: 0,
 								}}
 							>
-								{/* Format tools */}
-								<TBtn
-									icon={Icons.bold}
-									label="Bold"
-									onClick={() => document.execCommand("bold")}
-								/>
-								<TBtn
-									icon={Icons.italic}
-									label="Italic"
-									onClick={() => document.execCommand("italic")}
-								/>
-								<TBtn
-									icon={Icons.list}
-									label="Bullet list"
-									onClick={() => document.execCommand("insertUnorderedList")}
-								/>
-								<TBtn
-									icon={Icons.link2}
-									label="Link"
-									onClick={() => {
-										const url = window.prompt("URL:");
-										if (url) document.execCommand("createLink", false, url);
-									}}
-								/>
-								<div data-image-dropdown style={{ position: "relative" }}>
-									<TBtn
-										icon={Icons.image}
-										label="Image / Video"
-										onClick={() => setImageDropdownOpen((v) => !v)}
-									/>
-									<input
-										ref={imageFileInputRef}
-										type="file"
-										accept="image/*,video/*"
-										style={{ display: "none" }}
-										onChange={handleImageFileSelect}
-									/>
-									<AnimatePresence>
-										{imageDropdownOpen && (
-											<motion.div
-												initial={{ opacity: 0, y: 6, scale: 0.96 }}
-												animate={{ opacity: 1, y: 0, scale: 1 }}
-												exit={{ opacity: 0, y: 6, scale: 0.96 }}
-												transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-												style={{
-													position: "absolute",
-													top: "calc(100% + 6px)",
-													left: 0,
-													background: "#FFFFFF",
-													border: `1px solid ${T.border}`,
-													borderRadius: 12,
-													boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
-													zIndex: 60,
-													padding: 12,
-													minWidth: 260,
-												}}
-											>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														margin: "0 0 8px",
-													}}
-												>
-													Upload from computer
-												</p>
-												<motion.button
-													whileHover={{ background: "#F7F5F0" }}
-													whileTap={{ scale: 0.98 }}
-													onClick={() => imageFileInputRef.current?.click()}
-													disabled={imageUploading || !reduxUser}
-													style={{
-														width: "100%",
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														gap: 8,
-														background: "#F7F5F0",
-														border: `1px dashed ${T.border}`,
-														borderRadius: 8,
-														padding: "10px 14px",
-														fontSize: 12,
-														fontWeight: 600,
-														color: T.accent,
-														cursor:
-															imageUploading || !reduxUser
-																? "not-allowed"
-																: "pointer",
-														opacity: imageUploading || !reduxUser ? 0.6 : 1,
-													}}
-												>
-													{imageUploading
-														? "Uploading…"
-														: "Choose image or video"}
-												</motion.button>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														margin: "12px 0 8px",
-													}}
-												>
-													Or add from URL
-												</p>
-												<div style={{ display: "flex", gap: 6 }}>
-													<input
-														type="url"
-														placeholder="https://…"
-														value={imageUrlInput}
-														onChange={(e) => setImageUrlInput(e.target.value)}
-														onKeyDown={(e) => {
-															if (e.key === "Enter")
-																insertImageOrVideo(
-																	imageUrlInput.trim(),
-																	isVideoUrl(imageUrlInput.trim()),
-																);
-														}}
-														style={{
-															flex: 1,
-															padding: "8px 12px",
-															border: `1px solid ${T.border}`,
-															borderRadius: 8,
-															fontSize: 12,
-															outline: "none",
-															fontFamily: "inherit",
-														}}
-													/>
-													<motion.button
-														whileHover={{ background: T.warm }}
-														whileTap={{ scale: 0.96 }}
-														onClick={() =>
-															insertImageOrVideo(
-																imageUrlInput.trim(),
-																isVideoUrl(imageUrlInput.trim()),
-															)
-														}
-														style={{
-															background: T.warm,
-															color: "white",
-															border: "none",
-															borderRadius: 8,
-															padding: "8px 14px",
-															fontSize: 12,
-															fontWeight: 600,
-															cursor: "pointer",
-														}}
-													>
-														Insert
-													</motion.button>
-												</div>
-											</motion.div>
-										)}
-									</AnimatePresence>
-								</div>
 
-								{/* Divider */}
-								<div
-									style={{
-										width: 1,
-										height: 18,
-										background: T.border,
-										margin: "0 4px",
-									}}
-								/>
-
-								{/* ── Insert block dropdown ── */}
-								<div data-block-menu style={{ position: "relative" }}>
-									<motion.button
-										onClick={() => setBlockMenuOpen((v) => !v)}
-										whileHover={{ background: "#F0ECE5" }}
-										whileTap={{ scale: 0.95 }}
-										style={{
-											display: "flex",
-											alignItems: "center",
-											gap: 5,
-											background: blockMenuOpen ? "#F0ECE5" : "transparent",
-											border: "none",
-											borderRadius: 7,
-											padding: "5px 9px",
-											fontSize: 12,
-											fontWeight: 600,
-											color: T.accent,
-											cursor: "pointer",
-											transition: "background 0.15s",
-										}}
-									>
-										<Icon d="M12 5v14M5 12h14" size={13} stroke={T.accent} />
-										Insert
-										<Icon
-											d="M6 9l6 6 6-6"
-											size={11}
-											stroke={T.muted}
-											strokeWidth={2}
-										/>
-									</motion.button>
-
-									<AnimatePresence>
-										{blockMenuOpen && (
-											<motion.div
-												initial={{ opacity: 0, y: 6, scale: 0.96 }}
-												animate={{ opacity: 1, y: 0, scale: 1 }}
-												exit={{ opacity: 0, y: 6, scale: 0.96 }}
-												transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-												style={{
-													position: "absolute",
-													top: "calc(100% + 6px)",
-													left: 0,
-													background: "#FFFFFF",
-													border: `1px solid ${T.border}`,
-													borderRadius: 12,
-													boxShadow: "0 8px 32px rgba(0,0,0,0.10)",
-													zIndex: 60,
-													overflow: "hidden",
-													minWidth: 195,
-													padding: 6,
-												}}
-											>
-												{/* Callouts section */}
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														padding: "3px 8px 6px",
-														margin: 0,
-													}}
-												>
-													Callout
-												</p>
-												{["info", "warning", "success", "danger"].map(
-													(type) => {
-														const c = CALLOUT_CONFIGS[type];
-														return (
-															<motion.button
-																key={type}
-																onClick={() => insertBlock(type)}
-																whileHover={{ background: "#F7F5F0" }}
-																style={{
-																	width: "100%",
-																	display: "flex",
-																	alignItems: "center",
-																	gap: 8,
-																	background: "none",
-																	border: "none",
-																	borderRadius: 8,
-																	padding: "7px 10px",
-																	cursor: "pointer",
-																	textAlign: "left",
-																	transition: "background 0.12s",
-																}}
-															>
-																<span
-																	style={{
-																		fontSize: 15,
-																		width: 22,
-																		textAlign: "center",
-																	}}
-																>
-																	{c.emoji}
-																</span>
-																<div>
-																	<p
-																		style={{
-																			fontSize: 12,
-																			fontWeight: 600,
-																			color: c.textColor,
-																			margin: 0,
-																			lineHeight: 1.2,
-																		}}
-																	>
-																		{c.label}
-																	</p>
-																	<p
-																		style={{
-																			fontSize: 10.5,
-																			color: "#A8A29C",
-																			margin: 0,
-																		}}
-																	>
-																		Highlighted callout box
-																	</p>
-																</div>
-																<div style={{ flex: 1 }} />
-																<div
-																	style={{
-																		width: 10,
-																		height: 10,
-																		borderRadius: 2,
-																		background: c.border,
-																		opacity: 0.7,
-																	}}
-																/>
-															</motion.button>
-														);
-													},
-												)}
-
-												{/* Divider */}
-												<div
-													style={{
-														height: 1,
-														background: T.border,
-														margin: "5px 0",
-													}}
-												/>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														padding: "3px 8px 6px",
-														margin: 0,
-													}}
-												>
-													More blocks
-												</p>
-
-												{/* Code block */}
-												<motion.button
-													onClick={() => insertBlock("code")}
-													whileHover={{ background: "#F7F5F0" }}
-													style={{
-														width: "100%",
-														display: "flex",
-														alignItems: "center",
-														gap: 8,
-														background: "none",
-														border: "none",
-														borderRadius: 8,
-														padding: "7px 10px",
-														cursor: "pointer",
-														textAlign: "left",
-														transition: "background 0.12s",
-													}}
-												>
-													<span
-														style={{
-															fontSize: 15,
-															width: 22,
-															textAlign: "center",
-														}}
-													>
-														{"</>"}
-													</span>
-													<div>
-														<p
-															style={{
-																fontSize: 12,
-																fontWeight: 600,
-																color: T.accent,
-																margin: 0,
-																lineHeight: 1.2,
-															}}
-														>
-															Code block
-														</p>
-														<p
-															style={{
-																fontSize: 10.5,
-																color: "#A8A29C",
-																margin: 0,
-															}}
-														>
-															Syntax-highlighted code
-														</p>
-													</div>
-												</motion.button>
-
-												{/* Button */}
-												<motion.button
-													onClick={() => insertBlock("button")}
-													whileHover={{ background: "#F7F5F0" }}
-													style={{
-														width: "100%",
-														display: "flex",
-														alignItems: "center",
-														gap: 8,
-														background: "none",
-														border: "none",
-														borderRadius: 8,
-														padding: "7px 10px",
-														cursor: "pointer",
-														textAlign: "left",
-														transition: "background 0.12s",
-													}}
-												>
-													<span
-														style={{
-															fontSize: 15,
-															width: 22,
-															textAlign: "center",
-														}}
-													>
-														🔗
-													</span>
-													<div>
-														<p
-															style={{
-																fontSize: 12,
-																fontWeight: 600,
-																color: T.accent,
-																margin: 0,
-																lineHeight: 1.2,
-															}}
-														>
-															CTA Button
-														</p>
-														<p
-															style={{
-																fontSize: 10.5,
-																color: "#A8A29C",
-																margin: 0,
-															}}
-														>
-															Styled call-to-action link
-														</p>
-													</div>
-												</motion.button>
-											</motion.div>
-										)}
-									</AnimatePresence>
-								</div>
-
-								<div
-									style={{
-										width: 1,
-										height: 18,
-										background: T.border,
-										margin: "0 4px",
-									}}
-								/>
-
-								{/* ── Inline draft meta ── */}
+								<div className="flex items-center gap-2">
+									{/* ── Inline draft meta ── */}
 								{draft?.tag && (
 									<span
 										style={{
@@ -2550,20 +3793,11 @@ export default function DraftPage() {
 										</span>
 									</>
 								)}
+								</div>
 
-								<div style={{ flex: 1 }} />
-								<span style={{ fontSize: 12, color: T.muted }}>
-									{wordCount} words
-								</span>
-								<div
-									style={{
-										width: 1,
-										height: 18,
-										background: T.border,
-										margin: "0 4px",
-									}}
-								/>
-								{/* Actions */}
+								
+								<div className="flex items-center gap-2">
+									{/* Actions */}
 								<motion.button
 									whileHover={{ background: "#F0ECE5" }}
 									whileTap={{ scale: 0.96 }}
@@ -2594,8 +3828,9 @@ export default function DraftPage() {
 									whileHover={{ background: "#F0ECE5" }}
 									whileTap={{ scale: 0.96 }}
 									onClick={() => {
-										const raw =
-											editorRef.current?.innerHTML || draft?.body || "";
+										const raw = stripDraftSlashQueryFromHtmlString(
+											editorRef.current?.innerHTML || draft?.body || "",
+										);
 										const content = raw.trim().startsWith("<")
 											? raw
 											: formatBody(raw);
@@ -2604,7 +3839,18 @@ export default function DraftPage() {
 											draft?.title ||
 											"Untitled draft";
 										const htmlDoc = buildThemedHTML(content, THEMES.ink, title);
-										setPreviewData({ title, htmlDoc });
+										const markdown = htmlToMarkdown(content) || "";
+										const reactSnippet = buildThemedReactSnippet(
+											content,
+											"ink",
+											title,
+										);
+										setPreviewData({
+											title,
+											htmlDoc,
+											markdown,
+											reactSnippet,
+										});
 										setPreviewOpen(true);
 									}}
 									style={{
@@ -2655,6 +3901,7 @@ export default function DraftPage() {
 									/>
 									{saved ? "Saved!" : "Save draft"}
 								</motion.button>
+								</div>
 							</div>
 
 							<div className="overflow-y-auto flex flex-col h-full">
@@ -2698,7 +3945,7 @@ export default function DraftPage() {
 															? "Georgia, serif"
 															: editorFont === "system-ui"
 																? "system-ui, sans-serif"
-																: "'Outfit', sans-serif",
+																: "'Comic', sans-serif",
 											}}
 											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
 										/>
@@ -2812,39 +4059,236 @@ export default function DraftPage() {
 										[data-editor-root] [contenteditable="true"] blockquote *,
 										[data-editor-root] [contenteditable="true"] [data-block],
 										[data-editor-root] [contenteditable="true"] [data-block] * { font-size: inherit !important; }
+										[data-editor-root] [contenteditable="true"] a {
+											color: #0078D4;
+											text-decoration: underline;
+											text-underline-offset: 2px;
+											cursor: pointer;
+										}
+										[data-editor-root] [contenteditable="true"] img {
+											max-width: 100%;
+											height: auto;
+											border-radius: 6px;
+											margin: 12px 0;
+											display: block;
+										}
+										[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] img {
+											margin: 0 !important;
+											max-width: 100%;
+										}
+										[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] details[data-draft-img-popover] > summary {
+											list-style: none;
+										}
+										[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] details[data-draft-img-popover] > summary::-webkit-details-marker {
+											display: none;
+										}
+										[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] [data-draft-img-menu] button:hover {
+											background: #F3EFE8 !important;
+										}
+										[data-editor-root] [contenteditable="true"] [data-draft-caption]:empty:before {
+											content: attr(data-placeholder);
+											color: #B0AAA3;
+											pointer-events: none;
+										}
+										[data-editor-root] [contenteditable="true"] [data-draft-caption]:focus:before {
+											content: none !important;
+										}
+										[data-editor-root] [contenteditable="true"] ul:not([data-todo="true"]) {
+											list-style-type: disc !important;
+											list-style-position: outside !important;
+											padding-left: 1.5em !important;
+											margin: 0.5em 0 !important;
+										}
+										[data-editor-root] [contenteditable="true"] ol {
+											list-style-type: decimal !important;
+											list-style-position: outside !important;
+											padding-left: 1.5em !important;
+											margin: 0.5em 0 !important;
+										}
+										[data-editor-root] [contenteditable="true"] ul:not([data-todo="true"]) > li,
+										[data-editor-root] [contenteditable="true"] ol > li {
+											display: list-item !important;
+											margin: 0.2em 0 !important;
+										}
+										[data-editor-root] [contenteditable="true"] ul[data-todo="true"] {
+											list-style: none;
+											padding-left: 0;
+										}
+										[data-editor-root] [contenteditable="true"] ul[data-todo="true"] li {
+											list-style: none;
+										}
+										[data-editor-root] [contenteditable="true"] ul[data-todo="true"] li.todo-item span.todo-label {
+											flex: 1;
+											min-width: 0;
+										}
+										[data-editor-root] [contenteditable="true"] span[data-draft-inline] {
+											box-decoration-break: clone;
+											-webkit-box-decoration-break: clone;
+										}
+										[data-editor-root] [contenteditable="true"] [data-block="code-group"] [data-cg-panel] pre {
+											font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace !important;
+											font-size: 13px !important;
+											line-height: 1.75 !important;
+											color: #E8D5B0 !important;
+											background: #1A1A1A !important;
+											min-height: 72px !important;
+											display: block !important;
+											white-space: pre-wrap !important;
+											box-sizing: border-box !important;
+											width: 100% !important;
+											margin: 0 !important;
+										}
 									`}</style>
 									<div
 										ref={editorRef}
 										contentEditable
 										suppressContentEditableWarning
-										onInput={countWords}
+										onInput={onEditorInput}
 										onKeyDown={(e) => {
-											if (e.key === "/" && !slashCommand) {
-												e.preventDefault();
+											if ((e.key === " " || e.code === "Space") && !e.defaultPrevented) {
+												const root = editorRef.current;
 												const sel = window.getSelection();
-												if (!sel?.rangeCount) return;
-												const range = sel.getRangeAt(0);
-												const rect = range.getBoundingClientRect();
-												if (rect.width === 0 && rect.height === 0) return;
-												setSlashCommand({
-													x: Math.max(
-														12,
-														Math.min(rect.left, window.innerWidth - 280),
-													),
-													y: rect.bottom + 4,
-												});
+												if (root && sel?.rangeCount) {
+													const range = sel.getRangeAt(0);
+													let node = range.commonAncestorContainer;
+													if (node.nodeType === 3) node = node.parentElement;
+													const callout = node?.closest?.(
+														"[data-block^='callout-']",
+													);
+													if (callout && root.contains(callout)) {
+														const flex = callout.querySelector(
+															':scope > div[style*="flex:1"]',
+														);
+														const bodyDiv =
+															flex?.querySelector(":scope > p + div") ||
+															flex?.querySelector(":scope > div:last-of-type");
+														const bodyText = (
+															bodyDiv?.innerText ||
+															bodyDiv?.textContent ||
+															""
+														)
+															.replace(/\u00a0/g, " ")
+															.trim();
+														if (!bodyText) {
+															e.preventDefault();
+															const p = document.createElement("p");
+															p.appendChild(document.createElement("br"));
+															callout.replaceWith(p);
+															const r = document.createRange();
+															r.setStart(p, 0);
+															r.collapse(true);
+															sel.removeAllRanges();
+															sel.addRange(r);
+															countWords();
+															onEditorInput();
+															return;
+														}
+													}
+												}
+											}
+											if (e.key === "Enter" && !e.shiftKey) {
+												const sel = window.getSelection();
+												if (sel?.rangeCount && editorRef.current) {
+													const range = sel.getRangeAt(0);
+													const li =
+														range.commonAncestorContainer.nodeType === 3
+															? range.commonAncestorContainer.parentElement?.closest(
+																	"li",
+																)
+															: range.commonAncestorContainer.closest?.("li");
+													const ul = li?.closest?.('ul[data-todo="true"]');
+													if (li && ul && editorRef.current.contains(li)) {
+														e.preventDefault();
+														const span =
+															li.querySelector("span.todo-label") ||
+															li.querySelector(":scope > span");
+														if (!span) {
+															const newLi = document.createElement("li");
+															newLi.className = "todo-item";
+															newLi.setAttribute(
+																"style",
+																TODO_LI_STYLE,
+															);
+															newLi.innerHTML = `<input type="checkbox" class="todo-cb" style="${TODO_CHECKBOX_STYLE}"/><span class="todo-label" style="flex:1;min-width:0"> </span>`;
+															ul.insertBefore(newLi, li.nextSibling);
+															const ns = newLi.querySelector("span");
+															const r = document.createRange();
+															const tn = ns?.firstChild;
+															if (tn && tn.nodeType === 3) {
+																r.setStart(tn, 1);
+																r.collapse(true);
+															} else {
+																r.selectNodeContents(ns);
+																r.collapse(true);
+															}
+															sel.removeAllRanges();
+															sel.addRange(r);
+														} else {
+															const pre = document.createRange();
+															pre.selectNodeContents(span);
+															pre.setEnd(
+																range.startContainer,
+																range.startOffset,
+															);
+															const beforeText = pre.toString();
+															const post = document.createRange();
+															post.selectNodeContents(span);
+															post.setStart(
+																range.startContainer,
+																range.startOffset,
+															);
+															const afterText = post.toString();
+															span.textContent = beforeText;
+
+															const newLi = document.createElement("li");
+															newLi.className = "todo-item";
+															newLi.setAttribute(
+																"style",
+																li.getAttribute("style") || TODO_LI_STYLE,
+															);
+															const cb = document.createElement("input");
+															cb.className = "todo-cb";
+															cb.setAttribute("type", "checkbox");
+															cb.setAttribute("style", TODO_CHECKBOX_STYLE);
+															const newSpan = document.createElement("span");
+															newSpan.className = "todo-label";
+															newSpan.setAttribute("style", "flex:1;min-width:0");
+															const nextText =
+																afterText.length > 0 ? afterText : " ";
+															newSpan.textContent = nextText;
+															newLi.appendChild(cb);
+															newLi.appendChild(newSpan);
+															ul.insertBefore(newLi, li.nextSibling);
+
+															const r = document.createRange();
+															const nc = newSpan.firstChild;
+															if (nc && nc.nodeType === 3) {
+																const off = afterText.length > 0 ? 0 : 1;
+																r.setStart(nc, off);
+																r.collapse(true);
+															} else {
+																r.selectNodeContents(newSpan);
+																r.collapse(true);
+															}
+															sel.removeAllRanges();
+															sel.addRange(r);
+														}
+														countWords();
+														return;
+													}
+												}
 											}
 										}}
-										data-placeholder="Start writing…"
+										data-placeholder="Write, or type / for commands…"
 										style={{
-											maxWidth: 680,
+											maxWidth: 720,
 											margin: "0 auto",
-											padding: "28px 40px 80px",
+											padding: "36px 48px 100px",
 											minHeight: "100%",
 											outline: "none",
 											fontSize: `${editorFontSize}px`,
-											lineHeight: 1.8,
-											color: "#3A3530",
+											lineHeight: 1.75,
+											color: "#37352F",
 											fontFamily:
 												editorFont === "Inter"
 													? "'Inter', sans-serif"
@@ -2852,17 +4296,24 @@ export default function DraftPage() {
 														? "Georgia, serif"
 														: editorFont === "system-ui"
 															? "system-ui, sans-serif"
-															: "'Outfit', sans-serif",
+															: "'Comic', sans-serif",
 										}}
+									/>
+									<input
+										ref={imageFileInputRef}
+										type="file"
+										accept="image/*,video/*"
+										style={{ display: "none" }}
+										onChange={handleImageFileSelect}
 									/>
 									{/* Slash command dropdown */}
 									<AnimatePresence>
 										{slashCommand && (
 											<motion.div
 												data-slash-command
-												initial={{ opacity: 0, y: -4, scale: 0.98 }}
+												initial={{ opacity: 0, y: 6, scale: 0.98 }}
 												animate={{ opacity: 1, y: 0, scale: 1 }}
-												exit={{ opacity: 0, y: -4, scale: 0.98 }}
+												exit={{ opacity: 0, y: 6, scale: 0.98 }}
 												transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
 												style={{
 													position: "fixed",
@@ -2875,154 +4326,437 @@ export default function DraftPage() {
 													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
 													padding: 8,
 													minWidth: 240,
-													maxHeight: 320,
+													maxHeight: 420,
 													overflowY: "auto",
 												}}
 											>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														margin: "0 0 6px 4px",
-													}}
-												>
-													AI
-												</p>
-												<motion.button
-													whileHover={{ background: "#F0ECE5" }}
-													whileTap={{ scale: 0.98 }}
-													onClick={() => handleSlashCommand("continue-writing")}
-													style={{
-														width: "100%",
-														display: "flex",
-														alignItems: "center",
-														gap: 10,
-														padding: "8px 10px",
-														border: "none",
-														borderRadius: 8,
-														background: "none",
-														fontSize: 14,
-														fontWeight: 500,
-														color: T.accent,
-														cursor: "pointer",
-														textAlign: "left",
-													}}
-												>
-													<Icon
-														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
-														size={18}
-														stroke="#C17B2F"
-													/>
-													Continue Writing
-												</motion.button>
-												<motion.button
-													whileHover={{ background: "#F0ECE5" }}
-													whileTap={{ scale: 0.98 }}
-													onClick={() => handleSlashCommand("ask-ai")}
-													style={{
-														width: "100%",
-														display: "flex",
-														alignItems: "center",
-														gap: 10,
-														padding: "8px 10px",
-														border: "none",
-														borderRadius: 8,
-														background: "none",
-														fontSize: 14,
-														fontWeight: 500,
-														color: T.accent,
-														cursor: "pointer",
-														textAlign: "left",
-													}}
-												>
-													<Icon
-														d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
-														size={14}
-														stroke="#C17B2F"
-													/>
-													Ask AI
-												</motion.button>
-												<div
-													style={{
-														height: 1,
-														background: T.border,
-														margin: "8px 0",
-													}}
-												/>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														margin: "0 0 6px 4px",
-													}}
-												>
-													Style
-												</p>
-												{[
-													{ id: "text", label: "Text", icon: "T" },
-													{ id: "h1", label: "Heading 1", icon: "H₁" },
-													{ id: "h2", label: "Heading 2", icon: "H₂" },
-													{ id: "h3", label: "Heading 3", icon: "H₃" },
-													{
-														id: "bullet",
-														label: "Bullet List",
-														icon: Icons.list,
-													},
-													{
-														id: "numbered",
-														label: "Numbered List",
-														icon: Icons.list,
-													},
-													{ id: "todo", label: "To-do list", icon: "☐" },
-												].map(({ id, label, icon }) => (
-													<motion.button
-														key={id}
-														whileHover={{ background: "#F0ECE5" }}
-														whileTap={{ scale: 0.98 }}
-														onClick={() => handleSlashCommand(id)}
-														style={{
-															width: "100%",
-															display: "flex",
-															alignItems: "center",
-															gap: 10,
-															padding: "8px 10px",
-															border: "none",
-															borderRadius: 8,
-															background: "none",
-															fontSize: 14,
-															fontWeight: 500,
-															color: T.accent,
-															cursor: "pointer",
-															textAlign: "left",
-														}}
-													>
-														{typeof icon === "string" &&
-														!icon.startsWith("M") ? (
-															<span
+												{(() => {
+													const q = (slashCommand.query ?? "")
+														.trim()
+														.toLowerCase();
+													const aiHit = draftSlashItemMatchesQuery(
+														{
+															id: "ask-ai",
+															label: "Ask AI",
+															keywords: DRAFT_SLASH_AI_KEYWORDS,
+														},
+														q,
+													);
+													const styleItems = DRAFT_SLASH_BASE_ITEMS.filter(
+														(it) =>
+															it.section === "style" &&
+															draftSlashItemMatchesQuery(it, q),
+													);
+													const blockItems = DRAFT_SLASH_BASE_ITEMS.filter(
+														(it) =>
+															it.section === "blocks" &&
+															draftSlashItemMatchesQuery(it, q),
+													);
+													const flatRows = getDraftSlashFlatRows(
+														slashCommand.query,
+													);
+													const activeIdx =
+														flatRows.length > 0
+															? Math.min(
+																	slashListIndex,
+																	flatRows.length - 1,
+																)
+															: 0;
+													const styleRowOffset = aiHit ? 1 : 0;
+													const blockRowOffset =
+														styleRowOffset + styleItems.length;
+													if (
+														!aiHit &&
+														styleItems.length === 0 &&
+														blockItems.length === 0
+													) {
+														return (
+															<div
 																style={{
-																	fontSize: 14,
-																	fontWeight: 600,
-																	width: 20,
-																	textAlign: "center",
+																	padding: "10px 12px",
+																	fontSize: 13,
+																	color: T.muted,
 																}}
 															>
-																{icon}
-															</span>
-														) : (
-															<Icon d={icon} size={16} stroke={T.muted} />
-														)}
-														{label}
-													</motion.button>
-												))}
+																No matching commands
+															</div>
+														);
+													}
+													const sectionTitleStyle = {
+														fontSize: 10,
+														fontWeight: 700,
+														color: "#B0AAA3",
+														textTransform: "",
+														letterSpacing: "0.1em",
+														margin: "0 0 6px 4px",
+													};
+													const rowBtnStyle = {
+														width: "100%",
+														display: "flex",
+														alignItems: "center",
+														gap: 10,
+														padding: "8px 10px",
+														border: "none",
+														borderRadius: 8,
+														background: "none",
+														fontSize: 14,
+														fontWeight: 500,
+														color: T.accent,
+														cursor: "pointer",
+														textAlign: "left",
+													};
+													const divider = (
+														<div
+															style={{
+																height: 1,
+																background: T.border,
+																margin: "8px 0",
+															}}
+														/>
+													);
+													const renderIcon = (item) => {
+														const ic = item.icon;
+														if (ic === "list")
+															return (
+																<Icon
+																	d={Icons.list}
+																	size={16}
+																	stroke={T.muted}
+																/>
+															);
+														if (ic === "image")
+															return (
+																<Icon
+																	d={Icons.image}
+																	size={16}
+																	stroke={T.muted}
+																/>
+															);
+														if (ic === "table")
+															return (
+																<Icon
+																	d={Icons.table}
+																	size={16}
+																	stroke={T.muted}
+																/>
+															);
+														if (ic === "embed")
+															return (
+																<Icon
+																	d={Icons.video}
+																	size={16}
+																	stroke={T.muted}
+																/>
+															);
+														if (
+															typeof ic === "string" &&
+															!ic.startsWith("M")
+														) {
+															return (
+																<span
+																	style={{
+																		fontSize: 14,
+																		fontWeight: 600,
+																		width: 20,
+																		textAlign: "center",
+																	}}
+																>
+																	{ic}
+																</span>
+															);
+														}
+														return (
+															<Icon d={ic} size={16} stroke={T.muted} />
+														);
+													};
+													return (
+														<>
+															{aiHit && (
+																<>
+																	<p style={sectionTitleStyle}>AI</p>
+																	<motion.button
+																		whileHover={{ background: "#F0ECE5" }}
+																		whileTap={{ scale: 0.98 }}
+																		onClick={() =>
+																			handleSlashCommand("ask-ai")
+																		}
+																		data-slash-active={
+																			activeIdx === 0
+																				? "true"
+																				: undefined
+																		}
+																		style={{
+																			...rowBtnStyle,
+																			...(activeIdx === 0
+																				? { background: "#EDE8E0" }
+																				: {}),
+																		}}
+																	>
+																		<Icon
+																			d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
+																			size={14}
+																			stroke="#C17B2F"
+																		/>
+																		Ask AI
+																	</motion.button>
+																</>
+															)}
+															{aiHit &&
+																(styleItems.length > 0 ||
+																	blockItems.length > 0) &&
+																divider}
+															{styleItems.length > 0 && (
+																<>
+																	<p style={sectionTitleStyle}>Style</p>
+																	{styleItems.map((item, i) => {
+																		const isActive =
+																			activeIdx === styleRowOffset + i;
+																		return (
+																		<motion.button
+																			key={item.id}
+																			whileHover={{
+																				background: "#F0ECE5",
+																			}}
+																			whileTap={{ scale: 0.98 }}
+																			onClick={() =>
+																				handleSlashCommand(item.id)
+																			}
+																			data-slash-active={
+																				isActive ? "true" : undefined
+																			}
+																			style={{
+																				...rowBtnStyle,
+																				...(isActive
+																					? { background: "#EDE8E0" }
+																					: {}),
+																			}}
+																		>
+																			{renderIcon(item)}
+																			{item.label}
+																		</motion.button>
+																	);
+																	})}
+																</>
+															)}
+															{styleItems.length > 0 &&
+																blockItems.length > 0 &&
+																divider}
+															{blockItems.length > 0 && (
+																<>
+																	<p style={sectionTitleStyle}>
+																		Blocks
+																	</p>
+																	{blockItems.map((item, i) => {
+																		const isActive =
+																			activeIdx === blockRowOffset + i;
+																		return (
+																		<motion.button
+																			key={item.id}
+																			whileHover={{
+																				background: "#F0ECE5",
+																			}}
+																			whileTap={{ scale: 0.98 }}
+																			onClick={() =>
+																				handleSlashCommand(item.id)
+																			}
+																			data-slash-active={
+																				isActive ? "true" : undefined
+																			}
+																			style={{
+																				...rowBtnStyle,
+																				...(isActive
+																					? { background: "#EDE8E0" }
+																					: {}),
+																			}}
+																		>
+																			{renderIcon(item)}
+																			{item.label}
+																		</motion.button>
+																	);
+																	})}
+																</>
+															)}
+														</>
+													);
+												})()}
 											</motion.div>
 										)}
 									</AnimatePresence>
+									{draftSlashDatePickerPos &&
+										createPortal(
+											<div
+												data-draft-date-picker
+												style={{
+													position: "fixed",
+													left: draftSlashDatePickerPos.left,
+													top: draftSlashDatePickerPos.top,
+													zIndex: 120,
+												}}
+											>
+												<TiptapSlashDatePicker
+													initialDate={new Date()}
+													onSelect={insertDraftDateAtCursor}
+												/>
+											</div>,
+											document.body,
+										)}
+									{draftImageModalOpen &&
+										createPortal(
+											<div
+												role="presentation"
+												style={{
+													position: "fixed",
+													inset: 0,
+													zIndex: 130,
+													background: "rgba(55, 53, 47, 0.35)",
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "center",
+													padding: 16,
+												}}
+												onMouseDown={(e) => {
+													if (e.target === e.currentTarget) {
+														setDraftImageModalOpen(false);
+														setDraftImageModalUrl("");
+													}
+												}}
+											>
+												<div
+													role="dialog"
+													aria-modal="true"
+													aria-label="Insert image or video"
+													onMouseDown={(e) => e.stopPropagation()}
+													style={{
+														background: T.surface,
+														borderRadius: 12,
+														padding: 20,
+														minWidth: 300,
+														maxWidth: 420,
+														width: "100%",
+														boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
+														border: `1px solid ${T.border}`,
+													}}
+												>
+													<p
+														style={{
+															fontSize: 16,
+															fontWeight: 600,
+															color: T.accent,
+															marginBottom: 12,
+														}}
+													>
+														Insert image or video
+													</p>
+													<p
+														style={{
+															fontSize: 13,
+															color: T.muted,
+															marginBottom: 14,
+															lineHeight: 1.5,
+														}}
+													>
+														Upload a file from your computer, or paste an
+														https image or video URL.
+													</p>
+													<button
+														type="button"
+														onClick={() => imageFileInputRef.current?.click()}
+														disabled={imageUploading}
+														style={{
+															width: "100%",
+															padding: "10px 14px",
+															borderRadius: 8,
+															border: `1px solid ${T.border}`,
+															background: "#F7F5F0",
+															fontWeight: 600,
+															fontSize: 14,
+															color: T.accent,
+															cursor: imageUploading ? "wait" : "pointer",
+															marginBottom: 14,
+														}}
+													>
+														{imageUploading
+															? "Uploading…"
+															: "Choose file from computer"}
+													</button>
+													<label
+														style={{
+															display: "block",
+															fontSize: 12,
+															fontWeight: 600,
+															color: T.muted,
+															marginBottom: 6,
+														}}
+													>
+														Image or video URL
+													</label>
+													<input
+														type="url"
+														value={draftImageModalUrl}
+														onChange={(e) => setDraftImageModalUrl(e.target.value)}
+														placeholder="https://…"
+														style={{
+															width: "100%",
+															padding: "10px 12px",
+															borderRadius: 8,
+															border: `1px solid ${T.border}`,
+															fontSize: 14,
+															marginBottom: 12,
+															boxSizing: "border-box",
+														}}
+														onKeyDown={(e) => {
+															if (e.key === "Enter") {
+																e.preventDefault();
+																confirmDraftImageFromUrl();
+															}
+														}}
+													/>
+													<div
+														style={{
+															display: "flex",
+															justifyContent: "flex-end",
+															gap: 8,
+															marginTop: 8,
+														}}
+													>
+														<button
+															type="button"
+															onClick={() => {
+																setDraftImageModalOpen(false);
+																setDraftImageModalUrl("");
+															}}
+															style={{
+																padding: "8px 14px",
+																borderRadius: 8,
+																border: "none",
+																background: "transparent",
+																color: T.muted,
+																fontWeight: 500,
+																cursor: "pointer",
+															}}
+														>
+															Cancel
+														</button>
+														<button
+															type="button"
+															onClick={confirmDraftImageFromUrl}
+															style={{
+																padding: "8px 16px",
+																borderRadius: 8,
+																border: "none",
+																background: "#C17B2F",
+																color: "#fff",
+																fontWeight: 600,
+																cursor: "pointer",
+															}}
+														>
+															Insert from URL
+														</button>
+													</div>
+												</div>
+											</div>,
+											document.body,
+										)}
 									{/* Text selection dropdown (Notion-style) */}
 									<AnimatePresence>
 										{selectionDropdown && (
@@ -3040,13 +4774,23 @@ export default function DraftPage() {
 													border: `1px solid ${T.border}`,
 													borderRadius: 10,
 													boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-													padding: 6,
+													padding: 8,
 													display: "flex",
-													alignItems: "center",
-													gap: 4,
-													flexWrap: "wrap",
+													flexDirection: "column",
+													alignItems: "stretch",
+													gap: 0,
+													maxWidth: 700,
+													minWidth: selectionSubtool ? 280 : 200,
 												}}
 											>
+												<div
+													style={{
+														display: "flex",
+														flexWrap: "wrap",
+														alignItems: "center",
+														gap: 4,
+													}}
+												>
 												<motion.button
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.96 }}
@@ -3084,21 +4828,7 @@ export default function DraftPage() {
 														document.execCommand("bold");
 														setSelectionDropdown(null);
 													}}
-													style={{
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														width: 28,
-														height: 28,
-														padding: 0,
-														border: "none",
-														borderRadius: 6,
-														background: "none",
-														fontSize: 13,
-														fontWeight: 700,
-														color: T.accent,
-														cursor: "pointer",
-													}}
+													className="inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-zinc-600 cursor-pointer"
 												>
 													B
 												</motion.button>
@@ -3110,40 +4840,18 @@ export default function DraftPage() {
 														document.execCommand("italic");
 														setSelectionDropdown(null);
 													}}
-													style={{
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														width: 28,
-														height: 28,
-														padding: 0,
-														border: "none",
-														borderRadius: 6,
-														background: "none",
-														fontSize: 13,
-														fontStyle: "italic",
-														fontWeight: 600,
-														color: T.accent,
-														cursor: "pointer",
-													}}
+													className="inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-zinc-600 cursor-pointer"
 												>
 													I
 												</motion.button>
 												<div
-													style={{
-														width: 1,
-														height: 20,
-														background: T.border,
-														margin: "0 2px",
-													}}
+													className="w-px h-4 bg-zinc-200"
 												/>
 												{[
 													{ cmd: "p", label: "Text" },
 													{ cmd: "h1", label: "H1" },
 													{ cmd: "h2", label: "H2" },
-													{ cmd: "h3", label: "H3" },
 													{ cmd: "ul", label: "• List" },
-													{ cmd: "ol", label: "1. List" },
 												].map(({ cmd, label }) => (
 													<motion.button
 														key={cmd}
@@ -3187,54 +4895,360 @@ export default function DraftPage() {
 												<motion.button
 													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.96 }}
+													title="Add link"
+													onMouseDown={(e) => e.preventDefault()}
 													onClick={() => {
-														navigator.clipboard.writeText(
-															selectionDropdown.text,
-														);
-														setSelectionDropdown(null);
+														setSelectionSubtool((s) => {
+															if (s === "link") {
+																setSelectionLinkUrl("");
+																return null;
+															}
+															const { href: h } = getSelectionLinkContext(
+																window.getSelection(),
+															);
+															setSelectionLinkUrl(h);
+															return "link";
+														});
 													}}
-													style={{
-														display: "flex",
-														alignItems: "center",
-														gap: 5,
-														padding: "6px 10px",
-														border: "none",
-														borderRadius: 6,
-														background: "none",
-														fontSize: 12,
-														fontWeight: 600,
-														color: T.accent,
-														cursor: "pointer",
-													}}
+													className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-accent cursor-pointer ${selectionSubtool === "link" ? "bg-zinc-100" : "bg-none"}`}
 												>
-													<Icon d={Icons.copy} size={12} stroke={T.muted} />
-													Copy
+													<Icon
+														d={Icons.link2}
+														size={14}
+														stroke={T.accent}
+													/>
 												</motion.button>
 												<motion.button
-													whileHover={{ background: "rgba(239,68,68,0.1)" }}
+													whileHover={{ background: "#F0ECE5" }}
 													whileTap={{ scale: 0.96 }}
-													onClick={() => {
-														document.execCommand("delete");
-														setSelectionDropdown(null);
-														countWords();
-													}}
-													style={{
-														display: "flex",
-														alignItems: "center",
-														gap: 5,
-														padding: "6px 10px",
-														border: "none",
-														borderRadius: 6,
-														background: "none",
-														fontSize: 12,
-														fontWeight: 600,
-														color: "#EF4444",
-														cursor: "pointer",
-													}}
+													title="Text color (Tailwind palette)"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() =>
+														setSelectionSubtool((s) =>
+															s === "textColor" ? null : "textColor",
+														)
+													}
+													className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-zinc-500 cursor-pointer ${selectionSubtool === "textColor" ? "bg-zinc-100" : "bg-none"}`}
 												>
-													<Icon d={Icons.trash} size={12} stroke="#EF4444" />
-													Delete
+													A
 												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													title="Highlight / background color"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() =>
+														setSelectionSubtool((s) =>
+															s === "bgColor" ? null : "bgColor",
+														)
+													}
+													className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-zinc-500 cursor-pointer ${selectionSubtool === "bgColor" ? "bg-zinc-100" : "bg-none"}`}
+												>
+													ab
+												</motion.button>
+												</div>
+
+												<AnimatePresence initial={false}>
+													{selectionSubtool === "link" && (
+														<motion.div
+															key="selection-link-panel"
+															data-selection-dropdown
+															initial={{ opacity: 0, y: -8 }}
+															animate={{ opacity: 1, y: 0 }}
+															exit={{ opacity: 0, y: -8 }}
+															transition={{
+																duration: 0.18,
+																ease: [0.16, 1, 0.3, 1],
+															}}
+															style={{
+																marginTop: 8,
+																paddingTop: 10,
+																borderTop: `1px solid ${T.border}`,
+																display: "flex",
+																flexDirection: "column",
+																gap: 8,
+																overflow: "hidden",
+															}}
+														>
+															<p
+																style={{
+																	fontSize: 11,
+																	fontWeight: 700,
+																	color: "#B0AAA3",
+																	textTransform: "uppercase",
+																	letterSpacing: "0.06em",
+																	margin: 0,
+																}}
+															>
+																Link URL
+															</p>
+															<input
+																ref={selectionLinkInputRef}
+																type="text"
+																value={selectionLinkUrl}
+																onChange={(e) =>
+																	setSelectionLinkUrl(e.target.value)
+																}
+																onKeyDown={(e) => {
+																	if (e.key === "Enter") {
+																		e.preventDefault();
+																		let url = selectionLinkUrl.trim();
+																		if (!url) return;
+																		if (
+																			!/^https?:\/\//i.test(url) &&
+																			!url.startsWith("mailto:")
+																		) {
+																			url = `https://${url}`;
+																		}
+																		if (!restoreEditorSelection()) return;
+																		document.execCommand(
+																			"createLink",
+																			false,
+																			url,
+																		);
+																		countWords();
+																		setSelectionDropdown(null);
+																		setSelectionSubtool(null);
+																		setSelectionLinkUrl("");
+																	}
+																}}
+																placeholder="https:// or mailto:…"
+																style={{
+																	width: "100%",
+																	padding: "8px 10px",
+																	borderRadius: 8,
+																	border: `1px solid ${T.border}`,
+																	fontSize: 13,
+																	background: T.base,
+																	color: T.accent,
+																}}
+																className="outline-none"
+															/>
+															<div
+																style={{
+																	display: "flex",
+																	justifyContent: "flex-end",
+																	gap: 8,
+																}}
+															>
+																<button
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => {
+																		setSelectionSubtool(null);
+																		setSelectionLinkUrl("");
+																	}}
+																	style={{
+																		padding: "6px 12px",
+																		borderRadius: 8,
+																		border: `1px solid ${T.border}`,
+																		background: T.base,
+																		fontSize: 12,
+																		fontWeight: 600,
+																		color: T.muted,
+																		cursor: "pointer",
+																	}}
+																>
+																	Cancel
+																</button>
+																<button
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => {
+																		let url = selectionLinkUrl.trim();
+																		if (!url) return;
+																		if (
+																			!/^https?:\/\//i.test(url) &&
+																			!url.startsWith("mailto:")
+																		) {
+																			url = `https://${url}`;
+																		}
+																		if (!restoreEditorSelection()) return;
+																		document.execCommand(
+																			"createLink",
+																			false,
+																			url,
+																		);
+																		countWords();
+																		setSelectionDropdown(null);
+																		setSelectionSubtool(null);
+																		setSelectionLinkUrl("");
+																	}}
+																	style={{
+																		padding: "6px 14px",
+																		borderRadius: 8,
+																		border: "none",
+																		background: T.accent,
+																		fontSize: 12,
+																		fontWeight: 700,
+																		color: "white",
+																		cursor: "pointer",
+																	}}
+																>
+																	Apply link
+																</button>
+															</div>
+														</motion.div>
+													)}
+												</AnimatePresence>
+
+												{selectionSubtool === "textColor" && (
+													<div
+														data-selection-dropdown
+														style={{
+															marginTop: 8,
+															paddingTop: 10,
+															borderTop: `1px solid ${T.border}`,
+														}}
+													>
+														<p
+															style={{
+																fontSize: 11,
+																fontWeight: 700,
+																color: "#B0AAA3",
+																textTransform: "uppercase",
+																letterSpacing: "0.06em",
+																marginBottom: 8,
+															}}
+														>
+															Text color
+														</p>
+														<div
+															style={{
+																display: "grid",
+																gridTemplateColumns:
+																	"repeat(12, 1fr)",
+																gap: 4,
+															}}
+														>
+															{SELECTION_TEXT_COLORS.map(({ label, hex }) => (
+																<button
+																	key={label}
+																	type="button"
+																	title={label}
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => {
+																		if (!restoreEditorSelection()) return;
+																		const patch = {
+																			color: hex || null,
+																		};
+																		const ok = applyDraftBubbleInlineStyle(
+																			editorRef.current,
+																			patch,
+																		);
+																		if (!ok) {
+																			if (!hex)
+																				execDraftForeColor("#37352F");
+																			else execDraftForeColor(hex);
+																		}
+																		countWords();
+																		setSelectionDropdown(null);
+																		setSelectionSubtool(null);
+																	}}
+																	style={{
+																		width: "100%",
+																		aspectRatio: "1",
+																		borderRadius: 6,
+																		border: `1px solid ${T.border}`,
+																		background: hex || "#FFFFFF",
+																		cursor: "pointer",
+																		boxSizing: "border-box",
+																		display: "flex",
+																		alignItems: "center",
+																		justifyContent: "center",
+																		fontSize: 8,
+																		fontWeight: 700,
+																		color: hex ? "#fff" : T.muted,
+																		textDecoration: !hex
+																			? "line-through"
+																			: "none",
+																	}}
+																>
+																	{!hex ? "×" : ""}
+																</button>
+															))}
+														</div>
+													</div>
+												)}
+
+												{selectionSubtool === "bgColor" && (
+													<div
+														data-selection-dropdown
+														style={{
+															marginTop: 8,
+															paddingTop: 10,
+															borderTop: `1px solid ${T.border}`,
+														}}
+													>
+														<p
+															style={{
+																fontSize: 11,
+																fontWeight: 700,
+																color: "#B0AAA3",
+																textTransform: "uppercase",
+																letterSpacing: "0.06em",
+																marginBottom: 8,
+															}}
+														>
+															Background
+														</p>
+														<div
+															style={{
+																display: "grid",
+																gridTemplateColumns:
+																	"repeat(12, 1fr)",
+																gap: 4,
+															}}
+														>
+															{SELECTION_BG_COLORS.map(({ label, hex }) => (
+																<button
+																	key={label}
+																	type="button"
+																	title={label}
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => {
+																		if (!restoreEditorSelection()) return;
+																		const clearBg = "#F7F5F0";
+																		const patch =
+																			hex === "clear"
+																				? { backgroundColor: null }
+																				: { backgroundColor: hex };
+																		const ok = applyDraftBubbleInlineStyle(
+																			editorRef.current,
+																			patch,
+																		);
+																		if (!ok) {
+																			if (hex === "clear")
+																				execDraftHiliteColor(clearBg);
+																			else execDraftHiliteColor(hex);
+																		}
+																		countWords();
+																		setSelectionDropdown(null);
+																		setSelectionSubtool(null);
+																	}}
+																	style={{
+																		width: "100%",
+																		aspectRatio: "1",
+																		borderRadius: 6,
+																		border: `1px solid ${T.border}`,
+																		background:
+																			hex === "clear" ? T.base : hex,
+																		cursor: "pointer",
+																		boxSizing: "border-box",
+																		display: "flex",
+																		alignItems: "center",
+																		justifyContent: "center",
+																		fontSize: 7,
+																		fontWeight: 700,
+																		color: T.muted,
+																	}}
+																>
+																	{hex === "clear" ? "∅" : ""}
+																</button>
+															))}
+														</div>
+													</div>
+												)}
 											</motion.div>
 										)}
 									</AnimatePresence>
@@ -3481,7 +5495,9 @@ export default function DraftPage() {
 					}}
 					onClearSelectionContext={() => setSelectionContext("")}
 					editorRef={editorRef}
-					draftContent={editorRef.current?.innerHTML || draft?.body || ""}
+					draftContent={stripDraftSlashQueryFromHtmlString(
+						editorRef.current?.innerHTML || draft?.body || "",
+					)}
 					draftTitle={draft?.title || "Draft"}
 					userId={reduxUser?.uid || ""}
 					onAgentDraftCreated={(newDraftId) =>
@@ -3497,12 +5513,18 @@ export default function DraftPage() {
 				{themeDrawerOpen &&
 					(() => {
 						const activeTheme = THEMES[previewTheme];
-						const currentHTML =
-							editorRef.current?.innerHTML || draft?.body || "";
+						const currentHTML = stripDraftSlashQueryFromHtmlString(
+							editorRef.current?.innerHTML || draft?.body || "",
+						);
 						const themedDoc = activeTheme
 							? buildThemedHTML(currentHTML, activeTheme, draft?.title || "")
 							: "";
-						const isCopied = copiedTheme === previewTheme;
+						const isCopiedHtml =
+							copiedTheme?.key === previewTheme &&
+							copiedTheme?.format === "html";
+						const isCopiedReact =
+							copiedTheme?.key === previewTheme &&
+							copiedTheme?.format === "react";
 						return (
 							<>
 								{/* Backdrop */}
@@ -3582,8 +5604,7 @@ export default function DraftPage() {
 												Export themes
 											</p>
 											<p style={{ fontSize: 12, color: T.muted }}>
-												— pick a theme to preview your content, then copy the
-												HTML
+												— pick a theme, then copy HTML or a React embed
 											</p>
 											<div style={{ flex: 1 }} />
 
@@ -3636,7 +5657,7 @@ export default function DraftPage() {
 											{/* Copy HTML — primary CTA */}
 											<motion.button
 												whileHover={{
-													background: isCopied ? "#2D6A4F" : "#333",
+													background: isCopiedHtml ? "#2D6A4F" : "#333",
 												}}
 												whileTap={{ scale: 0.96 }}
 												onClick={() => handleCopyThemeHTML(previewTheme)}
@@ -3644,7 +5665,7 @@ export default function DraftPage() {
 													display: "flex",
 													alignItems: "center",
 													gap: 7,
-													background: isCopied ? "#2D6A4F" : T.accent,
+													background: isCopiedHtml ? "#2D6A4F" : T.accent,
 													color: "white",
 													border: "none",
 													borderRadius: 9,
@@ -3655,7 +5676,7 @@ export default function DraftPage() {
 													transition: "background 0.2s",
 												}}
 											>
-												{isCopied ? (
+												{isCopiedHtml ? (
 													<>
 														<svg
 															width={13}
@@ -3669,7 +5690,7 @@ export default function DraftPage() {
 														>
 															<polyline points="20 6 9 17 4 12" />
 														</svg>
-														Copied!
+														HTML copied!
 													</>
 												) : (
 													<>
@@ -3695,6 +5716,35 @@ export default function DraftPage() {
 														</svg>
 														Copy HTML — {activeTheme?.name}
 													</>
+												)}
+											</motion.button>
+
+											<motion.button
+												whileHover={{
+													background: isCopiedReact ? "#1E3A5F" : T.base,
+												}}
+												whileTap={{ scale: 0.96 }}
+												onClick={() => handleCopyThemeReact(previewTheme)}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 7,
+													background: isCopiedReact ? "#1E3A5F" : T.base,
+													color: isCopiedReact ? "white" : T.accent,
+													border: `1px solid ${T.border}`,
+													borderRadius: 9,
+													padding: "8px 16px",
+													fontSize: 13,
+													fontWeight: 600,
+													cursor: "pointer",
+													transition: "background 0.2s, color 0.2s",
+												}}
+												title="Copies a React component (iframe embed) you can paste into a Next.js or Vite app"
+											>
+												{isCopiedReact ? (
+													<>React copied!</>
+												) : (
+													<>Copy React — {activeTheme?.name}</>
 												)}
 											</motion.button>
 
@@ -3939,6 +5989,8 @@ export default function DraftPage() {
 										display: "flex",
 										alignItems: "center",
 										justifyContent: "space-between",
+										gap: 12,
+										flexWrap: "wrap",
 										flexShrink: 0,
 									}}
 								>
@@ -3947,26 +5999,216 @@ export default function DraftPage() {
 									>
 										Preview — {previewData.title || "Untitled"}
 									</span>
-									<motion.button
-										whileHover={{ background: "#F0ECE5" }}
-										whileTap={{ scale: 0.95 }}
-										onClick={() => setPreviewOpen(false)}
+									<div
+										ref={previewExportRef}
 										style={{
-											background: "none",
-											border: "none",
-											borderRadius: 8,
-											width: 32,
-											height: 32,
+											position: "relative",
 											display: "flex",
 											alignItems: "center",
-											justifyContent: "center",
-											cursor: "pointer",
-											fontSize: 18,
-											color: T.muted,
+											gap: 8,
 										}}
 									>
-										✕
-									</motion.button>
+										<motion.button
+											type="button"
+											whileHover={{ background: "#F0ECE5" }}
+											whileTap={{ scale: 0.95 }}
+											onClick={() =>
+												setPreviewExportOpen((open) => !open)
+											}
+											style={{
+												display: "flex",
+												alignItems: "center",
+												gap: 6,
+												background: T.base,
+												border: `1px solid ${T.border}`,
+												borderRadius: 8,
+												padding: "6px 12px",
+												fontSize: 12,
+												fontWeight: 600,
+												color: T.muted,
+												cursor: "pointer",
+											}}
+										>
+											<Icon d={Icons.copy} size={13} stroke={T.muted} />
+											Export
+											<span
+												style={{
+													display: "inline-flex",
+													transform: previewExportOpen
+														? "rotate(180deg)"
+														: "none",
+													transition: "transform 0.18s ease",
+												}}
+											>
+												<Icon
+													d={Icons.chevronD}
+													size={14}
+													stroke={T.muted}
+												/>
+											</span>
+										</motion.button>
+										<AnimatePresence>
+											{previewExportOpen && (
+												<motion.div
+													initial={{ opacity: 0, y: -6 }}
+													animate={{ opacity: 1, y: 0 }}
+													exit={{ opacity: 0, y: -6 }}
+													transition={{
+														duration: 0.14,
+														ease: [0.16, 1, 0.3, 1],
+													}}
+													style={{
+														position: "absolute",
+														top: "100%",
+														right: 0,
+														marginTop: 6,
+														minWidth: 210,
+														background: T.surface,
+														border: `1px solid ${T.border}`,
+														borderRadius: 10,
+														boxShadow:
+															"0 12px 32px rgba(0,0,0,0.12)",
+														padding: 6,
+														zIndex: 20,
+													}}
+												>
+													<button
+														type="button"
+														onClick={() => {
+															if (!previewData.markdown?.trim())
+																return;
+															navigator.clipboard
+																.writeText(previewData.markdown)
+																.catch(() => {});
+															setPreviewCopied("md");
+															setPreviewExportOpen(false);
+															setTimeout(
+																() => setPreviewCopied(null),
+																2000,
+															);
+														}}
+														style={{
+															width: "100%",
+															textAlign: "left",
+															padding: "8px 10px",
+															border: "none",
+															borderRadius: 8,
+															background:
+																previewCopied === "md"
+																	? "rgba(61,122,53,0.12)"
+																	: "transparent",
+															fontSize: 13,
+															fontWeight: 600,
+															color:
+																previewCopied === "md"
+																	? "#3D7A35"
+																	: T.accent,
+															cursor: "pointer",
+														}}
+													>
+														{previewCopied === "md"
+															? "Markdown copied"
+															: "Copy Markdown"}
+													</button>
+													<button
+														type="button"
+														onClick={() => {
+															if (!previewData.htmlDoc) return;
+															navigator.clipboard
+																.writeText(previewData.htmlDoc)
+																.catch(() => {});
+															setPreviewCopied("html");
+															setPreviewExportOpen(false);
+															setTimeout(
+																() => setPreviewCopied(null),
+																2000,
+															);
+														}}
+														style={{
+															width: "100%",
+															textAlign: "left",
+															padding: "8px 10px",
+															border: "none",
+															borderRadius: 8,
+															background:
+																previewCopied === "html"
+																	? "rgba(61,122,53,0.12)"
+																	: "transparent",
+															fontSize: 13,
+															fontWeight: 600,
+															color:
+																previewCopied === "html"
+																	? "#3D7A35"
+																	: T.accent,
+															cursor: "pointer",
+														}}
+													>
+														{previewCopied === "html"
+															? "HTML copied"
+															: "Copy HTML"}
+													</button>
+													<button
+														type="button"
+														onClick={() => {
+															if (!previewData.reactSnippet?.trim())
+																return;
+															navigator.clipboard
+																.writeText(previewData.reactSnippet)
+																.catch(() => {});
+															setPreviewCopied("react");
+															setPreviewExportOpen(false);
+															setTimeout(
+																() => setPreviewCopied(null),
+																2000,
+															);
+														}}
+														style={{
+															width: "100%",
+															textAlign: "left",
+															padding: "8px 10px",
+															border: "none",
+															borderRadius: 8,
+															background:
+																previewCopied === "react"
+																	? "rgba(61,122,53,0.12)"
+																	: "transparent",
+															fontSize: 13,
+															fontWeight: 600,
+															color:
+																previewCopied === "react"
+																	? "#3D7A35"
+																	: T.accent,
+															cursor: "pointer",
+														}}
+													>
+														{previewCopied === "react"
+															? "React copied"
+															: "Copy React"}
+													</button>
+												</motion.div>
+											)}
+										</AnimatePresence>
+										<motion.button
+											whileHover={{ background: "#F0ECE5" }}
+											whileTap={{ scale: 0.95 }}
+											onClick={() => setPreviewOpen(false)}
+											style={{
+												background: "none",
+												border: "none",
+												borderRadius: 8,
+												width: 32,
+												height: 32,
+												display: "flex",
+												alignItems: "center",
+												justifyContent: "center",
+												cursor: "pointer",
+												fontSize: 18,
+												color: T.muted,
+											}}
+										>
+											✕
+										</motion.button>
+									</div>
 								</div>
 								<div
 									style={{
@@ -3979,7 +6221,7 @@ export default function DraftPage() {
 										<iframe
 											srcDoc={previewData.htmlDoc}
 											title={`Preview — ${previewData.title}`}
-											sandbox="allow-same-origin"
+											sandbox="allow-scripts allow-same-origin"
 											style={{
 												width: "100%",
 												height: "100%",
@@ -4112,7 +6354,9 @@ export default function DraftPage() {
 			<InfographicsModal
 				open={infographicsOpen}
 				onClose={() => setInfographicsOpen(false)}
-				content={editorRef.current?.innerHTML || draft?.body || ""}
+				content={stripDraftSlashQueryFromHtmlString(
+					editorRef.current?.innerHTML || draft?.body || "",
+				)}
 				title={draft?.title || "Draft"}
 				userId={reduxUser?.uid || ""}
 				draftId={draftId}

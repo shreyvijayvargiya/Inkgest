@@ -18,7 +18,7 @@ export default function Footer() {
 					<div>
 						<div
 							style={{
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 								fontSize: 24,
 								color: "white",
 								display: "flex",
@@ -44,7 +44,7 @@ export default function Footer() {
 								color: "rgba(255,255,255,0.4)",
 								maxWidth: 200,
 								lineHeight: 1.6,
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 							}}
 						>
 							Turn any URL into a newsletter, email, or blog post, infographics
@@ -70,7 +70,7 @@ export default function Footer() {
 										letterSpacing: "0.1em",
 										color: "rgba(255,255,255,0.35)",
 										marginBottom: 16,
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 									}}
 								>
 									{col.title}
@@ -85,7 +85,7 @@ export default function Footer() {
 											color: "rgba(255,255,255,0.6)",
 											textDecoration: "none",
 											marginBottom: 10,
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 											transition: "color 0.2s",
 										}}
 										onMouseEnter={(e) => (e.target.style.color = "white")}
@@ -114,7 +114,7 @@ export default function Footer() {
 						style={{
 							fontSize: 13,
 							color: "rgba(255,255,255,0.3)",
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
 						© 2025 inkgest. All rights reserved.
@@ -123,7 +123,7 @@ export default function Footer() {
 						style={{
 							fontSize: 13,
 							color: "rgba(255,255,255,0.3)",
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
 						Made for writers who publish on a deadline. Built using{" "}

@@ -298,7 +298,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 													width: "100%", background: T.accent, color: "white",
 													border: "none", padding: "11px 16px",
 													borderRadius: 10, fontSize: 13, fontWeight: 700,
-													cursor: "pointer", fontFamily: "'Outfit', sans-serif",
+													cursor: "pointer", fontFamily: "'Comic', sans-serif",
 													display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
 												}}
 											>
@@ -318,7 +318,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 												padding: "9px 16px", borderRadius: 10,
 												fontSize: 13, fontWeight: 600, color: T.muted,
 												cursor: isLoading ? "not-allowed" : "pointer",
-												fontFamily: "'Outfit', sans-serif",
+												fontFamily: "'Comic', sans-serif",
 												opacity: isLoading ? 0.5 : 1,
 											}}
 										>

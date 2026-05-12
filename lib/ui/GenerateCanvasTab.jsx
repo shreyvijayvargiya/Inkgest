@@ -1891,7 +1891,7 @@ export default function GenerateCanvasTab({
 				background: T.base,
 				borderTop: `1px solid ${T.border}`,
 				overflow: "hidden",
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 			}}
 		>
 			<div

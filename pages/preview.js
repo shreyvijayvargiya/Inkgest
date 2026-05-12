@@ -148,7 +148,7 @@ const genTitle = (type, prompt) => {
 	const short = prompt
 		.replace(/^(write|create|make|generate|build|give me)\s+(a|an)?\s*/i, "")
 		.trim();
-	const cap = (s) => s.charAt(0).to() + s.slice(1);
+	const cap = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 	const labels = {
 		blog: "Blog:",
 		newsletter: "Newsletter:",

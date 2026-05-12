@@ -339,6 +339,31 @@ const CodeBlockItem = ({
 	);
 };
 
+// CodeGroup: ensure every tab has ≥1 code block (avoids empty first panel).
+function normalizeCodeGroupTabs(raw) {
+	const block = (id) => ({
+		id,
+		name: "",
+		code: "",
+		language: "text",
+	});
+	const tab = (idx, idBase = Date.now()) => ({
+		id: idBase + idx,
+		name: `Tab ${idx + 1}`,
+		code: "",
+		language: "text",
+		codeBlocks: [block(idBase + idx * 100 + 1)],
+	});
+	if (!raw || !Array.isArray(raw) || raw.length === 0) return [tab(0)];
+	return raw.map((t, i) => {
+		let blocks = t.codeBlocks;
+		if (!Array.isArray(blocks) || blocks.length === 0) {
+			blocks = [block((t.id || Date.now()) + i + 1)];
+		}
+		return { ...t, codeBlocks: blocks };
+	});
+}
+
 // CodeGroup Component
 const CodeGroupComponent = ({
 	node,
@@ -347,22 +372,25 @@ const CodeGroupComponent = ({
 	getPos,
 	editor,
 }) => {
-	const [tabs, setTabs] = useState(
-		node.attrs.tabs || [
-			{
-				id: Date.now(),
-				name: "Tab 1",
-				code: "",
-				language: "text",
-				codeBlocks: [
-					{ id: Date.now() + 1, name: "", code: "", language: "text" },
-				],
-			},
-		]
+	const nodeTabsKey = JSON.stringify(node.attrs.tabs ?? []);
+
+	const [tabs, setTabs] = useState(() =>
+		normalizeCodeGroupTabs(node.attrs.tabs),
 	);
+
 	const [activeTab, setActiveTab] = useState(0);
 	const [editingTabId, setEditingTabId] = useState(null);
 	const [editingTabName, setEditingTabName] = useState("");
+
+	useEffect(() => {
+		setTabs(normalizeCodeGroupTabs(node.attrs.tabs));
+	}, [nodeTabsKey]);
+
+	useEffect(() => {
+		const next = normalizeCodeGroupTabs(tabs);
+		if (JSON.stringify(next) === JSON.stringify(node.attrs.tabs)) return;
+		updateAttributes({ tabs: next });
+	}, [tabs, updateAttributes, node.attrs.tabs]);
 
 	const deleteNode = () => {
 		if (typeof getPos === "function") {
@@ -372,20 +400,6 @@ const CodeGroupComponent = ({
 			}
 		}
 	};
-
-	// Sync with node attributes when node changes
-	useEffect(() => {
-		if (
-			node.attrs.tabs &&
-			JSON.stringify(node.attrs.tabs) !== JSON.stringify(tabs)
-		) {
-			setTabs(node.attrs.tabs);
-		}
-	}, [node.attrs.tabs]);
-
-	useEffect(() => {
-		updateAttributes({ tabs });
-	}, [tabs, updateAttributes]);
 
 	const addTab = () => {
 		const newTab = {
@@ -591,9 +605,9 @@ const CodeGroupComponent = ({
 				</div>
 
 				{/* Tab Content */}
-				{currentTab && (
+				{currentTab && (currentTab.codeBlocks?.length ?? 0) > 0 && (
 					<div className="p-3 space-y-1 bg-white">
-						{currentTab.codeBlocks.map((block) => (
+						{(currentTab.codeBlocks ?? []).map((block) => (
 							<CodeBlockItem
 								key={block.id}
 								code={block.code}

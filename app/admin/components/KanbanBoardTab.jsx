@@ -85,9 +85,9 @@ const SortableTaskCard = ({
 			// It's an email, extract initials
 			const parts = assigneeId.split("@")[0].split(".");
 			if (parts.length >= 2) {
-				return (parts[0][0] + parts[1][0]).to();
+				return (parts[0][0] + parts[1][0]).toLowerCase();
 			}
-			return assigneeId.substring(0, 2).to();
+			return assigneeId.substring(0, 2).toLowerCase();
 		}
 		// Try to find in team members
 		const member = teamMembers?.find(
@@ -97,19 +97,19 @@ const SortableTaskCard = ({
 			if (member.username) {
 				const parts = member.username.split(" ");
 				if (parts.length >= 2) {
-					return (parts[0][0] + parts[1][0]).to();
+					return (parts[0][0] + parts[1][0]).toLowerCase();
 				}
-				return member.username.substring(0, 2).to();
+				return member.username.substring(0, 2).toLowerCase();
 			}
 			if (member.email) {
 				const parts = member.email.split("@")[0].split(".");
 				if (parts.length >= 2) {
-					return (parts[0][0] + parts[1][0]).to();
+					return (parts[0][0] + parts[1][0]).toLowerCase();
 				}
-				return member.email.substring(0, 2).to();
+				return member.email.substring(0, 2).toLowerCase();
 			}
 		}
-		return assigneeId?.substring(0, 2).to() || "U";
+		return assigneeId?.substring(0, 2).toLowerCase() || "U";
 	};
 
 	return (
@@ -761,9 +761,9 @@ const KanbanBoardTab = ({ queryClient }) => {
 		if (typeof assigneeId === "string" && assigneeId.includes("@")) {
 			const parts = assigneeId.split("@")[0].split(".");
 			if (parts.length >= 2) {
-				return (parts[0][0] + parts[1][0]).to();
+				return (parts[0][0] + parts[1][0]).toLowerCase();
 			}
-			return assigneeId.substring(0, 2).to();
+			return assigneeId.substring(0, 2).toLowerCase();
 		}
 		const member = teamMembers?.find(
 			(m) => m.id === assigneeId || m.email === assigneeId
@@ -772,19 +772,19 @@ const KanbanBoardTab = ({ queryClient }) => {
 			if (member.username) {
 				const parts = member.username.split(" ");
 				if (parts.length >= 2) {
-					return (parts[0][0] + parts[1][0]).to();
+					return (parts[0][0] + parts[1][0]).toLowerCase();
 				}
-				return member.username.substring(0, 2).to();
+				return member.username.substring(0, 2).toLowerCase();
 			}
 			if (member.email) {
 				const parts = member.email.split("@")[0].split(".");
 				if (parts.length >= 2) {
-					return (parts[0][0] + parts[1][0]).to();
+					return (parts[0][0] + parts[1][0]).toLowerCase();
 				}
-				return member.email.substring(0, 2).to();
+				return member.email.substring(0, 2).toLowerCase();
 			}
 		}
-		return assigneeId?.substring(0, 2).to() || "U";
+		return assigneeId?.substring(0, 2).toLowerCase() || "U";
 	};
 
 	// Get unique assignees from all tasks

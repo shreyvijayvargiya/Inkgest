@@ -1,14 +1,19 @@
-import React, { useCallback, useRef, useState } from "react";
-import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
+import { useEditor, EditorContent, BubbleMenu, FloatingMenu } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Node } from "@tiptap/core";
+import BulletList from "@tiptap/extension-bullet-list";
+import OrderedList from "@tiptap/extension-ordered-list";
+import { Node, Extension } from "@tiptap/core";
 import { CustomImage } from "../../../lib/ui/TiptapImageExtension";
-import { CustomTable } from "../../../lib/ui/TiptapTableExtension";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import { TabPanel, TabGroup } from "../../../lib/ui/TiptapTabExtensions";
 import Youtube from "@tiptap/extension-youtube";
 import Details from "@tiptap/extension-details";
 import TextAlign from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
-import Highlight from "@tiptap/extension-highlight";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import Typography from "@tiptap/extension-typography";
@@ -40,7 +45,13 @@ import {
 	Youtube as YoutubeIcon,
 	ChevronRight,
 	Table as TableIcon,
+	LayoutGrid,
 	CheckSquare2,
+	Minus,
+	ArrowUp,
+	ArrowDown,
+	ArrowLeft,
+	ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
@@ -50,6 +61,28 @@ import {
 	TiptapSlashDropdownExtension,
 	SlashDropdownMenu,
 } from "../../../lib/ui/TiptapSlashDropdownExtension";
+import {
+	TiptapInkHighlight,
+	TiptapInkTextFgExtension,
+} from "../../../lib/ui/TiptapInkEditorExtensions";
+
+/** Keyboard shortcuts when the cursor is inside a TipTap table (header row/column/cell). */
+const TiptapTableHeaderShortcuts = Extension.create({
+	name: "tiptapTableHeaderShortcuts",
+	addKeyboardShortcuts() {
+		return {
+			"Mod-Shift-r": () =>
+				this.editor.isActive("table") &&
+				this.editor.chain().focus().toggleHeaderRow().run(),
+			"Mod-Shift-c": () =>
+				this.editor.isActive("table") &&
+				this.editor.chain().focus().toggleHeaderColumn().run(),
+			"Mod-Shift-l": () =>
+				this.editor.isActive("table") &&
+				this.editor.chain().focus().toggleHeaderCell().run(),
+		};
+	},
+});
 
 // Create DetailsSummary and DetailsContent nodes (required by Details extension)
 // These are not exported from @tiptap/extension-details in v2, so we create them manually
@@ -99,6 +132,7 @@ const normalizeContent = (content) => {
 		/\[.*\]\(.*\)/, // Links
 		/!\[.*\]\(.*\)/, // Images
 		/```[\s\S]*```/, // Code blocks
+		/^\s*[-*]\s+\[[ xX]\]\s+.*$/m, // GFM task list
 	];
 	const isMarkdown = markdownPatterns.some((pattern) => pattern.test(content));
 
@@ -119,8 +153,13 @@ const normalizeContent = (content) => {
 	return { content: `<p>${content}</p>`, text: content.trim(), type: "text" };
 };
 
+const INTERNAL_CONTENT_SYNC_HOLD_MS = 450;
+
+const normalizeMarkdownForSyncCompare = (value) =>
+	(value ?? "").replace(/\r\n/g, "\n").trim();
+
 const TiptapEditor = ({
-	placeholder = "Start writing...",
+	placeholder = "Write, or type / for commands…",
 	content = "",
 	onChange,
 	onImageUpload,
@@ -134,6 +173,8 @@ const TiptapEditor = ({
 	const [textTypeDropdownOpen, setTextTypeDropdownOpen] = useState(false);
 	const [youtubeUrl, setYoutubeUrl] = useState("");
 	const [youtubeModalOpen, setYoutubeModalOpen] = useState(false);
+	const [imageModalOpen, setImageModalOpen] = useState(false);
+	const [imageUrlInput, setImageUrlInput] = useState("");
 	const [linkUrl, setLinkUrl] = useState("");
 	const linkInputRef = useRef(null);
 	const colorDropdownRef = useRef(null);
@@ -145,37 +186,70 @@ const TiptapEditor = ({
 	const lastContentRef = useRef("");
 	const updateTimeoutRef = useRef(null);
 
-	// Colors for color picker
+	useEffect(() => {
+		const onPick = () => setImageModalOpen(true);
+		window.addEventListener("inkgest-tiptap-image-picker", onPick);
+		return () => window.removeEventListener("inkgest-tiptap-image-picker", onPick);
+	}, []);
+
+	// Colors for color picker (token drives `.ink-tip-fg--*` so prose/zinc utilities don’t win)
 	const colors = [
-		{ name: "Default", value: "" },
-		{ name: "Red", value: "#ef4444" }, // Tailwind Red 500
-		{ name: "Orange", value: "#f97316" }, // Tailwind Orange 500
-		{ name: "Yellow", value: "#eab308" }, // Tailwind Yellow 500
-		{ name: "Green", value: "#22c55e" }, // Tailwind Green 500
-		{ name: "Blue", value: "#3b82f6" }, // Tailwind Blue 500
-		{ name: "Purple", value: "#a855f7" }, // Tailwind Purple 500
-		{ name: "Pink", value: "#ec4899" }, // Tailwind Pink 500
-		{ name: "Gray", value: "#6b7280" }, // Tailwind Gray 500
+		{ name: "Default", value: "", token: null },
+		{ name: "Red", value: "#ef4444", token: "red" },
+		{ name: "Orange", value: "#f97316", token: "orange" },
+		{ name: "Yellow", value: "#eab308", token: "yellow" },
+		{ name: "Green", value: "#22c55e", token: "green" },
+		{ name: "Blue", value: "#3b82f6", token: "blue" },
+		{ name: "Purple", value: "#a855f7", token: "purple" },
+		{ name: "Pink", value: "#ec4899", token: "pink" },
+		{ name: "Gray", value: "#6b7280", token: "gray" },
 	];
 
-	const editor = useEditor({
-		extensions: [
-			StarterKit.configure({
-				heading: {
-					levels: [1, 2],
+	const highlightSwatches = [
+		{ name: "None", value: null },
+		{ name: "Yellow", value: "rgba(250, 204, 21, 0.4)" },
+		{ name: "Lime", value: "rgba(163, 230, 53, 0.4)" },
+		{ name: "Green", value: "rgba(74, 222, 128, 0.4)" },
+		{ name: "Sky", value: "rgba(56, 189, 248, 0.4)" },
+		{ name: "Violet", value: "rgba(167, 139, 250, 0.4)" },
+		{ name: "Pink", value: "rgba(244, 114, 182, 0.4)" },
+	];
+
+	const editor = useEditor(
+		{
+			immediatelyRender: false,
+			extensions: [
+				StarterKit.configure({
+					heading: {
+						levels: [1, 2],
+					},
+					blockquote: true,
+					strike: true,
+					codeBlock: false, // Disable default code block
+					bulletList: false,
+					orderedList: false,
+					// Disable table extensions from StarterKit to use our custom table
+					table: false,
+					tableRow: false,
+					tableCell: false,
+					tableHeader: false,
+				}),
+				BulletList.extend({ priority: 2000 }),
+				OrderedList.extend({ priority: 2000 }),
+				CustomImage,
+			Table.configure({
+				resizable: true,
+				renderWrapper: true,
+				HTMLAttributes: {
+					class: "border-collapse",
 				},
-				blockquote: true,
-				strike: true,
-				codeBlock: false, // Disable default code block
-				// Disable table extensions from StarterKit to use our custom table
-				table: false,
-				tableRow: false,
-				tableCell: false,
-				tableHeader: false,
 			}),
-			CustomImage,
-			// Custom table extension (no Tiptap table extension to avoid bugs)
-			CustomTable,
+			TableRow,
+			TableHeader,
+			TableCell,
+			TiptapTableHeaderShortcuts,
+			TabPanel,
+			TabGroup,
 			Youtube.configure({
 				controls: true,
 				nocookie: false,
@@ -190,6 +264,11 @@ const TiptapEditor = ({
 			DetailsContent,
 			Link.configure({
 				protocols: ["http", "https", "mailto"],
+				openOnClick: true,
+				HTMLAttributes: {
+					class:
+						"text-sky-600 underline decoration-sky-300 underline-offset-2 cursor-pointer hover:text-sky-800",
+				},
 			}),
 			Placeholder.configure({
 				placeholder: placeholder,
@@ -198,9 +277,10 @@ const TiptapEditor = ({
 				types: ["heading", "paragraph"],
 			}),
 			Underline,
-			Highlight,
+			TiptapInkHighlight,
 			TextStyle,
 			Color,
+			TiptapInkTextFgExtension,
 			Typography,
 			CharacterCount,
 			TaskList.configure({
@@ -209,7 +289,7 @@ const TiptapEditor = ({
 				},
 			}),
 			TaskItem.configure({
-				nested: true,
+				nested: false,
 				HTMLAttributes: {
 					class: "task-item",
 				},
@@ -218,20 +298,23 @@ const TiptapEditor = ({
 			CodeGroup,
 			TiptapSlashDropdownExtension,
 			Markdown.configure({
-				html: true, // Allow HTML input for backward compatibility
-				transformPastedText: true, // Transform pasted markdown
-				transformCopiedText: true, // Transform copied text to markdown
+				html: false,
+				tightLists: true,
+				bulletListMarker: "-",
+				linkify: true,
+				transformPastedText: true,
+				transformCopiedText: true,
 			}),
 		],
 		content: content || "",
 		editorProps: {
 			attributes: {
 				class:
-					"prose prose-zinc prose-sm max-w-none p-4 h-full overflow-y-auto focus:outline-none outline-none focus-visible:outline-none",
+					"ink-notion-editor prose prose-zinc prose-lg max-w-3xl mx-auto px-10 py-12 min-h-full leading-relaxed text-[#37352F] prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-sky-600 prose-img:rounded-xl prose-img:shadow-sm focus:outline-none focus-visible:outline-none overflow-y-auto",
 			},
 		},
 		onUpdate: ({ editor }) => {
-			// Mark this as an internal update (from editor itself)
+			// Mark this as an internal update (from the editor itself)
 			isInternalUpdateRef.current = true;
 
 			// Clear any existing timeout
@@ -265,10 +348,12 @@ const TiptapEditor = ({
 				updateTimeoutRef.current = setTimeout(() => {
 					isInternalUpdateRef.current = false;
 					updateTimeoutRef.current = null;
-				}, 10);
+				}, INTERNAL_CONTENT_SYNC_HOLD_MS);
 			}
 		},
-	});
+	},
+	[],
+);
 
 	// Update content when prop changes (only for external changes, not internal editor updates)
 	React.useEffect(() => {
@@ -283,19 +368,23 @@ const TiptapEditor = ({
 		let currentContent = "";
 		try {
 			if (editor.storage && editor.storage.markdown) {
-				currentContent = (editor.storage.markdown.getMarkdown() || "").trim();
+				currentContent = normalizeMarkdownForSyncCompare(
+					editor.storage.markdown.getMarkdown() || "",
+				);
 			} else {
-				currentContent = (editor.getText() || "").trim();
+				currentContent = normalizeMarkdownForSyncCompare(
+					editor.getText() || "",
+				);
 			}
 		} catch (error) {
-			currentContent = (editor.getText() || "").trim();
+			currentContent = normalizeMarkdownForSyncCompare(editor.getText() || "");
 		}
 
 		// Normalize incoming content (handle HTML, markdown, and plain text)
 		const normalized = normalizeContent(content);
 
 		// Compare with last known content to avoid unnecessary updates
-		const incomingContent = normalized.text || "";
+		const incomingContent = normalizeMarkdownForSyncCompare(normalized.text || "");
 
 		// Only update if content is actually different
 		if (currentContent === incomingContent && content) {
@@ -305,7 +394,11 @@ const TiptapEditor = ({
 
 		// Also check against lastContentRef to prevent loops
 		// If the incoming content matches what we just sent out, skip update
-		if (lastContentRef.current === incomingContent && incomingContent) {
+		if (
+			normalizeMarkdownForSyncCompare(lastContentRef.current) ===
+				incomingContent &&
+			incomingContent
+		) {
 			return;
 		}
 
@@ -378,15 +471,27 @@ const TiptapEditor = ({
 			if (file) {
 				if (!file.type.startsWith("image/")) {
 					toast.warning("Please select an image file");
+					event.target.value = "";
 					return;
 				}
 				const reader = new FileReader();
 				reader.onload = (e) => {
 					const imageUrl = e.target.result;
-					editor?.chain().focus().setImage({ src: imageUrl }).run();
+					const captionHref =
+						typeof imageUrl === "string" && /^https?:\/\//i.test(imageUrl)
+							? imageUrl
+							: "";
+					editor
+						?.chain()
+						.focus()
+						.setImage({ src: imageUrl, caption: "", captionHref })
+						.run();
 					if (onImageUpload) {
 						onImageUpload(imageUrl);
 					}
+					setImageModalOpen(false);
+					setImageUrlInput("");
+					toast.success("Image inserted");
 				};
 				reader.readAsDataURL(file);
 			}
@@ -394,6 +499,34 @@ const TiptapEditor = ({
 		},
 		[editor, onImageUpload]
 	);
+
+	const handleImageInsertFromUrl = useCallback(() => {
+		const raw = imageUrlInput.trim();
+		if (!raw) {
+			toast.warning("Enter an image URL");
+			return;
+		}
+		let href;
+		try {
+			const u = new URL(raw);
+			if (!/^https?:$/i.test(u.protocol)) {
+				toast.error("Only http(s) image URLs are allowed");
+				return;
+			}
+			href = u.href;
+		} catch {
+			toast.error("Invalid URL");
+			return;
+		}
+		editor
+			?.chain()
+			.focus()
+			.setImage({ src: href, caption: "", captionHref: href })
+			.run();
+		setImageModalOpen(false);
+		setImageUrlInput("");
+		toast.success("Image inserted");
+	}, [editor, imageUrlInput]);
 
 	const handleYoutubeInsert = useCallback(() => {
 		if (!youtubeUrl.trim()) {
@@ -497,6 +630,20 @@ const TiptapEditor = ({
 
 	return (
 		<div className="border border-zinc-300 rounded-xl overflow-hidden flex flex-col h-full">
+			<style
+				dangerouslySetInnerHTML={{
+					__html: `
+				.ink-notion-editor .ink-tip-fg--red { color: #ef4444 !important; }
+				.ink-notion-editor .ink-tip-fg--orange { color: #f97316 !important; }
+				.ink-notion-editor .ink-tip-fg--yellow { color: #eab308 !important; }
+				.ink-notion-editor .ink-tip-fg--green { color: #22c55e !important; }
+				.ink-notion-editor .ink-tip-fg--blue { color: #3b82f6 !important; }
+				.ink-notion-editor .ink-tip-fg--purple { color: #a855f7 !important; }
+				.ink-notion-editor .ink-tip-fg--pink { color: #ec4899 !important; }
+				.ink-notion-editor .ink-tip-fg--gray { color: #6b7280 !important; }
+			`,
+				}}
+			/>
 			{/* Editor Toolbar */}
 			<div className="border-b border-zinc-200 bg-zinc-50 px-3 py-1.5 flex items-center gap-1 sticky top-0 z-10 flex-shrink-0">
 				<motion.button
@@ -618,13 +765,13 @@ const TiptapEditor = ({
 					onClick={() => {
 						if (!editor || editor.isDestroyed) return;
 
-						// Exit incompatible nodes
+						const chain = editor.chain().focus();
+
 						if (editor.isActive("codeBlock") || editor.isActive("codeGroup")) {
-							editor.chain().focus().exitCode().run();
+							chain.exitCode();
 						}
 
-						// Toggle task list (will create one if it doesn't exist)
-						editor.chain().focus().toggleTaskList().run();
+						chain.toggleTaskList().run();
 					}}
 					className={`p-1.5 rounded-xl ${editor.isActive("taskList")
 							? "bg-zinc-200 text-zinc-900"
@@ -704,7 +851,7 @@ const TiptapEditor = ({
 				<motion.button
 					whileHover={{ scale: 1.05 }}
 					whileTap={{ scale: 0.95 }}
-					onClick={() => fileInputRef.current?.click()}
+					onClick={() => setImageModalOpen(true)}
 					className="p-1.5 rounded-xl text-zinc-600 hover:bg-zinc-100"
 					title="Upload Image"
 				>
@@ -727,15 +874,12 @@ const TiptapEditor = ({
 					onClick={() => {
 						if (!editor || editor.isDestroyed) return;
 
-						// Insert custom table (no Tiptap table extension)
 						try {
-							// If we're inside a table, don't insert another table
-							if (editor.isActive("customTable")) {
+							if (editor.isActive("table")) {
 								editor.chain().focus().run();
 								return;
 							}
 
-							// Exit incompatible nodes
 							if (
 								editor.isActive("codeBlock") ||
 								editor.isActive("codeGroup")
@@ -743,16 +887,12 @@ const TiptapEditor = ({
 								editor.chain().focus().exitCode().run();
 							}
 
-							// Ensure we have content
 							if (editor.isEmpty) {
 								editor.chain().focus().insertContent("<p></p>").run();
 							}
 
-							// Ensure we're at the end of a paragraph or create one
 							const { state } = editor;
 							const { $from } = state.selection;
-
-							// If we're in the middle of a paragraph, split it first
 							if (
 								$from.parent.type.name === "paragraph" &&
 								$from.parentOffset > 0
@@ -760,58 +900,18 @@ const TiptapEditor = ({
 								editor.chain().focus().splitBlock().run();
 							}
 
-							// Wait for editor to be completely ready
-							// Use multiple delays to ensure React and Tiptap are both ready
 							setTimeout(() => {
-								requestAnimationFrame(() => {
-									requestAnimationFrame(() => {
-										try {
-											// Ensure editor is still valid
-											if (!editor || editor.isDestroyed || !editor.view) {
-												return;
-											}
-
-											// Get fresh state
-											const { state, view } = editor;
-											if (!state || !view) return;
-
-											// Get current position
-											const { $from } = state.selection;
-
-											// Validate position
-											if (
-												!$from ||
-												$from.pos < 0 ||
-												$from.pos > state.doc.content.size
-											) {
-												return;
-											}
-
-											// Create table node
-											const tableNode = state.schema.nodes.customTable.create({
-												rows: [
-													[{ content: "" }, { content: "" }, { content: "" }],
-													[{ content: "" }, { content: "" }, { content: "" }],
-												],
-												hasHeader: true,
-											});
-
-											// Create transaction
-											const tr = state.tr.insert($from.pos, tableNode);
-
-											// Dispatch transaction
-											view.dispatch(tr);
-
-											// Focus after a delay
-											setTimeout(() => {
-												editor.chain().focus().run();
-											}, 10);
-										} catch (error) {
-											console.error("Table insertion failed:", error);
-										}
-									});
-								});
-							}, 100);
+								if (!editor || editor.isDestroyed) return;
+								editor
+									.chain()
+									.focus()
+									.insertTable({
+										rows: 3,
+										cols: 3,
+										withHeaderRow: true,
+									})
+									.run();
+							}, 0);
 						} catch (error) {
 							console.error("Table insertion failed:", error);
 						}
@@ -820,6 +920,51 @@ const TiptapEditor = ({
 					title="Insert Table"
 				>
 					<TableIcon className="w-3.5 h-3.5" />
+				</motion.button>
+				<div className="w-px h-5 bg-zinc-200 mx-1" />
+				<motion.button
+					whileHover={{ scale: 1.05 }}
+					whileTap={{ scale: 0.95 }}
+					onClick={() => {
+						if (!editor || editor.isDestroyed) return;
+						try {
+							if (
+								editor.isActive("codeBlock") ||
+								editor.isActive("codeGroup")
+							) {
+								editor.chain().focus().exitCode().run();
+							}
+							if (editor.isEmpty) {
+								editor.chain().focus().insertContent("<p></p>").run();
+							}
+							const { state } = editor;
+							const { $from } = state.selection;
+							if (
+								$from.parent.type.name === "paragraph" &&
+								$from.parentOffset > 0
+							) {
+								editor.chain().focus().splitBlock().run();
+							}
+							setTimeout(() => {
+								requestAnimationFrame(() => {
+									requestAnimationFrame(() => {
+										if (!editor || editor.isDestroyed || !editor.view) return;
+										try {
+											editor.chain().focus().insertTabGroup().run();
+										} catch (err) {
+											console.error("Tab group insert failed:", err);
+										}
+									});
+								});
+							}, 100);
+						} catch (error) {
+							console.error("Tab group insert failed:", error);
+						}
+					}}
+					className="p-1.5 rounded-xl text-zinc-600 hover:bg-zinc-100"
+					title="Insert Tabs"
+				>
+					<LayoutGrid className="w-3.5 h-3.5" />
 				</motion.button>
 				<div className="w-px h-5 bg-zinc-200 mx-1" />
 				<motion.button
@@ -835,13 +980,140 @@ const TiptapEditor = ({
 				</motion.button>
 			</div>
 			<div
-				className="flex-1 overflow-y-auto relative"
+				className="flex-1 overflow-y-auto relative bg-[#FAFAF8] border-t border-zinc-100/80"
 				style={{ minHeight: "100%" }}
 			>
 				<EditorContent editor={editor} />
 
+				{/* Table controls (TipTap table extension): row/column/header + delete */}
+				{editor && (
+					<FloatingMenu
+						editor={editor}
+						tippyOptions={{
+							duration: 100,
+							placement: "top",
+							offset: [0, 8],
+						}}
+						className="tiptap-table-floating-menu"
+						shouldShow={({ editor: ed }) =>
+							!!ed?.isEditable && ed.isActive("table")
+						}
+					>
+						<div className="flex flex-wrap items-center gap-0.5 max-w-[min(100vw-2rem,520px)] bg-white text-zinc-800 border border-zinc-200 rounded-xl shadow-lg px-1 py-1">
+							<span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide px-1 mr-0.5">
+								Table
+							</span>
+							<button
+								type="button"
+								title="Add row above"
+								onClick={() =>
+									editor.chain().focus().addRowBefore().run()
+								}
+								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+							>
+								<ArrowUp className="w-3.5 h-3.5" />
+							</button>
+							<button
+								type="button"
+								title="Add row below"
+								onClick={() =>
+									editor.chain().focus().addRowAfter().run()
+								}
+								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+							>
+								<ArrowDown className="w-3.5 h-3.5" />
+							</button>
+							<button
+								type="button"
+								title="Delete row"
+								onClick={() =>
+									editor.chain().focus().deleteRow().run()
+								}
+								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+							>
+								<Minus className="w-3.5 h-3.5" />
+							</button>
+							<div className="w-px h-5 bg-zinc-200 mx-0.5" />
+							<button
+								type="button"
+								title="Add column before"
+								onClick={() =>
+									editor.chain().focus().addColumnBefore().run()
+								}
+								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+							>
+								<ArrowLeft className="w-3.5 h-3.5" />
+							</button>
+							<button
+								type="button"
+								title="Add column after"
+								onClick={() =>
+									editor.chain().focus().addColumnAfter().run()
+								}
+								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+							>
+								<ArrowRight className="w-3.5 h-3.5" />
+							</button>
+							<button
+								type="button"
+								title="Delete column"
+								onClick={() =>
+									editor.chain().focus().deleteColumn().run()
+								}
+								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+							>
+								<Minus className="w-3.5 h-3.5" />
+							</button>
+							<div className="w-px h-5 bg-zinc-200 mx-0.5" />
+							<button
+								type="button"
+								title="Toggle header row (⌘⇧R)"
+								onClick={() =>
+									editor.chain().focus().toggleHeaderRow().run()
+								}
+								className="px-2 py-1 rounded-md hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
+							>
+								H row
+							</button>
+							<button
+								type="button"
+								title="Toggle header column (⌘⇧C)"
+								onClick={() =>
+									editor.chain().focus().toggleHeaderColumn().run()
+								}
+								className="px-2 py-1 rounded-md hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
+							>
+								H col
+							</button>
+							<button
+								type="button"
+								title="Toggle header cell (⌘⇧L)"
+								onClick={() =>
+									editor.chain().focus().toggleHeaderCell().run()
+								}
+								className="px-2 py-1 rounded-md hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
+							>
+								H cell
+							</button>
+							<div className="w-px h-5 bg-zinc-200 mx-0.5" />
+							<button
+								type="button"
+								title="Delete table"
+								onClick={() =>
+									editor.chain().focus().deleteTable().run()
+								}
+								className="p-1.5 rounded-md hover:bg-red-50 text-red-600"
+							>
+								<Trash2 className="w-3.5 h-3.5" />
+								<span className="sr-only">Delete table</span>
+							</button>
+						</div>
+					</FloatingMenu>
+				)}
+
 				{/* Slash Dropdown Menu (trigger: /) */}
 				{editor && <SlashDropdownMenu editor={editor} />}
+				
 
 				{/* Bubble Menu */}
 				{editor && (
@@ -861,7 +1133,7 @@ const TiptapEditor = ({
 									nodeType === "codeGroup" ||
 									nodeType === "youtube" ||
 									nodeType === "table" ||
-									nodeType === "customTable" ||
+									nodeType === "tabGroup" ||
 									nodeType === "details" ||
 									nodeType === "detailsSummary" ||
 									nodeType === "detailsContent"
@@ -889,7 +1161,7 @@ const TiptapEditor = ({
 										nodeType === "codeBlock" ||
 										nodeType === "codeGroup" ||
 										nodeType === "table" ||
-										nodeType === "customTable"
+										nodeType === "tabGroup"
 									) {
 										return false;
 									}
@@ -908,7 +1180,7 @@ const TiptapEditor = ({
 														nodeAtPos.type.name === "codeGroup" ||
 														nodeAtPos.type.name === "youtube" ||
 														nodeAtPos.type.name === "table" ||
-														nodeAtPos.type.name === "customTable" ||
+														nodeAtPos.type.name === "tabGroup" ||
 														nodeAtPos.type.name === "details" ||
 														nodeAtPos.type.name === "detailsSummary" ||
 														nodeAtPos.type.name === "detailsContent")
@@ -945,7 +1217,7 @@ const TiptapEditor = ({
 								selectedNodeTypes.has("codeGroup") ||
 								selectedNodeTypes.has("youtube") ||
 								selectedNodeTypes.has("table") ||
-								selectedNodeTypes.has("customTable") ||
+								selectedNodeTypes.has("tabGroup") ||
 								selectedNodeTypes.has("details") ||
 								selectedNodeTypes.has("detailsSummary") ||
 								selectedNodeTypes.has("detailsContent")
@@ -1104,9 +1376,11 @@ const TiptapEditor = ({
 							{/* Color Dropdown */}
 							<div className="relative" ref={colorDropdownRef}>
 								<button
+									type="button"
+									onMouseDown={(e) => e.preventDefault()}
 									onClick={() => setColorDropdownOpen(!colorDropdownOpen)}
 									className="p-2 rounded hover:bg-zinc-100 text-zinc-700 transition-colors"
-									title="Text color"
+									title="Text & highlight colors"
 								>
 									<Palette className="w-3 h-3" />
 								</button>
@@ -1116,31 +1390,73 @@ const TiptapEditor = ({
 											initial={{ opacity: 0, y: -10 }}
 											animate={{ opacity: 1, y: 0 }}
 											exit={{ opacity: 0, y: -10 }}
-											className="absolute top-full left-0 mb-1 bg-white border border-zinc-200 rounded shadow-lg z-50 p-2 min-w-[150px]"
+											className="absolute top-full left-0 mb-1 bg-white border border-zinc-200 rounded shadow-lg z-50 p-2 min-w-[200px] max-h-[min(70vh,420px)] overflow-y-auto"
+											onMouseDown={(e) => e.preventDefault()}
 										>
+											<div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide px-0.5 mb-1.5">
+												Text
+											</div>
 											<div className="grid grid-cols-5 gap-1">
 												{colors.map((color) => (
 													<button
-														key={color.value || "default"}
+														key={color.token ?? "default"}
+														type="button"
+														onMouseDown={(e) => e.preventDefault()}
 														onClick={() => {
+															const ch = editor.chain().focus();
+															if (editor.isActive("textStyle")) {
+																ch.extendMarkRange("textStyle");
+															}
 															if (color.value) {
-																editor
-																	.chain()
-																	.focus()
-																	.setColor(color.value)
-																	.run();
+																ch.setMark("textStyle", {
+																	color: color.value,
+																	inkFgToken: color.token,
+																}).run();
 															} else {
-																editor.chain().focus().unsetColor().run();
+																ch.unsetMark("textStyle").run();
 															}
 															setColorDropdownOpen(false);
 														}}
 														className="flex flex-col items-center gap-1 p-1 hover:bg-zinc-100 rounded transition-colors"
+														title={color.name}
 													>
 														<div
-															className={`w-4 h-4 rounded border ${color.value ? "" : "bg-white border-zinc-300"
-																}`}
+															className={`w-4 h-4 rounded border ${color.value ? "" : "bg-white border-zinc-300"}`}
 															style={{
 																backgroundColor: color.value || "transparent",
+															}}
+														/>
+													</button>
+												))}
+											</div>
+											<div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide px-0.5 mt-2.5 mb-1.5">
+												Background
+											</div>
+											<div className="grid grid-cols-5 gap-1">
+												{highlightSwatches.map((sw) => (
+													<button
+														key={sw.name}
+														type="button"
+														onMouseDown={(e) => e.preventDefault()}
+														onClick={() => {
+															const ch = editor.chain().focus();
+															if (editor.isActive("highlight")) {
+																ch.extendMarkRange("highlight");
+															}
+															if (sw.value) {
+																ch.setHighlight({ color: sw.value }).run();
+															} else {
+																ch.unsetHighlight().run();
+															}
+															setColorDropdownOpen(false);
+														}}
+														className="flex flex-col items-center gap-1 p-1 hover:bg-zinc-100 rounded transition-colors"
+														title={sw.name}
+													>
+														<div
+															className={`w-4 h-4 rounded border border-zinc-200 ${sw.value ? "" : "bg-white"}`}
+															style={{
+																backgroundColor: sw.value || "transparent",
 															}}
 														/>
 													</button>
@@ -1270,6 +1586,63 @@ const TiptapEditor = ({
 				onChange={handleImageUpload}
 				style={{ display: "none" }}
 			/>
+
+			{/* Image: modal so file picker runs from a real click (slash / menu). */}
+			<AnimatePresence>
+				{imageModalOpen && (
+					<div
+						className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+						onClick={() => {
+							setImageModalOpen(false);
+							setImageUrlInput("");
+						}}
+					>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.95 }}
+							animate={{ opacity: 1, scale: 1 }}
+							exit={{ opacity: 0, scale: 0.95 }}
+							className="bg-white rounded-xl shadow-xl p-4 max-w-md w-full mx-4"
+							onClick={(e) => e.stopPropagation()}
+						>
+							<h3 className="font-semibold text-zinc-900 mb-4">
+								Insert image
+							</h3>
+							<button
+								type="button"
+								onClick={() => fileInputRef.current?.click()}
+								className="w-full p-2 mb-4 border border-zinc-200 rounded-xl text-zinc-800 font-medium hover:bg-zinc-50 transition-colors"
+							>
+								Upload from device
+							</button>
+							<input
+								type="text"
+								value={imageUrlInput}
+								onChange={(e) => setImageUrlInput(e.target.value)}
+								placeholder="Or paste image URL (https://…)"
+								className="w-full p-2 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-100 mb-4"
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										handleImageInsertFromUrl();
+									} else if (e.key === "Escape") {
+										setImageModalOpen(false);
+										setImageUrlInput("");
+									}
+								}}
+								autoFocus
+							/>
+							<div className="flex items-center gap-2">
+								<button
+									type="button"
+									onClick={handleImageInsertFromUrl}
+									className="flex-1 p-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+								>
+									Insert URL
+								</button>
+							</div>
+						</motion.div>
+					</div>
+				)}
+			</AnimatePresence>
 
 			{/* YouTube Video Modal */}
 			<AnimatePresence>

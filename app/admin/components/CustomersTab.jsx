@@ -181,7 +181,7 @@ const CustomersTab = () => {
 	const formatCurrency = (amount, currency = "usd") => {
 		return new Intl.NumberFormat("en-US", {
 			style: "currency",
-			currency: currency.to(),
+			currency: currency.toLowerCase(),
 		}).format(amount / 100);
 	};
 

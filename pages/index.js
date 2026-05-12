@@ -57,6 +57,31 @@ const PRESETS = [
 	},
 ];
 
+/* ── Export format showcase data ── */
+const EXPORT_FORMATS = [
+	{
+		label: "Markdown",
+		icon: "📄",
+		color: "#4A90D9",
+		description: "Clean .md output — paste directly into Ghost, Notion, or any CMS.",
+		sample: `# Why Founders Ship Slow\n\nResearch shows that 78% of early-stage...\n\n## The Fix\n\n- Cut scoping meetings by half\n- Ship a "bad" v1 this week`,
+	},
+	{
+		label: "HTML",
+		icon: "🌐",
+		color: "#E67E22",
+		description: "Production-ready HTML with semantic tags, ready to drop into any email or page.",
+		sample: `<article>\n  <h1>Why Founders Ship Slow</h1>\n  <p>Research shows that 78%...</p>\n  <h2>The Fix</h2>\n  <ul>\n    <li>Cut scoping meetings</li>\n  </ul>\n</article>`,
+	},
+	{
+		label: "React",
+		icon: "⚛️",
+		color: "#61DAFB",
+		description: "A ready-to-use JSX component — drop it straight into your Next.js or React app.",
+		sample: `export default function Article() {\n  return (\n    <article>\n      <h1>Why Founders Ship Slow</h1>\n      <p>Research shows that 78%...</p>\n    </article>\n  );\n}`,
+	},
+];
+
 /* ── InkAgent prompt suggestions — URL + short prompt per row (GenerateAssetPanel) ── */
 const AGENT_PROMPT_SUGGESTIONS = [
 	{
@@ -106,40 +131,46 @@ const AGENT_PROMPT_SUGGESTIONS = [
 
 const LANDING_AI_FEATURES = [
 	{
-		title: "AI Blog Generator",
+		title: "Web Scraping Agent",
 		description:
-			"Turn one or many source URLs into a structured blog draft with clear sections and a publish-ready flow.",
-		icon: "📝",
+			"Paste one or many URLs — Inkgest reads the full page, extracts the signal, and feeds it directly into your draft. No copy-pasting.",
+		icon: "🔗",
+		tag: "AI Agent",
 	},
 	{
-		title: "AI Newsletter Creator",
+		title: "Advanced Writing Editor",
 		description:
-			"Generate concise newsletter issues with hooks, scannable sections, and CTA-friendly writing.",
-		icon: "📧",
+			"A rich Tiptap-powered editor with slash commands, code blocks, tables, image embeds, and real-time formatting — designed for serious writers.",
+		icon: "✍️",
+		tag: "Editor",
 	},
 	{
-		title: "AI URL to Infographics",
+		title: "AI Chatbot Sidebar",
 		description:
-			"Convert long-form sources into visual infographic points and clean, presentation-ready summaries.",
+			"Chat with your draft live. Ask the AI to rewrite, expand, shorten, change tone, or add research — without leaving the editor.",
+		icon: "💬",
+		tag: "AI Chat",
+	},
+	{
+		title: "AI Automations",
+		description:
+			"Chain scrape → draft → format → export into a single automated workflow. Set it once, run it on any URL.",
+		icon: "⚡",
+		tag: "Automation",
+	},
+	{
+		title: "Export to React / HTML / Markdown",
+		description:
+			"One-click export to clean Markdown for your CMS, production HTML for email, or a JSX component for your React app.",
+		icon: "📤",
+		tag: "Export",
+	},
+	{
+		title: "AI Infographics & Tables",
+		description:
+			"Convert long-form sources into scannable infographic summaries and comparison tables — perfect for LinkedIn or newsletters.",
 		icon: "📊",
-	},
-	{
-		title: "AI Table Creator",
-		description:
-			"Extract key comparisons and data from content into readable rows and columns instantly.",
-		icon: "🧮",
-	},
-	{
-		title: "AI Landing Page Generator",
-		description:
-			"Create a full landing page structure from your URLs, including hero copy, sections, and CTA blocks.",
-		icon: "🚀",
-	},
-	{
-		title: "AI React / HTML Output",
-		description:
-			"Generate implementation-ready HTML or React-oriented output to speed up your next build.",
-		icon: "⚛️",
+		tag: "Visuals",
 	},
 ];
 
@@ -172,7 +203,7 @@ function Nav() {
 
 	return (
 		<motion.nav
-			style={{ boxShadow: shadow, fontFamily: "'Outfit', sans-serif" }}
+			style={{ boxShadow: shadow, fontFamily: "'Comic', sans-serif" }}
 			className="fixed top-0 left-0 right-0 z-50 border-b"
 			initial={{ y: -60, opacity: 0 }}
 			animate={{ y: 0, opacity: 1 }}
@@ -195,7 +226,7 @@ function Nav() {
 						href="#"
 						className="flex items-center gap-2 no-underline"
 						style={{
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 							fontSize: 22,
 							color: T.accent,
 						}}
@@ -215,7 +246,7 @@ function Nav() {
 
 					{/* Links */}
 					<div className="hidden md:flex items-center gap-8">
-						{["Features", "Blog", "How it works", "Pricing", "FAQ"].map((l) => (
+						{["Features", "Export", "How it works", "Pricing", "FAQ"].map((l) => (
 							<a
 								key={l}
 								href={
@@ -224,7 +255,7 @@ function Nav() {
 										: `#${l.toLowerCase().replace(/ /g, "-")}`
 								}
 								className="no-underline text-sm font-medium transition-colors"
-								style={{ color: T.muted, fontFamily: "'Outfit', sans-serif" }}
+								style={{ color: T.muted, fontFamily: "'Comic', sans-serif" }}
 								onMouseEnter={(e) => (e.target.style.color = T.accent)}
 								onMouseLeave={(e) => (e.target.style.color = T.muted)}
 							>
@@ -241,7 +272,7 @@ function Nav() {
 							whileTap={{ scale: 0.97 }}
 							className="hidden md:inline-flex text-sm font-semibold no-underline px-4 py-2 rounded-xl border transition-all"
 							style={{
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 								color: T.accent,
 								borderColor: T.border,
 								background: "transparent",
@@ -259,7 +290,7 @@ function Nav() {
 							whileTap={{ scale: 0.96 }}
 							className="inline-flex text-sm font-semibold no-underline px-5 py-2.5 rounded-xl text-white"
 							style={{
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 								background: T.accent,
 							}}
 						>
@@ -304,10 +335,11 @@ function Hero() {
 	}, [reduxUser]);
 
 	const texts = [
-		"Scrape content from URL turn into newsletter",
-		"Turn multiple links into good SEO blog",
-		"Extensive research for your next academic paper",
-		"Create detailed comparison table for SaaS product",
+		"Scrape any URL → newsletter in 60 seconds",
+		"Turn 5 links into a publish-ready SEO blog",
+		"Export your draft as React, HTML, or Markdown",
+		"Chat with your draft, rewrite in one click",
+		"AI automations for your entire content workflow",
 	];
 
 	function AnimatedText() {
@@ -376,16 +408,19 @@ function Hero() {
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
 					style={{
-						lineHeight: 1,
+						lineHeight: 1.05,
 						letterSpacing: "-1.5px",
 						color: T.accent,
-						marginBottom: 24,
+						marginBottom: 16,
 					}}
 					className="text-6xl font-bold text-center"
 				>
-					Read a LINK, get a <span style={{ color: T.warm }}>GEST</span>
-					<AnimatedText />
+					The AI writing editor
+					<br />
+					for <span style={{ color: T.warm }}>content creators</span>
 				</motion.h1>
+
+				<AnimatedText />
 
 				{/* Sub */}
 				<motion.p
@@ -397,13 +432,12 @@ function Hero() {
 						color: T.muted,
 						margin: "0 auto 32px",
 						lineHeight: 1.7,
-						fontFamily: "'Outfit', sans-serif",
+						fontFamily: "'Comic', sans-serif",
 					}}
 					className="max-w-2xl mx-auto"
 				>
-					Paste a URL, describe your angle. Get a structured newsletter, blog,
-					infographics, tables, and landing page drafts ready to edit and
-					publish — in under 60 seconds.
+					Scrape any URL, draft with AI, edit in a powerful editor, then export
+					to <strong style={{ color: T.accent }}>React, HTML, or Markdown</strong> — your whole content workflow in one place.
 				</motion.p>
 
 				{/* Generate asset — POST /generate/:type (proxied to Hono; INKGEST_GENERATE_URL on server) */}
@@ -438,7 +472,7 @@ function Hero() {
 					style={{
 						fontSize: 13,
 						color: T.muted,
-						fontFamily: "'Outfit', sans-serif",
+						fontFamily: "'Comic', sans-serif",
 						marginTop: 20,
 					}}
 				>
@@ -460,7 +494,7 @@ function Hero() {
 						fontWeight: 600,
 						color: T.warm,
 						textDecoration: "none",
-						fontFamily: "'Outfit', sans-serif",
+						fontFamily: "'Comic', sans-serif",
 						transition: "color 0.2s",
 					}}
 					onMouseEnter={(e) => (e.target.style.color = T.accent)}
@@ -491,22 +525,22 @@ function AIFeaturesSection() {
 		>
 			<div className="max-w-6xl mx-auto">
 				<FadeUp>
-					<p
-						style={{
-							fontSize: 12,
-							fontWeight: 700,
-							textTransform: "uppercase",
-							letterSpacing: "0.1em",
-							color: T.warm,
-							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						AI Features
-					</p>
+				<p
+					style={{
+						fontSize: 12,
+						fontWeight: 700,
+						textTransform: "uppercase",
+						letterSpacing: "0.1em",
+						color: T.warm,
+						marginBottom: 10,
+						fontFamily: "'Comic', sans-serif",
+					}}
+				>
+					Platform Features
+				</p>
 					<h2
 						style={{
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 							fontSize: "clamp(34px,4vw,50px)",
 							color: T.accent,
 							lineHeight: 1.12,
@@ -514,7 +548,7 @@ function AIFeaturesSection() {
 							letterSpacing: "-0.4px",
 						}}
 					>
-						Built for modern content workflows.
+						Everything a content writer needs.
 					</h2>
 					<p
 						style={{
@@ -522,11 +556,10 @@ function AIFeaturesSection() {
 							color: T.muted,
 							lineHeight: 1.65,
 							maxWidth: 680,
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						Go from URL to blog posts, newsletters, infographics, tables, and
-						landing pages with one clean generation flow.
+						From AI web scraping to an advanced editor, chatbot, automations, and multi-format export — the full stack for professional content creation.
 					</p>
 				</FadeUp>
 
@@ -538,51 +571,63 @@ function AIFeaturesSection() {
 						marginTop: 40,
 					}}
 				>
-					{LANDING_AI_FEATURES.map((f, i) => (
-						<FadeUp key={f.title} delay={i * 0.06}>
-							<motion.div
-								whileHover={{ y: -4, boxShadow: "0 14px 34px rgba(0,0,0,0.09)" }}
+				{LANDING_AI_FEATURES.map((f, i) => (
+					<FadeUp key={f.title} delay={i * 0.06}>
+						<motion.div
+							whileHover={{ y: -4, boxShadow: "0 14px 34px rgba(0,0,0,0.09)" }}
+							style={{
+								background: T.surface,
+								border: `1px solid ${T.border}`,
+								borderRadius: 14,
+								padding: "22px 20px 20px",
+								height: "100%",
+								display: "flex",
+								flexDirection: "column",
+								gap: 10,
+							}}
+						>
+							<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+								<div style={{ fontSize: 22, lineHeight: 1 }}>{f.icon}</div>
+								<span
+									style={{
+										fontSize: 10,
+										fontWeight: 700,
+										letterSpacing: "0.07em",
+										textTransform: "uppercase",
+										color: T.warm,
+										background: `${T.warm}18`,
+										padding: "3px 8px",
+										borderRadius: 20,
+										fontFamily: "'Comic', sans-serif",
+									}}
+								>
+									{f.tag}
+								</span>
+							</div>
+							<h3
 								style={{
-									background: T.surface,
-									border: `1px solid ${T.border}`,
-									borderRadius: 14,
-									padding: "18px 18px 16px",
-									height: "100%",
+									fontSize: 16,
+									fontWeight: 700,
+									color: T.accent,
+									fontFamily: "'Comic', sans-serif",
+									lineHeight: 1.3,
 								}}
 							>
-								<div
-									style={{
-										fontSize: 20,
-										marginBottom: 10,
-										lineHeight: 1,
-									}}
-								>
-									{f.icon}
-								</div>
-								<h3
-									style={{
-										fontSize: 16,
-										fontWeight: 700,
-										color: T.accent,
-										marginBottom: 8,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{f.title}
-								</h3>
-								<p
-									style={{
-										fontSize: 13.5,
-										lineHeight: 1.6,
-										color: T.muted,
-										fontFamily: "'Outfit', sans-serif",
-									}}
-								>
-									{f.description}
-								</p>
-							</motion.div>
-						</FadeUp>
-					))}
+								{f.title}
+							</h3>
+							<p
+								style={{
+									fontSize: 13.5,
+									lineHeight: 1.65,
+									color: T.muted,
+									fontFamily: "'Comic', sans-serif",
+								}}
+							>
+								{f.description}
+							</p>
+						</motion.div>
+					</FadeUp>
+				))}
 				</div>
 			</div>
 		</section>
@@ -592,29 +637,34 @@ function AIFeaturesSection() {
 /* ── Features bento grid ── */
 const FEATURES = [
 	{
-		title: "AI draft generator form",
-		word: "Generate",
+		title: "Scrape any URL — blog, news, research, Substack — and draft instantly",
+		word: "Scrape & Generate",
 		image: "/features/feature-1.png",
+		emoji: "⚡",
 	},
 	{
-		title: "AI chatbot in right sidebar",
-		word: "Chat",
+		title: "AI chatbot sidebar — rewrite, expand, or change tone without leaving the editor",
+		word: "AI Chat",
 		image: "/features/feature-2.png",
+		emoji: "💬",
 	},
 	{
-		title: "Themes modal to view content into format",
-		word: "Preview",
+		title: "Preview your content in beautiful themes before exporting",
+		word: "Theme Preview",
 		image: "/features/feature-3.png",
+		emoji: "🎨",
 	},
 	{
-		title: "Infographics using AI",
+		title: "AI-generated infographics and tables from any source URL",
 		word: "Visualize",
 		image: "/features/feature-4.png",
+		emoji: "📊",
 	},
 	{
-		title: "Advance editor, save/unsaved",
-		word: "Edit",
+		title: "Advanced rich-text editor with slash commands, code blocks, and autosave",
+		word: "Advanced Editor",
 		image: "/features/feature-5.png",
+		emoji: "✏️",
 	},
 ];
 
@@ -632,21 +682,21 @@ function Features() {
 			<div className="max-w-6xl mx-auto">
 				<FadeUp>
 					<p
-						style={{
-							fontSize: 12,
-							fontWeight: 700,
-							textTransform: "",
-							letterSpacing: "0.1em",
-							color: T.warm,
-							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Product showcase
-					</p>
+					style={{
+						fontSize: 12,
+						fontWeight: 700,
+						textTransform: "uppercase",
+						letterSpacing: "0.1em",
+						color: T.warm,
+						marginBottom: 10,
+						fontFamily: "'Comic', sans-serif",
+					}}
+				>
+					Product showcase
+				</p>
 					<h2
 						style={{
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
@@ -654,21 +704,20 @@ function Features() {
 							letterSpacing: "-0.5px",
 						}}
 					>
-						See the product in action
+						Scrape. Edit. Chat.
 						<br />
-						across your workflow.
+						Export. Done.
 					</h2>
 					<p
 						style={{
 							fontSize: 17,
 							color: T.muted,
 							lineHeight: 1.65,
-							maxWidth: 440,
-							fontFamily: "'Outfit', sans-serif",
+							maxWidth: 480,
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						From generation to editing and visualization, every screen is built
-						for fast publishing.
+						Every screen in Inkgest is designed to cut time from idea to published content — no tab switching, no copy-pasting.
 					</p>
 				</FadeUp>
 
@@ -747,11 +796,7 @@ function Features() {
 											color: T.muted,
 										}}
 									>
-										{i === 0 && "⚡"}
-										{i === 1 && "💬"}
-										{i === 2 && "🎨"}
-										{i === 3 && "📊"}
-										{i === 4 && "✏️"}
+									{f.emoji}
 									</div>
 								</div>
 								<div style={{ padding: "20px 22px" }}>
@@ -762,14 +807,14 @@ function Features() {
 											textTransform: "",
 											letterSpacing: "0.08em",
 											color: T.warm,
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 										}}
 									>
 										{f.word}
 									</span>
 									<h3
 										style={{
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 											fontWeight: 700,
 											fontSize: 16,
 											color: T.accent,
@@ -789,23 +834,214 @@ function Features() {
 	);
 }
 
+/* ── Export Formats ── */
+function ExportFormats() {
+	const [active, setActive] = useState(0);
+	const fmt = EXPORT_FORMATS[active];
+
+	return (
+		<section
+			id="export"
+			style={{
+				padding: "96px 24px",
+				background: T.accent,
+				borderTop: `1px solid ${T.border}`,
+			}}
+		>
+			<div className="max-w-6xl mx-auto">
+				<FadeUp>
+					<p
+						style={{
+							fontSize: 12,
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.1em",
+							color: T.warm,
+							marginBottom: 10,
+							fontFamily: "'Comic', sans-serif",
+						}}
+					>
+						Export Formats
+					</p>
+					<h2
+						style={{
+							fontFamily: "'Comic', sans-serif",
+							fontSize: "clamp(34px,4vw,52px)",
+							color: "white",
+							lineHeight: 1.1,
+							marginBottom: 14,
+							letterSpacing: "-0.5px",
+						}}
+					>
+						Write once.
+						<br />
+						<span style={{ color: T.warm }}>Export anywhere.</span>
+					</h2>
+					<p
+						style={{
+							fontSize: 17,
+							color: "rgba(255,255,255,0.6)",
+							lineHeight: 1.65,
+							maxWidth: 540,
+							fontFamily: "'Comic', sans-serif",
+							marginBottom: 40,
+						}}
+					>
+						Your draft, your format. Export to clean Markdown for your CMS, semantic HTML for email campaigns, or a JSX React component for your codebase — in one click.
+					</p>
+				</FadeUp>
+
+				<div
+					style={{
+						display: "grid",
+						gridTemplateColumns: "1fr 1.4fr",
+						gap: 40,
+						alignItems: "start",
+					}}
+					className="export-grid"
+				>
+					<style>{`
+						@media (max-width: 768px) {
+							.export-grid { grid-template-columns: 1fr !important; }
+						}
+					`}</style>
+					{/* Selector */}
+					<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+						{EXPORT_FORMATS.map((f, i) => (
+							<motion.button
+								key={f.label}
+								onClick={() => setActive(i)}
+								whileHover={{ x: 4 }}
+								style={{
+									background: active === i ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)",
+									border: active === i ? "1.5px solid rgba(255,255,255,0.3)" : "1.5px solid rgba(255,255,255,0.1)",
+									borderRadius: 12,
+									padding: "18px 20px",
+									textAlign: "left",
+									cursor: "pointer",
+									transition: "all 0.2s",
+									display: "flex",
+									alignItems: "flex-start",
+									gap: 14,
+								}}
+							>
+								<span style={{ fontSize: 24, lineHeight: 1, marginTop: 2 }}>{f.icon}</span>
+								<div>
+									<p
+										style={{
+											fontSize: 15,
+											fontWeight: 700,
+											color: "white",
+											fontFamily: "'Comic', sans-serif",
+											marginBottom: 4,
+										}}
+									>
+										{f.label}
+									</p>
+									<p
+										style={{
+											fontSize: 13,
+											color: "rgba(255,255,255,0.55)",
+											fontFamily: "'Comic', sans-serif",
+											lineHeight: 1.5,
+										}}
+									>
+										{f.description}
+									</p>
+								</div>
+							</motion.button>
+						))}
+					</div>
+
+					{/* Code preview */}
+					<FadeUp>
+						<AnimatePresence mode="wait">
+							<motion.div
+								key={active}
+								initial={{ opacity: 0, y: 12 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: -12 }}
+								transition={{ duration: 0.3 }}
+								style={{
+									background: "#0D1117",
+									borderRadius: 16,
+									overflow: "hidden",
+									border: "1px solid rgba(255,255,255,0.1)",
+								}}
+							>
+								{/* Window chrome */}
+								<div
+									style={{
+										padding: "12px 16px",
+										borderBottom: "1px solid rgba(255,255,255,0.08)",
+										display: "flex",
+										alignItems: "center",
+										gap: 8,
+									}}
+								>
+									<span style={{ width: 12, height: 12, borderRadius: "50%", background: "#FF5F57", display: "inline-block" }} />
+									<span style={{ width: 12, height: 12, borderRadius: "50%", background: "#FFBD2E", display: "inline-block" }} />
+									<span style={{ width: 12, height: 12, borderRadius: "50%", background: "#28CA41", display: "inline-block" }} />
+									<span
+										style={{
+											marginLeft: 8,
+											fontSize: 12,
+											color: "rgba(255,255,255,0.35)",
+											fontFamily: "monospace",
+										}}
+									>
+										{fmt.label === "Markdown" ? "draft.md" : fmt.label === "HTML" ? "draft.html" : "Article.jsx"}
+									</span>
+								</div>
+								<pre
+									style={{
+										margin: 0,
+										padding: "24px 20px",
+										fontSize: 13,
+										lineHeight: 1.75,
+										color: "#E6EDF3",
+										fontFamily: "monospace",
+										overflowX: "auto",
+										whiteSpace: "pre-wrap",
+									}}
+								>
+									{fmt.sample}
+								</pre>
+							</motion.div>
+						</AnimatePresence>
+					</FadeUp>
+				</div>
+			</div>
+		</section>
+	);
+}
+
 /* ── How it works ── */
 function HowItWorks() {
 	const steps = [
 		{
 			n: "01",
-			title: "Paste any URL",
-			body: "Drop in any article, blog post, research paper, or news story. inkgest reads the full page — no copy-pasting, no summarizing.",
+			title: "Scrape any URL",
+			body: "Paste one or multiple URLs — blog posts, news, research, Substack. The AI agent reads the full page, no copy-pasting required.",
+			icon: "🔗",
 		},
 		{
 			n: "02",
-			title: "Describe your angle",
-			body: "Tell inkgest who you're writing for and what point you're making. One sentence is enough. Two is better.",
+			title: "Generate your draft",
+			body: "Describe your angle and content format — newsletter, blog, table, infographic. A structured draft is ready in under 60 seconds.",
+			icon: "⚡",
 		},
 		{
 			n: "03",
-			title: "Edit and publish",
-			body: "Your draft arrives structured — hook, body sections, closing CTA. Edit in the editor, then copy or save instantly.",
+			title: "Edit with AI assistance",
+			body: "Open the advanced editor. Use the AI chatbot to rewrite sections, adjust tone, expand ideas, or run automations — all inline.",
+			icon: "✍️",
+		},
+		{
+			n: "04",
+			title: "Export to your format",
+			body: "One click to export clean Markdown, semantic HTML, or a ready-to-use React component. Ship to any platform instantly.",
+			icon: "📤",
 		},
 	];
 
@@ -829,14 +1065,14 @@ function HowItWorks() {
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
 						How it works
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
@@ -844,34 +1080,33 @@ function HowItWorks() {
 							letterSpacing: "-0.5px",
 						}}
 					>
-						Three steps.
+						Four steps.
 						<br />
-						One solid draft.
+						Full content workflow.
 					</h2>
 					<p
 						style={{
 							fontSize: 17,
 							color: T.muted,
 							lineHeight: 1.65,
-							maxWidth: 440,
-							fontFamily: "'Outfit', sans-serif",
+							maxWidth: 480,
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						No prompt engineering. No tab switching. No copy-pasting research
-						from five different places.
+						No prompt engineering. No tab switching. No copy-pasting from five different places. Scrape → draft → edit → export.
 					</p>
 				</FadeUp>
 
 				<div
 					style={{
 						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+						gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
 						gap: 24,
 						marginTop: 52,
 					}}
 				>
 					{steps.map((s, i) => (
-						<FadeUp key={s.n} delay={i * 0.12}>
+						<FadeUp key={s.n} delay={i * 0.1}>
 							<motion.div
 								whileHover={{
 									y: -6,
@@ -882,37 +1117,55 @@ function HowItWorks() {
 									background: T.base,
 									border: `1px solid ${T.border}`,
 									borderRadius: 14,
-									padding: "32px 28px",
+									padding: "28px 24px",
 									height: "100%",
 									cursor: "default",
+									position: "relative",
 								}}
 							>
-								<div
-									style={{
-										fontFamily: "'Outfit', sans-serif",
-										fontSize: 42,
-										color: T.warm,
-										lineHeight: 1,
-										marginBottom: 20,
-										opacity: 0.6,
-									}}
-								>
-									{s.n}
+								<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+									<div
+										style={{
+											width: 36,
+											height: 36,
+											borderRadius: "50%",
+											background: T.warm,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											fontSize: 16,
+											flexShrink: 0,
+										}}
+									>
+										{s.icon}
+									</div>
+									<span
+										style={{
+											fontFamily: "'Comic', sans-serif",
+											fontSize: 13,
+											fontWeight: 700,
+											color: T.warm,
+											opacity: 0.7,
+										}}
+									>
+										Step {s.n}
+									</span>
 								</div>
 								<h3
 									style={{
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 										fontWeight: 700,
 										fontSize: 17,
 										color: T.accent,
 										marginBottom: 10,
+										lineHeight: 1.3,
 									}}
 								>
 									{s.title}
 								</h3>
 								<p
 									style={{
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 										fontSize: 14,
 										color: T.muted,
 										lineHeight: 1.7,
@@ -932,9 +1185,10 @@ function HowItWorks() {
 /* ── Stats strip ── */
 function StatsStrip() {
 	const stats = [
-		{ num: "60", suffix: "s", label: "Average URL to draft time" },
-		{ num: "3", suffix: "hrs", label: "Saved per newsletter on average" },
-		{ num: "$9", suffix: "/mo", label: "Less than one coffee per week" },
+		{ num: "60", suffix: "s", label: "URL to publish-ready draft" },
+		{ num: "3", suffix: "hrs", label: "Saved per content piece on average" },
+		{ num: "3", suffix: "formats", label: "Export to React, HTML, or Markdown" },
+		{ num: "∞", suffix: "", label: "URLs you can scrape per draft on Pro" },
 	];
 	return (
 		<div style={{ background: T.accent, padding: "56px 24px" }}>
@@ -959,7 +1213,7 @@ function StatsStrip() {
 						>
 							<div
 								style={{
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 									fontSize: 54,
 									color: "white",
 									lineHeight: 1,
@@ -973,7 +1227,7 @@ function StatsStrip() {
 									fontSize: 14,
 									color: "rgba(255,255,255,0.5)",
 									marginTop: 6,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								{s.label}
@@ -983,6 +1237,102 @@ function StatsStrip() {
 				))}
 			</div>
 		</div>
+	);
+}
+
+/* ── Use Cases strip ── */
+function UseCasesStrip() {
+	const cases = [
+		{ icon: "📰", title: "Newsletter writers", body: "Go from 5 URLs to a structured issue in under 60 seconds. Never miss a publish day." },
+		{ icon: "✍️", title: "Blog content creators", body: "Research, draft, and format SEO-ready blog posts from multiple sources — no tab juggling." },
+		{ icon: "📱", title: "Social media managers", body: "Turn long-form articles into Twitter threads, LinkedIn posts, or short-form content instantly." },
+		{ icon: "🏢", title: "Content teams", body: "Run AI automations for recurring formats. Consistent quality at scale without growing headcount." },
+	];
+	return (
+		<section
+			style={{
+				padding: "80px 24px",
+				background: T.surface,
+				borderTop: `1px solid ${T.border}`,
+				borderBottom: `1px solid ${T.border}`,
+			}}
+		>
+			<div className="max-w-6xl mx-auto">
+				<FadeUp>
+					<p
+						style={{
+							fontSize: 12,
+							fontWeight: 700,
+							textTransform: "uppercase",
+							letterSpacing: "0.1em",
+							color: T.warm,
+							marginBottom: 10,
+							textAlign: "center",
+							fontFamily: "'Comic', sans-serif",
+						}}
+					>
+						Built for
+					</p>
+					<h2
+						style={{
+							fontFamily: "'Comic', sans-serif",
+							fontSize: "clamp(32px,3.5vw,48px)",
+							color: T.accent,
+							lineHeight: 1.1,
+							marginBottom: 40,
+							letterSpacing: "-0.4px",
+							textAlign: "center",
+						}}
+					>
+						Every type of content creator.
+					</h2>
+				</FadeUp>
+				<div
+					style={{
+						display: "grid",
+						gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+						gap: 18,
+					}}
+				>
+					{cases.map((c, i) => (
+						<FadeUp key={c.title} delay={i * 0.08}>
+							<motion.div
+								whileHover={{ y: -4, boxShadow: "0 12px 32px rgba(0,0,0,0.08)" }}
+								style={{
+									background: "white",
+									border: `1px solid ${T.border}`,
+									borderRadius: 14,
+									padding: "24px 22px",
+								}}
+							>
+								<div style={{ fontSize: 28, marginBottom: 12 }}>{c.icon}</div>
+								<h3
+									style={{
+										fontSize: 15,
+										fontWeight: 700,
+										color: T.accent,
+										marginBottom: 8,
+										fontFamily: "'Comic', sans-serif",
+									}}
+								>
+									{c.title}
+								</h3>
+								<p
+									style={{
+										fontSize: 13.5,
+										color: T.muted,
+										lineHeight: 1.65,
+										fontFamily: "'Comic', sans-serif",
+									}}
+								>
+									{c.body}
+								</p>
+							</motion.div>
+						</FadeUp>
+					))}
+				</div>
+			</div>
+		</section>
 	);
 }
 
@@ -1031,14 +1381,14 @@ function Pricing() {
 							color: T.warm,
 							textAlign: "center",
 							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
 						Pricing
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							textAlign: "center",
 							color: T.accent,
@@ -1055,7 +1405,7 @@ function Pricing() {
 							fontSize: 17,
 							color: T.muted,
 							lineHeight: 1.6,
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
 						Try it free. Upgrade when it saves you more time than it costs.
@@ -1087,14 +1437,14 @@ function Pricing() {
 									letterSpacing: "0.08em",
 									color: T.muted,
 									marginBottom: 10,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Free
 							</p>
 							<div
 								style={{
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 									fontSize: 52,
 									color: T.accent,
 									lineHeight: 1,
@@ -1108,7 +1458,7 @@ function Pricing() {
 									color: T.muted,
 									margin: "10px 0 24px",
 									lineHeight: 1.6,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Enough to know if it works for you. No card, no expiry.
@@ -1125,7 +1475,7 @@ function Pricing() {
 											display: "flex",
 											alignItems: "center",
 											gap: 9,
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 										}}
 									>
 										<span style={{ color: T.warm, fontWeight: 700 }}>✓</span>{" "}
@@ -1147,7 +1497,7 @@ function Pricing() {
 									fontSize: 14,
 									fontWeight: 600,
 									textDecoration: "none",
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Start for free →
@@ -1177,14 +1527,14 @@ function Pricing() {
 									letterSpacing: "0.08em",
 									color: T.muted,
 									marginBottom: 10,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Starter
 							</p>
 							<div
 								style={{
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 									fontSize: 52,
 									color: T.accent,
 									lineHeight: 1,
@@ -1198,14 +1548,14 @@ function Pricing() {
 									color: T.muted,
 									margin: "10px 0 24px",
 									lineHeight: 1.6,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Unlimited credits for serious creators
 							</p>
 							<ul style={{ listStyle: "none", marginBottom: 28, flex: 1 }}>
 								{starter.map((f) => (
-									<li key={f} style={{ fontSize: 13.5, color: T.muted, padding: "8px 0", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 9, fontFamily: "'Outfit', sans-serif" }}>
+									<li key={f} style={{ fontSize: 13.5, color: T.muted, padding: "8px 0", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 9, fontFamily: "'Comic', sans-serif" }}>
 										<span style={{ color: T.warm, fontWeight: 700 }}>✓</span> {f}
 									</li>
 								))}
@@ -1214,7 +1564,7 @@ function Pricing() {
 								href="/login"
 								whileHover={{ scale: 1.02 }}
 								whileTap={{ scale: 0.97 }}
-								style={{ display: "block", textAlign: "center", background: T.accent, color: "white", padding: "13px", borderRadius: 10, fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "'Outfit', sans-serif" }}
+								style={{ display: "block", textAlign: "center", background: T.accent, color: "white", padding: "13px", borderRadius: 10, fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: "'Comic', sans-serif" }}
 							>
 								Start for free →
 							</motion.a>
@@ -1245,14 +1595,14 @@ function Pricing() {
 									letterSpacing: "0.08em",
 									color: "rgba(255,255,255,0.5)",
 									marginBottom: 10,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Pro
 							</p>
 							<div
 								style={{
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 									fontSize: 52,
 									color: "white",
 									lineHeight: 1,
@@ -1263,7 +1613,7 @@ function Pricing() {
 									style={{
 										fontSize: 18,
 										color: "rgba(255,255,255,0.45)",
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 										fontWeight: 400,
 									}}
 								>
@@ -1276,7 +1626,7 @@ function Pricing() {
 									color: "rgba(255,255,255,0.6)",
 									margin: "10px 0 24px",
 									lineHeight: 1.6,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								For writers who publish on a schedule and can't afford a bad
@@ -1294,7 +1644,7 @@ function Pricing() {
 											display: "flex",
 											alignItems: "center",
 											gap: 9,
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 										}}
 									>
 										<span style={{ color: "#F0C070", fontWeight: 700 }}>✓</span>{" "}
@@ -1317,7 +1667,7 @@ function Pricing() {
 									fontWeight: 700,
 									border: "none",
 									cursor: "pointer",
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Upgrade to Pro →
@@ -1360,39 +1710,37 @@ function OpenSource() {
 									letterSpacing: "0.1em",
 									color: T.warm,
 									marginBottom: 10,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Open Source
 							</p>
-							<h2
-								style={{
-									fontFamily: "'Outfit', sans-serif",
-									fontSize: "clamp(36px,4vw,54px)",
-									color: T.accent,
-									lineHeight: 1.1,
-									marginBottom: 16,
-									letterSpacing: "-0.5px",
-								}}
-							>
-								Fully open.
-								<br />
-								<em style={{ color: T.warm }}>No black boxes.</em>
-							</h2>
-							<p
-								style={{
-									fontSize: 16,
-									color: T.muted,
-									lineHeight: 1.7,
-									maxWidth: 420,
-									fontFamily: "'Outfit', sans-serif",
-									marginBottom: 32,
-								}}
-							>
-								inkgest is completely open source. Read the code, fork it,
-								self-host it, or contribute back. Built in public so you can see
-								exactly what runs when you paste a URL.
-							</p>
+						<h2
+							style={{
+								fontFamily: "'Comic', sans-serif",
+								fontSize: "clamp(36px,4vw,54px)",
+								color: T.accent,
+								lineHeight: 1.1,
+								marginBottom: 16,
+								letterSpacing: "-0.5px",
+							}}
+						>
+							Fully open.
+							<br />
+							<em style={{ color: T.warm }}>No black boxes.</em>
+						</h2>
+						<p
+							style={{
+								fontSize: 16,
+								color: T.muted,
+								lineHeight: 1.7,
+								maxWidth: 440,
+								fontFamily: "'Comic', sans-serif",
+								marginBottom: 32,
+							}}
+						>
+							Inkgest is completely open source — the scraping agent, the editor, the AI chat, the automations, and the export pipeline. Read the code, fork it, self-host it, or contribute back.
+						</p>
 							<div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
 								<motion.a
 									href="https://github.com/shreyvijayvargiya/Inkgest"
@@ -1415,7 +1763,7 @@ function OpenSource() {
 										fontSize: 14,
 										fontWeight: 700,
 										textDecoration: "none",
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 									}}
 								>
 									{/* GitHub icon */}
@@ -1441,7 +1789,7 @@ function OpenSource() {
 										fontSize: 14,
 										fontWeight: 600,
 										textDecoration: "none",
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 										border: `1.5px solid ${T.border}`,
 										transition: "border-color 0.2s",
 									}}
@@ -1505,7 +1853,7 @@ function OpenSource() {
 												fontWeight: 700,
 												color: T.accent,
 												marginBottom: 5,
-												fontFamily: "'Outfit', sans-serif",
+												fontFamily: "'Comic', sans-serif",
 											}}
 										>
 											{item.title}
@@ -1515,7 +1863,7 @@ function OpenSource() {
 												fontSize: 12.5,
 												color: T.muted,
 												lineHeight: 1.6,
-												fontFamily: "'Outfit', sans-serif",
+												fontFamily: "'Comic', sans-serif",
 											}}
 										>
 											{item.body}
@@ -1537,31 +1885,35 @@ function FAQ() {
 	const faqs = [
 		{
 			q: "What URLs does it support?",
-			a: "Most publicly accessible web pages — blog posts, news articles, research papers, Medium, Substack. Paywalled content won't work. We use Firecrawl so JavaScript-rendered pages are handled correctly.",
+			a: "Most publicly accessible web pages — blog posts, news articles, research papers, Medium, Substack, LinkedIn articles. Paywalled content won't work. We use Firecrawl so JavaScript-rendered pages are handled correctly.",
+		},
+		{
+			q: "What export formats are supported?",
+			a: "Inkgest exports to three formats: clean Markdown (.md) for Ghost, Notion, or any CMS; semantic HTML for emails or landing pages; and a JSX React component ready to drop into your Next.js or React app.",
+		},
+		{
+			q: "How does the AI chatbot work in the editor?",
+			a: "Once your draft is open in the editor, a collapsible AI sidebar lets you chat with the document. Ask it to rewrite a section, adjust the tone, expand a paragraph, add bullet points, or summarize — it knows the full context of your draft.",
+		},
+		{
+			q: "What are AI automations?",
+			a: "Automations let you chain scrape → draft → format into a repeatable workflow. Set up a sequence once and run it on any URL — useful for newsletters on a schedule or content teams with recurring formats.",
 		},
 		{
 			q: "How good is the output, really?",
-			a: "Better than starting from scratch, not a replacement for your voice. The draft gives you a structured starting point you then edit and make your own. Most users report needing to change 20–40% of the output. The more specific your prompt, the better the first draft.",
+			a: "Better than starting from scratch. The draft gives you a structured starting point you then edit and make your own. Most users report needing to change 20–40% of the output. The more specific your prompt, the better the first draft.",
 		},
 		{
-			q: "What happens when I use all 3 free generations?",
-			a: "You'll see the upgrade screen. Your saved drafts stay accessible. We warn you after your 2nd generation so it's never a surprise.",
-		},
-		{
-			q: "Can I cancel Pro anytime?",
-			a: "Yes. Cancel from account settings in one click. No emails, no forms. Your Pro access continues until the end of the current billing period.",
+			q: "Can I use multiple source URLs for one draft?",
+			a: "Yes — on paid plans you can add multiple URLs per draft. The AI synthesizes all sources into a single cohesive piece.",
 		},
 		{
 			q: "Is my content private?",
 			a: "Yes. Your drafts are stored in your private account and are never used to train any AI model. We don't share or sell your content.",
 		},
 		{
-			q: "What AI model powers the drafts?",
-			a: "State-of-the-art language models via OpenRouter, selecting the best available model for writing quality and speed. The model may change as better options emerge — we always optimize for output quality.",
-		},
-		{
-			q: "Can I use it for blog posts, not just newsletters?",
-			a: "Absolutely. Tell inkgest you're writing a blog post, LinkedIn article, or Twitter thread and it structures the output accordingly.",
+			q: "Can I cancel Pro anytime?",
+			a: "Yes. Cancel from account settings in one click. No emails, no forms. Your Pro access continues until the end of the current billing period.",
 		},
 		{
 			q: "Do you offer refunds?",
@@ -1589,21 +1941,23 @@ function FAQ() {
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 10,
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
 						FAQ
 					</p>
 					<h2
 						style={{
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 							fontSize: "clamp(36px,4vw,54px)",
 							color: T.accent,
 							lineHeight: 1.1,
 							letterSpacing: "-0.5px",
 						}}
 					>
-						Questions.
+						Real questions.
+						<br />
+						<span style={{ color: T.warm }}>Real answers.</span>
 					</h2>
 					<p
 						style={{
@@ -1611,10 +1965,10 @@ function FAQ() {
 							color: T.muted,
 							marginTop: 14,
 							lineHeight: 1.65,
-							fontFamily: "'Outfit', sans-serif",
+							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						Anything else?{" "}
+						Still curious?{" "}
 						<a
 							href="mailto:shreyvijayvargiya26@gmail.com"
 							style={{ color: T.accent, textDecoration: "underline" }}
@@ -1644,7 +1998,7 @@ function FAQ() {
 										justifyContent: "space-between",
 										alignItems: "center",
 										gap: 16,
-										fontFamily: "'Outfit', sans-serif",
+										fontFamily: "'Comic', sans-serif",
 									}}
 								>
 									{f.q}
@@ -1676,7 +2030,7 @@ function FAQ() {
 													color: T.muted,
 													lineHeight: 1.7,
 													paddingBottom: 20,
-													fontFamily: "'Outfit', sans-serif",
+													fontFamily: "'Comic', sans-serif",
 												}}
 											>
 												{f.a}
@@ -1706,15 +2060,16 @@ export default function inkgestLanding() {
 		return null;
 	}
 	return (
-		<div style={{ fontFamily: "'Outfit', sans-serif", background: T.base }}>
+		<div style={{ fontFamily: "'Comic', sans-serif", background: T.base }}>
 			<FontLink />
 			<Nav />
 			<Hero />
 			<AIFeaturesSection />
 			<Features />
+			<ExportFormats />
 			<HowItWorks />
 			<StatsStrip />
-			{/* /<Testimonials /> */}
+			<UseCasesStrip />
 			<Pricing />
 			<OpenSource />
 			<FAQ />

@@ -1058,7 +1058,7 @@ export default function AIChatSidebar({
 				display: "flex",
 				flexDirection: "column",
 				overflow: "hidden",
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 			}
 		: {
 				position: "fixed",
@@ -1073,7 +1073,7 @@ export default function AIChatSidebar({
 				zIndex: 150,
 				overflow: "visible",
 				boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 			};
 
 	const sidebarContent = (
@@ -1787,7 +1787,7 @@ export default function AIChatSidebar({
 											resize: "none", fontSize: 13,
 											color: "#1A1A1A", lineHeight: 1.65,
 											caretColor: "#C17B2F",
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 										}}
 									/>
 									<div style={{

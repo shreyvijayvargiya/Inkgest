@@ -502,6 +502,8 @@ export default function inkgestApp() {
 	const [generateError, setGenerateError] = useState(null);
 	const [loadingMsg, setLoadingMsg] = useState("Reading URL content…");
 	const [draftMode, setDraftMode] = useState("agent"); // "simple" | "agent" | "ai" | "scrape" | "blank"
+	/** Inside InkAgent form: full generate panel vs empty note. */
+	const [agentFormTab, setAgentFormTab] = useState("generate"); // "generate" | "empty"
 	const [scrapeUrl, setScrapeUrl] = useState("");
 	const [scraping, setScraping] = useState(false);
 	const [blankTitle, setBlankTitle] = useState("");
@@ -804,7 +806,7 @@ export default function inkgestApp() {
 				display: "flex",
 				flexDirection: "column",
 				background: T.base,
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 				overflow: "hidden",
 			}}
 		>
@@ -1146,24 +1148,29 @@ export default function inkgestApp() {
 								}}
 								className="max-w-5xl mx-auto"
 							>
-								<GenerateAssetPanel
-									variant="app"
-									theme={T}
-									reduxUser={reduxUser}
-									creditRemaining={creditRemaining}
-									queryClient={queryClient}
-									router={router}
-									onLogin={() => setLoginModalOpen(true)}
-									presets={PRESETS}
-									promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
-									showFormatControls
-									format={format}
-									setFormat={setFormat}
-									style={style}
-									setStyle={setStyle}
-									FORMATS={FORMATS}
-									STYLES={STYLES}
-								/>
+
+								{agentFormTab === "generate" && (
+									<GenerateAssetPanel
+										variant="app"
+										theme={T}
+										reduxUser={reduxUser}
+										creditRemaining={creditRemaining}
+										queryClient={queryClient}
+										router={router}
+										onLogin={() => setLoginModalOpen(true)}
+										presets={PRESETS}
+										promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
+										showFormatControls
+										format={format}
+										setFormat={setFormat}
+										style={style}
+										setStyle={setStyle}
+										FORMATS={FORMATS}
+										STYLES={STYLES}
+									/>
+								)}
+
+								
 							</motion.div>
 						)}
 
@@ -1286,91 +1293,6 @@ export default function inkgestApp() {
 								</motion.div>
 							)}
 
-							{/* ── BLANK MODE ── */}
-							{draftMode === "blank" && (
-								<motion.div
-									key="blank-form"
-									initial={{ opacity: 0, y: 8 }}
-									animate={{ opacity: 1, y: 0 }}
-									exit={{ opacity: 0, y: 8 }}
-									transition={{ duration: 0.18 }}
-								>
-									<div style={{ marginBottom: 20 }}>
-										<label
-											style={{
-												display: "block",
-												fontSize: 12,
-												fontWeight: 700,
-												textTransform: "",
-												letterSpacing: "0.08em",
-												color: T.muted,
-												marginBottom: 8,
-											}}
-										>
-											Draft title (optional)
-										</label>
-										<input
-											type="text"
-											value={blankTitle}
-											onChange={(e) => setBlankTitle(e.target.value)}
-											onKeyDown={(e) => e.key === "Enter" && handleBlank()}
-											placeholder="Untitled draft"
-											style={{
-												width: "100%",
-												background: T.surface,
-												border: `1.5px solid ${T.border}`,
-												borderRadius: 11,
-												padding: "13px 16px",
-												fontSize: 14,
-												color: T.accent,
-												outline: "none",
-												transition: "border-color 0.2s",
-											}}
-											onFocus={(e) => (e.target.style.borderColor = T.warm)}
-											onBlur={(e) => (e.target.style.borderColor = T.border)}
-										/>
-									</div>
-									<motion.button
-										onClick={handleBlank}
-										whileHover={{
-											scale: 1.02,
-											y: -1,
-											boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-										}}
-										whileTap={{ scale: 0.97 }}
-										style={{
-											width: "100%",
-											background: T.accent,
-											color: "white",
-											border: "none",
-											padding: "15px",
-											borderRadius: 12,
-											fontSize: 16,
-											fontWeight: 700,
-											cursor: "pointer",
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "center",
-											gap: 10,
-										}}
-									>
-										<svg
-											width={18}
-											height={18}
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="white"
-											strokeWidth={2}
-											strokeLinecap="round"
-											strokeLinejoin="round"
-										>
-											<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-											<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-										</svg>
-										Open blank editor →
-									</motion.button>
-								</motion.div>
-							)}
 						</AnimatePresence>
 
 						{/* ── AI MODE — existing form ── */}

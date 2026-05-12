@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
 	Link2,
@@ -9,8 +9,10 @@ import {
 	Table,
 	LayoutTemplate,
 	Code2,
+	File,
 } from "lucide-react";
 import { useGenerateAsset } from "../hooks/useGenerateAsset";
+import { createDraft } from "../api/userAssets";
 import {
 	GENERATE_PANEL_TYPES,
 	taskEmojiForType,
@@ -36,6 +38,7 @@ const PANEL_TAB_ICONS = {
 	table: Table,
 	"landing-page": LayoutTemplate,
 	react: Code2,
+	blank: File,
 };
 
 /**
@@ -66,6 +69,9 @@ export default function GenerateAssetPanel({
 	const [internalStyle, setInternalStyle] = useState("casual");
 	/** Same URL + prompt + type, repeated API calls (max 5). */
 	const [variantCount, setVariantCount] = useState(1);
+	const [blankName, setBlankName] = useState("");
+	const [blankCreating, setBlankCreating] = useState(false);
+	const [blankError, setBlankError] = useState(null);
 
 	const format = formatProp ?? internalFormat;
 	const style = styleProp ?? internalStyle;
@@ -98,8 +104,45 @@ export default function GenerateAssetPanel({
 	const selectedLabel = selectedType.label;
 
 	const isApp = variant === "app";
+	const isBlank = assetType === "blank";
 
-	
+	const handleCreateBlank = useCallback(async () => {
+		setBlankError(null);
+		if (!reduxUser) {
+			onLogin?.();
+			return;
+		}
+		setBlankCreating(true);
+		try {
+			const title = blankName.trim() || "Untitled draft";
+			const now = new Date();
+			const date = now.toLocaleDateString("en-US", {
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+			});
+			const draft = {
+				title,
+				preview: "",
+				body: "",
+				urls: [],
+				words: 0,
+				date,
+				tag: "Draft",
+			};
+			const { id } = await createDraft(reduxUser.uid, draft);
+			if (queryClient) {
+				queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			}
+			setBlankName("");
+			if (router?.push) router.push(`/app/${id}`);
+		} catch (e) {
+			setBlankError(e?.message || "Could not create draft");
+		} finally {
+			setBlankCreating(false);
+		}
+	}, [blankName, onLogin, queryClient, reduxUser, router]);
+
 	const applySuggestion = (s) => {
 		const n = normalizePromptSuggestion(s);
 		if (n.urls.length) setUrlInputs([...n.urls]);
@@ -129,7 +172,7 @@ export default function GenerateAssetPanel({
 				outline: "none",
 				width: "100%",
 				boxSizing: "border-box",
-				fontFamily: "'Outfit', sans-serif",
+				fontFamily: "'Comic', sans-serif",
 			};
 
 	const mainCardStyle = isApp
@@ -200,10 +243,12 @@ export default function GenerateAssetPanel({
 						lineHeight: 1.6,
 						maxWidth: 640,
 						fontSize: 15,
-						fontFamily: "'Outfit', sans-serif",
+						fontFamily: "'Comic', sans-serif",
 					}}
 				>
-					Paste links, add a short brief to create your {selectedLabel} post
+					{isBlank
+						? "Give your draft a name, then open it in the editor—saved to your workspace, no AI run required."
+						: `Paste links, add a short brief to create your ${selectedLabel} post`}
 				</p>
 			</header>
 
@@ -230,10 +275,15 @@ export default function GenerateAssetPanel({
 								type="button"
 								role="tab"
 								aria-selected={active}
-								whileHover={gen.loading ? {} : { scale: 1.02 }}
+								whileHover={
+									gen.loading || blankCreating ? {} : { scale: 1.02 }
+								}
 								whileTap={{ scale: 0.98 }}
-								onClick={() => setAssetType(opt.value)}
-								disabled={gen.loading}
+								onClick={() => {
+									setAssetType(opt.value);
+									if (opt.value !== "blank") setBlankError(null);
+								}}
+								disabled={gen.loading || blankCreating}
 								style={{
 									display: "flex",
 									alignItems: "center",
@@ -245,13 +295,14 @@ export default function GenerateAssetPanel({
 									border: "none",
 									background: active ? T.surface : "transparent",
 									color: active ? T.accent : T.muted,
-									cursor: gen.loading ? "not-allowed" : "pointer",
+									cursor:
+										gen.loading || blankCreating ? "not-allowed" : "pointer",
 									flexShrink: 0,
 									boxShadow: active
 										? "0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)"
 										: "none",
 									transition: "background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease",
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								<Icon size={15} strokeWidth={2} aria-hidden className="flex-shrink-0" />
@@ -280,31 +331,141 @@ export default function GenerateAssetPanel({
 					gap: 22,
 				}}
 			>
-				<div className="flex min-w-0 flex-col gap-2">
-					<label
-						style={{
-							fontSize: 11,
-							fontWeight: 700,
-							textTransform: "",
-							letterSpacing: "0.1em",
-							color: T.muted,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Source URLs
-					</label>
-					{urlInputs.map((u, i) => (
-						<div
-							key={i}
-							style={{ display: "flex", gap: 8, alignItems: "center" }}
+				{isBlank ? (
+					<div className="w-full min-w-0">
+						<label
+							style={{
+								display: "block",
+								fontSize: 11,
+								fontWeight: 700,
+								letterSpacing: "0.1em",
+								color: T.muted,
+								marginBottom: 8,
+								fontFamily: "'Comic', sans-serif",
+							}}
 						>
-							<input
-								type="url"
-								value={u}
-								onChange={(e) => gen.setUrlAt(i, e.target.value)}
-								placeholder="https://…"
+							Draft name
+						</label>
+						<input
+							type="text"
+							value={blankName}
+							onChange={(e) => setBlankName(e.target.value)}
+							placeholder="Title of the draft"
+							disabled={blankCreating}
+							style={inputStyle}
+							onFocus={(e) => {
+								e.target.style.borderColor = T.warm;
+							}}
+							onBlur={(e) => {
+								e.target.style.borderColor = T.border;
+							}}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" && !blankCreating) handleCreateBlank();
+							}}
+						/>
+						
+					</div>
+				) : (
+					<>
+						<div className="flex min-w-0 flex-col gap-2">
+							<label
+								style={{
+									fontSize: 11,
+									fontWeight: 700,
+									textTransform: "",
+									letterSpacing: "0.1em",
+									color: T.muted,
+									fontFamily: "'Comic', sans-serif",
+								}}
+							>
+								Source URLs
+							</label>
+							{urlInputs.map((u, i) => (
+								<div
+									key={i}
+									style={{ display: "flex", gap: 8, alignItems: "center" }}
+								>
+									<input
+										type="url"
+										value={u}
+										onChange={(e) => gen.setUrlAt(i, e.target.value)}
+										placeholder="https://…"
+										disabled={gen.loading}
+										style={inputStyle}
+										onFocus={(e) => {
+											e.target.style.borderColor = T.warm;
+										}}
+										onBlur={(e) => {
+											e.target.style.borderColor = T.border;
+										}}
+									/>
+									{urlInputs.length > 1 && (
+										<button
+											type="button"
+											onClick={() => gen.removeUrlAt(i)}
+											style={{
+												background: "none",
+												border: "none",
+												color: T.muted,
+												cursor: "pointer",
+												padding: 4,
+												flexShrink: 0,
+											}}
+											aria-label="Remove URL"
+										>
+											×
+										</button>
+									)}
+								</div>
+							))}
+							<motion.button
+								type="button"
+								whileTap={{ scale: 0.98 }}
+								onClick={gen.addUrlField}
 								disabled={gen.loading}
-								style={inputStyle}
+								style={{
+									alignSelf: "flex-start",
+									fontSize: 12,
+									fontWeight: 600,
+									color: T.warm,
+									background: "none",
+									border: "none",
+									cursor: gen.loading ? "not-allowed" : "pointer",
+									padding: 0,
+									fontFamily: "'Comic', sans-serif",
+								}}
+							>
+								+ Add URL
+							</motion.button>
+						</div>
+
+						<div className="w-full min-w-0">
+							<label
+								style={{
+									display: "block",
+									fontSize: 11,
+									fontWeight: 700,
+									textTransform: "",
+									letterSpacing: "0.1em",
+									color: T.muted,
+									marginBottom: 8,
+									fontFamily: "'Comic', sans-serif",
+								}}
+							>
+								Prompt
+							</label>
+							<textarea
+								value={prompt}
+								onChange={(e) => setPrompt(e.target.value)}
+								placeholder="Describe tone, audience, and what you want (optional if URLs are enough)."
+								rows={4}
+								disabled={gen.loading}
+								style={{
+									...inputStyle,
+									resize: "vertical",
+									lineHeight: 1.6,
+									minHeight: 100,
+								}}
 								onFocus={(e) => {
 									e.target.style.borderColor = T.warm;
 								}}
@@ -312,83 +473,9 @@ export default function GenerateAssetPanel({
 									e.target.style.borderColor = T.border;
 								}}
 							/>
-							{urlInputs.length > 1 && (
-								<button
-									type="button"
-									onClick={() => gen.removeUrlAt(i)}
-									style={{
-										background: "none",
-										border: "none",
-										color: T.muted,
-										cursor: "pointer",
-										padding: 4,
-										flexShrink: 0,
-									}}
-									aria-label="Remove URL"
-								>
-									×
-								</button>
-							)}
 						</div>
-					))}
-					<motion.button
-						type="button"
-						whileTap={{ scale: 0.98 }}
-						onClick={gen.addUrlField}
-						disabled={gen.loading}
-						style={{
-							alignSelf: "flex-start",
-							fontSize: 12,
-							fontWeight: 600,
-							color: T.warm,
-							background: "none",
-							border: "none",
-							cursor: gen.loading ? "not-allowed" : "pointer",
-							padding: 0,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						+ Add URL
-					</motion.button>
-				</div>
-
-				<div className="w-full min-w-0">
-					<label
-						style={{
-							display: "block",
-							fontSize: 11,
-							fontWeight: 700,
-							textTransform: "",
-							letterSpacing: "0.1em",
-							color: T.muted,
-							marginBottom: 8,
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						Prompt
-					</label>
-					<textarea
-						value={prompt}
-						onChange={(e) => setPrompt(e.target.value)}
-						placeholder="Describe tone, audience, and what you want (optional if URLs are enough)."
-						rows={4}
-						disabled={gen.loading}
-						style={{
-							...inputStyle,
-							resize: "vertical",
-							lineHeight: 1.6,
-							minHeight: 100,
-						}}
-						onFocus={(e) => {
-							e.target.style.borderColor = T.warm;
-						}}
-						onBlur={(e) => {
-							e.target.style.borderColor = T.border;
-						}}
-					/>
-				</div>
-
-				
+					</>
+				)}
 			</div>
 
 			<div
@@ -408,56 +495,103 @@ export default function GenerateAssetPanel({
 						gap: 10,
 						justifyContent: "center",
 					}}
+					className="my-4"
 				>
-					<motion.button
-						type="button"
-						whileHover={gen.canSubmit && !gen.loading ? { scale: 1.01 } : {}}
-						whileTap={{ scale: 0.99 }}
-						onClick={gen.loading ? gen.cancel : gen.handleGenerate}
-						disabled={!gen.loading && !gen.canSubmit}
-						style={{
-							width: "100%",
-							padding: "15px 20px",
-							borderRadius: 14,
-							border: "none",
-							background: gen.loading || !gen.canSubmit ? T.border : T.accent,
-							color: gen.loading || !gen.canSubmit ? T.muted : "white",
-							fontWeight: 700,
-							fontSize: 15,
-							cursor:
-								!gen.canSubmit && !gen.loading ? "not-allowed" : "pointer",
-							fontFamily: "'Outfit', sans-serif",
-						}}
-					>
-						{gen.loading
-							? "Generating…"
-							: variantCount > 1
-								? `Generate ×${variantCount}`
-								: "Generate"}
-					</motion.button>
-					{gen.loading && (
+					{isBlank ? (
 						<motion.button
 							type="button"
-							whileTap={{ scale: 0.98 }}
-							onClick={gen.cancel}
+							whileHover={!blankCreating ? { scale: 1.01 } : {}}
+							whileTap={{ scale: 0.99 }}
+							onClick={handleCreateBlank}
+							disabled={blankCreating}
 							style={{
 								width: "100%",
-								padding: "12px 16px",
-								borderRadius: 12,
-								border: `1px solid ${T.border}`,
-								background: "#FEE2E2",
-								color: "#DC2626",
-								fontWeight: 600,
-								fontSize: 13,
-								cursor: "pointer",
-								fontFamily: "'Outfit', sans-serif",
+								padding: "15px 20px",
+								borderRadius: 14,
+								border: "none",
+								background: blankCreating ? T.border : T.accent,
+								color: blankCreating ? T.muted : "white",
+								fontWeight: 700,
+								fontSize: 15,
+								cursor: blankCreating ? "not-allowed" : "pointer",
+								fontFamily: "'Comic', sans-serif",
 							}}
 						>
-							Stop
+							{blankCreating ? "Creating…" : "Create draft"}
 						</motion.button>
+					) : (
+						<>
+							<motion.button
+								type="button"
+								whileHover={gen.canSubmit && !gen.loading ? { scale: 1.01 } : {}}
+								whileTap={{ scale: 0.99 }}
+								onClick={gen.loading ? gen.cancel : gen.handleGenerate}
+								disabled={!gen.loading && !gen.canSubmit}
+								style={{
+									width: "100%",
+									padding: "15px 20px",
+									borderRadius: 14,
+									border: "none",
+									background:
+									gen.loading || !gen.canSubmit ? T.border : T.accent,
+									color: gen.loading || !gen.canSubmit ? T.muted : "white",
+									fontWeight: 700,
+									fontSize: 15,
+									cursor:
+										!gen.canSubmit && !gen.loading ? "not-allowed" : "pointer",
+									fontFamily: "'Comic', sans-serif",
+								}}
+							>
+								{gen.loading
+									? "Generating…"
+									: variantCount > 1
+										? `Generate ×${variantCount}`
+										: "Generate"}
+							</motion.button>
+							{gen.loading && (
+								<motion.button
+									type="button"
+									whileTap={{ scale: 0.98 }}
+									onClick={gen.cancel}
+									style={{
+										width: "100%",
+										padding: "12px 16px",
+										borderRadius: 12,
+										border: `1px solid ${T.border}`,
+										background: "#FEE2E2",
+										color: "#DC2626",
+										fontWeight: 600,
+										fontSize: 13,
+										cursor: "pointer",
+										fontFamily: "'Comic', sans-serif",
+									}}
+								>
+									Stop
+								</motion.button>
+							)}
+						</>
 					)}
 				</div>
 			</div>
+
+			{blankError && (
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					style={{
+						marginTop: 20,
+						padding: "14px 18px",
+						background: "#FEF2F2",
+						border: "1px solid #FECACA",
+						borderRadius: 14,
+						fontSize: 13,
+						color: "#DC2626",
+						fontFamily: "'Comic', sans-serif",
+					}}
+				>
+					{blankError}
+				</motion.div>
+			)}
 
 			{gen.error && (
 				<motion.div
@@ -471,17 +605,18 @@ export default function GenerateAssetPanel({
 						borderRadius: 14,
 						fontSize: 13,
 						color: "#DC2626",
-						fontFamily: "'Outfit', sans-serif",
+						fontFamily: "'Comic', sans-serif",
 					}}
 				>
 					{gen.error}
 				</motion.div>
 			)}
 
-			{(gen.loading ||
-				gen.streamed ||
-				gen.completedTasks.length > 0 ||
-				(Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1)) && (
+			{!isBlank &&
+				(gen.loading ||
+					gen.streamed ||
+					gen.completedTasks.length > 0 ||
+					(Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1)) && (
 				<motion.div
 					initial={{ opacity: 0, y: 6 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -491,7 +626,7 @@ export default function GenerateAssetPanel({
 						background: T.base,
 						border: `1px solid ${T.border}`,
 						borderRadius: 16,
-						fontFamily: "'Outfit', sans-serif",
+						fontFamily: "'Comic', sans-serif",
 					}}
 				>
 					<p
@@ -763,7 +898,8 @@ export default function GenerateAssetPanel({
 			)}
 			</div>
 
-			{!gen.loading &&
+			{!isBlank &&
+				!gen.loading &&
 				gen.completedTasks.length === 0 &&
 				promptSuggestions.length > 0 && (
 					<div style={suggestionsCardStyle}>
@@ -776,7 +912,7 @@ export default function GenerateAssetPanel({
 								letterSpacing: "0.1em",
 								color: T.muted,
 								marginBottom: 12,
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 							}}
 						>
 							Try a suggestion
@@ -803,7 +939,7 @@ export default function GenerateAssetPanel({
 											color: T.accent,
 											textAlign: "left",
 											lineHeight: 1.5,
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 										}}
 									>
 										{s.urls.length > 0 && (

@@ -23,21 +23,18 @@ const queryClient = new QueryClient({
 const MyApp = ({ Component, pageProps }) => {
 	return (
 		<QueryClientProvider client={queryClient}>
-			{/* PostHog Provider - Session Replays & Product Analytics */}
-			<PostHogProvider>
-				<Provider store={store}>
-					<PersistGate loading={null} persistor={persistor}>
-						{/* Automatic SEO tags based on route - configured in lib/config/seo.js */}
-						<SEO customSEO={pageProps.customSEO} />
-						{/* Analytics Tracker - tracks once per session */}
-						<AnalyticsTracker />
-						<Component {...pageProps} />
-					</PersistGate>
-				</Provider>
-				<Toaster />
-				{/* Vercel Analytics - Web Performance & Visitor Metrics */}
-				<Analytics />
-			</PostHogProvider>
+			<Provider store={store}>
+				<PersistGate loading={null} persistor={persistor}>
+					{/* Automatic SEO tags based on route - configured in lib/config/seo.js */}
+					<SEO customSEO={pageProps.customSEO} />
+					{/* Analytics Tracker - tracks once per session */}
+					<AnalyticsTracker />
+					<Component {...pageProps} />
+				</PersistGate>
+			</Provider>
+			<Toaster />
+			{/* Vercel Analytics - Web Performance & Visitor Metrics */}
+			<Analytics />
 		</QueryClientProvider>
 	);
 };

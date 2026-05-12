@@ -238,7 +238,7 @@ function DonutChart({ data }) {
 								y={cy + 14}
 								textAnchor="middle"
 								style={{
-									fontFamily: "Outfit,sans-serif",
+									fontFamily: "Comic,sans-serif",
 									fontSize: 10,
 									fill: D.muted,
 								}}
