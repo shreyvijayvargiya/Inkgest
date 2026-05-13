@@ -11,9 +11,8 @@ import { useRouter } from "next/router";
 import LoginModal from "../lib/ui/LoginModal";
 import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { getTheme } from "../lib/utils/theme";
-import { SparkleIcon } from "lucide-react";
+import { CreditCardIcon, SparkleIcon, XCircleIcon, LinkIcon, FileTextIcon, CodeIcon, MessageSquareIcon, ZapIcon } from "lucide-react";
 import Footer from "../app/components/Footer";
-import GenerateAssetPanel from "../lib/ui/GenerateAssetPanel";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
@@ -204,7 +203,7 @@ function Nav() {
 	return (
 		<motion.nav
 			style={{ boxShadow: shadow, fontFamily: "'Comic', sans-serif" }}
-			className="fixed top-0 left-0 right-0 z-50 border-b"
+			className="fixed top-0 left-0 right-0 z-50 "
 			initial={{ y: -60, opacity: 0 }}
 			animate={{ y: 0, opacity: 1 }}
 			transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -214,11 +213,10 @@ function Nav() {
 				style={{
 					background: "rgba(247,245,240,0.88)",
 					backdropFilter: "blur(18px)",
-					borderBottom: `1px solid ${T.border}`,
 				}}
 			>
 				<div
-					className="max-w-6xl mx-auto px-6 flex items-center justify-between"
+					className="max-w-7xl mx-auto px-6 flex items-center justify-between"
 					style={{ height: 60 }}
 				>
 					{/* Logo */}
@@ -315,54 +313,40 @@ function Hero() {
 	const y = useTransform(scrollYProgress, [0, 1], [0, 80]);
 
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
-	const [credits, setCredits] = useState(null);
-
-	const creditRemaining = credits
-		? credits.plan === "pro"
-			? Infinity
-			: Math.max(0, credits.remaining ?? FREE_CREDIT_LIMIT)
-		: FREE_CREDIT_LIMIT;
-
-	/* Load credits when user is logged in */
-	useEffect(() => {
-		if (!reduxUser) {
-			setCredits(null);
-			return;
-		}
-		getUserCredits(reduxUser.uid)
-			.then(setCredits)
-			.catch(() => setCredits(null));
-	}, [reduxUser]);
 
 	const texts = [
-		"Scrape any URL → newsletter in 60 seconds",
-		"Turn 5 links into a publish-ready SEO blog",
-		"Export your draft as React, HTML, or Markdown",
-		"Chat with your draft, rewrite in one click",
-		"AI automations for your entire content workflow",
+		{ icon: "🔗", text: "Scrape any URL → newsletter in 60 seconds" },
+		{ icon: "📝", text: "Turn 5 links into a publish-ready SEO blog" },
+		{ icon: "📦", text: "Export your draft as React, HTML, or Markdown" },
+		{ icon: "💬", text: "Chat with your draft, rewrite in one click" },
+		{ icon: "⚡", text: "AI automations for your entire content workflow" },
+		{ icon: "🖼️", text: "Generate images & assets directly in your draft" },
+		{ icon: "🔍", text: "SEO analysis and keyword suggestions built-in" },
+		{ icon: "📤", text: "One-click publish to your blog or CMS" },
 	];
 
 	function AnimatedText() {
-		const [index, setIndex] = useState(0);
+		const doubled = [...texts, ...texts];
 
 		return (
-			<motion.h1
-				key={index}
-				initial={{ opacity: 0, y: 40 }}
-				animate={{ opacity: [0, 1, 1, 0], y: [40, 0, 0, -40] }}
-				transition={{
-					duration: 5.5,
-					times: [0, 0.2, 0.8, 1],
-					ease: "easeInOut",
-				}}
-				onAnimationComplete={() => {
-					setIndex((prev) => (prev + 1) % texts.length);
-				}}
-				className="text-2xl text-center my-4"
-				style={{ color: T.accent }}
-			>
-				{texts[index]}
-			</motion.h1>
+			<div style={{ overflow: "hidden", width: "100%", margin: "16px 0" }}>
+				<motion.div
+					animate={{ x: ["0%", "-50%"] }}
+					transition={{ duration: 20, ease: "linear", repeat: Infinity }}
+					style={{ display: "flex", gap: 24, width: "max-content" }}
+				>
+					{doubled.map((item, i) => (
+						<div
+							key={i}
+							className="text-sm py-1 px-2 rounded-xl bg-amber-50/50"
+							style={{ display: "flex", alignItems: "center", gap: 8 }}
+						>
+							<span>{item.icon}</span>
+							<span>{item.text}</span>
+						</div>
+					))}
+				</motion.div>
+			</div>
 		);
 	}
 
@@ -391,7 +375,7 @@ function Hero() {
 
 			<motion.div
 				style={{ y }}
-				className="relative max-w-2xl mx-auto px-6 text-center"
+				className="relative max-w-5xl mx-auto px-6 text-left"
 			>
 				<a
 					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto p-2 mb-4 border border-amber-200 rounded-full flex gap-2 items-center"
@@ -402,6 +386,7 @@ function Hero() {
 					<SparkleIcon className="w-3 h-3" />
 					We are live on Product Hunt
 				</a>
+			<motion.div className="max-w-5xl mx-auto my-10">
 				{/* Headline */}
 				<motion.h1
 					initial={{ opacity: 0, y: 24 }}
@@ -413,58 +398,12 @@ function Hero() {
 						color: T.accent,
 						marginBottom: 16,
 					}}
-					className="text-6xl font-bold text-center"
+					className="text-5xl font-bold text-center leading-tight"
 				>
-					The AI writing editor
-					<br />
-					for <span style={{ color: T.warm }}>content creators</span>
+					Futuristic AI writing editor for
+					<motion.span initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }} style={{ color: T.warm }} className="text-6xl font-semibold px-2 border border-amber-100 bg-gradient-to-r from-amber-50 to-amber-50/20 m-1 rounded-xl ml-2">content creators</motion.span>
 				</motion.h1>
-
 				<AnimatedText />
-
-				{/* Sub */}
-				<motion.p
-					initial={{ opacity: 0, y: 20 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.35, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-					style={{
-						fontSize: 18,
-						color: T.muted,
-						margin: "0 auto 32px",
-						lineHeight: 1.7,
-						fontFamily: "'Comic', sans-serif",
-					}}
-					className="max-w-2xl mx-auto"
-				>
-					Scrape any URL, draft with AI, edit in a powerful editor, then export
-					to <strong style={{ color: T.accent }}>React, HTML, or Markdown</strong> — your whole content workflow in one place.
-				</motion.p>
-
-				{/* Generate asset — POST /generate/:type (proxied to Hono; INKGEST_GENERATE_URL on server) */}
-				<motion.div
-					initial={{ opacity: 0, y: 24 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.4, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-					style={{
-						width: "100%",
-						margin: "0 auto",
-						textAlign: "left",
-					}}
-					className="max-w-5xl mx-auto"
-				>
-					<GenerateAssetPanel
-						variant="app"
-						theme={T}
-						reduxUser={reduxUser}
-						creditRemaining={creditRemaining}
-						queryClient={null}
-						router={router}
-						onLogin={() => setLoginModalOpen(true)}
-						presets={PRESETS}
-						promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
-					/>
-				</motion.div>
-
 				<motion.p
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
@@ -473,35 +412,150 @@ function Hero() {
 						fontSize: 13,
 						color: T.muted,
 						fontFamily: "'Comic', sans-serif",
-						marginTop: 20,
+						marginTop: 16,
+						marginBottom: 32,
 					}}
+					className="flex items-center justify-center gap-2"
 				>
-					<strong style={{ color: T.accent }}>
-						{FREE_CREDIT_LIMIT} free credits
+					<strong style={{ color: T.accent }} className="flex items-center gap-2">
+						<SparkleIcon className="w-4 h-4" /> {FREE_CREDIT_LIMIT} free credits
 					</strong>{" "}
-					· No credit card · Cancel anytime
+					· <div className="flex items-center gap-2"><CreditCardIcon className="w-4 h-4" /> No credit card </div>· <div className="flex items-center gap-2"><XCircleIcon className="w-4 h-4" /> Cancel anytime</div>
 				</motion.p>
 
-				<motion.a
-					href="#how-it-works"
-					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					transition={{ delay: 0.6 }}
+				{/* ── DEMO EDITOR UI ── */}
+				<motion.div
+					initial={{ opacity: 0, y: 32 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ delay: 0.55, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
 					style={{
-						display: "inline-block",
-						marginTop: 12,
-						fontSize: 14,
-						fontWeight: 600,
-						color: T.warm,
-						textDecoration: "none",
-						fontFamily: "'Comic', sans-serif",
-						transition: "color 0.2s",
+						border: `1px solid ${T.border}`,
+						borderRadius: 16,
+						overflow: "hidden",
+						boxShadow: "0 24px 80px rgba(0,0,0,0.10)",
+						background: T.surface,
+						display: "flex",
+						flexDirection: "column",
+						height: 560,
 					}}
-					onMouseEnter={(e) => (e.target.style.color = T.accent)}
-					onMouseLeave={(e) => (e.target.style.color = T.warm)}
+					className="max-w-5xl mx-auto ring hover:ring-4 ring-amber-50 transition-all duration-100 ease-in"
 				>
-					See how it works ↓
-				</motion.a>
+					{/* Top bar */}
+					<div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", flexShrink: 0 }}>
+						<div style={{ display: "flex", gap: 6 }}>
+							<div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FF5F57" }} />
+							<div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FEBC2E" }} />
+							<div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28C840" }} />
+						</div>
+						<div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+							<span style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>inkgest</span>
+							<span style={{ fontSize: 11, color: T.muted }}>— AI Content Editor</span>
+						</div>
+						<div style={{ display: "flex", gap: 6 }}>
+							{["Preview", "Theme", "Export"].map((label) => (
+								<div key={label} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: `1px solid ${T.border}`, color: T.accent, background: T.base, cursor: "default" }}>{label}</div>
+							))}
+						</div>
+					</div>
+
+					{/* Body: 3 columns */}
+					<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+						{/* Left sidebar */}
+						<div style={{ width: 220, borderRight: `1px solid ${T.border}`, background: T.base, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+							<div style={{ padding: "12px 10px 8px", borderBottom: `1px solid ${T.border}` }}>
+								<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+									<span style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>My Drafts</span>
+									<div style={{ width: 22, height: 22, borderRadius: 6, background: T.warm, display: "flex", alignItems: "center", justifyContent: "center", cursor: "default" }}>
+										<span style={{ color: "white", fontSize: 14, lineHeight: 1, marginTop: -1 }}>+</span>
+									</div>
+								</div>
+								<div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: "5px 8px", fontSize: 11, color: T.muted }}>🔍 Search drafts…</div>
+							</div>
+							<div style={{ flex: 1, overflowY: "auto", padding: "8px 6px" }}>
+								{[
+									{ title: "YC Newsletter · June 2026", tag: "Newsletter", active: true },
+									{ title: "SEO Blog: AI Writing Tools", tag: "Blog" },
+									{ title: "TechCrunch Digest", tag: "Newsletter" },
+									{ title: "Product Launch Copy", tag: "Landing" },
+									{ title: "Hacker News Roundup", tag: "Digest" },
+								].map((d) => (
+									<div key={d.title} style={{ padding: "8px 8px", borderRadius: 8, marginBottom: 2, background: d.active ? T.surface : "transparent", border: `1px solid ${d.active ? T.border : "transparent"}`, cursor: "default" }}>
+										<p style={{ fontSize: 12, fontWeight: d.active ? 700 : 500, color: d.active ? T.accent : T.muted, lineHeight: 1.4, marginBottom: 3 }}>{d.title}</p>
+										<span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 4, background: d.active ? "#FEF3E2" : "transparent", color: T.warm }}>{d.tag}</span>
+									</div>
+								))}
+							</div>
+						</div>
+
+						{/* Center editor */}
+						<div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: T.surface }}>
+							{/* Editor toolbar */}
+							<div style={{ padding: "8px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+								<span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "#FEF3E2", color: T.warm }}>Newsletter</span>
+								<div style={{ flex: 1 }} />
+								{["B", "I", "H1", "H2", "·—", "{ }"].map((btn) => (
+									<div key={btn} style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 5, border: `1px solid ${T.border}`, color: T.muted, cursor: "default" }}>{btn}</div>
+								))}
+								<div style={{ width: 1, height: 16, background: T.border }} />
+								<div style={{ fontSize: 11, padding: "2px 8px", borderRadius: 5, background: T.accent, color: "white", fontWeight: 600, cursor: "default" }}>Save</div>
+							</div>
+							{/* Editor content */}
+							<div style={{ flex: 1, overflowY: "auto", padding: "28px 40px" }}>
+								<div style={{ maxWidth: 620, margin: "0 auto" }}>
+									<div style={{ fontSize: 22, fontWeight: 800, color: T.accent, marginBottom: 8, lineHeight: 1.3 }}>YC Newsletter · June 2026</div>
+									<div style={{ fontSize: 11, color: T.muted, marginBottom: 20, display: "flex", gap: 10 }}>
+										<span>✍️ 420 words</span><span>·</span><span>📅 May 13, 2026</span><span>·</span><span>🔗 ycombinator.com</span>
+									</div>
+									{[
+										"Y Combinator's latest batch is here — and the trends are clear. Founders are building smaller, leaner, and faster than ever before.",
+										"Three themes dominated Demo Day this season: **AI-native infrastructure**, **vertical SaaS for emerging markets**, and **developer tools** that slash time-to-production.",
+										"One standout: a two-person team that replaced an entire 20-person ops department using a single AI agent. Their ARR? $1.2M in 8 months.",
+									].map((para, i) => (
+										<p key={i} style={{ fontSize: 14, lineHeight: 1.8, color: "#37352F", marginBottom: 16 }}>{para}</p>
+									))}
+									<div style={{ height: 2, background: `linear-gradient(to right, ${T.warm}40, transparent)`, borderRadius: 2, marginBottom: 16 }} />
+									<p style={{ fontSize: 13, color: T.muted, lineHeight: 1.7, fontStyle: "italic" }}>Type <span style={{ background: T.base, padding: "1px 5px", borderRadius: 4, fontStyle: "normal", fontWeight: 600, fontSize: 12 }}>/</span> for AI commands, headings, images, tables and more…</p>
+								</div>
+							</div>
+						</div>
+
+						{/* Right AI chat sidebar */}
+						<div style={{ width: 260, borderLeft: `1px solid ${T.border}`, background: T.base, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+							<div style={{ padding: "12px 12px 10px", borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+								<div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+									<div style={{ width: 8, height: 8, borderRadius: "50%", background: T.warm }} />
+									<span style={{ fontSize: 12, fontWeight: 700, color: T.accent }}>AI Assistant</span>
+								</div>
+							</div>
+							<div style={{ flex: 1, overflowY: "auto", padding: "10px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+								{[
+									{ role: "ai", text: "I've drafted your YC newsletter. Want me to add a CTA or make the tone more conversational?" },
+									{ role: "user", text: "Make it punchier and add 3 key takeaways at the end." },
+									{ role: "ai", text: "Done! Added a bold takeaways section. I also tightened the opening paragraph to hook readers faster." },
+								].map((msg, i) => (
+									<div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+										<div style={{ maxWidth: "85%", padding: "8px 10px", borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px", background: msg.role === "user" ? T.accent : T.surface, color: msg.role === "user" ? "white" : T.accent, fontSize: 11.5, lineHeight: 1.6, border: msg.role === "ai" ? `1px solid ${T.border}` : "none" }}>
+											{msg.text}
+										</div>
+									</div>
+								))}
+							</div>
+							<div style={{ padding: "8px 10px", borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
+								<div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: "7px 10px", display: "flex", alignItems: "center", gap: 6 }}>
+									<span style={{ fontSize: 11, color: T.muted, flex: 1 }}>Ask AI anything…</span>
+									<div style={{ width: 22, height: 22, borderRadius: 6, background: T.warm, display: "flex", alignItems: "center", justifyContent: "center", cursor: "default" }}>
+										<span style={{ color: "white", fontSize: 12 }}>↑</span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+					</div>
+				</motion.div>
+
+			
+			</motion.div>
 			</motion.div>
 
 			<LoginModal
@@ -523,7 +577,7 @@ function AIFeaturesSection() {
 				borderBottom: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 				<p
 					style={{
@@ -570,6 +624,7 @@ function AIFeaturesSection() {
 						gap: 16,
 						marginTop: 40,
 					}}
+					
 				>
 				{LANDING_AI_FEATURES.map((f, i) => (
 					<FadeUp key={f.title} delay={i * 0.06}>
@@ -679,7 +734,7 @@ function Features() {
 				borderBottom: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 					<p
 					style={{
@@ -848,7 +903,7 @@ function ExportFormats() {
 				borderTop: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 					<p
 						style={{
@@ -1055,7 +1110,7 @@ function HowItWorks() {
 				borderBottom: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 					<p
 						style={{
@@ -1193,7 +1248,7 @@ function StatsStrip() {
 	return (
 		<div style={{ background: T.accent, padding: "56px 24px" }}>
 			<div
-				className="max-w-6xl mx-auto"
+				className="max-w-7xl mx-auto"
 				style={{
 					display: "grid",
 					gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -1257,7 +1312,7 @@ function UseCasesStrip() {
 				borderBottom: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 					<p
 						style={{
@@ -1370,7 +1425,7 @@ function Pricing() {
 				borderTop: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 					<p
 						style={{
@@ -1690,7 +1745,7 @@ function OpenSource() {
 				borderTop: `1px solid ${T.border}`,
 			}}
 		>
-			<div className="max-w-6xl mx-auto">
+			<div className="max-w-7xl mx-auto">
 				<FadeUp>
 					<div
 						style={{
@@ -1924,7 +1979,7 @@ function FAQ() {
 	return (
 		<section id="faq" style={{ padding: "96px 24px", background: T.base }}>
 			<div
-				className="max-w-6xl mx-auto"
+				className="max-w-7xl mx-auto"
 				style={{
 					display: "grid",
 					gridTemplateColumns: "1fr 1.6fr",

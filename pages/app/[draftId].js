@@ -247,7 +247,7 @@ const THEMES = {
 		palette: ["#0D0D0D", "#E8E8E8", "#7C7CFF", "#444444"],
 		fontUrl:
 			"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
-		bodyFont: "'Inter', sans-serif",
+		bodyFont: "'Comic', sans-serif",
 		bg: "#0D0D0D",
 		text: "#A8A8A8",
 		container:
@@ -3940,7 +3940,7 @@ export default function DraftPage() {
 												minHeight: 36,
 												fontFamily:
 													editorFont === "Inter"
-														? "'Inter', sans-serif"
+														? "'Comic', sans-serif"
 														: editorFont === "Georgia"
 															? "Georgia, serif"
 															: editorFont === "system-ui"
@@ -4291,7 +4291,7 @@ export default function DraftPage() {
 											color: "#37352F",
 											fontFamily:
 												editorFont === "Inter"
-													? "'Inter', sans-serif"
+													? "'Comic', sans-serif"
 													: editorFont === "Georgia"
 														? "Georgia, serif"
 														: editorFont === "system-ui"

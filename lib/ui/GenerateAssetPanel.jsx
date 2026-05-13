@@ -898,76 +898,7 @@ export default function GenerateAssetPanel({
 			)}
 			</div>
 
-			{!isBlank &&
-				!gen.loading &&
-				gen.completedTasks.length === 0 &&
-				promptSuggestions.length > 0 && (
-					<div style={suggestionsCardStyle}>
-						<label
-							style={{
-								display: "block",
-								fontSize: 11,
-								fontWeight: 700,
-								textTransform: "",
-								letterSpacing: "0.1em",
-								color: T.muted,
-								marginBottom: 12,
-								fontFamily: "'Comic', sans-serif",
-							}}
-						>
-							Try a suggestion
-						</label>
-						<div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-							{promptSuggestions.map((raw, i) => {
-								const s = normalizePromptSuggestion(raw);
-								return (
-									<motion.button
-										key={i}
-										type="button"
-										whileHover={{ scale: 1.005, x: 4 }}
-										whileTap={{ scale: 0.995 }}
-										onClick={() => applySuggestion(raw)}
-										style={{
-											width: "100%",
-											padding: "14px 18px",
-											borderRadius: 12,
-											fontSize: 13,
-											fontWeight: 500,
-											cursor: "pointer",
-											border: `1px solid ${T.border}`,
-											background: T.base,
-											color: T.accent,
-											textAlign: "left",
-											lineHeight: 1.5,
-											fontFamily: "'Comic', sans-serif",
-										}}
-									>
-										{s.urls.length > 0 && (
-											<div
-												style={{
-													fontSize: 11,
-													fontWeight: 500,
-													color: T.muted,
-													wordBreak: "break-all",
-													marginBottom: 6,
-													lineHeight: 1.45,
-												}}
-											>
-												{s.urls.map((u, j) => (
-													<span key={j}>
-														{j > 0 ? " · " : ""}
-														{u}
-													</span>
-												))}
-											</div>
-										)}
-										<div style={{ fontWeight: 600 }}>{s.prompt}</div>
-									</motion.button>
-								);
-							})}
-						</div>
-					</div>
-				)}
+			
 		</div>
 	);
 }
