@@ -1173,7 +1173,7 @@ export default function AIChatSidebar({
 								flexShrink: 0,
 							}}>
 								<div style={{
-									width: 34, height: 34, borderRadius: 11,
+									width: 24, height: 24, borderRadius: 11,
 									background: "#C17B2F15",
 									border: "1px solid #C17B2F30",
 									display: "flex", alignItems: "center", justifyContent: "center",
@@ -1182,10 +1182,7 @@ export default function AIChatSidebar({
 								</div>
 								<div style={{ flex: 1 }}>
 									<p style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A", lineHeight: 1.2, margin: 0 }}>
-										AI Writing Assistant
-									</p>
-									<p style={{ fontSize: 11, color: "#7A7570", margin: 0 }}>
-										Powered by {process.env.NEXT_PUBLIC_OPENROUTER_MODEL_LABEL || "GPT-4o mini"} via OpenRouter
+										Inkgest Agent
 									</p>
 								</div>
 								<div style={{ display: "flex", gap: 5 }}>

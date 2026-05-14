@@ -30,6 +30,7 @@ import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
 import { formatInkDateLong, TiptapSlashDatePicker } from "../../lib/ui/TiptapSlashDatePicker.jsx";
 import { htmlToMarkdown } from "../../lib/utils/htmlToMarkdown";
+import IconSelectorDropdown, { lucideToSvgString } from "../../lib/ui/IconSelectorDropdown.jsx";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -681,7 +682,17 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 			}
 			if (tag === "pre")
 				return `<pre style="background:rgba(0,0,0,0.06);padding:16px 20px;border-radius:6px;overflow:auto;margin:0 0 16px;font-family:monospace;font-size:13px;line-height:1.6;">${node.textContent || ""}</pre>\n`;
-			if (tag === "hr") return `<hr style="${theme.hr}"/>\n`;
+			/* Date chip — strip editor-only attrs, keep visual style */
+			if (tag === "span" && node.getAttribute("data-ink-date") != null) {
+				const label = (node.textContent || "").trim();
+				return `<span style="display:inline-flex;align-items:center;gap:5px;background:#FEF3E2;border:1px solid #F6D9A8;border-radius:6px;padding:2px 9px 2px 7px;color:#92400E;font-weight:600;font-size:0.92em;white-space:nowrap;vertical-align:middle;line-height:1.7"><svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='#C17B2F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='flex-shrink:0'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>${label}</span>`;
+			}
+			if (tag === "hr") {
+				const dtype = node.getAttribute("data-divider-type") || "solid";
+				const borderMap = { solid: "1.5px solid #C8C4BC", dashed: "1.5px dashed #C8C4BC", dotted: "2px dotted #C8C4BC" };
+				const border = borderMap[dtype] || borderMap.solid;
+				return `<hr style="border:none;border-top:${border};margin:28px 0"/>\n`;
+			}
 			if (
 				tag === "figure" &&
 				node.getAttribute("data-draft-image-wrap") != null
@@ -734,6 +745,74 @@ function buildThemedHTML(currentHTML = "", theme, title = "") {
 				return `<p style="${theme.p}"><iframe src="${src}" title="Embedded content" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="" style="max-width:100%;aspect-ratio:16/9;height:auto;min-height:200px;border:0;border-radius:8px;width:100%"></iframe></p>\n`;
 			}
 			if (tag === "table") return `${node.outerHTML}\n`;
+			if (tag === "figure" && node.getAttribute("data-block") === "audio-block") {
+				const audioEl = node.querySelector("audio[data-audio-src]");
+				const nameEl = node.querySelector("[data-audio-name]");
+				const capEl = node.querySelector("[data-audio-caption]");
+				const iconEl = node.querySelector("[data-icon-selector]");
+				const src = audioEl?.getAttribute("src") || "";
+				const name = nameEl?.textContent?.trim() || "Audio track";
+				const caption = capEl?.innerHTML?.trim() ? parseInlineMarkdown(capEl.innerHTML.trim()) : "";
+				const iconHtml = iconEl?.innerHTML?.trim() || "🎵";
+				const safeSrc = src.replace(/"/g, "&quot;");
+				const capBlock = caption ? `<figcaption style="padding:8px 16px 12px;font-size:12px;color:#7A7570;line-height:1.5;border-top:1px solid #F0ECE5">${caption}</figcaption>` : "";
+				const waveGray = `repeating-linear-gradient(90deg,#C8C4BC 0,#C8C4BC 2px,transparent 2px,transparent 8px)`;
+				const waveAmberE = `repeating-linear-gradient(90deg,#C17B2F 0,#C17B2F 2px,transparent 2px,transparent 8px)`;
+				/* Export uses the same [data-pi]/[data-qi] toggle pattern — no innerHTML, no double quotes */
+				const fmtFn = `function(s){var m=Math.floor(s/60)|0;var sc=Math.floor(s%60);return m+':'+(sc<10?'0':'')+sc;}`;
+				const playJs = `(function(btn){var fig=btn.closest('figure');var aud=fig&&fig.querySelector('audio');if(!aud)return;var fmt=${fmtFn};var prog=fig.querySelector('[data-ap]');var curEl=fig.querySelector('[data-cur]');var durEl=fig.querySelector('[data-dur]');var pi=btn.querySelector('[data-pi]');var qi=btn.querySelector('[data-qi]');if(aud.paused){aud.play();if(pi)pi.style.display='none';if(qi)qi.style.display='';aud.onloadedmetadata=function(){if(durEl)durEl.textContent=fmt(aud.duration);};if(aud.duration&&durEl)durEl.textContent=fmt(aud.duration);aud.ontimeupdate=function(){if(curEl)curEl.textContent=fmt(aud.currentTime);if(prog&&aud.duration)prog.style.width=(aud.currentTime/aud.duration*100)+'%';};aud.onended=function(){if(pi)pi.style.display='';if(qi)qi.style.display='none';if(curEl)curEl.textContent='0:00';if(prog)prog.style.width='0%';};}else{aud.pause();if(pi)pi.style.display='';if(qi)qi.style.display='none';}})(this)`;
+				const seekJs = `(function(bar,e){var fig=bar.closest('figure');var aud=fig&&fig.querySelector('audio');if(!aud)return;var rect=bar.getBoundingClientRect();var ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));if(aud.duration)aud.currentTime=ratio*aud.duration;var prog=fig.querySelector('[data-ap]');if(prog)prog.style.width=(ratio*100)+'%';})(this,event)`;
+				return `<figure style="margin:18px 0;border:1px solid #E8E4DC;border-radius:14px;overflow:hidden;background:#FAFAF8;font-family:inherit">` +
+					`<div style="padding:14px 16px 12px;display:flex;flex-direction:column;gap:10px">` +
+						`<div style="display:flex;align-items:center;gap:10px">` +
+							`<div style="width:34px;height:34px;border-radius:8px;background:#FEF3E2;border:1px solid #F6D9A8;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;line-height:1">${iconHtml}</div>` +
+							`<div><div style="font-size:13px;font-weight:600;color:#37352F">${name}</div></div>` +
+						`</div>` +
+						`<div style="background:#37352F;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px">` +
+							`<audio src="${safeSrc}" preload="metadata" style="display:none"></audio>` +
+							`<button type="button" onclick="${playJs}" style="width:34px;height:34px;border-radius:50%;background:#555250;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0">` +
+								`<svg data-pi width="14" height="14" viewBox="0 0 24 24" style="display:block"><polygon points="5,3 19,12 5,21" fill="white" stroke="none"/></svg>` +
+								`<svg data-qi width="14" height="14" viewBox="0 0 24 24" style="display:none"><rect x="5" y="3" width="4" height="18" fill="white" rx="1"/><rect x="15" y="3" width="4" height="18" fill="white" rx="1"/></svg>` +
+							`</button>` +
+							`<div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0">` +
+								`<div onclick="${seekJs}" style="position:relative;height:20px;cursor:pointer;display:flex;align-items:center">` +
+									`<div style="position:absolute;inset:0;display:flex;align-items:center;pointer-events:none"><div style="width:100%;height:3px;background:${waveGray};border-radius:2px;opacity:0.5"></div></div>` +
+									`<div data-ap style="position:absolute;left:0;top:0;height:100%;width:0%;overflow:hidden;pointer-events:none"><div style="position:absolute;inset:0;display:flex;align-items:center"><div style="width:9999px;height:3px;background:${waveAmberE};border-radius:2px"></div></div></div>` +
+								`</div>` +
+								`<div style="display:flex;justify-content:space-between;align-items:center">` +
+									`<span data-cur style="font-size:10px;color:#9A9490;font-variant-numeric:tabular-nums">0:00</span>` +
+									`<span style="font-size:10px;color:#6B6560;font-weight:600;letter-spacing:0.06em">&#127911; NOW PLAYING</span>` +
+									`<span data-dur style="font-size:10px;color:#9A9490;font-variant-numeric:tabular-nums">0:00</span>` +
+								`</div>` +
+							`</div>` +
+						`</div>` +
+					`</div>` +
+					`${capBlock}</figure>\n`;
+			}
+			if (tag === "div" && node.getAttribute("data-block") === "toggle-group") {
+				/* Render as clean FAQ section */
+				const label = node.querySelector("[data-toggle-group-label]")?.textContent?.trim() || "FAQ";
+				const items = Array.from(node.querySelectorAll("details[data-block='draft-toggle']")).map((d) => {
+					const q = d.querySelector("summary span[contenteditable]")?.innerHTML?.trim() || d.querySelector("summary")?.textContent?.trim() || "";
+					const a = d.querySelector("div[contenteditable]")?.innerHTML?.trim() || "";
+					return `<details style="border-bottom:1px solid #E8E4DC"><summary style="padding:12px 14px;cursor:pointer;font-size:14px;font-weight:600;color:#37352F;list-style:none">${parseInlineMarkdown(q)}</summary><div style="padding:10px 14px 14px 24px;font-size:14px;color:#6B6560;line-height:1.7">${parseInlineMarkdown(a)}</div></details>`;
+				}).join("");
+				return `<div style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;overflow:hidden;background:#FAFAF8"><div style="padding:8px 14px;border-bottom:1px solid #E8E4DC;background:#F3EFE8"><span style="font-size:11px;font-weight:700;color:#9A9490;text-transform:uppercase;letter-spacing:0.07em">${label}</span></div>${items}</div>\n`;
+			}
+			if (tag === "div" && node.getAttribute("data-block") === "card") {
+				const iconEl = node.querySelector("[data-card-icon]");
+				const headingEl = node.querySelector("[data-card-heading]");
+				const descEl = node.querySelector("[data-card-desc]");
+				const iconHtml = iconEl?.innerHTML?.trim() || "🎯";
+				const heading = parseInlineMarkdown(headingEl?.innerHTML?.trim() || "Card heading");
+				const desc = parseInlineMarkdown(descEl?.innerHTML?.trim() || "");
+				return `<div style="margin:16px 0;border:1.5px solid #E8E4DC;border-radius:14px;padding:20px 22px;background:#FAFAF8;display:flex;gap:14px;align-items:flex-start"><div style="font-size:28px;line-height:1;flex-shrink:0">${iconHtml}</div><div style="flex:1"><div style="font-size:16px;font-weight:700;color:#37352F;margin-bottom:6px;line-height:1.3">${heading}</div><div style="font-size:14px;color:#6B6560;line-height:1.7">${desc}</div></div></div>\n`;
+			}
+			if (tag === "span" && node.getAttribute("data-icon-selector") != null) {
+				/* Inline icon chip — strip editor-only attrs */
+				const inner = node.innerHTML || "";
+				return `<span style="display:inline-flex;align-items:center;justify-content:center;vertical-align:middle">${inner}</span>`;
+			}
 			if (tag === "div" && node.getAttribute("data-block"))
 				return `${cloneBlockHtmlForPreview(node)}\n`;
 			if (tag === "details" && node.getAttribute("data-block") === "draft-toggle")
@@ -1540,8 +1619,96 @@ const DRAFT_TAB_BUTTON_ONCLICK = `(function(btn){var w=btn.closest("[data-block=
 
 const DRAFT_CODEGROUP_TAB_ONCLICK = `(function(btn){var w=btn.closest("[data-block=\\"code-group\\"]");if(!w)return;var i=btn.getAttribute("data-cg-idx");w.querySelectorAll("[data-cg-panel]").forEach(function(p){p.style.display=p.getAttribute("data-cg-panel")===i?"block":"none";});w.querySelectorAll("[data-action=\\"cg-tab\\"]").forEach(function(b){var on=b.getAttribute("data-cg-idx")===i;b.style.background=on?"#fff":"transparent";b.style.fontWeight=on?"700":"600";b.style.color=on?"#37352F":"#6B6560";});})(this)`;
 
-function makeDraftDividerHtml() {
-	return `<hr style="border:none;border-top:1px solid #E8E4DC;margin:20px 0" /><p><br></p>`;
+/* ─── Audio player inline JS (works in editor + exported HTML) ─────────────
+   IMPORTANT: these strings are embedded inside onclick="..." (double-quoted)
+   so they must NEVER contain unescaped double-quote characters.
+   Use closest('figure') — no attribute selectors with inner quotes needed.
+   Toggle play/pause by showing/hiding [data-pi] / [data-qi] child elements
+   instead of innerHTML manipulation (which would also require quoted SVG attrs).
+──────────────────────────────────────────────────────────────────────────── */
+const AUDIO_PLAY_ONCLICK = `(function(btn){var fig=btn.closest('figure');var aud=fig&&fig.querySelector('audio');if(!aud)return;var fmt=function(s){var m=Math.floor(s/60)|0;var sc=Math.floor(s%60);return m+':'+(sc<10?'0':'')+sc;};var prog=fig.querySelector('[data-ap]');var curEl=fig.querySelector('[data-cur]');var durEl=fig.querySelector('[data-dur]');var pi=btn.querySelector('[data-pi]');var qi=btn.querySelector('[data-qi]');if(aud.paused){aud.play();if(pi)pi.style.display='none';if(qi)qi.style.display='';aud.onloadedmetadata=function(){if(durEl)durEl.textContent=fmt(aud.duration);};if(aud.duration&&durEl)durEl.textContent=fmt(aud.duration);aud.ontimeupdate=function(){if(curEl)curEl.textContent=fmt(aud.currentTime);if(prog&&aud.duration)prog.style.width=(aud.currentTime/aud.duration*100)+'%';};aud.onended=function(){if(pi)pi.style.display='';if(qi)qi.style.display='none';if(curEl)curEl.textContent='0:00';if(prog)prog.style.width='0%';};}else{aud.pause();if(pi)pi.style.display='';if(qi)qi.style.display='none';}})(this)`;
+const AUDIO_SEEK_ONCLICK = `(function(bar,e){var fig=bar.closest('figure');var aud=fig&&fig.querySelector('audio');if(!aud)return;var rect=bar.getBoundingClientRect();var ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));if(aud.duration)aud.currentTime=ratio*aud.duration;var prog=fig.querySelector('[data-ap]');if(prog)prog.style.width=(ratio*100)+'%';})(this,event)`;
+const AUDIO_DELETE_ONCLICK = `(function(btn){var fig=btn.closest('figure');if(fig&&fig.parentNode){var p=document.createElement('p');p.innerHTML='<br>';fig.parentNode.insertBefore(p,fig.nextSibling||null);fig.parentNode.removeChild(fig);}})(this)`;
+
+function makeDraftDividerHtml(type = "solid") {
+	const borderMap = {
+		solid: "1.5px solid #C8C4BC",
+		dashed: "1.5px dashed #C8C4BC",
+		dotted: "2px dotted #C8C4BC",
+	};
+	const border = borderMap[type] || borderMap.solid;
+	return `<hr data-divider-type="${type}" style="border:none;border-top:${border};margin:28px 0" /><p><br></p>`;
+}
+
+function makeToggleGroupHtml() {
+	const toggleItem = (q) =>
+		`<details data-block="draft-toggle" style="border-bottom:1px solid #E8E4DC"><summary style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;list-style:none;user-select:none;font-size:14px;font-weight:600;color:#37352F"><span data-toggle-chevron></span><span data-toggle-grip></span><span contenteditable="true" style="flex:1;outline:none">${q}</span></summary><div contenteditable="true" style="padding:10px 14px 14px 44px;font-size:14px;color:#6B6560;line-height:1.7;outline:none"><p>Answer goes here…</p></div></details>`;
+	return `<div data-block="toggle-group" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;overflow:hidden;background:#FAFAF8"><div contenteditable="false" style="padding:8px 14px;border-bottom:1px solid #E8E4DC;background:#F3EFE8;display:flex;align-items:center;gap:6px"><span contenteditable="true" data-toggle-group-label data-placeholder="Group heading…" style="font-size:11px;font-weight:700;color:#9A9490;text-transform:uppercase;letter-spacing:0.07em;outline:none;min-width:40px">FAQ</span></div>${toggleItem("What is Inkgest?")}${toggleItem("How does the AI editor work?")}${toggleItem("Can I export to React, HTML, or Markdown?")}</div><p><br></p>`;
+}
+
+function makeCardBlockHtml() {
+	return `<div data-block="card" style="margin:16px 0;border:1.5px solid #E8E4DC;border-radius:14px;padding:20px 22px;background:#FAFAF8;display:flex;gap:14px;align-items:flex-start"><div data-card-icon data-icon-selector data-icon-type="emoji" contenteditable="false" title="Click to change icon" style="font-size:28px;line-height:1;flex-shrink:0;min-width:36px;text-align:center;cursor:pointer;user-select:none"><span style="font-size:28px;line-height:1">🎯</span></div><div style="flex:1;min-width:0"><div contenteditable="true" data-card-heading data-placeholder="Card heading" style="font-size:16px;font-weight:700;color:#37352F;margin-bottom:6px;outline:none;line-height:1.3">Card heading</div><div contenteditable="true" data-card-desc data-placeholder="Write a short description…" style="font-size:14px;color:#6B6560;line-height:1.7;outline:none">Write a short description for this card.</div></div></div><p><br></p>`;
+}
+
+function makeIconBlockHtml(value = "✨", type = "emoji") {
+	const inner =
+		type === "lucide"
+			? value /* already an SVG string */
+			: `<span style="font-size:28px;line-height:1">${value}</span>`;
+	return `<span data-icon-selector data-icon-type="${type}" contenteditable="false" title="Click to change icon" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;padding:2px;border-radius:6px;vertical-align:middle">${inner}</span>`;
+}
+
+function makeAudioBlockHtml(src = "", name = "Audio track", caption = "") {
+	const safeSrc = src.replace(/"/g, "&quot;");
+	const safeName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	const safeCaption = caption.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	const waveGray  = "repeating-linear-gradient(90deg,#9A9490 0,#9A9490 2px,transparent 2px,transparent 8px)";
+	const waveAmber = "repeating-linear-gradient(90deg,#C17B2F 0,#C17B2F 2px,transparent 2px,transparent 8px)";
+	/* Play icon ▶ and Pause icon ⏸ — both kept in DOM, toggled via display */
+	const playSvg  = `<svg data-pi width="14" height="14" viewBox="0 0 24 24" style="display:block"><polygon points="5,3 19,12 5,21" fill="white" stroke="none"/></svg>`;
+	const pauseSvg = `<svg data-qi width="14" height="14" viewBox="0 0 24 24" style="display:none"><rect x="5" y="3" width="4" height="18" fill="white" rx="1"/><rect x="15" y="3" width="4" height="18" fill="white" rx="1"/></svg>`;
+	return (
+		`<figure data-block="audio-block" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:14px;overflow:hidden;background:#FAFAF8;position:relative">` +
+		/* ── Delete button (top-right) ── */
+		`<button type="button" onclick="${AUDIO_DELETE_ONCLICK}" contenteditable="false" title="Remove audio block" style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:6px;border:1px solid #E8E4DC;background:#fff;color:#9A9490;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;padding:0">✕</button>` +
+		`<div contenteditable="false" style="padding:14px 16px 12px;display:flex;flex-direction:column;gap:10px">` +
+			/* ── Header: emoji icon + editable name ── */
+			`<div style="display:flex;align-items:center;gap:10px;padding-right:28px">` +
+				`<div data-icon-selector data-icon-type="emoji" contenteditable="false" title="Click to change icon" style="width:34px;height:34px;border-radius:8px;background:#FEF3E2;border:1px solid #F6D9A8;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;user-select:none;font-size:18px;line-height:1">🎵</div>` +
+				`<div style="flex:1;min-width:0">` +
+					`<div contenteditable="true" data-audio-name data-placeholder="Track name…" style="font-size:13px;font-weight:600;color:#37352F;outline:none;line-height:1.4">${safeName}</div>` +
+				`</div>` +
+			`</div>` +
+			/* ── Player chrome ── */
+			`<div style="background:#37352F;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px">` +
+				`<audio data-audio-src src="${safeSrc}" preload="metadata" style="display:none"></audio>` +
+				/* Play/pause button — uses [data-pi] / [data-qi] children, no innerHTML swap */
+				`<button type="button" onclick="${AUDIO_PLAY_ONCLICK}" style="width:34px;height:34px;border-radius:50%;background:#555250;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:0">` +
+					playSvg + pauseSvg +
+				`</button>` +
+				/* Waveform + seek + time */
+				`<div style="flex:1;display:flex;flex-direction:column;gap:5px;min-width:0">` +
+					`<div onclick="${AUDIO_SEEK_ONCLICK}" style="position:relative;height:20px;cursor:pointer;display:flex;align-items:center">` +
+						`<div style="position:absolute;inset:0;display:flex;align-items:center;pointer-events:none">` +
+							`<div style="width:100%;height:3px;background:${waveGray};border-radius:2px;opacity:0.5"></div>` +
+						`</div>` +
+						`<div data-ap style="position:absolute;left:0;top:0;height:100%;width:0%;overflow:hidden;pointer-events:none">` +
+							`<div style="position:absolute;inset:0;display:flex;align-items:center">` +
+								`<div style="width:9999px;height:3px;background:${waveAmber};border-radius:2px"></div>` +
+							`</div>` +
+						`</div>` +
+					`</div>` +
+					`<div style="display:flex;justify-content:space-between;align-items:center">` +
+						`<span data-cur style="font-size:10px;color:#9A9490;font-variant-numeric:tabular-nums">0:00</span>` +
+						`<span style="font-size:10px;color:#6B6560;font-weight:600;letter-spacing:0.06em">&#127911; NOW PLAYING</span>` +
+						`<span data-dur style="font-size:10px;color:#9A9490;font-variant-numeric:tabular-nums">0:00</span>` +
+					`</div>` +
+				`</div>` +
+			`</div>` +
+		`</div>` +
+		`<figcaption contenteditable="true" data-audio-caption data-placeholder="Add a caption…" style="padding:8px 16px 10px;font-size:12px;color:#7A7570;line-height:1.5;outline:none;border-top:1px solid #F0ECE5;min-height:1.4em">${safeCaption}</figcaption>` +
+		`</figure><p><br></p>`
+	);
 }
 
 function makeDraftTabsHtml() {
@@ -1828,10 +1995,52 @@ const DRAFT_SLASH_BASE_ITEMS = [
 	},
 	{
 		id: "divider",
-		label: "Divider",
+		label: "Divider — Solid",
 		icon: "—",
 		section: "blocks",
-		keywords: ["divider", "horizontal", "hr", "rule", "separator", "---"],
+		keywords: ["divider", "horizontal", "hr", "rule", "separator", "---", "solid"],
+	},
+	{
+		id: "divider-dashed",
+		label: "Divider — Dashed",
+		icon: "╌",
+		section: "blocks",
+		keywords: ["divider", "dashed", "hr", "separator", "line"],
+	},
+	{
+		id: "divider-dotted",
+		label: "Divider — Dotted",
+		icon: "···",
+		section: "blocks",
+		keywords: ["divider", "dotted", "hr", "separator", "dots"],
+	},
+	{
+		id: "toggle-group",
+		label: "Toggle Group (FAQ)",
+		icon: "☰",
+		section: "blocks",
+		keywords: ["faq", "toggle group", "accordion", "collapse", "questions"],
+	},
+	{
+		id: "card",
+		label: "Card",
+		icon: "▭",
+		section: "blocks",
+		keywords: ["card", "box", "panel", "feature", "icon card"],
+	},
+	{
+		id: "icon-block",
+		label: "Icon",
+		icon: "✦",
+		section: "blocks",
+		keywords: ["icon", "emoji", "symbol", "glyph", "svg"],
+	},
+	{
+		id: "audio",
+		label: "Audio",
+		icon: "♪",
+		section: "blocks",
+		keywords: ["audio", "music", "mp3", "sound", "track", "podcast"],
 	},
 	{
 		id: "code",
@@ -2021,7 +2230,12 @@ export default function DraftPage() {
 	slashListIndexRef.current = slashListIndex;
 	const [draftImageModalOpen, setDraftImageModalOpen] = useState(false);
 	const [draftImageModalUrl, setDraftImageModalUrl] = useState("");
+	const [audioModalOpen, setAudioModalOpen] = useState(false);
+	const [audioUploading, setAudioUploading] = useState(false);
+	const audioFileInputRef = useRef(null);
 	const [draftSlashDatePickerPos, setDraftSlashDatePickerPos] = useState(null);
+	const [datePickerInitial, setDatePickerInitial] = useState(new Date());
+	const dateEditTargetRef = useRef(null);
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewCopied, setPreviewCopied] = useState(null);
 	const [previewExportOpen, setPreviewExportOpen] = useState(false);
@@ -2035,11 +2249,26 @@ export default function DraftPage() {
 	const [editorFont, setEditorFont] = useState("Outfit");
 	const [editorFontSize, setEditorFontSize] = useState(15);
 	const [localTableData, setLocalTableData] = useState(null);
+	const [iconSelector, setIconSelector] = useState(null); // { x, y, target: DOM element }
+	const iconSelectorRef = useRef(null);
+	const [dragHandle, setDragHandle] = useState(null); // { top, handleLeft, block }
+	const [dropIndicator, setDropIndicator] = useState(null); // { top, left, width }
+	const dragSrcRef = useRef(null);
+	const dragOverRef = useRef(null); // { block, before }
 	const editorRef = useRef(null);
 	const titleRef = useRef(null);
 	const imageFileInputRef = useRef(null);
 	const handleSlashCommandRef = useRef(() => {});
 	const editorContainerRef = useRef(null);
+
+	useEffect(() => {
+		if (!iconSelector) return;
+		const onDown = (e) => {
+			if (!iconSelectorRef.current?.contains(e.target)) setIconSelector(null);
+		};
+		document.addEventListener("mousedown", onDown);
+		return () => document.removeEventListener("mousedown", onDown);
+	}, [iconSelector]);
 
 	useEffect(() => {
 		if (!previewExportOpen) return;
@@ -2509,6 +2738,54 @@ export default function DraftPage() {
 		e.target.value = "";
 	};
 
+	/* ── Insert audio block at cursor ── */
+	const insertAudioBlock = (src, name = "Audio track") => {
+		if (!editorRef.current) return;
+		editorRef.current.focus();
+		const html = makeAudioBlockHtml(src, name, "");
+		document.execCommand("insertHTML", false, html);
+		countWords();
+		setAudioModalOpen(false);
+		requestAnimationFrame(() => editorRef.current?.focus());
+	};
+
+	const handleAudioFileSelect = (e) => {
+		const file = e.target?.files?.[0];
+		if (!file) return;
+		const isAudio = file.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(file.name);
+		if (!isAudio) { alert("Please select an audio file (MP3, WAV, OGG, M4A…)"); return; }
+
+		const name = file.name.replace(/\.[^.]+$/, "");
+		e.target.value = "";
+
+		setAudioUploading(true);
+
+		const reader = new FileReader();
+		reader.onload = async () => {
+			try {
+				const dataUrl = reader.result;
+				const res = await fetch("/api/uploadAudio", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ dataUrl, name, type: file.type }),
+				});
+				const json = await res.json();
+				if (!res.ok || json.error) throw new Error(json.error ?? "Upload failed");
+				insertAudioBlock(json.url, name);
+			} catch (err) {
+				console.error("Audio upload failed:", err);
+				alert(`Audio upload failed: ${err.message}`);
+			} finally {
+				setAudioUploading(false);
+			}
+		};
+		reader.onerror = () => {
+			setAudioUploading(false);
+			alert("Could not read audio file.");
+		};
+		reader.readAsDataURL(file);
+	};
+
 	const isVideoUrl = (url) => {
 		try {
 			const u = new URL(url);
@@ -2656,6 +2933,31 @@ export default function DraftPage() {
 					b.style.color = on ? "#37352F" : "#6B6560";
 				});
 			}
+			/* ── Date chip — click to reopen calendar ── */
+			const dateChip = el?.closest?.("[data-ink-date]");
+			if (dateChip) {
+				e.preventDefault();
+				e.stopPropagation();
+				const iso = dateChip.getAttribute("data-ink-date");
+				const parsed = iso ? new Date(iso) : new Date();
+				const rect = dateChip.getBoundingClientRect();
+				dateEditTargetRef.current = dateChip;
+				setDatePickerInitial(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+				setDraftSlashDatePickerPos({
+					left: Math.max(8, Math.min(rect.left, window.innerWidth - 300)),
+					top: rect.bottom + 6,
+				});
+				return;
+			}
+			/* ── Icon selector trigger ── */
+			const iconEl = el?.closest?.("[data-icon-selector]") || (el?.getAttribute?.("data-icon-selector") != null ? el : null);
+			if (iconEl) {
+				e.preventDefault();
+				e.stopPropagation();
+				const rect = iconEl.getBoundingClientRect();
+				setIconSelector({ x: rect.left, y: rect.bottom + 6, target: iconEl });
+				return;
+			}
 		};
 
 		const handleChange = (e) => {
@@ -2670,13 +2972,42 @@ export default function DraftPage() {
 				d.removeAttribute("open");
 			});
 		};
+		const handleMouseMove = (e) => {
+			if (dragSrcRef.current) return; // don't reposition while dragging
+			const editorEl = editorRef.current;
+			const containerEl = editorContainerRef.current;
+			if (!editorEl || !containerEl) return;
+			let node = e.target;
+			if (node.nodeType === 3) node = node.parentElement;
+			while (node && node.parentElement !== editorEl) node = node.parentElement;
+			if (!node || !editorEl.contains(node)) { setDragHandle(null); return; }
+			const tag = node.nodeName.toLowerCase();
+			if (["br", "span", "a", "strong", "em", "code", "input"].includes(tag)) {
+				setDragHandle(null);
+				return;
+			}
+			const containerRect = containerEl.getBoundingClientRect();
+			const editorRect = editorEl.getBoundingClientRect();
+			const nodeRect = node.getBoundingClientRect();
+			/* top relative to scrollable container */
+			const top = nodeRect.top - containerRect.top + containerEl.scrollTop;
+			/* place handle in the left gutter of the editor content area */
+			const handleLeft = editorRect.left - containerRect.left - 28;
+			setDragHandle({ top, handleLeft: Math.max(2, handleLeft), block: node, height: nodeRect.height });
+		};
+		const handleMouseLeave = () => { if (!dragSrcRef.current) setDragHandle(null); };
+
 		document.addEventListener("mousedown", onDocMouseDown);
 		el.addEventListener("click", handleClick);
 		el.addEventListener("change", handleChange);
+		el.addEventListener("mousemove", handleMouseMove);
+		el.addEventListener("mouseleave", handleMouseLeave);
 		return () => {
 			document.removeEventListener("mousedown", onDocMouseDown);
 			el.removeEventListener("click", handleClick);
 			el.removeEventListener("change", handleChange);
+			el.removeEventListener("mousemove", handleMouseMove);
+			el.removeEventListener("mouseleave", handleMouseLeave);
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
@@ -2896,10 +3227,32 @@ export default function DraftPage() {
 		return () => document.removeEventListener("keydown", onKey);
 	}, [draftImageModalOpen]);
 
+	const makeDateChipHtml = (d) => {
+		const label = formatInkDateLong(d);
+		if (!label) return "";
+		const iso = d.toISOString();
+		const safe = label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+		return `<span data-ink-date="${iso}" contenteditable="false" title="Click to change date" style="display:inline-flex;align-items:center;gap:5px;background:#FEF3E2;border:1px solid #F6D9A8;border-radius:6px;padding:2px 9px 2px 7px;color:#92400E;font-weight:600;font-size:0.92em;cursor:pointer;user-select:none;white-space:nowrap;vertical-align:middle;line-height:1.7"><svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='#C17B2F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='flex-shrink:0'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>${safe}</span>`;
+	};
+
 	const insertDraftDateAtCursor = (d) => {
 		if (!editorRef.current) return;
-		editorRef.current.focus();
 
+		/* If we're editing an existing chip, update it in-place */
+		if (dateEditTargetRef.current) {
+			const chip = dateEditTargetRef.current;
+			const label = formatInkDateLong(d);
+			if (label) {
+				chip.setAttribute("data-ink-date", d.toISOString());
+				const safe = label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+				chip.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='#C17B2F' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' style='flex-shrink:0'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg>${safe}`;
+			}
+			dateEditTargetRef.current = null;
+			setDraftSlashDatePickerPos(null);
+			return;
+		}
+
+		editorRef.current.focus();
 		const sel = window.getSelection();
 		if (sel?.rangeCount) {
 			const range = sel.getRangeAt(0);
@@ -2907,26 +3260,13 @@ export default function DraftPage() {
 			if (block) {
 				const text = getTextFromBlockStartToCaret(block, range);
 				const slash = matchDraftSlashQuery(text);
-				if (slash) {
-					deleteDraftSlashToken(block, range, slash.slashToken.length);
-				}
+				if (slash) deleteDraftSlashToken(block, range, slash.slashToken.length);
 			}
 		}
 
-		const label = formatInkDateLong(d);
-		if (!label) {
-			setDraftSlashDatePickerPos(null);
-			return;
-		}
-		const safe = label
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;");
-		document.execCommand(
-			"insertHTML",
-			false,
-			`<span data-ink-date style="color:#C17B2F;font-weight:600">${safe}</span>`,
-		);
+		const html = makeDateChipHtml(d);
+		if (!html) { setDraftSlashDatePickerPos(null); return; }
+		document.execCommand("insertHTML", false, html);
 		countWords();
 		setDraftSlashDatePickerPos(null);
 		requestAnimationFrame(() => editorRef.current?.focus());
@@ -2976,8 +3316,27 @@ export default function DraftPage() {
 		} else if (action === "divider") {
 			insertDraftRichBlock(
 				editorRef.current,
-				makeDraftDividerHtml().replace(/<p><br><\/p>\s*$/, ""),
+				makeDraftDividerHtml("solid").replace(/<p><br><\/p>\s*$/, ""),
 			);
+		} else if (action === "divider-dashed") {
+			insertDraftRichBlock(
+				editorRef.current,
+				makeDraftDividerHtml("dashed").replace(/<p><br><\/p>\s*$/, ""),
+			);
+		} else if (action === "divider-dotted") {
+			insertDraftRichBlock(
+				editorRef.current,
+				makeDraftDividerHtml("dotted").replace(/<p><br><\/p>\s*$/, ""),
+			);
+		} else if (action === "toggle-group") {
+			insertDraftRichBlock(editorRef.current, makeToggleGroupHtml());
+		} else if (action === "card") {
+			insertDraftRichBlock(editorRef.current, makeCardBlockHtml());
+		} else if (action === "icon-block") {
+			insertDraftRichBlock(editorRef.current, makeIconBlockHtml("✨", "emoji") + "<p><br></p>");
+		} else if (action === "audio") {
+			deleteDraftSlashFromCaret(editorRef.current);
+			setAudioModalOpen(true);
 		} else if (action === "code") {
 			insertDraftRichBlock(
 				editorRef.current,
@@ -4138,6 +4497,47 @@ export default function DraftPage() {
 											width: 100% !important;
 											margin: 0 !important;
 										}
+										[data-editor-root] [contenteditable="true"] [data-card-icon]:empty:before,
+										[data-editor-root] [contenteditable="true"] [data-card-heading]:empty:before,
+										[data-editor-root] [contenteditable="true"] [data-card-desc]:empty:before {
+											content: attr(data-placeholder);
+											color: #B0AAA3;
+											pointer-events: none;
+										}
+										[data-editor-root] [contenteditable="true"] [data-placeholder]:empty:before {
+											content: attr(data-placeholder);
+											color: #B0AAA3;
+											pointer-events: none;
+										}
+										[data-editor-root] [contenteditable="true"] [data-icon-selector]:hover {
+											background: rgba(193,123,47,0.08);
+											border-radius: 4px;
+										}
+										[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary::-webkit-details-marker { display: none; }
+										[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary { list-style: none; }
+										[data-editor-root] [contenteditable="true"] > *:hover ~ [data-drag-handle] { opacity: 1 !important; }
+										[data-editor-root] [contenteditable="true"] [data-audio-name]:empty:before,
+										[data-editor-root] [contenteditable="true"] [data-audio-caption]:empty:before {
+											content: attr(data-placeholder);
+											color: #C8C4BC;
+											pointer-events: none;
+										}
+										[data-editor-root] [contenteditable="true"] [data-audio-name]:focus:before,
+										[data-editor-root] [contenteditable="true"] [data-audio-caption]:focus:before {
+											content: none !important;
+										}
+										@keyframes spin { to { transform: rotate(360deg); } }
+										[data-editor-root] [contenteditable="true"] [data-block="audio-block"] audio::-webkit-media-controls-panel {
+											background: #F7F5F0;
+										}
+										[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:empty:before {
+											content: attr(data-placeholder);
+											color: #C8C4BC;
+											pointer-events: none;
+										}
+										[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:focus:before {
+											content: none !important;
+										}
 									`}</style>
 									<div
 										ref={editorRef}
@@ -4279,13 +4679,60 @@ export default function DraftPage() {
 												}
 											}
 										}}
-										data-placeholder="Write, or type / for commands…"
-										style={{
-											maxWidth: 720,
-											margin: "0 auto",
-											padding: "36px 48px 100px",
-											minHeight: "100%",
-											outline: "none",
+									onDragOver={(e) => {
+										if (!dragSrcRef.current) return;
+										e.preventDefault();
+										e.dataTransfer.dropEffect = "move";
+										const editor = editorRef.current;
+										const container = editorContainerRef.current;
+										if (!editor || !container) return;
+										let target = e.target;
+										if (target.nodeType === 3) target = target.parentElement;
+										while (target && target.parentElement !== editor) target = target.parentElement;
+										if (!target || target === dragSrcRef.current) { setDropIndicator(null); return; }
+										const tgtRect = target.getBoundingClientRect();
+										const containerRect = container.getBoundingClientRect();
+										const before = e.clientY < tgtRect.top + tgtRect.height / 2;
+										const editorRect = editor.getBoundingClientRect();
+										dragOverRef.current = { block: target, before };
+										setDropIndicator({
+											top: (before ? tgtRect.top : tgtRect.bottom) - containerRect.top + container.scrollTop,
+											left: editorRect.left - containerRect.left,
+											width: editorRect.width,
+										});
+									}}
+									onDragLeave={(e) => {
+										if (!editorRef.current?.contains(e.relatedTarget)) {
+											setDropIndicator(null);
+											dragOverRef.current = null;
+										}
+									}}
+									onDrop={(e) => {
+										const src = dragSrcRef.current;
+										if (!src) return;
+										e.preventDefault();
+										const editor = editorRef.current;
+										if (!editor) return;
+										const over = dragOverRef.current;
+										if (over?.block && over.block !== src) {
+											if (over.before) editor.insertBefore(src, over.block);
+											else editor.insertBefore(src, over.block.nextSibling);
+										}
+										src.style.opacity = "";
+										src.style.outline = "";
+										dragSrcRef.current = null;
+										dragOverRef.current = null;
+										setDragHandle(null);
+										setDropIndicator(null);
+										countWords();
+									}}
+									data-placeholder="Write, or type / for commands…"
+									style={{
+										maxWidth: 720,
+										margin: "0 auto",
+										padding: "36px 48px 100px",
+										minHeight: "100%",
+										outline: "none",
 											fontSize: `${editorFontSize}px`,
 											lineHeight: 1.75,
 											color: "#37352F",
@@ -4299,14 +4746,21 @@ export default function DraftPage() {
 															: "'Comic', sans-serif",
 										}}
 									/>
-									<input
-										ref={imageFileInputRef}
-										type="file"
-										accept="image/*,video/*"
-										style={{ display: "none" }}
-										onChange={handleImageFileSelect}
-									/>
-									{/* Slash command dropdown */}
+								<input
+									ref={imageFileInputRef}
+									type="file"
+									accept="image/*,video/*"
+									style={{ display: "none" }}
+									onChange={handleImageFileSelect}
+								/>
+								<input
+									ref={audioFileInputRef}
+									type="file"
+									accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
+									style={{ display: "none" }}
+									onChange={handleAudioFileSelect}
+								/>
+								{/* Slash command dropdown */}
 									<AnimatePresence>
 										{slashCommand && (
 											<motion.div
@@ -4582,24 +5036,157 @@ export default function DraftPage() {
 											</motion.div>
 										)}
 									</AnimatePresence>
-									{draftSlashDatePickerPos &&
-										createPortal(
-											<div
-												data-draft-date-picker
-												style={{
-													position: "fixed",
-													left: draftSlashDatePickerPos.left,
-													top: draftSlashDatePickerPos.top,
-													zIndex: 120,
+
+									{/* ── Drag handle ── */}
+									{dragHandle && dragHandle.block && (
+										<div
+											contentEditable={false}
+											draggable
+											onDragStart={(e) => {
+												dragSrcRef.current = dragHandle.block;
+												e.dataTransfer.effectAllowed = "move";
+												/* Ghost image: small translucent clone */
+												try {
+													const ghost = dragHandle.block.cloneNode(true);
+													ghost.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0.7;pointer-events:none;max-width:400px;background:#fff;border-radius:8px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,0.12)";
+													document.body.appendChild(ghost);
+													e.dataTransfer.setDragImage(ghost, 20, 20);
+													setTimeout(() => document.body.removeChild(ghost), 0);
+												} catch (_) {}
+												dragHandle.block.style.opacity = "0.35";
+												dragHandle.block.style.outline = `2px dashed ${T.border}`;
+												dragHandle.block.style.borderRadius = "6px";
+											}}
+											onDragEnd={() => {
+												if (dragSrcRef.current) {
+													dragSrcRef.current.style.opacity = "";
+													dragSrcRef.current.style.outline = "";
+													dragSrcRef.current.style.borderRadius = "";
+												}
+												dragSrcRef.current = null;
+												dragOverRef.current = null;
+												setDropIndicator(null);
+											}}
+											style={{
+												position: "absolute",
+												left: dragHandle.handleLeft,
+												top: dragHandle.top + (dragHandle.height / 2) - 11,
+												width: 22,
+												height: 22,
+												display: "flex",
+												alignItems: "center",
+												justifyContent: "center",
+												cursor: "grab",
+												opacity: 0,
+												borderRadius: 5,
+												background: "transparent",
+												transition: "opacity 0.12s, background 0.12s",
+												userSelect: "none",
+												zIndex: 20,
+												color: "#B0AAA3",
+											}}
+											title="Drag to reorder"
+											onMouseEnter={(e) => {
+												e.currentTarget.style.opacity = "1";
+												e.currentTarget.style.background = "#F0ECE5";
+											}}
+											onMouseLeave={(e) => {
+												e.currentTarget.style.opacity = "0";
+												e.currentTarget.style.background = "transparent";
+											}}
+											/* make it visible when parent block is hovered */
+											ref={(el) => {
+												if (el && dragHandle.block) {
+													const show = () => { el.style.opacity = "1"; };
+													const hide = () => { if (!dragSrcRef.current) el.style.opacity = "0"; };
+													dragHandle.block.addEventListener("mouseenter", show);
+													dragHandle.block.addEventListener("mouseleave", hide);
+												}
+											}}
+										>
+											{/* 6-dot grip */}
+											<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+												<circle cx="4.5" cy="3.5" r="1.2" fill="#9A9490"/>
+												<circle cx="4.5" cy="7" r="1.2" fill="#9A9490"/>
+												<circle cx="4.5" cy="10.5" r="1.2" fill="#9A9490"/>
+												<circle cx="9.5" cy="3.5" r="1.2" fill="#9A9490"/>
+												<circle cx="9.5" cy="7" r="1.2" fill="#9A9490"/>
+												<circle cx="9.5" cy="10.5" r="1.2" fill="#9A9490"/>
+											</svg>
+										</div>
+									)}
+
+									{/* ── Drop indicator line ── */}
+									{dropIndicator && (
+										<div
+											contentEditable={false}
+											style={{
+												position: "absolute",
+												top: dropIndicator.top - 1,
+												left: dropIndicator.left,
+												width: dropIndicator.width,
+												height: 2,
+												background: T.warm,
+												borderRadius: 2,
+												zIndex: 30,
+												pointerEvents: "none",
+												boxShadow: `0 0 0 3px ${T.warm}22`,
+											}}
+										/>
+									)}
+
+									{/* ── Icon selector popup ── */}
+									{iconSelector && createPortal(
+										<div
+											ref={iconSelectorRef}
+											style={{
+												position: "fixed",
+												left: Math.min(iconSelector.x, window.innerWidth - 310),
+												top: Math.min(iconSelector.y, window.innerHeight - 390),
+												zIndex: 200,
+											}}
+										>
+											<IconSelectorDropdown
+												onSelect={({ type, value, icon }) => {
+													const target = iconSelector.target;
+													if (!target) return;
+													if (type === "emoji") {
+														target.setAttribute("data-icon-type", "emoji");
+														target.innerHTML = `<span style="font-size:28px;line-height:1">${value}</span>`;
+													} else if (type === "lucide" && icon) {
+														target.setAttribute("data-icon-type", "lucide");
+														target.innerHTML = lucideToSvgString(icon, 26, "#37352F");
+													}
 												}}
-											>
-												<TiptapSlashDatePicker
-													initialDate={new Date()}
-													onSelect={insertDraftDateAtCursor}
-												/>
-											</div>,
-											document.body,
-										)}
+												onClose={() => setIconSelector(null)}
+											/>
+										</div>,
+										document.body
+									)}
+
+								{draftSlashDatePickerPos &&
+									createPortal(
+										<div
+											data-draft-date-picker
+											style={{
+												position: "fixed",
+												left: draftSlashDatePickerPos.left,
+												top: draftSlashDatePickerPos.top,
+												zIndex: 120,
+											}}
+										>
+											<TiptapSlashDatePicker
+												key={datePickerInitial.toISOString()}
+												initialDate={datePickerInitial}
+												onSelect={insertDraftDateAtCursor}
+												onClose={() => {
+													dateEditTargetRef.current = null;
+													setDraftSlashDatePickerPos(null);
+												}}
+											/>
+										</div>,
+										document.body,
+									)}
 									{draftImageModalOpen &&
 										createPortal(
 											<div
@@ -4757,9 +5344,71 @@ export default function DraftPage() {
 											</div>,
 											document.body,
 										)}
-									{/* Text selection dropdown (Notion-style) */}
-									<AnimatePresence>
-										{selectionDropdown && (
+								{/* ── Audio upload modal ── */}
+								{audioModalOpen && createPortal(
+									<div
+										role="presentation"
+										style={{ position: "fixed", inset: 0, zIndex: 130, background: "rgba(55,53,47,0.40)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+										onMouseDown={(e) => { if (e.target === e.currentTarget) setAudioModalOpen(false); }}
+									>
+										<div
+											role="dialog"
+											aria-modal="true"
+											aria-label="Insert audio"
+											onMouseDown={(e) => e.stopPropagation()}
+											style={{ background: T.surface, borderRadius: 14, padding: 24, width: "100%", maxWidth: 400, boxShadow: "0 16px 48px rgba(0,0,0,0.18)", border: `1px solid ${T.border}` }}
+										>
+											{/* Header */}
+											<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+												<div style={{ width: 36, height: 36, borderRadius: 9, background: "#FEF3E2", border: "1px solid #F6D9A8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+													<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C17B2F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+												</div>
+												<div>
+													<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, lineHeight: 1.2 }}>Insert Audio</p>
+													<p style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>MP3, WAV, OGG, M4A supported</p>
+												</div>
+											</div>
+
+											{/* Upload button */}
+											<button
+												type="button"
+												onClick={() => audioFileInputRef.current?.click()}
+												disabled={audioUploading}
+												style={{ width: "100%", padding: "12px 14px", borderRadius: 9, border: `1.5px dashed ${T.border}`, background: "#F7F5F0", fontWeight: 600, fontSize: 14, color: T.accent, cursor: audioUploading ? "wait" : "pointer", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+											>
+												{audioUploading ? (
+													<>
+														<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+														Uploading…
+													</>
+												) : (
+													<>
+														<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+														Choose audio file from computer
+													</>
+												)}
+											</button>
+											<p style={{ fontSize: 11, color: T.muted, textAlign: "center", marginBottom: 16 }}>
+												File will be uploaded and an audio player inserted into your draft.
+											</p>
+
+											<div style={{ display: "flex", justifyContent: "flex-end" }}>
+												<button
+													type="button"
+													onClick={() => setAudioModalOpen(false)}
+													style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "transparent", color: T.muted, fontWeight: 500, cursor: "pointer", fontSize: 13 }}
+												>
+													Cancel
+												</button>
+											</div>
+										</div>
+									</div>,
+									document.body
+								)}
+
+								{/* Text selection dropdown (Notion-style) */}
+								<AnimatePresence>
+									{selectionDropdown && (
 											<motion.div
 												data-selection-dropdown
 												initial={{ opacity: 0, y: 4, scale: 0.96 }}
