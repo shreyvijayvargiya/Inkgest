@@ -334,11 +334,12 @@ function Hero() {
 					animate={{ x: ["0%", "-50%"] }}
 					transition={{ duration: 20, ease: "linear", repeat: Infinity }}
 					style={{ display: "flex", gap: 24, width: "max-content" }}
+					className="bg-amber-50/20 py-10 w-full"
 				>
 					{doubled.map((item, i) => (
 						<div
 							key={i}
-							className="text-sm py-1 px-2 rounded-xl bg-amber-50/50"
+							className="text-sm py-1 px-2 bg-amber-50"
 							style={{ display: "flex", alignItems: "center", gap: 8 }}
 						>
 							<span>{item.icon}</span>
@@ -386,43 +387,124 @@ function Hero() {
 					<SparkleIcon className="w-3 h-3" />
 					We are live on Product Hunt
 				</a>
-			<motion.div className="max-w-5xl mx-auto my-10">
-				{/* Headline */}
-				<motion.h1
-					initial={{ opacity: 0, y: 24 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-					style={{
-						lineHeight: 1.05,
-						letterSpacing: "-1.5px",
-						color: T.accent,
-						marginBottom: 16,
-					}}
-					className="text-5xl font-bold text-center leading-tight"
-				>
-					Futuristic AI writing editor for
-					<motion.span initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }} style={{ color: T.warm }} className="text-6xl font-semibold px-2 border border-amber-100 bg-gradient-to-r from-amber-50 to-amber-50/20 m-1 rounded-xl ml-2">content creators</motion.span>
-				</motion.h1>
-				<AnimatedText />
-				<motion.p
-					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					transition={{ delay: 0.55 }}
-					style={{
-						fontSize: 13,
-						color: T.muted,
-						fontFamily: "'Comic', sans-serif",
-						marginTop: 16,
-						marginBottom: 32,
-					}}
-					className="flex items-center justify-center gap-2"
-				>
-					<strong style={{ color: T.accent }} className="flex items-center gap-2">
-						<SparkleIcon className="w-4 h-4" /> {FREE_CREDIT_LIMIT} free credits
-					</strong>{" "}
-					· <div className="flex items-center gap-2"><CreditCardIcon className="w-4 h-4" /> No credit card </div>· <div className="flex items-center gap-2"><XCircleIcon className="w-4 h-4" /> Cancel anytime</div>
-				</motion.p>
+		<motion.div className="max-w-5xl mx-auto my-10">
+			{/* Headline — design-tool annotation style */}
+			<motion.div
+				initial={{ opacity: 0, y: 24 }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+				style={{ textAlign: "center", marginBottom: 16, position: "relative" }}
+			>
+				{/* Line 1 — plain large heading */}
+				<div style={{ fontSize: "clamp(36px,5.5vw,68px)", fontWeight: 800, color: T.accent, lineHeight: 1.05, letterSpacing: "-2px", marginBottom: 6 }}>
+					Futuristic Agentic editor
+				</div>
 
+				{/* Line 2 — "for content creators" with bounding-box treatment */}
+				<div style={{ position: "relative", display: "inline-block", marginBottom: 4 }}>
+					{/* Annotation label top-left — font style */}
+					<motion.div
+						initial={{ opacity: 0, x: -8 }}
+						animate={{ opacity: 1, x: 0 }}
+						transition={{ delay: 0.7, duration: 0.5 }}
+						style={{
+							position: "absolute",
+							top: -8,
+							left: -4,
+							background: T.surface,
+							border: `1px solid ${T.border}`,
+							borderRadius: 5,
+							padding: "2px 8px",
+							fontSize: 10.5,
+							fontWeight: 600,
+							color: T.muted,
+							whiteSpace: "nowrap",
+							fontFamily: "monospace",
+							boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+						}}
+					>
+						AI chatbot
+					</motion.div>
+
+					{/* Annotation label top-right — color */}
+					<motion.div
+						initial={{ opacity: 0, x: 8 }}
+						animate={{ opacity: 1, x: 0 }}
+						transition={{ delay: 0.85, duration: 0.5 }}
+						style={{
+							position: "absolute",
+							top: -8,
+							right: -4,
+							background: T.surface,
+							border: `1px solid ${T.border}`,
+							borderRadius: 5,
+							padding: "2px 8px",
+							fontSize: 10.5,
+							fontWeight: 600,
+							color: T.warm,
+							whiteSpace: "nowrap",
+							fontFamily: "monospace",
+							display: "flex",
+							alignItems: "center",
+							gap: 5,
+							boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+						}}
+					>
+						<span style={{ width: 8, height: 8, borderRadius: "50%", background: T.warm, display: "inline-block", flexShrink: 0 }} />
+						{T.warm}
+					</motion.div>
+					<br />
+					{/* The text with selection border */}
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						transition={{ delay: 0.55, duration: 0.5 }}
+						style={{
+							position: "relative",
+							display: "inline-block",
+							border: `1.5px solid ${T.warm}`,
+							padding: "4px 18px 4px 12px",
+						}}
+						className="bg-gradient-to-r from-amber-50 to-amber-50/20"
+					>
+						{/* Corner handles */}
+						{[["top", "left"], ["top", "right"], ["bottom", "left"], ["bottom", "right"]].map(([v, h]) => (
+							<div key={`${v}-${h}`} style={{ position: "absolute", [v]: -2, [h]: -2, width: 7, height: 7, borderRadius: 2, background: "white", border: `1.5px solid ${T.warm}` }} />
+						))}
+						
+						<span style={{ fontStyle: "italic", fontSize: "clamp(36px,5.5vw,68px)", fontWeight: 400, color: T.warm, lineHeight: 1.05, letterSpacing: "-2px" }} className="text-amber-500">
+							for content creators
+						</span>
+					</motion.div>
+
+					{/* Annotation label bottom — letter-spacing */}
+					<motion.div
+						initial={{ opacity: 0, y: 6 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ delay: 1, duration: 0.5 }}
+						style={{
+							position: "absolute",
+							bottom: -26,
+							left: "50%",
+							transform: "translateX(-50%)",
+							background: T.surface,
+							border: `1px solid ${T.border}`,
+							borderRadius: 5,
+							padding: "2px 8px",
+							fontSize: 10.5,
+							fontWeight: 600,
+							color: T.muted,
+							whiteSpace: "nowrap",
+							fontFamily: "monospace",
+							boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+						}}
+					>
+						Advance Editor
+					</motion.div>
+				</div>
+				<br />
+				<br />
+			</motion.div>
 				{/* ── DEMO EDITOR UI ── */}
 				<motion.div
 					initial={{ opacity: 0, y: 32 }}
@@ -553,10 +635,28 @@ function Hero() {
 
 					</div>
 				</motion.div>
-
-			
+				<motion.p
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ delay: 0.55 }}
+					style={{
+						fontSize: 13,
+						color: T.muted,
+						fontFamily: "'Comic', sans-serif",
+						marginTop: 16,
+						marginBottom: 32,
+					}}
+					className="flex items-center justify-center gap-2"
+				>
+					<strong style={{ color: T.accent }} className="flex items-center gap-2">
+						<SparkleIcon className="w-4 h-4" /> {FREE_CREDIT_LIMIT} free credits
+					</strong>{" "}
+					· <div className="flex items-center gap-2"><CreditCardIcon className="w-4 h-4" /> No credit card </div>· <div className="flex items-center gap-2"><XCircleIcon className="w-4 h-4" /> Cancel anytime</div>
+				</motion.p>
 			</motion.div>
 			</motion.div>
+			<br />
+			<AnimatedText />
 
 			<LoginModal
 				isOpen={loginModalOpen}
