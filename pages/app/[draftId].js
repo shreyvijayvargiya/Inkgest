@@ -496,6 +496,28 @@ const THEMES = {
 	},
 };
 
+/* ─── Supported translation languages (MyMemory free API) ─── */
+const TRANSLATION_LANGUAGES = [
+	{ code: "en", label: "English", flag: "🇬🇧" },
+	{ code: "es", label: "Spanish", flag: "🇪🇸" },
+	{ code: "fr", label: "French", flag: "🇫🇷" },
+	{ code: "de", label: "German", flag: "🇩🇪" },
+	{ code: "pt", label: "Portuguese", flag: "🇵🇹" },
+	{ code: "it", label: "Italian", flag: "🇮🇹" },
+	{ code: "zh", label: "Chinese", flag: "🇨🇳" },
+	{ code: "ja", label: "Japanese", flag: "🇯🇵" },
+	{ code: "ko", label: "Korean", flag: "🇰🇷" },
+	{ code: "ar", label: "Arabic", flag: "🇸🇦" },
+	{ code: "hi", label: "Hindi", flag: "🇮🇳" },
+	{ code: "ru", label: "Russian", flag: "🇷🇺" },
+	{ code: "nl", label: "Dutch", flag: "🇳🇱" },
+	{ code: "sv", label: "Swedish", flag: "🇸🇪" },
+	{ code: "tr", label: "Turkish", flag: "🇹🇷" },
+	{ code: "pl", label: "Polish", flag: "🇵🇱" },
+	{ code: "id", label: "Indonesian", flag: "🇮🇩" },
+	{ code: "vi", label: "Vietnamese", flag: "🇻🇳" },
+];
+
 /* ─── Inline markdown → HTML (links, images, bold, italic, code) ─── */
 const parseInlineMarkdown = (text = "") =>
 	text
@@ -906,6 +928,63 @@ export default function ThemedNewsletterEmbed() {
   );
 }
 `;
+}
+
+/**
+ * Translate all text nodes in an HTML string to the target language
+ * using the free MyMemory API (no key required, ~1 000 words/day per IP).
+ * HTML structure (tags, attributes, styles) is fully preserved.
+ */
+async function translateHTMLContent(html, targetLang) {
+	if (!html || targetLang === "en") return html;
+
+	const parser = new DOMParser();
+	const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+	const root = doc.body.firstChild;
+
+	const textNodes = [];
+	function collectTextNodes(node) {
+		for (const child of node.childNodes) {
+			if (child.nodeType === 3 && child.textContent.trim()) {
+				textNodes.push(child);
+			} else if (child.nodeType === 1) {
+				collectTextNodes(child);
+			}
+		}
+	}
+	collectTextNodes(root);
+
+	if (textNodes.length === 0) return html;
+
+	/* Translate each text node individually in batches of 5 parallel requests.
+	   Avoids delimiter-splitting issues where the API modifies join markers. */
+	const CONCURRENCY = 5;
+	for (let i = 0; i < textNodes.length; i += CONCURRENCY) {
+		const slice = textNodes.slice(i, i + CONCURRENCY);
+		await Promise.all(
+			slice.map(async (node) => {
+				const text = node.textContent.trim();
+				if (!text) return;
+				try {
+					const res = await fetch(
+						`https://api.mymemory.translated.world/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`,
+					);
+					const json = await res.json();
+					const translated = json?.responseData?.translatedText;
+					if (translated && translated.toLowerCase() !== "invalid language pair") {
+						/* Decode any HTML entities the API may return (e.g. &amp; → &) */
+						const ta = document.createElement("textarea");
+						ta.innerHTML = translated;
+						node.textContent = ta.value;
+					}
+				} catch {
+					/* keep original text on network/rate-limit error */
+				}
+			}),
+		);
+	}
+
+	return root.innerHTML;
 }
 
 /* ─── Asset type labels ─── */
@@ -2043,6 +2122,13 @@ const DRAFT_SLASH_BASE_ITEMS = [
 		keywords: ["audio", "music", "mp3", "sound", "track", "podcast"],
 	},
 	{
+		id: "record",
+		label: "Record Audio",
+		icon: "⏺",
+		section: "blocks",
+		keywords: ["record", "recording", "microphone", "mic", "voice", "capture"],
+	},
+	{
 		id: "code",
 		label: "Code block",
 		icon: "{ }",
@@ -2210,6 +2296,11 @@ export default function DraftPage() {
 	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
 	const [copiedTheme, setCopiedTheme] = useState(null); // { key, format: 'html' | 'react' }
 	const [previewTheme, setPreviewTheme] = useState("ink");
+	const [translationLang, setTranslationLang] = useState("en");
+	const [translating, setTranslating] = useState(false);
+	const [translatedHTML, setTranslatedHTML] = useState("");
+	const [themeExportOpen, setThemeExportOpen] = useState(false);
+	const themeExportRef = useRef(null);
 	const [infographicsOpen, setInfographicsOpen] = useState(false);
 	const [chatOpen, setChatOpen] = useState(false);
 	const [blockMenuOpen, setBlockMenuOpen] = useState(false);
@@ -2233,9 +2324,27 @@ export default function DraftPage() {
 	const [audioModalOpen, setAudioModalOpen] = useState(false);
 	const [audioUploading, setAudioUploading] = useState(false);
 	const audioFileInputRef = useRef(null);
+	const [recordingOpen, setRecordingOpen] = useState(false);
+	const [recordingState, setRecordingState] = useState("idle"); // idle | requesting | recording | uploading
+	const [recordingSeconds, setRecordingSeconds] = useState(0);
+	const [recordingMode, setRecordingMode] = useState("audio"); // "audio" | "text"
+	const [transcriptFinal, setTranscriptFinal] = useState("");
+	const [transcriptInterim, setTranscriptInterim] = useState("");
+	const mediaRecorderRef = useRef(null);
+	const recordingChunksRef = useRef([]);
+	const recordingStreamRef = useRef(null);
+	const recordingTimerRef = useRef(null);
+	const recognitionRef = useRef(null);
 	const [draftSlashDatePickerPos, setDraftSlashDatePickerPos] = useState(null);
 	const [datePickerInitial, setDatePickerInitial] = useState(new Date());
 	const dateEditTargetRef = useRef(null);
+	// ── Publish settings ──
+	const [isPublic, setIsPublic] = useState(false);
+	const [slugInput, setSlugInput] = useState("");
+	const [publishDropOpen, setPublishDropOpen] = useState(false);
+	const [publishSaving, setPublishSaving] = useState(false);
+	const [publishCopied, setPublishCopied] = useState(false);
+	const publishDropRef = useRef(null);
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewCopied, setPreviewCopied] = useState(null);
 	const [previewExportOpen, setPreviewExportOpen] = useState(false);
@@ -2284,6 +2393,21 @@ export default function DraftPage() {
 	useEffect(() => {
 		if (!previewOpen) setPreviewExportOpen(false);
 	}, [previewOpen]);
+
+	useEffect(() => {
+		if (!themeExportOpen) return;
+		const onDown = (e) => {
+			if (!themeExportRef.current?.contains(e.target)) {
+				setThemeExportOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", onDown);
+		return () => document.removeEventListener("mousedown", onDown);
+	}, [themeExportOpen]);
+
+	useEffect(() => {
+		if (!themeDrawerOpen) setThemeExportOpen(false);
+	}, [themeDrawerOpen]);
 
 	/* All assets (drafts + tables) — from users/uid/assets or fallback to drafts+tables */
 	const { data: items = [] } = useQuery({
@@ -2594,6 +2718,25 @@ export default function DraftPage() {
 		}
 	}, [draft]);
 
+	/* Sync publish state from Firestore doc */
+	useEffect(() => {
+		if (draft) {
+			setIsPublic(draft.isPublic ?? false);
+			setSlugInput(draft.slug ?? "");
+		}
+	}, [draft?.isPublic, draft?.slug]);
+
+	/* Close publish dropdown on outside click */
+	useEffect(() => {
+		const handler = (e) => {
+			if (publishDropRef.current && !publishDropRef.current.contains(e.target)) {
+				setPublishDropOpen(false);
+			}
+		};
+		if (publishDropOpen) document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
+	}, [publishDropOpen]);
+
 	const countWords = () => {
 		const text = editorRef.current?.innerText || "";
 		setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
@@ -2674,6 +2817,71 @@ export default function DraftPage() {
 		setTimeout(() => setSaved(false), 2000);
 	};
 
+	/* ── Publish helpers ── */
+	const toSlug = (str) =>
+		(str || "")
+			.toLowerCase()
+			.trim()
+			.replace(/[^\w\s-]/g, "")
+			.replace(/\s+/g, "-")
+			.replace(/-+/g, "-")
+			.slice(0, 80) || draftId;
+
+	const getEffectiveSlug = () =>
+		toSlug(slugInput) || toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId;
+
+	const getPublicUrl = (slug) => {
+		if (typeof window === "undefined") return "";
+		return `${window.location.origin}/p/${slug || getEffectiveSlug()}`;
+	};
+
+	const savePublishSettings = async (nextPublic, nextSlug) => {
+		if (!draftId || !reduxUser?.uid) return;
+		setPublishSaving(true);
+		const slug = toSlug(nextSlug ?? slugInput) || toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId;
+		try {
+			// 1. Update asset doc with publish fields
+			await updateAsset(
+				reduxUser.uid,
+				draftId,
+				{ isPublic: nextPublic, slug },
+				docData?.source || "assets",
+			);
+			// 2. Mirror to / remove from published_blogs top-level collection
+			const { doc: fsDoc, setDoc: fsSetDoc, deleteDoc: fsDeleteDoc } = await import("firebase/firestore");
+			const { db: fsDb } = await import("../../lib/config/firebase");
+			const oldSlug = draft?.slug;
+			if (nextPublic) {
+				const html = editorRef.current?.innerHTML || draft?.body || "";
+				const title = titleRef.current?.innerText?.trim() || draft?.title || "Untitled";
+				await fsSetDoc(fsDoc(fsDb, "published_blogs", slug), {
+					userId: reduxUser.uid,
+					assetId: draftId,
+					slug,
+					title,
+					description: draft?.description || "",
+					body: html,
+					publishedAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				});
+				// Clean up old slug doc if slug changed
+				if (oldSlug && oldSlug !== slug) {
+					try { await fsDeleteDoc(fsDoc(fsDb, "published_blogs", oldSlug)); } catch (_) {}
+				}
+			} else {
+				// Unpublishing: remove from published_blogs
+				const slugToRemove = oldSlug || slug;
+				try { await fsDeleteDoc(fsDoc(fsDb, "published_blogs", slugToRemove)); } catch (_) {}
+			}
+			setIsPublic(nextPublic);
+			setSlugInput(slug);
+		} catch (e) {
+			console.error("Publish settings save failed", e);
+		} finally {
+			setPublishSaving(false);
+		}
+	};
+
 	/* ── Insert image or video at cursor ── */
 	const insertImageOrVideo = (url, isVideo = false) => {
 		if (!url?.trim()) return;
@@ -2746,7 +2954,130 @@ export default function DraftPage() {
 		document.execCommand("insertHTML", false, html);
 		countWords();
 		setAudioModalOpen(false);
+		setRecordingOpen(false);
 		requestAnimationFrame(() => editorRef.current?.focus());
+	};
+
+	/* ── Recording: start microphone capture ── */
+	const startRecording = async () => {
+		try {
+			setRecordingState("requesting");
+			setTranscriptFinal("");
+			setTranscriptInterim("");
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			recordingStreamRef.current = stream;
+			const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+			const mr = new MediaRecorder(stream, { mimeType });
+			recordingChunksRef.current = [];
+			mr.ondataavailable = (e) => { if (e.data.size > 0) recordingChunksRef.current.push(e.data); };
+			mr.start(100);
+			mediaRecorderRef.current = mr;
+			setRecordingSeconds(0);
+			setRecordingState("recording");
+			recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+			// start speech recognition in text mode
+			const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+			if (SpeechRecognition) {
+				const rec = new SpeechRecognition();
+				rec.continuous = true;
+				rec.interimResults = true;
+				rec.lang = "en-US";
+				rec.onresult = (ev) => {
+					let finalChunk = "";
+					let interimChunk = "";
+					for (let i = ev.resultIndex; i < ev.results.length; i++) {
+						if (ev.results[i].isFinal) finalChunk += ev.results[i][0].transcript + " ";
+						else interimChunk += ev.results[i][0].transcript;
+					}
+					if (finalChunk) setTranscriptFinal((p) => p + finalChunk);
+					setTranscriptInterim(interimChunk);
+				};
+				rec.onerror = () => {};
+				rec.start();
+				recognitionRef.current = rec;
+			}
+		} catch {
+			setRecordingState("idle");
+			alert("Microphone access was denied. Please allow microphone in your browser settings.");
+		}
+	};
+
+	const stopRecordingStream = () => {
+		clearInterval(recordingTimerRef.current);
+		try {
+			if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current?.stop();
+		} catch (_) {}
+		try { recognitionRef.current?.stop(); } catch (_) {}
+		recognitionRef.current = null;
+		recordingStreamRef.current?.getTracks().forEach((t) => t.stop());
+		recordingStreamRef.current = null;
+	};
+
+	const handleRecordingDone = async () => {
+		if (recordingState !== "recording") return;
+		clearInterval(recordingTimerRef.current);
+		try { recognitionRef.current?.stop(); } catch (_) {}
+		recognitionRef.current = null;
+
+		// ── Text mode: just insert transcript as paragraph ──
+		if (recordingMode === "text") {
+			const text = (transcriptFinal + transcriptInterim).trim();
+			recordingStreamRef.current?.getTracks().forEach((t) => t.stop());
+			recordingStreamRef.current = null;
+			try { mediaRecorderRef.current?.stop(); } catch (_) {}
+			if (text && editorRef.current) {
+				editorRef.current.focus();
+				document.execCommand("insertHTML", false, `<p>${text.replace(/\n/g, "<br>")}</p>`);
+				countWords();
+			}
+			setRecordingOpen(false);
+			setRecordingState("idle");
+			setRecordingSeconds(0);
+			setTranscriptFinal("");
+			setTranscriptInterim("");
+			setRecordingMode("audio");
+			return;
+		}
+
+		// ── Audio mode: upload and insert block ──
+		setRecordingState("uploading");
+		const mr = mediaRecorderRef.current;
+		if (!mr) return;
+		await new Promise((res) => { mr.onstop = res; try { mr.stop(); } catch (_) { res(); } });
+		recordingStreamRef.current?.getTracks().forEach((t) => t.stop());
+		recordingStreamRef.current = null;
+		const mimeType = recordingChunksRef.current[0]?.type || "audio/webm";
+		const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+		const label = `Voice note ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+		const reader = new FileReader();
+		reader.onload = async () => {
+			try {
+				const res = await fetch("/api/uploadAudio", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ dataUrl: reader.result, name: label, type: mimeType }),
+				});
+				const json = await res.json();
+				if (!res.ok || json.error) throw new Error(json.error || "Upload failed");
+				insertAudioBlock(json.url, label);
+			} catch (err) {
+				alert(`Recording upload failed: ${err.message}`);
+			} finally {
+				setRecordingState("idle");
+				setRecordingSeconds(0);
+			}
+		};
+		reader.readAsDataURL(blob);
+	};
+
+	const handleRecordingCancel = () => {
+		stopRecordingStream();
+		setRecordingOpen(false);
+		setRecordingState("idle");
+		setRecordingSeconds(0);
+		setTranscriptFinal("");
+		setTranscriptInterim("");
+		setRecordingMode("audio");
 	};
 
 	const handleAudioFileSelect = (e) => {
@@ -3337,6 +3668,10 @@ export default function DraftPage() {
 		} else if (action === "audio") {
 			deleteDraftSlashFromCaret(editorRef.current);
 			setAudioModalOpen(true);
+		} else if (action === "record") {
+			deleteDraftSlashFromCaret(editorRef.current);
+			setRecordingOpen(true);
+			setTimeout(() => startRecording(), 300);
 		} else if (action === "code") {
 			insertDraftRichBlock(
 				editorRef.current,
@@ -3446,6 +3781,26 @@ export default function DraftPage() {
 		navigator.clipboard.writeText(snippet).catch(() => {});
 		setCopiedTheme({ key: themeKey, format: "react" });
 		setTimeout(() => setCopiedTheme(null), 2200);
+	};
+
+	const handleTranslate = async (lang) => {
+		setTranslationLang(lang);
+		if (lang === "en") {
+			setTranslatedHTML("");
+			return;
+		}
+		const raw = stripDraftSlashQueryFromHtmlString(
+			editorRef.current?.innerHTML || draft?.body || "",
+		);
+		setTranslating(true);
+		try {
+			const result = await translateHTMLContent(raw, lang);
+			setTranslatedHTML(result);
+		} catch {
+			setTranslatedHTML("");
+		} finally {
+			setTranslating(false);
+		}
 	};
 
 	const filtered = items.filter((i) => {
@@ -4230,36 +4585,128 @@ export default function DraftPage() {
 									<Icon d={Icons.eye} size={13} stroke={T.muted} />
 									Preview
 								</motion.button>
+							{/* ── Publish dropdown ── */}
+							<div style={{ position: "relative" }} ref={publishDropRef}>
 								<motion.button
-									whileHover={{
-										scale: 1.03,
-										y: -1,
-										boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
-									}}
+									whileHover={{ background: isPublic ? "#EFF6EE" : "#F0ECE5" }}
 									whileTap={{ scale: 0.96 }}
-									onClick={handleSave}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 6,
-										background: saved ? "#EFF6EE" : T.accent,
-										border: "none",
-										borderRadius: 8,
-										padding: "6px 14px",
-										fontSize: 12,
-										fontWeight: 700,
-										color: saved ? "#3D7A35" : "white",
-										cursor: "pointer",
-										transition: "all 0.2s",
-									}}
+									onClick={() => setPublishDropOpen((v) => !v)}
+									style={{ display: "flex", alignItems: "center", gap: 6, background: isPublic ? "#EFF6EE" : T.base, border: `1px solid ${isPublic ? "#8BC57E" : T.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: isPublic ? "#3D7A35" : T.muted, cursor: "pointer", transition: "all 0.18s" }}
 								>
-									<Icon
-										d={Icons.save}
-										size={13}
-										stroke={saved ? "#3D7A35" : "white"}
-									/>
-									{saved ? "Saved!" : "Save draft"}
+									<span style={{ width: 7, height: 7, borderRadius: "50%", background: isPublic ? "#3D7A35" : T.border, display: "inline-block", flexShrink: 0 }} />
+									{isPublic ? "Published" : "Private"}
+									<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
 								</motion.button>
+
+								<AnimatePresence>
+								{publishDropOpen && (
+									<motion.div
+										initial={{ opacity: 0, y: -6, scale: 0.97 }}
+										animate={{ opacity: 1, y: 0, scale: 1 }}
+										exit={{ opacity: 0, y: -6, scale: 0.97 }}
+										transition={{ duration: 0.15 }}
+										style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 340, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 200, padding: "16px 16px 14px" }}
+									>
+										{/* Visibility toggle */}
+										<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Visibility</p>
+										<div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+											{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map((opt) => (
+												<button
+													key={String(opt.val)}
+													type="button"
+													onClick={() => setIsPublic(opt.val)}
+													style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 0", borderRadius: 8, border: `1.5px solid ${isPublic === opt.val ? (opt.val ? "#8BC57E" : T.warm) : T.border}`, background: isPublic === opt.val ? (opt.val ? "#EFF6EE" : "#FEF3E2") : "transparent", color: isPublic === opt.val ? (opt.val ? "#3D7A35" : T.warm) : T.muted, fontWeight: 600, fontSize: 12, cursor: "pointer", transition: "all 0.15s" }}
+												>
+													{opt.icon} {opt.label}
+												</button>
+											))}
+										</div>
+
+										{/* Slug / URL */}
+										<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Page URL</p>
+										<div style={{ display: "flex", alignItems: "center", gap: 0, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
+											<span style={{ padding: "7px 8px 7px 10px", fontSize: 11, color: T.muted, whiteSpace: "nowrap", flexShrink: 0 }}>/p/</span>
+											<input
+												value={slugInput}
+												onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))}
+												placeholder={toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId}
+												style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, fontWeight: 500, color: T.accent, padding: "7px 4px", outline: "none", minWidth: 0 }}
+											/>
+											<button
+												type="button"
+												title="Copy link"
+												onClick={() => {
+													navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput) || undefined));
+													setPublishCopied(true);
+													setTimeout(() => setPublishCopied(false), 2000);
+												}}
+												style={{ padding: "7px 10px", background: "transparent", border: "none", borderLeft: `1px solid ${T.border}`, cursor: "pointer", color: publishCopied ? "#3D7A35" : T.muted, display: "flex", alignItems: "center", flexShrink: 0 }}
+											>
+												{publishCopied
+													? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+													: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+												}
+											</button>
+										</div>
+										{isPublic && (
+											<a
+												href={getPublicUrl(draft?.slug || undefined)}
+												target="_blank"
+												rel="noopener noreferrer"
+												style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: T.warm, textDecoration: "none", marginBottom: 14 }}
+											>
+												<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+												View live page
+											</a>
+										)}
+
+										{/* Save button */}
+										<div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+											<button
+												type="button"
+												disabled={publishSaving}
+												onClick={() => savePublishSettings(isPublic, slugInput)}
+												style={{ padding: "7px 18px", borderRadius: 8, border: "none", background: isPublic ? "#3D7A35" : T.accent, color: "white", fontWeight: 700, fontSize: 12, cursor: publishSaving ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: publishSaving ? 0.7 : 1 }}
+											>
+												{publishSaving && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "recSpin 0.7s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>}
+												{publishSaving ? "Saving…" : isPublic ? "Publish" : "Save as Private"}
+											</button>
+										</div>
+									</motion.div>
+								)}
+								</AnimatePresence>
+							</div>
+
+							<motion.button
+								whileHover={{
+									scale: 1.03,
+									y: -1,
+									boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
+								}}
+								whileTap={{ scale: 0.96 }}
+								onClick={handleSave}
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: 6,
+									background: saved ? "#EFF6EE" : T.accent,
+									border: "none",
+									borderRadius: 8,
+									padding: "6px 14px",
+									fontSize: 12,
+									fontWeight: 700,
+									color: saved ? "#3D7A35" : "white",
+									cursor: "pointer",
+									transition: "all 0.2s",
+								}}
+							>
+								<Icon
+									d={Icons.save}
+									size={13}
+									stroke={saved ? "#3D7A35" : "white"}
+								/>
+								{saved ? "Saved!" : "Save draft"}
+							</motion.button>
 								</div>
 							</div>
 
@@ -5406,8 +5853,138 @@ export default function DraftPage() {
 									document.body
 								)}
 
-								{/* Text selection dropdown (Notion-style) */}
-								<AnimatePresence>
+						{/* ── Recording modal ── */}
+							{recordingOpen && createPortal(
+								<div
+									role="presentation"
+									style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(30,28,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
+								>
+									<style>{`
+										@keyframes recBar { 0%,100%{transform:scaleY(0.3)} 50%{transform:scaleY(1)} }
+										@keyframes recPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
+										@keyframes recSpin { to{transform:rotate(360deg)} }
+									`}</style>
+									<motion.div
+										initial={{ opacity: 0, scale: 0.92, y: 16 }}
+										animate={{ opacity: 1, scale: 1, y: 0 }}
+										exit={{ opacity: 0, scale: 0.92, y: 16 }}
+										transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+										style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "28px 28px 22px", width: "100%", maxWidth: 460, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", display: "flex", flexDirection: "column", gap: 0 }}
+									>
+										{/* Mode toggle */}
+										<div style={{ display: "flex", gap: 0, background: T.bg, borderRadius: 10, padding: 3, marginBottom: 22, alignSelf: "center", border: `1px solid ${T.border}` }}>
+											{[{ id: "audio", label: "Audio Player", icon: "♪" }, { id: "text", label: "Transcript to Text", icon: "T" }].map((m) => (
+												<button
+													key={m.id}
+													type="button"
+													onClick={() => { if (recordingState !== "uploading") setRecordingMode(m.id); }}
+													style={{ padding: "6px 16px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 12, cursor: recordingState === "uploading" ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s", background: recordingMode === m.id ? T.surface : "transparent", color: recordingMode === m.id ? T.accent : T.muted, boxShadow: recordingMode === m.id ? `0 1px 4px rgba(0,0,0,0.1)` : "none" }}
+												>
+													<span style={{ fontSize: 11 }}>{m.icon}</span>{m.label}
+												</button>
+											))}
+										</div>
+
+										{/* Animated waveform bars */}
+										<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 52, marginBottom: 16 }}>
+											{[0.4,0.7,1,0.8,0.6,0.9,1,0.7,0.5,0.8,0.6,1,0.4,0.75,0.9,0.55,0.85].map((h, i) => (
+												<div
+													key={i}
+													style={{
+														width: recordingState === "recording" ? 4 : 3,
+														borderRadius: 3,
+														background: recordingState === "uploading" ? T.border : recordingState === "recording" ? (recordingMode === "text" ? "#6366F1" : T.warm) : T.border,
+														height: `${Math.round(h * 42)}px`,
+														transformOrigin: "center",
+														animation: recordingState === "recording"
+															? `recBar ${0.55 + (i % 5) * 0.12}s ${(i * 0.06).toFixed(2)}s ease-in-out infinite alternate`
+															: "none",
+														opacity: recordingState === "uploading" ? 0.35 : 1,
+														transition: "background 0.3s, opacity 0.3s",
+													}}
+												/>
+											))}
+										</div>
+
+										{/* Status row: dot + label + timer */}
+										<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}>
+											{recordingState === "recording" && (
+												<div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", flexShrink: 0, animation: "recPulse 1.2s ease-in-out infinite" }} />
+											)}
+											{recordingState === "uploading" && (
+												<div style={{ width: 13, height: 13, border: `2px solid ${T.warm}`, borderTopColor: "transparent", borderRadius: "50%", flexShrink: 0, animation: "recSpin 0.7s linear infinite" }} />
+											)}
+											<span style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
+												{recordingState === "idle" || recordingState === "requesting"
+													? "Starting microphone…"
+													: recordingState === "recording"
+														? `Recording${recordingMode === "text" ? " & Transcribing" : ""}`
+														: recordingMode === "text" ? "Inserting text…" : "Uploading audio…"}
+											</span>
+											{recordingState === "recording" && (
+												<span style={{ fontSize: 13, fontWeight: 700, color: recordingMode === "text" ? "#6366F1" : T.warm, fontVariantNumeric: "tabular-nums", marginLeft: 4 }}>
+													{String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:{String(recordingSeconds % 60).padStart(2, "0")}
+												</span>
+											)}
+										</div>
+
+										{/* Caption */}
+										<p style={{ fontSize: 11, color: T.muted, textAlign: "center", lineHeight: 1.6, marginBottom: recordingMode === "text" ? 14 : 22 }}>
+											{recordingState === "recording"
+												? recordingMode === "text"
+													? "Speak clearly — your words are being transcribed live below."
+													: "Speak clearly into your microphone. Click Done when finished."
+												: recordingState === "uploading"
+													? recordingMode === "text" ? "Inserting your transcript into the editor…" : "Processing and uploading your recording…"
+													: "Requesting microphone access…"}
+										</p>
+
+										{/* Live transcript textarea — text mode only */}
+										{recordingMode === "text" && (
+											<div style={{ width: "100%", marginBottom: 20 }}>
+												<div style={{ fontSize: 11, fontWeight: 600, color: T.muted, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+													<span style={{ width: 6, height: 6, borderRadius: "50%", background: recordingState === "recording" ? "#6366F1" : T.border, display: "inline-block", animation: recordingState === "recording" ? "recPulse 1.5s ease-in-out infinite" : "none" }} />
+													Live transcript
+												</div>
+												<textarea
+													readOnly
+													value={(transcriptFinal + transcriptInterim)}
+													placeholder="Your speech will appear here as you speak…"
+													style={{ width: "100%", minHeight: 110, maxHeight: 200, resize: "vertical", borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg, color: T.accent, fontSize: 13, lineHeight: 1.65, padding: "10px 12px", fontFamily: "inherit", outline: "none", boxSizing: "border-box", overflowY: "auto" }}
+												/>
+												<p style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
+													You can edit the transcript above after clicking Done — it will be inserted as editable text in the editor.
+												</p>
+											</div>
+										)}
+
+										{/* Action buttons */}
+										<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+											<button
+												type="button"
+												onClick={handleRecordingCancel}
+												disabled={recordingState === "uploading"}
+												style={{ padding: "8px 18px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontWeight: 500, fontSize: 13, cursor: recordingState === "uploading" ? "wait" : "pointer" }}
+											>
+												Cancel
+											</button>
+											<button
+												type="button"
+												onClick={handleRecordingDone}
+												disabled={recordingState !== "recording"}
+												style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: recordingState === "recording" ? (recordingMode === "text" ? "#6366F1" : T.warm) : T.border, color: recordingState === "recording" ? "white" : T.muted, fontWeight: 700, fontSize: 13, cursor: recordingState === "recording" ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }}
+											>
+												<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+												{recordingMode === "text" ? "Insert Text" : "Done"}
+											</button>
+										</div>
+									</motion.div>
+								</div>,
+								document.body
+							)}
+
+							{/* Text selection dropdown (Notion-style) */}
+							<AnimatePresence>
 									{selectionDropdown && (
 											<motion.div
 												data-selection-dropdown
@@ -6159,15 +6736,16 @@ export default function DraftPage() {
 
 			{/* ── THEMES MODAL ── full-screen two-panel preview */}
 			<AnimatePresence>
-				{themeDrawerOpen &&
-					(() => {
-						const activeTheme = THEMES[previewTheme];
-						const currentHTML = stripDraftSlashQueryFromHtmlString(
-							editorRef.current?.innerHTML || draft?.body || "",
-						);
-						const themedDoc = activeTheme
-							? buildThemedHTML(currentHTML, activeTheme, draft?.title || "")
-							: "";
+			{themeDrawerOpen &&
+				(() => {
+					const activeTheme = THEMES[previewTheme];
+					const currentHTML = stripDraftSlashQueryFromHtmlString(
+						editorRef.current?.innerHTML || draft?.body || "",
+					);
+					const htmlForPreview = translatedHTML || currentHTML;
+					const themedDoc = activeTheme
+						? buildThemedHTML(htmlForPreview, activeTheme, draft?.title || "")
+						: "";
 						const isCopiedHtml =
 							copiedTheme?.key === previewTheme &&
 							copiedTheme?.format === "html";
@@ -6182,14 +6760,18 @@ export default function DraftPage() {
 									initial={{ opacity: 0 }}
 									animate={{ opacity: 1 }}
 									exit={{ opacity: 0 }}
-									onClick={() => setThemeDrawerOpen(false)}
-									style={{
-										position: "fixed",
-										inset: 0,
-										background: "rgba(0,0,0,0.5)",
-										zIndex: 300,
-										backdropFilter: "blur(4px)",
-									}}
+								onClick={() => {
+									setThemeDrawerOpen(false);
+									setTranslatedHTML("");
+									setTranslationLang("en");
+								}}
+								style={{
+									position: "fixed",
+									inset: 0,
+									background: "rgba(0,0,0,0.5)",
+									zIndex: 300,
+									backdropFilter: "blur(4px)",
+								}}
 								/>
 
 								{/* Centering shell — flexbox positions the modal, pointer-events:none lets backdrop work */}
@@ -6255,153 +6837,219 @@ export default function DraftPage() {
 											<p style={{ fontSize: 12, color: T.muted }}>
 												— pick a theme, then copy HTML or a React embed
 											</p>
-											<div style={{ flex: 1 }} />
+										<div style={{ flex: 1 }} />
 
-											{/* Download HTML */}
+										{/* Export dropdown */}
+										<div
+											ref={themeExportRef}
+											style={{ position: "relative" }}
+										>
 											<motion.button
+												type="button"
 												whileHover={{ background: "#F0ECE5" }}
-												whileTap={{ scale: 0.96 }}
-												onClick={() => {
-													if (!themedDoc) return;
-													const blob = new Blob([themedDoc], {
-														type: "text/html;charset=utf-8",
-													});
-													const a = document.createElement("a");
-													a.href = URL.createObjectURL(blob);
-													a.download = `${(draft?.title || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${activeTheme?.name?.toLowerCase() || "theme"}.html`;
-													a.click();
-													URL.revokeObjectURL(a.href);
-												}}
+												whileTap={{ scale: 0.95 }}
+												onClick={() => setThemeExportOpen((o) => !o)}
 												style={{
 													display: "flex",
 													alignItems: "center",
-													gap: 7,
+													gap: 6,
 													background: T.base,
+													border: `1px solid ${T.border}`,
+													borderRadius: 9,
+													padding: "8px 14px",
+													fontSize: 13,
+													fontWeight: 600,
 													color: T.accent,
-													border: `1px solid ${T.border}`,
-													borderRadius: 9,
-													padding: "8px 16px",
-													fontSize: 13,
-													fontWeight: 600,
 													cursor: "pointer",
 												}}
 											>
-												<svg
-													width={13}
-													height={13}
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth={2}
-													strokeLinecap="round"
-													strokeLinejoin="round"
+												<Icon d={Icons.copy} size={13} stroke={T.accent} />
+												Export — {activeTheme?.name}
+												<span
+													style={{
+														display: "inline-flex",
+														transform: themeExportOpen
+															? "rotate(180deg)"
+															: "none",
+														transition: "transform 0.18s ease",
+													}}
 												>
-													<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-													<polyline points="7 10 12 15 17 10" />
-													<line x1="12" y1="15" x2="12" y2="3" />
-												</svg>
-												Download .html
+													<Icon
+														d={Icons.chevronD}
+														size={14}
+														stroke={T.accent}
+													/>
+												</span>
 											</motion.button>
 
-											{/* Copy HTML — primary CTA */}
-											<motion.button
-												whileHover={{
-													background: isCopiedHtml ? "#2D6A4F" : "#333",
-												}}
-												whileTap={{ scale: 0.96 }}
-												onClick={() => handleCopyThemeHTML(previewTheme)}
-												style={{
-													display: "flex",
-													alignItems: "center",
-													gap: 7,
-													background: isCopiedHtml ? "#2D6A4F" : T.accent,
-													color: "white",
-													border: "none",
-													borderRadius: 9,
-													padding: "8px 18px",
-													fontSize: 13,
-													fontWeight: 600,
-													cursor: "pointer",
-													transition: "background 0.2s",
-												}}
-											>
-												{isCopiedHtml ? (
-													<>
-														<svg
-															width={13}
-															height={13}
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="white"
-															strokeWidth={2.5}
-															strokeLinecap="round"
-															strokeLinejoin="round"
+											<AnimatePresence>
+												{themeExportOpen && (
+													<motion.div
+														initial={{ opacity: 0, y: -6 }}
+														animate={{ opacity: 1, y: 0 }}
+														exit={{ opacity: 0, y: -6 }}
+														transition={{
+															duration: 0.14,
+															ease: [0.16, 1, 0.3, 1],
+														}}
+														style={{
+															position: "absolute",
+															top: "100%",
+															right: 0,
+															marginTop: 6,
+															minWidth: 230,
+															background: T.surface,
+															border: `1px solid ${T.border}`,
+															borderRadius: 10,
+															boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+															padding: 6,
+															zIndex: 400,
+														}}
+													>
+														{/* Download HTML */}
+														<button
+															type="button"
+															onClick={() => {
+																if (!themedDoc) return;
+																const blob = new Blob([themedDoc], {
+																	type: "text/html;charset=utf-8",
+																});
+																const a = document.createElement("a");
+																a.href = URL.createObjectURL(blob);
+																a.download = `${(draft?.title || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${activeTheme?.name?.toLowerCase() || "theme"}.html`;
+																a.click();
+																URL.revokeObjectURL(a.href);
+																setThemeExportOpen(false);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: T.accent,
+																cursor: "pointer",
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
 														>
-															<polyline points="20 6 9 17 4 12" />
-														</svg>
-														HTML copied!
-													</>
-												) : (
-													<>
-														<svg
-															width={13}
-															height={13}
-															viewBox="0 0 24 24"
-															fill="none"
-															stroke="white"
-															strokeWidth={2}
-															strokeLinecap="round"
-															strokeLinejoin="round"
+															<svg
+																width={13}
+																height={13}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2}
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															>
+																<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+																<polyline points="7 10 12 15 17 10" />
+																<line x1="12" y1="15" x2="12" y2="3" />
+															</svg>
+															Download .html
+														</button>
+
+														{/* Copy HTML */}
+														<button
+															type="button"
+															onClick={() => {
+																handleCopyThemeHTML(previewTheme);
+																setThemeExportOpen(false);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: isCopiedHtml
+																	? "rgba(45,106,79,0.1)"
+																	: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: isCopiedHtml ? "#2D6A4F" : T.accent,
+																cursor: "pointer",
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
 														>
-															<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-															<rect
-																x="8"
-																y="2"
-																width="8"
-																height="4"
-																rx="1"
-																ry="1"
+															<Icon
+																d={Icons.copy}
+																size={13}
+																stroke={
+																	isCopiedHtml ? "#2D6A4F" : T.accent
+																}
 															/>
-														</svg>
-														Copy HTML — {activeTheme?.name}
-													</>
-												)}
-											</motion.button>
+															{isCopiedHtml
+																? "HTML copied!"
+																: `Copy HTML — ${activeTheme?.name}`}
+														</button>
 
-											<motion.button
-												whileHover={{
-													background: isCopiedReact ? "#1E3A5F" : T.base,
-												}}
-												whileTap={{ scale: 0.96 }}
-												onClick={() => handleCopyThemeReact(previewTheme)}
-												style={{
-													display: "flex",
-													alignItems: "center",
-													gap: 7,
-													background: isCopiedReact ? "#1E3A5F" : T.base,
-													color: isCopiedReact ? "white" : T.accent,
-													border: `1px solid ${T.border}`,
-													borderRadius: 9,
-													padding: "8px 16px",
-													fontSize: 13,
-													fontWeight: 600,
-													cursor: "pointer",
-													transition: "background 0.2s, color 0.2s",
-												}}
-												title="Copies a React component (iframe embed) you can paste into a Next.js or Vite app"
-											>
-												{isCopiedReact ? (
-													<>React copied!</>
-												) : (
-													<>Copy React — {activeTheme?.name}</>
+														{/* Copy React */}
+														<button
+															type="button"
+															title="Copies a React component (iframe embed) you can paste into a Next.js or Vite app"
+															onClick={() => {
+																handleCopyThemeReact(previewTheme);
+																setThemeExportOpen(false);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: isCopiedReact
+																	? "rgba(30,58,95,0.1)"
+																	: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: isCopiedReact
+																	? "#1E3A5F"
+																	: T.accent,
+																cursor: "pointer",
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<svg
+																width={13}
+																height={13}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2}
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															>
+																<polyline points="16 18 22 12 16 6" />
+																<polyline points="8 6 2 12 8 18" />
+															</svg>
+															{isCopiedReact
+																? "React copied!"
+																: `Copy React — ${activeTheme?.name}`}
+														</button>
+													</motion.div>
 												)}
-											</motion.button>
+											</AnimatePresence>
+										</div>
 
-											{/* Close */}
-											<motion.button
-												whileHover={{ background: "#F0ECE5" }}
-												whileTap={{ scale: 0.93 }}
-												onClick={() => setThemeDrawerOpen(false)}
+										{/* Close */}
+										<motion.button
+											whileHover={{ background: "#F0ECE5" }}
+											whileTap={{ scale: 0.93 }}
+											onClick={() => {
+												setThemeDrawerOpen(false);
+												setTranslatedHTML("");
+												setTranslationLang("en");
+											}}
 												style={{
 													background: "transparent",
 													border: `1px solid ${T.border}`,
@@ -6536,9 +7184,164 @@ export default function DraftPage() {
 														</motion.button>
 													);
 												})}
-											</div>
 
-											{/* Right: iframe live preview */}
+											{/* ─ Language translation section ─ */}
+											<div
+												style={{
+													marginTop: 8,
+													borderTop: `1px solid ${T.border}`,
+													paddingTop: 12,
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: T.muted,
+														textTransform: "uppercase",
+														letterSpacing: "0.08em",
+														marginBottom: 8,
+														paddingLeft: 4,
+													}}
+												>
+													Translate
+												</p>
+												<select
+													value={translationLang}
+													onChange={(e) => setTranslationLang(e.target.value)}
+													style={{
+														width: "100%",
+														background: T.surface,
+														border: `1px solid ${T.border}`,
+														borderRadius: 8,
+														padding: "7px 10px",
+														fontSize: 12,
+														color: T.accent,
+														cursor: "pointer",
+														outline: "none",
+														marginBottom: 8,
+													}}
+												>
+													{TRANSLATION_LANGUAGES.map((l) => (
+														<option key={l.code} value={l.code}>
+															{l.flag} {l.label}
+														</option>
+													))}
+												</select>
+												<motion.button
+													whileTap={{ scale: 0.97 }}
+													onClick={() => handleTranslate(translationLang)}
+													disabled={translating}
+													style={{
+														width: "100%",
+														background: translating
+															? T.border
+															: translationLang === "en"
+																? T.base
+																: T.accent,
+														color: translating
+															? T.muted
+															: translationLang === "en"
+																? T.muted
+																: "white",
+														border: `1px solid ${T.border}`,
+														borderRadius: 8,
+														padding: "8px 0",
+														fontSize: 12,
+														fontWeight: 600,
+														cursor: translating ? "wait" : "pointer",
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "center",
+														gap: 6,
+														transition: "background 0.2s, color 0.2s",
+													}}
+												>
+													{translating ? (
+														<>
+															<svg
+																width={12}
+																height={12}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2.5}
+																strokeLinecap="round"
+																style={{
+																	animation: "spin 1s linear infinite",
+																}}
+															>
+																<path d="M21 12a9 9 0 1 1-6.219-8.56" />
+															</svg>
+															Translating…
+														</>
+													) : translatedHTML ? (
+														<>
+															<svg
+																width={12}
+																height={12}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2.5}
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															>
+																<polyline points="20 6 9 17 4 12" />
+															</svg>
+															Translated
+														</>
+													) : (
+														<>
+															<svg
+																width={12}
+																height={12}
+																viewBox="0 0 24 24"
+																fill="none"
+																stroke="currentColor"
+																strokeWidth={2}
+																strokeLinecap="round"
+																strokeLinejoin="round"
+															>
+																<path d="M5 8l6 6" />
+																<path d="M4 14l6-6 2-3" />
+																<path d="M2 5h12" />
+																<path d="M7 2h1" />
+																<path d="M22 22l-5-10-5 10" />
+																<path d="M14 18h6" />
+															</svg>
+															Translate
+														</>
+													)}
+												</motion.button>
+												{translatedHTML && (
+													<motion.button
+														whileTap={{ scale: 0.97 }}
+														initial={{ opacity: 0, y: 4 }}
+														animate={{ opacity: 1, y: 0 }}
+														onClick={() => {
+															setTranslatedHTML("");
+															setTranslationLang("en");
+														}}
+														style={{
+															width: "100%",
+															marginTop: 6,
+															background: "transparent",
+															border: `1px solid ${T.border}`,
+															borderRadius: 8,
+															padding: "6px 0",
+															fontSize: 11,
+															color: T.muted,
+															cursor: "pointer",
+														}}
+													>
+														Reset to original
+													</motion.button>
+												)}
+											</div>
+										</div>
+
+										{/* Right: iframe live preview */}
 											<div
 												style={{
 													flex: 1,
@@ -6546,10 +7349,10 @@ export default function DraftPage() {
 													background: "#e5e7eb",
 												}}
 											>
-												{themedDoc ? (
-													<iframe
-														key={previewTheme}
-														srcDoc={themedDoc}
+											{themedDoc ? (
+												<iframe
+													key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}`}
+													srcDoc={themedDoc}
 														title={`Preview — ${activeTheme?.name}`}
 														sandbox="allow-same-origin"
 														style={{
