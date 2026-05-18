@@ -272,7 +272,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 							<div
 								style={{
 									fontSize: 11,
-									fontFamily: "'Courier New',monospace",
+									
 									color: cfg.color,
 									textTransform: "",
 									letterSpacing: 2,
@@ -284,7 +284,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 							<div
 								style={{
 									fontSize: 10,
-									fontFamily: "'Courier New',monospace",
+									
 									color: "rgba(255,255,255,0.35)",
 								}}
 							>
@@ -331,7 +331,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 								<span
 									style={{
 										fontSize: 9,
-										fontFamily: "'Courier New',monospace",
+										
 										color: cfg.color,
 										textTransform: "",
 										letterSpacing: 2.5,
@@ -370,7 +370,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 									style={{
 										display: "block",
 										fontSize: 8.5,
-										fontFamily: "'Courier New',monospace",
+										
 										color: "rgba(255,255,255,0.3)",
 										textTransform: "",
 										letterSpacing: 1.8,
@@ -404,7 +404,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 											color: "#dce2f4",
 											fontSize: 11.5,
 											outline: "none",
-											fontFamily: "'Courier New',monospace",
+											
 											transition: "border-color 0.15s",
 										}}
 									/>
@@ -433,7 +433,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 									style={{
 										display: "block",
 										fontSize: 8.5,
-										fontFamily: "'Courier New',monospace",
+										
 										color: "rgba(255,255,255,0.3)",
 										textTransform: "",
 										letterSpacing: 1.8,
@@ -479,7 +479,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 										color: "#dce2f4",
 										fontSize: 11.5,
 										outline: "none",
-										fontFamily: "'Courier New',monospace",
+										
 										lineHeight: 1.6,
 										transition: "border-color 0.15s",
 									}}
@@ -487,7 +487,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 								<div
 									style={{
 										fontSize: 8.5,
-										fontFamily: "'Courier New',monospace",
+										
 										color: "rgba(255,255,255,0.18)",
 										marginTop: 4,
 									}}
@@ -516,7 +516,7 @@ function EdgeSpawnInput({ pending, pan, scale, onConfirm, onCancel }) {
 									cursor: canConfirm ? "pointer" : "default",
 									fontSize: 11.5,
 									fontWeight: 600,
-									fontFamily: "'Courier New',monospace",
+									
 									transition: "all 0.15s",
 									letterSpacing: 0.5,
 								}}
@@ -692,7 +692,7 @@ function NodeCard({
 					<span
 						style={{
 							fontSize: 9,
-							fontFamily: "'Courier New',monospace",
+							
 							color: cfg.color,
 							textTransform: "",
 							letterSpacing: 2.5,
@@ -706,7 +706,7 @@ function NodeCard({
 							style={{
 								marginLeft: "auto",
 								fontSize: 8,
-								fontFamily: "'Courier New',monospace",
+								
 								color: "rgba(255,255,255,0.22)",
 								letterSpacing: 1,
 								border: "1px solid rgba(255,255,255,0.1)",
@@ -722,7 +722,7 @@ function NodeCard({
 							style={{
 								marginLeft: "auto",
 								fontSize: 8,
-								fontFamily: "'Courier New',monospace",
+								
 								color: "rgba(255,255,255,0.22)",
 								letterSpacing: 0.5,
 								border: "1px solid rgba(255,255,255,0.1)",
@@ -756,7 +756,7 @@ function NodeCard({
 						fontSize: 10.5,
 						color: "rgba(255,255,255,0.24)",
 						lineHeight: 1.68,
-						fontFamily: "'Courier New',monospace",
+						
 					}}
 				>
 					{node.content.slice(0, 108)}…
@@ -788,7 +788,7 @@ function NodeCard({
 								fontSize: 9.5,
 								color: C[a]?.color || "#aaa",
 								cursor: "pointer",
-								fontFamily: "'Courier New',monospace",
+								
 								letterSpacing: 0.2,
 								transition: "all 0.1s",
 							}}
@@ -871,7 +871,7 @@ function SidePanel({
 						<span
 							style={{
 								fontSize: 9,
-								fontFamily: "'Courier New',monospace",
+								
 								color: cfg.color,
 								textTransform: "",
 								letterSpacing: 2.5,
@@ -910,7 +910,7 @@ function SidePanel({
 						style={{
 							marginTop: 6,
 							fontSize: 9.5,
-							fontFamily: "'Courier New',monospace",
+							
 							color: "rgba(255,255,255,0.3)",
 							wordBreak: "break-all",
 						}}
@@ -925,7 +925,7 @@ function SidePanel({
 						fontSize: 11.5,
 						color: "rgba(255,255,255,0.4)",
 						lineHeight: 1.9,
-						fontFamily: "'Courier New',monospace",
+						
 						whiteSpace: "pre-wrap",
 					}}
 				>
@@ -941,7 +941,7 @@ function SidePanel({
 				<div
 					style={{
 						fontSize: 8.5,
-						fontFamily: "'Courier New',monospace",
+						
 						color: "rgba(255,255,255,0.2)",
 						textTransform: "",
 						letterSpacing: 2.5,
@@ -963,7 +963,7 @@ function SidePanel({
 								fontSize: 10.5,
 								color: C[a]?.color || "#fff",
 								cursor: "pointer",
-								fontFamily: "'Courier New',monospace",
+								
 								display: "flex",
 								alignItems: "center",
 								gap: 5,
@@ -1004,7 +1004,7 @@ function SidePanel({
 							color: "#dce2f4",
 							fontSize: 11.5,
 							outline: "none",
-							fontFamily: "'Courier New',monospace",
+							
 						}}
 					/>
 					<button
@@ -1450,7 +1450,7 @@ function CanvasTab({ nodes, setNodes, edges, setEdges }) {
 							borderRadius: 8,
 							padding: "6px 16px",
 							fontSize: 10,
-							fontFamily: "'Courier New',monospace",
+							
 							color: "rgba(255,255,255,0.4)",
 							pointerEvents: "none",
 							zIndex: 50,
@@ -1497,7 +1497,7 @@ function CanvasTab({ nodes, setNodes, edges, setEdges }) {
 						<span
 							style={{
 								fontSize: 8.5,
-								fontFamily: "'Courier New',monospace",
+								
 								color: "rgba(255,255,255,0.18)",
 							}}
 						>
@@ -1567,7 +1567,7 @@ function CanvasTab({ nodes, setNodes, edges, setEdges }) {
 							style={{
 								fontSize: 9.5,
 								color: C[selectedNode.type]?.color,
-								fontFamily: "'Courier New',monospace",
+								
 							}}
 						>
 							↳ {selectedNode.title.slice(0, 22)}
@@ -1608,7 +1608,7 @@ function CanvasTab({ nodes, setNodes, edges, setEdges }) {
 							style={{
 								fontSize: 9.5,
 								color: "rgba(255,255,255,0.25)",
-								fontFamily: "'Courier New',monospace",
+								
 							}}
 						>
 							{isPending ? "edge input open" : "no context"}
@@ -1636,7 +1636,7 @@ function CanvasTab({ nodes, setNodes, edges, setEdges }) {
 						color: isPending ? "rgba(255,255,255,0.3)" : "#dce2f4",
 						fontSize: 12.5,
 						outline: "none",
-						fontFamily: "'Courier New',monospace",
+						
 						cursor: isPending ? "not-allowed" : "text",
 					}}
 				/>
@@ -1721,7 +1721,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 				<span
 					style={{
 						fontSize: 8.5,
-						fontFamily: "'Courier New',monospace",
+						
 						color: cfg.color,
 						textTransform: "",
 						letterSpacing: 2.2,
@@ -1740,7 +1740,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 							fontSize: 9,
 							color: "rgba(255,255,255,0.45)",
 							cursor: "pointer",
-							fontFamily: "'Courier New',monospace",
+							
 						}}
 						onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
 						onMouseLeave={(e) =>
@@ -1759,7 +1759,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 							fontSize: 9,
 							color: "rgba(255,255,255,0.45)",
 							cursor: "pointer",
-							fontFamily: "'Courier New',monospace",
+							
 						}}
 						onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
 						onMouseLeave={(e) =>
@@ -1787,7 +1787,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 					fontSize: 10.5,
 					color: "rgba(255,255,255,0.3)",
 					lineHeight: 1.7,
-					fontFamily: "'Courier New',monospace",
+					
 					whiteSpace: "pre-wrap",
 				}}
 			>
@@ -1805,7 +1805,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 				<span
 					style={{
 						fontSize: 8.5,
-						fontFamily: "'Courier New',monospace",
+						
 						color: "rgba(255,255,255,0.18)",
 						alignSelf: "center",
 						letterSpacing: 1,
@@ -1825,7 +1825,7 @@ function ChatAssetCard({ asset, onAction, onSendToCanvas }) {
 							fontSize: 9.5,
 							color: C[a]?.color || "#aaa",
 							cursor: "pointer",
-							fontFamily: "'Courier New',monospace",
+							
 						}}
 						onMouseEnter={(e) =>
 							(e.currentTarget.style.background =
@@ -1882,7 +1882,7 @@ function TypingIndicator({ stage }) {
 			<span
 				style={{
 					fontSize: 10.5,
-					fontFamily: "'Courier New',monospace",
+					
 					color: "rgba(255,255,255,0.3)",
 				}}
 			>
@@ -2046,7 +2046,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 					<div
 						style={{
 							fontSize: 8.5,
-							fontFamily: "'Courier New',monospace",
+							
 							color: "rgba(255,255,255,0.2)",
 							textTransform: "",
 							letterSpacing: 2,
@@ -2069,7 +2069,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 								fontSize: 10.5,
 								color: "rgba(255,255,255,0.35)",
 								cursor: "pointer",
-								fontFamily: "'Courier New',monospace",
+								
 								lineHeight: 1.5,
 								borderRadius: 5,
 								marginBottom: 2,
@@ -2096,7 +2096,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 					<div
 						style={{
 							fontSize: 8.5,
-							fontFamily: "'Courier New',monospace",
+							
 							color: "rgba(255,255,255,0.2)",
 							textTransform: "",
 							letterSpacing: 2,
@@ -2142,7 +2142,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 								style={{
 									fontSize: 10.5,
 									color: "rgba(255,255,255,0.3)",
-									fontFamily: "'Courier New',monospace",
+									
 								}}
 							>
 								{v.label}
@@ -2176,7 +2176,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 							style={{
 								fontSize: 10.5,
 								color: "#ff6b35",
-								fontFamily: "'Courier New',monospace",
+								
 							}}
 						>
 							View canvas ({nodes.length} nodes)
@@ -2217,7 +2217,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 									style={{
 										textAlign: "center",
 										fontSize: 9.5,
-										fontFamily: "'Courier New',monospace",
+										
 										color: "rgba(255,255,255,0.2)",
 										padding: "3px 0",
 									}}
@@ -2231,7 +2231,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 											color: "#ff6b35",
 											cursor: "pointer",
 											fontSize: 9.5,
-											fontFamily: "'Courier New',monospace",
+											
 											marginLeft: 4,
 											textDecoration: "underline",
 										}}
@@ -2256,7 +2256,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 											fontSize: 12.5,
 											color: "rgba(255,255,255,0.75)",
 											lineHeight: 1.6,
-											fontFamily: "'Courier New',monospace",
+											
 										}}
 									>
 										{msg.text}
@@ -2385,7 +2385,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 								color: "#dce2f4",
 								fontSize: 12.5,
 								outline: "none",
-								fontFamily: "'Courier New',monospace",
+								
 								lineHeight: 1.5,
 							}}
 						/>
@@ -2436,7 +2436,7 @@ function ChatTab({ nodes, setNodes, edges, setEdges, onSwitchToCanvas }) {
 									fontSize: 9.5,
 									color: "rgba(255,255,255,0.25)",
 									cursor: "pointer",
-									fontFamily: "'Courier New',monospace",
+									
 								}}
 								onMouseEnter={(e) => {
 									e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
@@ -2543,7 +2543,7 @@ export default function InkgestApp() {
 								fontSize: 11,
 								color: tab === t.id ? "#dce2f4" : "rgba(255,255,255,0.3)",
 								cursor: "pointer",
-								fontFamily: "'Courier New',monospace",
+								
 								letterSpacing: 0.3,
 								transition: "all 0.15s",
 								position: "relative",
@@ -2610,7 +2610,7 @@ export default function InkgestApp() {
 										fontSize: 9.5,
 										color: C[t]?.color || "#fff",
 										cursor: "pointer",
-										fontFamily: "'Courier New',monospace",
+										
 									}}
 								>
 									{C[t]?.icon} {C[t]?.label}
@@ -2624,7 +2624,7 @@ export default function InkgestApp() {
 					<span
 						style={{
 							fontSize: 9,
-							fontFamily: "'Courier New',monospace",
+							
 							color: "rgba(255,255,255,0.15)",
 						}}
 					>

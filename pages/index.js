@@ -8,8 +8,10 @@ import {
 } from "framer-motion";
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
+import { useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../lib/ui/LoginModal";
-import { FREE_CREDIT_LIMIT } from "../lib/utils/credits";
+import GenerateAssetPanel from "../lib/ui/GenerateAssetPanel";
+import { FREE_CREDIT_LIMIT, getUserCredits } from "../lib/utils/credits";
 import { getTheme } from "../lib/utils/theme";
 import { CreditCardIcon, SparkleIcon, XCircleIcon } from "lucide-react";
 import Footer from "../app/components/Footer";
@@ -126,6 +128,21 @@ const AGENT_PROMPT_SUGGESTIONS = [
 		urls: ["https://www.ndtv.com/topic/tech-news"],
 		prompt: "National tech news summary; general audience.",
 	},
+];
+
+const LANDING_FORM_FORMATS = [
+	{ id: "substack", label: "Newsletter", icon: "✉️" },
+	{ id: "linkedin", label: "LinkedIn", icon: "💼" },
+	{ id: "twitter_thread", label: "Thread", icon: "🐦" },
+	{ id: "blog_post", label: "Blog Post", icon: "📝" },
+	{ id: "email_digest", label: "Digest", icon: "📰" },
+];
+
+const LANDING_FORM_STYLES = [
+	{ id: "casual", label: "Casual" },
+	{ id: "professional", label: "Professional" },
+	{ id: "educational", label: "Educational" },
+	{ id: "persuasive", label: "Persuasive" },
 ];
 
 const LANDING_AI_FEATURES = [
@@ -309,6 +326,10 @@ function Nav() {
 /* ── Hero with AI draft form ── */
 function Hero() {
 	const heroRef = useRef(null);
+	const router = useRouter();
+	const queryClient = useQueryClient();
+	const reduxUser = useSelector((state) => state.user?.user ?? null);
+
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
 		offset: ["start start", "end start"],
@@ -316,6 +337,25 @@ function Hero() {
 	const y = useTransform(scrollYProgress, [0, 1], [0, 80]);
 
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
+	const [format, setFormat] = useState("substack");
+	const [style, setStyle] = useState("casual");
+	const [credits, setCredits] = useState(null);
+
+	useEffect(() => {
+		if (!reduxUser) {
+			setCredits(null);
+			return;
+		}
+		getUserCredits(reduxUser.uid)
+			.then(setCredits)
+			.catch((e) => console.error("[landing] credits load failed:", e));
+	}, [reduxUser]);
+
+	const creditRemaining = credits
+		? credits.plan === "pro"
+			? Infinity
+			: Math.max(0, credits.remaining ?? FREE_CREDIT_LIMIT)
+		: FREE_CREDIT_LIMIT;
 
 	const texts = [
 		{ icon: "🔗", text: "Scrape any URL → newsletter in 60 seconds" },
@@ -379,7 +419,7 @@ function Hero() {
 
 			<motion.div
 				style={{ y }}
-				className="relative max-w-5xl mx-auto px-6 text-left"
+				className="relative max-w-7xl mx-auto px-6 text-left"
 			>
 				<a
 					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto mb-4 border border-amber-200 rounded-full flex gap-2 items-center min-h-12 px-4 py-2"
@@ -390,7 +430,7 @@ function Hero() {
 					<SparkleIcon className="w-3 h-3 shrink-0" aria-hidden />
 					We are live on Product Hunt
 				</a>
-		<motion.div className="max-w-5xl mx-auto my-10">
+		<motion.div className="max-w-7xl mx-auto my-10 w-full">
 			{/* Headline — design-tool annotation style */}
 			<motion.div
 				initial={{ opacity: 0, y: 24 }}
@@ -522,23 +562,86 @@ function Hero() {
 				<br />
 				<br />
 			</motion.div>
-				{/* ── DEMO EDITOR UI ── */}
+
+				{/* ── Agentic create form + demo editor ── */}
 				<motion.div
-					initial={{ opacity: 0, y: 32 }}
+					initial={{ opacity: 0, y: 24 }}
 					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.55, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-					style={{
-						border: `1px solid ${T.border}`,
-						borderRadius: 16,
-						overflow: "hidden",
-						boxShadow: "0 24px 80px rgba(0,0,0,0.10)",
-						background: T.surface,
-						display: "flex",
-						flexDirection: "column",
-						height: 560,
-					}}
-					className="max-w-5xl mx-auto ring hover:ring-4 ring-amber-50 transition-all duration-100 ease-in"
+					transition={{ delay: 0.5, duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+					style={{ marginTop: 8, marginBottom: 12 }}
+					className="w-full max-w-7xl mx-auto"
 				>
+					<p
+						style={{
+							textAlign: "center",
+							fontSize: 14,
+							color: T.muted,
+							lineHeight: 1.55,
+							maxWidth: 540,
+							margin: "0 auto 20px",
+							fontFamily: "'Comic', sans-serif",
+						}}
+					>
+						<span
+							style={{
+								fontWeight: 700,
+								color: T.warm,
+								marginRight: 6,
+							}}
+						>
+							New
+						</span>
+						Start from links and a prompt—then open your draft in the editor below.
+						Sign in when you generate; your first runs use free credits.
+					</p>
+					<div
+						className="flex flex-col xl:flex-row gap-10 xl:items-stretch"
+						style={{ width: "100%", alignItems: "stretch" }}
+					>
+						<div
+							className="w-full shrink-0 xl:max-w-md mx-auto xl:mx-0"
+							style={{ maxWidth: 440 }}
+						>
+							<GenerateAssetPanel
+								variant="landing"
+								theme={T}
+								reduxUser={reduxUser}
+								creditRemaining={creditRemaining}
+								queryClient={queryClient}
+								router={router}
+								onLogin={() => setLoginModalOpen(true)}
+								presets={PRESETS}
+								promptSuggestions={AGENT_PROMPT_SUGGESTIONS}
+								showFormatControls
+								format={format}
+								setFormat={setFormat}
+								style={style}
+								setStyle={setStyle}
+								FORMATS={LANDING_FORM_FORMATS}
+								STYLES={LANDING_FORM_STYLES}
+								initialAssetType="agent"
+							/>
+						</div>
+
+						{/* ── DEMO EDITOR UI ── */}
+						<motion.div
+							initial={{ opacity: 0, y: 28 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={{ delay: 0.58, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+							style={{
+								border: `1px solid ${T.border}`,
+								borderRadius: 16,
+								overflow: "hidden",
+								boxShadow: "0 24px 80px rgba(0,0,0,0.10)",
+								background: T.surface,
+								display: "flex",
+								flexDirection: "column",
+								minHeight: 520,
+								flex: 1,
+								minWidth: 0,
+							}}
+							className="max-w-5xl mx-auto w-full ring hover:ring-4 ring-amber-50 transition-all duration-100 ease-in"
+						>
 					{/* Top bar */}
 					<div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", flexShrink: 0 }}>
 						<div style={{ display: "flex", gap: 6 }}>
@@ -650,6 +753,8 @@ function Hero() {
 							</div>
 						</div>
 
+					</div>
+				</motion.div>
 					</div>
 				</motion.div>
 				<motion.p

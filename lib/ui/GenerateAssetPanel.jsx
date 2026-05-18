@@ -10,8 +10,10 @@ import {
 	LayoutTemplate,
 	Code2,
 	File,
+	Sparkles,
 } from "lucide-react";
 import { useGenerateAsset } from "../hooks/useGenerateAsset";
+import { useInkgestAgentAssetGenerate } from "../hooks/useInkgestAgentAssetGenerate";
 import { createDraft } from "../api/userAssets";
 import {
 	GENERATE_PANEL_TYPES,
@@ -35,6 +37,7 @@ const PANEL_TAB_ICONS = {
 	blog: FileText,
 	infographics: BarChart2,
 	newsletter: Mail,
+	agent: Sparkles,
 	table: Table,
 	"landing-page": LayoutTemplate,
 	react: Code2,
@@ -61,10 +64,12 @@ export default function GenerateAssetPanel({
 	setStyle: setStyleProp,
 	FORMATS,
 	STYLES,
+	/** Initial tab — e.g. `"agent"` on marketing hero */
+	initialAssetType = "blog",
 }) {
 	const [urlInputs, setUrlInputs] = useState([""]);
 	const [prompt, setPrompt] = useState("");
-	const [assetType, setAssetType] = useState("blog");
+	const [assetType, setAssetType] = useState(() => initialAssetType);
 	const [internalFormat, setInternalFormat] = useState("substack");
 	const [internalStyle, setInternalStyle] = useState("casual");
 	/** Same URL + prompt + type, repeated API calls (max 5). */
@@ -78,11 +83,14 @@ export default function GenerateAssetPanel({
 	const setFormat = setFormatProp ?? setInternalFormat;
 	const setStyle = setStyleProp ?? setInternalStyle;
 
+	const hookAssetType =
+		assetType === "blank" || assetType === "agent" ? "blog" : assetType;
+
 	const gen = useGenerateAsset({
 		reduxUser,
 		router,
 		queryClient,
-		assetType,
+		assetType: hookAssetType,
 		format,
 		style,
 		urlInputs,
@@ -93,18 +101,32 @@ export default function GenerateAssetPanel({
 		variantCount,
 	});
 
+	const agentGen = useInkgestAgentAssetGenerate({
+		reduxUser,
+		queryClient,
+		router,
+		creditRemaining,
+		onLogin,
+	});
+
 	const showFormatStyle = Boolean(showFormatControls && FORMATS && STYLES);
 
 	const selectedType = useMemo(
 		() =>
 			GENERATE_PANEL_TYPES.find((x) => x.value === assetType) ??
-			GENERATE_PANEL_TYPES[2],
+			GENERATE_PANEL_TYPES.find((x) => x.value === "blog"),
 		[assetType],
 	);
 	const selectedLabel = selectedType.label;
 
 	const isApp = variant === "app";
 	const isBlank = assetType === "blank";
+	const isAgentTab = assetType === "agent";
+
+	function shortUrlChip(u, max = 48) {
+		if (!u || u.length <= max) return u || "";
+		return `${u.slice(0, max - 1)}…`;
+	}
 
 	const handleCreateBlank = useCallback(async () => {
 		setBlankError(null);
@@ -248,7 +270,9 @@ export default function GenerateAssetPanel({
 				>
 					{isBlank
 						? "Give your draft a name, then open it in the editor—saved to your workspace, no AI run required."
-						: `Paste links, add a short brief to create your ${selectedLabel} post`}
+						: isAgentTab
+							? "Paste URLs and instructions together. We detect links, scrape them on run, and the agent decides what to create—same backend as Inkgest Agent."
+							: `Paste links, add a short brief to create your ${selectedLabel} post`}
 				</p>
 			</header>
 
@@ -276,14 +300,16 @@ export default function GenerateAssetPanel({
 								role="tab"
 								aria-selected={active}
 								whileHover={
-									gen.loading || blankCreating ? {} : { scale: 1.02 }
+									gen.loading || blankCreating || agentGen.loading
+										? {}
+										: { scale: 1.02 }
 								}
 								whileTap={{ scale: 0.98 }}
 								onClick={() => {
 									setAssetType(opt.value);
 									if (opt.value !== "blank") setBlankError(null);
 								}}
-								disabled={gen.loading || blankCreating}
+								disabled={gen.loading || blankCreating || agentGen.loading}
 								style={{
 									display: "flex",
 									alignItems: "center",
@@ -296,7 +322,9 @@ export default function GenerateAssetPanel({
 									background: active ? T.surface : "transparent",
 									color: active ? T.accent : T.muted,
 									cursor:
-										gen.loading || blankCreating ? "not-allowed" : "pointer",
+										gen.loading || blankCreating || agentGen.loading
+											? "not-allowed"
+											: "pointer",
 									flexShrink: 0,
 									boxShadow: active
 										? "0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06)"
@@ -364,6 +392,99 @@ export default function GenerateAssetPanel({
 							}}
 						/>
 						
+					</div>
+				) : isAgentTab ? (
+					<div className="flex w-full min-w-0 flex-col gap-3">
+						<label
+							style={{
+								fontSize: 11,
+								fontWeight: 700,
+								textTransform: "",
+								letterSpacing: "0.1em",
+								color: T.muted,
+								fontFamily: "'Comic', sans-serif",
+							}}
+						>
+							Prompt & URLs
+						</label>
+						{agentGen.extractedUrls.length > 0 && (
+							<div
+								style={{
+									display: "flex",
+									flexWrap: "wrap",
+									gap: 8,
+									marginBottom: 2,
+								}}
+							>
+								{agentGen.extractedUrls.map((url) => (
+									<span
+										key={url}
+										style={{
+											display: "inline-flex",
+											alignItems: "center",
+											gap: 6,
+											padding: "6px 10px",
+											borderRadius: 10,
+											background: T.surface,
+											border: `1px solid ${T.border}`,
+											fontSize: 12,
+											color: T.accent,
+											maxWidth: "100%",
+										}}
+									>
+										<span
+											title={url}
+											style={{
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+												maxWidth: 280,
+											}}
+										>
+											{shortUrlChip(url)}
+										</span>
+										<button
+											type="button"
+											disabled={agentGen.loading}
+											onClick={() => agentGen.removeChipUrl(url)}
+											style={{
+												background: "none",
+												border: "none",
+												color: T.muted,
+												cursor: agentGen.loading
+													? "not-allowed"
+													: "pointer",
+												padding: 0,
+												lineHeight: 1,
+												fontSize: 16,
+											}}
+											aria-label={`Remove link ${url}`}
+										>
+											×
+										</button>
+									</span>
+								))}
+							</div>
+						)}
+						<textarea
+							value={agentGen.combinedPrompt}
+							onChange={(e) => agentGen.setCombinedPrompt(e.target.value)}
+							placeholder="Paste one or more https links and say what you want — e.g. turn https://… into a Sunday newsletter for founders…"
+							rows={6}
+							disabled={agentGen.loading}
+							style={{
+								...inputStyle,
+								resize: "vertical",
+								lineHeight: 1.6,
+								minHeight: 140,
+							}}
+							onFocus={(e) => {
+								e.target.style.borderColor = T.warm;
+							}}
+							onBlur={(e) => {
+								e.target.style.borderColor = T.border;
+							}}
+						/>
 					</div>
 				) : (
 					<>
@@ -523,36 +644,71 @@ export default function GenerateAssetPanel({
 						<>
 							<motion.button
 								type="button"
-								whileHover={gen.canSubmit && !gen.loading ? { scale: 1.01 } : {}}
+								whileHover={
+									(isAgentTab
+										? agentGen.canSubmit && !agentGen.loading
+										: gen.canSubmit && !gen.loading)
+										? { scale: 1.01 }
+										: {}
+								}
 								whileTap={{ scale: 0.99 }}
-								onClick={gen.loading ? gen.cancel : gen.handleGenerate}
-								disabled={!gen.loading && !gen.canSubmit}
+								onClick={
+									isAgentTab
+										? agentGen.loading
+											? agentGen.cancel
+											: agentGen.handleGenerate
+										: gen.loading
+											? gen.cancel
+											: gen.handleGenerate
+								}
+								disabled={
+									isAgentTab
+										? !agentGen.loading && !agentGen.canSubmit
+										: !gen.loading && !gen.canSubmit
+								}
 								style={{
 									width: "100%",
 									padding: "15px 20px",
 									borderRadius: 14,
 									border: "none",
 									background:
-									gen.loading || !gen.canSubmit ? T.border : T.accent,
-									color: gen.loading || !gen.canSubmit ? T.muted : "white",
+										(isAgentTab
+											? agentGen.loading || !agentGen.canSubmit
+											: gen.loading || !gen.canSubmit)
+											? T.border
+											: T.accent,
+									color:
+										(isAgentTab
+											? agentGen.loading || !agentGen.canSubmit
+											: gen.loading || !gen.canSubmit)
+											? T.muted
+											: "white",
 									fontWeight: 700,
 									fontSize: 15,
 									cursor:
-										!gen.canSubmit && !gen.loading ? "not-allowed" : "pointer",
+										(isAgentTab
+											? !agentGen.canSubmit && !agentGen.loading
+											: !gen.canSubmit && !gen.loading)
+											? "not-allowed"
+											: "pointer",
 									fontFamily: "'Comic', sans-serif",
 								}}
 							>
-								{gen.loading
-									? "Generating…"
-									: variantCount > 1
-										? `Generate ×${variantCount}`
-										: "Generate"}
+								{isAgentTab
+									? agentGen.loading
+										? "Running agent…"
+										: "Generate"
+									: gen.loading
+										? "Generating…"
+										: variantCount > 1
+											? `Generate ×${variantCount}`
+											: "Generate"}
 							</motion.button>
-							{gen.loading && (
+							{(isAgentTab ? agentGen.loading : gen.loading) && (
 								<motion.button
 									type="button"
 									whileTap={{ scale: 0.98 }}
-									onClick={gen.cancel}
+									onClick={isAgentTab ? agentGen.cancel : gen.cancel}
 									style={{
 										width: "100%",
 										padding: "12px 16px",
@@ -568,6 +724,69 @@ export default function GenerateAssetPanel({
 								>
 									Stop
 								</motion.button>
+							)}
+							{isAgentTab && agentGen.urlProgress.length > 0 && (
+								<div style={{ marginTop: 12 }}>
+									<p
+										style={{
+											fontSize: 11,
+											fontWeight: 700,
+											letterSpacing: "0.08em",
+											color: T.muted,
+											marginBottom: 8,
+										}}
+									>
+										Scrape progress
+									</p>
+									<ul
+										style={{
+											listStyle: "none",
+											margin: 0,
+											padding: 0,
+											display: "flex",
+											flexDirection: "column",
+											gap: 8,
+										}}
+									>
+										{agentGen.urlProgress.map(({ url: u, status }) => (
+											<li
+												key={u}
+												style={{
+													display: "flex",
+													alignItems: "center",
+													gap: 10,
+													fontSize: 12,
+													color:
+														status === "error"
+															? "#DC2626"
+															: T.accent,
+												}}
+											>
+												<span style={{ flexShrink: 0, width: 18 }}>
+													{status === "done"
+														? "✓"
+														: status === "scraping"
+															? "…"
+															: status === "error"
+																? "✕"
+																: status === "skipped"
+																	? "–"
+																	: "○"}
+												</span>
+												<span
+													style={{
+														overflow: "hidden",
+														textOverflow: "ellipsis",
+														whiteSpace: "nowrap",
+													}}
+													title={u}
+												>
+													{shortUrlChip(u, 72)}
+												</span>
+											</li>
+										))}
+									</ul>
+								</div>
 							)}
 						</>
 					)}
@@ -593,7 +812,7 @@ export default function GenerateAssetPanel({
 				</motion.div>
 			)}
 
-			{gen.error && (
+			{(isAgentTab ? agentGen.error : gen.error) && (
 				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
@@ -608,15 +827,19 @@ export default function GenerateAssetPanel({
 						fontFamily: "'Comic', sans-serif",
 					}}
 				>
-					{gen.error}
+					{isAgentTab ? agentGen.error : gen.error}
 				</motion.div>
 			)}
 
 			{!isBlank &&
-				(gen.loading ||
-					gen.streamed ||
-					gen.completedTasks.length > 0 ||
-					(Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1)) && (
+				(isAgentTab
+					? agentGen.loading ||
+						Boolean(agentGen.streamedPreview) ||
+						agentGen.completedTasks.length > 0
+					: gen.loading ||
+						gen.streamed ||
+						gen.completedTasks.length > 0 ||
+						(Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1)) && (
 				<motion.div
 					initial={{ opacity: 0, y: 6 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -642,7 +865,7 @@ export default function GenerateAssetPanel({
 					>
 						<span style={{ color: T.warm }}>✦</span> Output
 					</p>
-					{gen.lastRunPrompt && (
+					{(isAgentTab ? agentGen.lastRunSnippet : gen.lastRunPrompt) && (
 						<p
 							style={{
 								fontSize: 12,
@@ -651,14 +874,24 @@ export default function GenerateAssetPanel({
 							}}
 						>
 							<strong style={{ color: T.accent }}>{selectedLabel}</strong>
-							{gen.lastRunType ? ` · ${gen.lastRunType}` : ""}
-							{gen.lastRunPrompt
-								? ` — “${gen.lastRunPrompt.slice(0, 120)}${gen.lastRunPrompt.length > 120 ? "…" : ""}”`
+							{isAgentTab
+								? " · agent"
+								: gen.lastRunType
+									? ` · ${gen.lastRunType}`
+									: ""}
+							{(isAgentTab ? agentGen.lastRunSnippet : gen.lastRunPrompt)
+								? ` — “${(
+										isAgentTab
+											? agentGen.lastRunSnippet
+											: gen.lastRunPrompt
+									).slice(0, 120)}${(isAgentTab ? agentGen.lastRunSnippet : gen.lastRunPrompt).length > 120 ? "…" : ""}”`
 								: ""}
 						</p>
 					)}
 
-					{Array.isArray(gen.slotOutputs) && gen.slotOutputs.length > 1 ? (
+					{!isAgentTab &&
+					Array.isArray(gen.slotOutputs) &&
+					gen.slotOutputs.length > 1 ? (
 						<div
 							style={{
 								display: "flex",
@@ -799,12 +1032,17 @@ export default function GenerateAssetPanel({
 						</div>
 					) : (
 						<>
-							{gen.loading && !gen.streamed && (
+							{(isAgentTab ? agentGen.loading : gen.loading) &&
+								!(isAgentTab
+									? agentGen.streamedPreview
+									: gen.streamed) && (
 								<p style={{ fontSize: 13, color: T.muted }}>
-									Working on your blog/newsletter...
+									{isAgentTab
+										? "Running agent and scraping sources…"
+										: "Working on your blog/newsletter..."}
 								</p>
 							)}
-							{gen.streamed && (
+							{(isAgentTab ? agentGen.streamedPreview : gen.streamed) && (
 								<pre
 									style={{
 										fontSize: 12,
@@ -822,10 +1060,13 @@ export default function GenerateAssetPanel({
 										fontFamily: "ui-monospace, monospace",
 									}}
 								>
-									{gen.streamed}
+									{isAgentTab ? agentGen.streamedPreview : gen.streamed}
 								</pre>
 							)}
-							{gen.completedTasks.length > 0 && (
+							{(isAgentTab
+								? agentGen.completedTasks
+								: gen.completedTasks
+							).length > 0 && (
 								<div style={{ marginTop: 14 }}>
 									<p
 										style={{
@@ -838,9 +1079,16 @@ export default function GenerateAssetPanel({
 										Open in editor
 									</p>
 									<div
-										style={{ display: "flex", flexDirection: "column", gap: 8 }}
+										style={{
+											display: "flex",
+											flexDirection: "column",
+											gap: 8,
+										}}
 									>
-										{gen.completedTasks.map((t, i) => (
+										{(isAgentTab
+											? agentGen.completedTasks
+											: gen.completedTasks
+										).map((t, i) => (
 											<motion.a
 												key={`${t.id}-${i}`}
 												href={t.path}

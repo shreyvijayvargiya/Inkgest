@@ -2,11 +2,18 @@
  * Public blog page — /p/[slug]
  * Renders a published Inkgest blog post with full SEO meta tags.
  * Uses getServerSideProps for SSR (SEO-friendly) + React Query for client-side refresh.
+ * Optional `?theme=<id>` applies an export theme to the body (client-rendered iframe).
  */
 import Head from "next/head";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
+import {
+	THEMES,
+	buildThemedHTML,
+	resolvePublicThemeId,
+} from "../../lib/blogExportThemes";
 import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds";
 
 /* ── Fetch helper ── */
@@ -34,7 +41,20 @@ export async function getServerSideProps(ctx) {
 		if (!res.ok) return { notFound: true };
 		const data = await res.json();
 		const body = normalizeYoutubeEmbedsInHtml(data.body || "");
-		return { props: { initialData: { ...data, body }, slug } };
+		const rawTheme =
+			typeof ctx.query?.theme === "string"
+				? ctx.query.theme
+				: Array.isArray(ctx.query?.theme)
+					? ctx.query.theme[0]
+					: "";
+		const initialResolvedTheme = resolvePublicThemeId(rawTheme);
+		return {
+			props: {
+				initialData: { ...data, body },
+				slug,
+				initialResolvedTheme,
+			},
+		};
 	} catch {
 		return { notFound: true };
 	}
@@ -73,9 +93,22 @@ const PAGE_STYLE = `
 	details[data-block="draft-toggle"] summary { list-style: none; cursor: pointer; }
 `;
 
-export default function PublicBlogPage({ initialData, slug }) {
+export default function PublicBlogPage({ initialData, slug, initialResolvedTheme = null }) {
 	const router = useRouter();
 	const currentSlug = router.query.slug || slug;
+	const [clientReady, setClientReady] = useState(false);
+	const [themedSrcDoc, setThemedSrcDoc] = useState("");
+
+	useEffect(() => {
+		setClientReady(true);
+	}, []);
+
+	const themeKey = useMemo(() => {
+		if (!router.isReady) return initialResolvedTheme;
+		const q = router.query?.theme;
+		const raw = typeof q === "string" ? q : Array.isArray(q) ? q[0] : "";
+		return resolvePublicThemeId(raw);
+	}, [router.isReady, router.query?.theme, initialResolvedTheme]);
 
 	const { data, isLoading, isError } = useQuery({
 		queryKey: ["public-blog", currentSlug],
@@ -84,6 +117,30 @@ export default function PublicBlogPage({ initialData, slug }) {
 		staleTime: 60 * 1000,
 		retry: false,
 	});
+
+	const { title, description, body, publishedAt, updatedAt } = data || {};
+	const safeBody = normalizeYoutubeEmbedsInHtml(body || "");
+
+	useEffect(() => {
+		if (!clientReady || !themeKey || !data) {
+			setThemedSrcDoc("");
+			return;
+		}
+		const theme = THEMES[themeKey];
+		if (!theme) {
+			setThemedSrcDoc("");
+			return;
+		}
+		try {
+			setThemedSrcDoc(
+				buildThemedHTML(safeBody, theme, title || ""),
+			);
+		} catch {
+			setThemedSrcDoc("");
+		}
+	}, [clientReady, themeKey, data, safeBody, title]);
+
+	const showThemedBody = Boolean(clientReady && themeKey && themedSrcDoc);
 
 	const canonicalUrl =
 		typeof window !== "undefined"
@@ -124,8 +181,6 @@ export default function PublicBlogPage({ initialData, slug }) {
 		);
 	}
 
-	const { title, description, body, publishedAt, updatedAt } = data;
-	const safeBody = normalizeYoutubeEmbedsInHtml(body || "");
 	const publishDate = publishedAt
 		? new Date(publishedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 		: null;
@@ -214,15 +269,62 @@ export default function PublicBlogPage({ initialData, slug }) {
 							<span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "#3D7A35", background: "#EFF6EE", padding: "2px 8px", borderRadius: 100 }}>
 								🌐 Published
 							</span>
+							{themeKey && THEMES[themeKey] ? (
+								<span
+									title={`Export theme: ${THEMES[themeKey].name}`}
+									style={{
+										display: "inline-flex",
+										alignItems: "center",
+										gap: 4,
+										fontSize: 11,
+										fontWeight: 600,
+										color: "#6B21A8",
+										background: "#F3E8FF",
+										padding: "2px 8px",
+										borderRadius: 100,
+									}}
+								>
+									✨ Theme: {THEMES[themeKey].name}
+								</span>
+							) : null}
 						</div>
 						<div style={{ height: 1, background: "#E7E2DA", marginTop: 24 }} />
 					</header>
 
-					{/* Body content */}
-					<article
-						className="ink-prose"
-						dangerouslySetInnerHTML={{ __html: safeBody }}
-					/>
+					{showThemedBody ? (
+						<div
+							style={{
+								borderRadius: 12,
+								overflow: "hidden",
+								boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+								minHeight: 480,
+								background: "#fff",
+								border: "1px solid #E7E2DA",
+							}}
+						>
+							<iframe
+								title={`Post — ${THEMES[themeKey]?.name || themeKey}`}
+								srcDoc={themedSrcDoc}
+								sandbox="allow-scripts allow-same-origin"
+								style={{
+									width: "100%",
+									minHeight: "calc(100vh - 260px)",
+									border: "none",
+									display: "block",
+								}}
+							/>
+						</div>
+					) : themeKey && clientReady && data ? (
+						<p style={{ fontSize: 14, color: "#A8A29E", textAlign: "center", padding: "48px 16px" }}>
+							Applying theme preview…
+						</p>
+					) : (
+						<article
+							className="ink-prose"
+							dangerouslySetInnerHTML={{ __html: safeBody }}
+							suppressHydrationWarning
+						/>
+					)}
 
 					{/* Footer */}
 					<footer style={{ marginTop: 64, paddingTop: 24, borderTop: "1px solid #E7E2DA", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
