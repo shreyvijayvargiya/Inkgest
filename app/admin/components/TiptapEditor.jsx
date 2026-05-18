@@ -44,6 +44,8 @@ import {
 	ChevronDown,
 	Type,
 	Youtube as YoutubeIcon,
+	BarChart3,
+	Workflow,
 	ChevronRight,
 	Table as TableIcon,
 	LayoutGrid,
@@ -67,6 +69,11 @@ import {
 	TiptapInkHighlight,
 	TiptapInkTextFgExtension,
 } from "../../../lib/ui/TiptapInkEditorExtensions";
+import { InkInfographicIframe } from "../../../lib/ui/TiptapInkInfographicIframe";
+import { InkMermaidBlock } from "../../../lib/ui/TiptapInkMermaid";
+import InfographicInlineGeneratePanel from "../../../lib/ui/InfographicInlineGeneratePanel";
+import MermaidInlineGeneratePanel from "../../../lib/ui/MermaidInlineGeneratePanel";
+import { infographicSpecToSrcDoc } from "../../../lib/ui/infographicInsertion";
 
 /** Keyboard shortcuts when the cursor is inside a TipTap table (header row/column/cell). */
 const TiptapTableHeaderShortcuts = Extension.create({
@@ -295,6 +302,10 @@ const TiptapEditor = ({
 	onImageUpload,
 	showPreview,
 	onPreview,
+	/** Passed to infographic agent as title grounding (optional). */
+	infographicContextTitle = "",
+	/** Optional Firebase uid; falls back to auth.currentUser. */
+	infographicUserId = "",
 }) => {
 	const fileInputRef = useRef(null);
 	const [linkDropdownOpen, setLinkDropdownOpen] = useState(false);
@@ -311,6 +322,10 @@ const TiptapEditor = ({
 	const menuDropdownRef = useRef(null);
 	const textTypeDropdownRef = useRef(null);
 	const youtubeInputRef = useRef(null);
+	const infographicPanelRef = useRef(null);
+	const [infographicPanelOpen, setInfographicPanelOpen] = useState(false);
+	const mermaidPanelRef = useRef(null);
+	const [mermaidPanelOpen, setMermaidPanelOpen] = useState(false);
 	// Track if update is from editor itself (internal) vs external prop change
 	const isInternalUpdateRef = useRef(false);
 	const lastContentRef = useRef("");
@@ -384,6 +399,8 @@ const TiptapEditor = ({
 				controls: true,
 				nocookie: false,
 			}),
+			InkInfographicIframe,
+			InkMermaidBlock,
 			Details.configure({
 				persist: true,
 				HTMLAttributes: {
@@ -722,6 +739,40 @@ const TiptapEditor = ({
 		toast.success("YouTube video inserted!");
 	}, [editor, youtubeUrl]);
 
+	const insertInfographicFromSpec = useCallback(
+		(spec) => {
+			if (!editor) return;
+			const caption = String(spec.title || spec.type || "Infographic").slice(
+				0,
+				140,
+			);
+			const srcDoc = infographicSpecToSrcDoc(spec);
+			editor
+				.chain()
+				.focus()
+				.insertInkInfographicIframe({ srcDoc, caption })
+				.run();
+			setInfographicPanelOpen(false);
+		},
+		[editor],
+	);
+
+	const insertMermaidFromPayload = useCallback(
+		(payload) => {
+			if (!editor) return;
+			editor
+				.chain()
+				.focus()
+				.insertInkMermaidBlock({
+					code: payload.code || "",
+					caption: String(payload.title || "").slice(0, 500),
+				})
+				.run();
+			setMermaidPanelOpen(false);
+		},
+		[editor],
+	);
+
 	// Handle click outside for dropdowns
 	React.useEffect(() => {
 		const handleClickOutside = (event) => {
@@ -749,6 +800,18 @@ const TiptapEditor = ({
 			) {
 				setTextTypeDropdownOpen(false);
 			}
+			if (
+				infographicPanelRef.current &&
+				!infographicPanelRef.current.contains(event.target)
+			) {
+				setInfographicPanelOpen(false);
+			}
+			if (
+				mermaidPanelRef.current &&
+				!mermaidPanelRef.current.contains(event.target)
+			) {
+				setMermaidPanelOpen(false);
+			}
 		};
 
 		document.addEventListener("mousedown", handleClickOutside);
@@ -761,20 +824,7 @@ const TiptapEditor = ({
 
 	return (
 		<div className="border border-zinc-300 rounded-xl overflow-hidden flex flex-col h-full">
-			<style
-				dangerouslySetInnerHTML={{
-					__html: `
-				.ink-notion-editor .ink-tip-fg--red { color: #ef4444 !important; }
-				.ink-notion-editor .ink-tip-fg--orange { color: #f97316 !important; }
-				.ink-notion-editor .ink-tip-fg--yellow { color: #eab308 !important; }
-				.ink-notion-editor .ink-tip-fg--green { color: #22c55e !important; }
-				.ink-notion-editor .ink-tip-fg--blue { color: #3b82f6 !important; }
-				.ink-notion-editor .ink-tip-fg--purple { color: #a855f7 !important; }
-				.ink-notion-editor .ink-tip-fg--pink { color: #ec4899 !important; }
-				.ink-notion-editor .ink-tip-fg--gray { color: #6b7280 !important; }
-			`,
-				}}
-			/>
+			
 			{/* Editor Toolbar */}
 			<div className="border-b border-zinc-200 bg-zinc-50 px-3 py-1.5 flex items-center gap-1 sticky top-0 z-10 flex-shrink-0">
 				<motion.button
@@ -1263,6 +1313,8 @@ const TiptapEditor = ({
 									nodeType === "codeBlock" ||
 									nodeType === "codeGroup" ||
 									nodeType === "youtube" ||
+									nodeType === "inkInfographicIframe" ||
+									nodeType === "inkMermaidBlock" ||
 									nodeType === "table" ||
 									nodeType === "tabGroup" ||
 									nodeType === "details" ||
@@ -1310,6 +1362,8 @@ const TiptapEditor = ({
 														nodeAtPos.type.name === "codeBlock" ||
 														nodeAtPos.type.name === "codeGroup" ||
 														nodeAtPos.type.name === "youtube" ||
+														nodeAtPos.type.name === "inkInfographicIframe" ||
+														nodeAtPos.type.name === "inkMermaidBlock" ||
 														nodeAtPos.type.name === "table" ||
 														nodeAtPos.type.name === "tabGroup" ||
 														nodeAtPos.type.name === "details" ||
@@ -1347,6 +1401,8 @@ const TiptapEditor = ({
 								selectedNodeTypes.has("codeBlock") ||
 								selectedNodeTypes.has("codeGroup") ||
 								selectedNodeTypes.has("youtube") ||
+								selectedNodeTypes.has("inkInfographicIframe") ||
+								selectedNodeTypes.has("inkMermaidBlock") ||
 								selectedNodeTypes.has("table") ||
 								selectedNodeTypes.has("tabGroup") ||
 								selectedNodeTypes.has("details") ||
@@ -1502,6 +1558,108 @@ const TiptapEditor = ({
 										</motion.div>
 									)}
 								</AnimatePresence>
+							</div>
+
+							{/* Infographics */}
+							<div className="relative z-[160]" ref={infographicPanelRef}>
+								<button
+									type="button"
+									onMouseDown={(e) => e.preventDefault()}
+									onClick={() => setInfographicPanelOpen((o) => !o)}
+									className={`p-2 rounded transition-colors ${
+										infographicPanelOpen
+											? "bg-amber-100 text-amber-900"
+											: "hover:bg-zinc-100 text-zinc-700"
+									}`}
+									title="Infographics from selection"
+								>
+									<BarChart3 className="w-3 h-3" />
+								</button>
+								{infographicPanelOpen && editor ? (
+									<div
+										className="absolute top-full mt-2 left-0 rounded-xl bg-white border border-zinc-200 shadow-2xl p-3 max-w-[calc(100vw-24px)] w-[340px] z-[200]"
+										onMouseDown={(e) => e.preventDefault()}
+									>
+										<InfographicInlineGeneratePanel
+											userId={
+												infographicUserId?.trim()
+													? infographicUserId
+													: undefined
+											}
+											sourceText={(() => {
+												const sel = editor.state.selection;
+												const a = sel.from;
+												const b = sel.to;
+												return editor.state.doc
+													.textBetween(
+														Math.min(a, b),
+														Math.max(a, b),
+														"\n",
+													)
+													.trim();
+											})()}
+											draftTitle={
+												infographicContextTitle?.trim() ||
+												"Untitled draft"
+											}
+											onInsertSpec={insertInfographicFromSpec}
+											requestClose={() =>
+												setInfographicPanelOpen(false)
+											}
+										/>
+									</div>
+								) : null}
+							</div>
+
+							{/* Mermaid (prompt-only) */}
+							<div className="relative z-[160]" ref={mermaidPanelRef}>
+								<button
+									type="button"
+									onMouseDown={(e) => e.preventDefault()}
+									onClick={() => setMermaidPanelOpen((o) => !o)}
+									className={`p-2 rounded transition-colors ${
+										mermaidPanelOpen
+											? "bg-violet-100 text-violet-900"
+											: "hover:bg-zinc-100 text-zinc-700"
+									}`}
+									title="Mermaid diagram from selection"
+								>
+									<Workflow className="w-3 h-3" />
+								</button>
+								{mermaidPanelOpen && editor ? (
+									<div
+										className="absolute top-full mt-2 left-0 rounded-xl bg-white border border-zinc-200 shadow-2xl p-3 max-w-[calc(100vw-24px)] w-[340px] z-[200]"
+										onMouseDown={(e) => e.preventDefault()}
+									>
+										<MermaidInlineGeneratePanel
+											userId={
+												infographicUserId?.trim()
+													? infographicUserId
+													: undefined
+											}
+											sourceText={(() => {
+												const sel = editor.state.selection;
+												const a = sel.from;
+												const b = sel.to;
+												return editor.state.doc
+													.textBetween(
+														Math.min(a, b),
+														Math.max(a, b),
+														"\n",
+													)
+													.trim();
+											})()}
+											draftTitle={
+												infographicContextTitle?.trim() ||
+												"Untitled draft"
+											}
+											onInsert={insertMermaidFromPayload}
+											requestClose={() =>
+												setMermaidPanelOpen(false)
+											}
+										/>
+									</div>
+								) : null}
 							</div>
 
 							{/* Color Dropdown */}

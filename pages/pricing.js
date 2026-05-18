@@ -34,7 +34,7 @@ const T = {
 	warm: "#C17B2F",
 	muted: "#7A7570",
 	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
+	sidebar: "#FFFFFF",
 };
 
 const PricingPage = () => {

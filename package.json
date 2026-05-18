@@ -59,6 +59,7 @@
 		"jspdf": "^3.0.4",
 		"leaflet": "^1.9.4",
 		"lucide-react": "^0.474.0",
+		"mermaid": "11",
 		"next": "^15.1.7",
 		"postcss": "^8.5.1",
 		"posthog-js": "^1.321.2",

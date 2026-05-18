@@ -510,3 +510,9 @@
 	from { transform: rotate(0deg); }
 	to   { transform: rotate(360deg); }
 }
+
+
+.ink-themed-post-root > div {
+	padding-left: 0 !important;
+	padding-right: 0 !important;
+  }

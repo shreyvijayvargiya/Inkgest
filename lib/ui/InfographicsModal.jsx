@@ -23,45 +23,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { assetRef } from "../api/userAssets";
-import {
-	INKGEST_AGENT_URL,
-	inkgestAgentRequestHeaders,
-} from "../config/agent";
-import { deductCredits } from "../api/deductCredits";
-
-/* ─── Builds a fully self-contained HTML file from a card's rendered DOM ─── */
-function wrapStandaloneHTML(innerHTML, igType = "") {
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Infographic — ${igType}</title>
-<link href="https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Comic', sans-serif;
-    background: #ffffff;
-    -webkit-font-smoothing: antialiased;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 40px 24px;
-  }
-  .ig-root { width: 100%; max-width: 520px; }
-  /* Restore framer-motion inline transforms to static */
-  [style*="transform"] { transform: none !important; }
-</style>
-</head>
-<body>
-<div class="ig-root">
-${innerHTML}
-</div>
-</body>
-</html>`;
-}
+import { fetchInfographicsFromAgent } from "../api/infographicsAgentClient";
+import { buildStandaloneIframeSrcDoc } from "../utils/standaloneInfographicDoc";
 
 /* ── App light tokens (modal chrome) ── */
 const T = {
@@ -1352,20 +1315,17 @@ export default function InfographicsModal({
 			}
 
 			try {
-				const res = await fetch(INKGEST_AGENT_URL, {
-					method: "POST",
-					headers: inkgestAgentRequestHeaders(userId),
-					body: JSON.stringify({ content, title, idToken, excludeTypes }),
-				});
 				clearInterval(stepTimer.current);
 
-				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || "Generation failed");
+				const { infographics: newBatch } = await fetchInfographicsFromAgent({
+					userId,
+					idToken,
+					htmlOrTextContent: content,
+					title,
+					excludeTypes,
+					visualFormatId: null,
+				});
 
-				const newBatch = data.infographics || [];
-				if (newBatch.length > 0) {
-					deductCredits(idToken, 1);
-				}
 				if (isMore) {
 					setBatches((prev) => [...prev, newBatch]);
 				} else {
@@ -1416,7 +1376,10 @@ export default function InfographicsModal({
 		const el = document.getElementById(`ig-content-${globalIdx}`);
 		const ig = batches[bIdx]?.[iIdx];
 		if (!el || !ig) return;
-		const html = wrapStandaloneHTML(el.innerHTML, ig.type.replace(/_/g, " "));
+		const html = buildStandaloneIframeSrcDoc(
+			el.innerHTML,
+			ig.type.replace(/_/g, " "),
+		);
 		navigator.clipboard.writeText(html).catch(() => {});
 		const key = `${bIdx}-${iIdx}`;
 		setCopiedHtml(key);

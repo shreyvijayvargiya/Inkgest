@@ -4,6 +4,7 @@
  */
 
 import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDownIcon } from "lucide-react";
 
 export const CHAT_MODE_ASK = "ask";
 export const CHAT_MODE_AGENT = "agent";
@@ -12,37 +13,17 @@ export const CHAT_MODE_OPTIONS = [
 	{
 		id: CHAT_MODE_ASK,
 		label: "Ask",
-		sub: "Chat & edit help",
+		sub: "Chat help",
 		dot: "#7A7570",
 	},
 	{
 		id: CHAT_MODE_AGENT,
 		label: "Agent",
-		sub: "Search drafts · create with approval",
+		sub: "AI can edit the content",
 		dot: "#C17B2F",
 	},
 ];
 
-const IcChevron = ({ open }) => (
-	<motion.span
-		animate={{ rotate: open ? 180 : 0 }}
-		transition={{ duration: 0.18 }}
-		style={{ display: "flex" }}
-	>
-		<svg
-			width={11}
-			height={11}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="#7A7570"
-			strokeWidth={2}
-			strokeLinecap="round"
-			strokeLinejoin="round"
-		>
-			<path d="M6 9l6 6 6-6" />
-		</svg>
-	</motion.span>
-);
 
 export function AIChatSidebarAgentBar({
 	mode,
@@ -62,33 +43,11 @@ export function AIChatSidebarAgentBar({
 				whileHover={disabled ? {} : { background: "#F0ECE5" }}
 				whileTap={disabled ? {} : { scale: 0.95 }}
 				title="Chat mode"
-				style={{
-					display: "flex",
-					alignItems: "center",
-					gap: 4,
-					background: modeOpen ? "#F0ECE5" : "#F7F5F0",
-					border: "1px solid #E8E4DC",
-					borderRadius: 7,
-					padding: "4px 8px",
-					fontSize: 11,
-					fontWeight: 600,
-					color: "#5A5550",
-					cursor: disabled ? "not-allowed" : "pointer",
-					opacity: disabled ? 0.55 : 1,
-					transition: "all 0.14s",
-				}}
+				className="flex items-center gap-2 p-1 rounded bg-zinc-50 text-xs font-medium"
 			>
-				<span
-					style={{
-						width: 6,
-						height: 6,
-						borderRadius: "50%",
-						background: current.dot,
-						flexShrink: 0,
-					}}
-				/>
+				<span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
 				{current.label}
-				<IcChevron open={modeOpen} />
+				<ChevronDownIcon className="w-3 h-3 text-zinc-500" />
 			</motion.button>
 
 			<AnimatePresence>
@@ -101,7 +60,7 @@ export function AIChatSidebarAgentBar({
 						style={{
 							position: "absolute",
 							bottom: "calc(100% + 6px)",
-							right: 0,
+							left: 0,
 							background: "#FFFFFF",
 							border: "1px solid #E8E4DC",
 							borderRadius: 12,
@@ -121,22 +80,22 @@ export function AIChatSidebarAgentBar({
 									onModeOpenChange(false);
 								}}
 								whileHover={{ background: "#F7F5F0" }}
-								style={{
-									width: "100%",
-									display: "flex",
-									alignItems: "center",
-									gap: 10,
-									background: mode === o.id ? "#F7F5F0" : "#FFFFFF",
-									border: "none",
-									borderBottom:
-										i < CHAT_MODE_OPTIONS.length - 1
-											? "1px solid #F0ECE5"
-											: "none",
-									padding: "10px 13px",
-									cursor: "pointer",
-									textAlign: "left",
-									transition: "background 0.12s",
-								}}
+									style={{
+										width: "100%",
+										display: "flex",
+										alignItems: "center",
+										gap: 10,
+										background: mode === o.id ? "#F7F5F0" : "#FFFFFF",
+										border: "none",
+										borderBottom:
+											i < CHAT_MODE_OPTIONS.length - 1
+												? "1px solid #F0ECE5"
+												: "none",
+										padding: "10px 13px",
+										cursor: "pointer",
+										textAlign: "left",
+										transition: "background 0.12s",
+									}}
 							>
 								<span
 									style={{
@@ -149,22 +108,12 @@ export function AIChatSidebarAgentBar({
 								/>
 								<div style={{ flex: 1 }}>
 									<p
-										style={{
-											fontSize: 12,
-											fontWeight: 700,
-											color: "#1A1A1A",
-											margin: 0,
-											lineHeight: 1.2,
-										}}
+									className="text-xs font-medium"
 									>
 										{o.label}
 									</p>
 									<p
-										style={{
-											fontSize: 10.5,
-											color: "#A8A29C",
-											margin: 0,
-										}}
+									className="text-xs text-zinc-500"
 									>
 										{o.sub}
 									</p>

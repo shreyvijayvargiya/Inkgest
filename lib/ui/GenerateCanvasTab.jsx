@@ -22,6 +22,7 @@ import {
 	saveCanvasEdges,
 } from "../api/canvasProjects";
 import { regenerateAsset } from "../utils/regenerateAsset";
+import MotionSelect from "./MotionSelect";
 
 const NW = 280;
 const NH = 188;
@@ -1966,10 +1967,17 @@ export default function GenerateCanvasTab({
 						>
 							PROJECT
 						</span>
-						<select
+						<MotionSelect
 							value={activeProjectId || ""}
-							onChange={(e) => persistActiveProject(e.target.value)}
-							style={{
+							onChange={(id) => persistActiveProject(id)}
+							placeholder="Select project…"
+							options={projects.map((p) => ({
+								value: p.id,
+								label: `${p.name} (${(p.assetIds || []).length})`,
+							}))}
+							alignMenu="left"
+							style={{ maxWidth: 220 }}
+							triggerStyle={{
 								background: T.base,
 								border: `1px solid ${T.border}`,
 								borderRadius: 8,
@@ -1978,13 +1986,12 @@ export default function GenerateCanvasTab({
 								color: T.accent,
 								maxWidth: 220,
 							}}
-						>
-							{projects.map((p) => (
-								<option key={p.id} value={p.id}>
-									{p.name} ({(p.assetIds || []).length})
-								</option>
-							))}
-						</select>
+							menuStyle={{
+								background: T.surface,
+								border: `1px solid ${T.border}`,
+							}}
+							optionStyle={{ fontSize: 11 }}
+						/>
 						<button
 							type="button"
 							onClick={handleNewProject}

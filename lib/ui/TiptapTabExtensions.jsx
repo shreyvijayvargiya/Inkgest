@@ -185,7 +185,16 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 						);
 					})}
 				</div>
-				<div className="relative flex items-center pr-1 pl-0.5" ref={menuRef}>
+				<div className="relative flex items-center shrink-0 pr-1 gap-0.5" ref={menuRef}>
+					<button
+						type="button"
+						className="p-1.5 rounded-xl text-zinc-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+						title="Remove tab group"
+						onMouseDown={(e) => e.preventDefault()}
+						onClick={() => deleteGroup()}
+					>
+						<Trash2 className="w-3.5 h-3.5" />
+					</button>
 					<button
 						type="button"
 						className="p-1.5 rounded-xl text-zinc-600 hover:bg-zinc-200/80 transition-colors"

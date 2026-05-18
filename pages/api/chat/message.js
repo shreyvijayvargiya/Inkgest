@@ -9,6 +9,7 @@
 import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
+import { INFOGRAPHIC_FORMAT_IDS } from "../../../lib/config/infographicCreativeFormats";
 
 export const config = {
 	api: {
@@ -76,14 +77,88 @@ const SCRAPE_TOOLS = [
 	},
 ];
 
+const GENERATE_MERMAID_TOOL = {
+	type: "function",
+	function: {
+		name: "generate_mermaid",
+		description:
+			"Generate ONE valid Mermaid.js diagram from grounded facts (flowchart, sequence, state, ER, etc.). Use when the user asks for a diagram, flowchart, architecture sketch, sequence chart, state machine, ER diagram, Gantt slice, or visual structure — not for infographic iframe panels.",
+		parameters: {
+			type: "object",
+			properties: {
+				brief: {
+					type: "string",
+					description:
+						"What the diagram must show — diagram type preference if any, audience, and key relationships.",
+				},
+				source_text: {
+					type: "string",
+					description:
+						"Facts and labels to preserve (editor context bullets, scraped text). Concise excerpts.",
+				},
+				title: {
+					type: "string",
+					description:
+						"Optional short title shown above the diagram in the UI.",
+				},
+			},
+			required: ["brief"],
+		},
+	},
+};
+
+const GENERATE_INFOGRAPHICS_TOOL = {
+	type: "function",
+	function: {
+		name: "generate_infographics",
+		description:
+			"Turn source text into 1–5 structured infographic panels via Inkgest (charts, timelines, comparisons, slide-style figures — not raw Mermaid syntax). Call when users ask for infographics or dense visual summaries from editor context / scrapes.",
+		parameters: {
+			type: "object",
+			properties: {
+				brief: {
+					type: "string",
+					description:
+						"Creative direction — what the visuals must communicate.",
+				},
+				source_text: {
+					type: "string",
+					description:
+						"Facts to visualize (reuse editor context bullets, scraped text, transcripts). Concatenate distilled facts.",
+				},
+				title: {
+					type: "string",
+					description:
+						"Optional human headline anchored to this batch (often matches article title).",
+				},
+				visual_format: {
+					type: "string",
+					description:
+						"Recommended when the user implies a storytelling pattern.",
+					enum: [...INFOGRAPHIC_FORMAT_IDS],
+				},
+			},
+			required: ["brief"],
+		},
+	},
+};
+
+const WEB_INGEST_TOOLS = [
+	...SCRAPE_TOOLS,
+	GENERATE_INFOGRAPHICS_TOOL,
+	GENERATE_MERMAID_TOOL,
+];
+
 const SYSTEM = `You are Inkgest — an expert AI writing assistant for newsletter writers, bloggers, and indie founders.
 Help users draft, rewrite, expand, outline and polish content. Output clean markdown.
 
 TOOLS — Page content:
 • You MAY call scrape_url with a single URL or scrape_urls with an array when the user gives link(s), asks for a summary of a site/article, or you need factual text from a page.
 • For **YouTube** (watch, embed, Shorts, youtu.be), call **scrape_youtube** with that URL — not scrape_url — so you get the real transcript.
-• After tool results arrive, answer from the scraped markdown or transcript; cite sources by domain or title when helpful.
-• If a scrape fails, say so briefly and proceed with whatever context you still have — do not pretend you scraped successfully.
+• Call **generate_infographics** when the user wants infographic-style visuals grounded in editor context and/or scraped text: pass a sharp **brief**, **source_text** with distilled facts from context/scrapes, and **visual_format** when you can infer Mindmap/Timeline/etc.
+• generate_infographics runs on the server (OpenRouter JSON → panels); after it succeeds, summarise what was generated and invite the author to inspect or drag panels into their draft.
+• Call **generate_mermaid** when the user wants a native Mermaid diagram (flowcharts, sequences, state/ER sketches). Pass **brief**, **source_text** from context/scrapes when available. After success, invite them to insert from the chat card into the draft.
+• generate_mermaid returns server-validated Mermaid source — never paste fictional URLs as links.
 
 Rules:
 • Be direct and concise. No filler phrases like "Certainly!" or "Great question!".
@@ -123,7 +198,7 @@ AGENT MODE — Inkgest workspace (client-executed tools):
 • search_user_assets — fuzzy search the user's drafts and tables by title/preview. Use when they ask to find a note, draft, or "that table about X".
 • read_user_asset — load stored content for one asset id from search results. Drafts return markdown body (truncated in tool result). Tables return a short JSON summary of columns/rows.
 • propose_create_draft — when the user wants a **new** draft/note/blog **saved to their library**. Put the **entire** article in bodyMarkdown and a clear title. The app will show **Approve / Decline**; nothing is saved until they approve. You may still write a short reply in normal text.
-• You still have scrape_url / scrape_urls for live web pages when needed.
+• You still have scrape_url / scrape_urls / scrape_youtube, **generate_infographics**, and **generate_mermaid** when they want visuals from web or grounded text.
 
 Rules for propose_create_draft:
 • Call it when the user asks for a **new** saved item: e.g. "save as draft", "new blog", "add to my library", "create a post from this link", or summarize a pasted URL **into** something they keep.
@@ -137,7 +212,7 @@ ASK MODE — User's saved library (same as Agent for search/read):
 • read_user_asset — load one asset by id from search_user_assets results to quote or summarise it.
 • Do **not** use scrape_url / scrape_urls to "find" the user's drafts — scraping is only for **public https URLs** the user pasted or when they explicitly want live web page text.
 • For **YouTube** links, use **scrape_youtube** (not scrape_url) for the transcript.
-• You still may use scrape_url / scrape_urls when they share a non-YouTube link or ask about a website.`;
+• You still may use scrape_url / scrape_urls when they share a non-YouTube link or ask about a website — **generate_infographics** for infographic panels, **generate_mermaid** for diagram syntax blocks from grounded text.`;
 
 const AGENT_TOOLS = [
 	{
@@ -282,8 +357,8 @@ export default async function handler(req, res) {
 	};
 	if (enableScrapeTools) {
 		payloadBody.tools = isAgent
-			? [...SCRAPE_TOOLS, ...AGENT_TOOLS]
-			: [...SCRAPE_TOOLS, ...ASK_LIBRARY_TOOLS];
+			? [...WEB_INGEST_TOOLS, ...AGENT_TOOLS]
+			: [...WEB_INGEST_TOOLS, ...ASK_LIBRARY_TOOLS];
 		payloadBody.tool_choice = "auto";
 	}
 

@@ -32,6 +32,19 @@ import { getTheme } from "../../lib/utils/theme";
 import { formatInkDateLong, TiptapSlashDatePicker } from "../../lib/ui/TiptapSlashDatePicker.jsx";
 import { htmlToMarkdown } from "../../lib/utils/htmlToMarkdown";
 import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds";
+import InfographicInlineGeneratePanel from "../../lib/ui/InfographicInlineGeneratePanel";
+import MermaidInlineGeneratePanel from "../../lib/ui/MermaidInlineGeneratePanel";
+import MotionSelect from "../../lib/ui/MotionSelect";
+import {
+	tryInsertInfographicFromDragData,
+	INK_INFOGRAPHIC_DRAG_MIME,
+	insertInfographicAfterCollapsedRange,
+} from "../../lib/ui/infographicInsertion";
+import {
+	tryInsertMermaidFromDragData,
+	insertMermaidAfterCollapsedRange,
+} from "../../lib/ui/mermaidInsertion";
+import { useMermaidHydrateEditorRoot } from "../../lib/hooks/useMermaidHydrateEditorRoot";
 import IconSelectorDropdown, { lucideToSvgString } from "../../lib/ui/IconSelectorDropdown.jsx";
 import {
 	THEMES,
@@ -167,6 +180,10 @@ const Icons = {
 		"M3 3h18v4H3V3zm0 8h18v4H3v-4zm0 8h18v4H3v-4z M9 3v18 M15 3v18",
 	video:
 		"M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
+	barChart:
+		"M18 20V10M12 20V4M6 20v-4M3 18h18",
+	workflow:
+		"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z",
 	settings:
 		"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
 };
@@ -589,9 +606,15 @@ const LANG_OPTIONS = [
 	"text",
 ];
 
+/** Removes a rich block and leaves an empty paragraph (draft editor onclick). Single-quoted JS only inside handler. */
+const DRAFT_BLOCK_DELETE_CLICK = `(function(btn,e){var ev=e||window.event;if(ev){if(ev.preventDefault)ev.preventDefault();if(ev.stopPropagation)ev.stopPropagation();}var k=btn.getAttribute('data-draft-del');var el=null;if(k==='toggle-group')el=btn.closest('[data-block=toggle-group]');else if(k==='card')el=btn.closest('[data-block=card]');else if(k==='tabs')el=btn.closest('[data-block=tabs]');else if(k==='code-group')el=btn.closest('[data-block=code-group]');else if(k==='draft-toggle')el=btn.closest('details[data-block=draft-toggle]');else if(k==='callout')el=btn.closest('[data-block^=callout-]');else if(k==='code')el=btn.closest('[data-block=code]');if(!el||!el.parentNode)return;var p=document.createElement('p');p.innerHTML='<br>';el.parentNode.insertBefore(p,el.nextSibling||null);el.parentNode.removeChild(el);})(this,typeof event==='undefined'?null:event)`;
+
+const DRAFT_BLOCK_DEL_BTN_STYLE =
+	"width:22px;height:22px;border-radius:6px;border:1px solid #E8E4DC;background:#fff;color:#9A9490;font-size:12px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0";
+
 function makeCalloutHtml(type, text = "") {
 	const c = CALLOUT_CONFIGS[type] || CALLOUT_CONFIGS.info;
-	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:;letter-spacing:0.1em;margin:0 0 5px;font-family:'Comic',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Comic',sans-serif">${text}</div></div></div>`;
+	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:11px 10px 11px 16px;margin:14px 0;display:flex;gap:10px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1;min-width:0"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:;letter-spacing:0.1em;margin:0 0 5px;font-family:'Comic',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Comic',sans-serif">${text}</div></div><button type="button" data-draft-del="callout" onclick="${DRAFT_BLOCK_DELETE_CLICK}" contenteditable="false" title="Remove callout" style="${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button></div>`;
 }
 
 function makeCodeBlockHtml(
@@ -603,7 +626,7 @@ function makeCodeBlockHtml(
 		(l) =>
 			`<option value="${l}" ${l === lang ? "selected" : ""}>${l?.charAt(0).toLowerCase() + l.slice(1)}</option>`,
 	).join("");
-	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Comic',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Comic',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
+	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Comic',sans-serif">${opts}</select><div style="display:flex;align-items:center;gap:6px"><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Comic',sans-serif;transition:all 0.15s">Copy</button><button type="button" data-draft-del="code" onclick="${DRAFT_BLOCK_DELETE_CLICK}" title="Remove code block" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;color:#9A9490;cursor:pointer;font-family:'Comic',sans-serif;line-height:1">✕</button></div></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
 }
 
 function makeButtonBlockHtml(text = "Click here →", href = "#") {
@@ -1219,12 +1242,12 @@ function makeDraftDividerHtml(type = "solid") {
 
 function makeToggleGroupHtml() {
 	const toggleItem = (q) =>
-		`<details data-block="draft-toggle" style="border-bottom:1px solid #E8E4DC"><summary style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;list-style:none;user-select:none;font-size:14px;font-weight:600;color:#37352F"><span data-toggle-chevron></span><span data-toggle-grip></span><span contenteditable="true" style="flex:1;outline:none">${q}</span></summary><div contenteditable="true" style="padding:10px 14px 14px 44px;font-size:14px;color:#6B6560;line-height:1.7;outline:none"><p>Answer goes here…</p></div></details>`;
-	return `<div data-block="toggle-group" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;overflow:hidden;background:#FAFAF8"><div contenteditable="false" style="padding:8px 14px;border-bottom:1px solid #E8E4DC;background:#F3EFE8;display:flex;align-items:center;gap:6px"><span contenteditable="true" data-toggle-group-label data-placeholder="Group heading…" style="font-size:11px;font-weight:700;color:#9A9490;text-transform:uppercase;letter-spacing:0.07em;outline:none;min-width:40px">FAQ</span></div>${toggleItem("What is Inkgest?")}${toggleItem("How does the AI editor work?")}${toggleItem("Can I export to React, HTML, or Markdown?")}</div><p><br></p>`;
+		`<details data-block="draft-toggle" style="border-bottom:1px solid #E8E4DC"><summary style="display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;list-style:none;user-select:none;font-size:14px;font-weight:600;color:#37352F"><span data-toggle-chevron></span><span data-toggle-grip></span><span contenteditable="true" style="flex:1;outline:none;min-width:0">${q}</span><button type="button" tabindex="-1" data-draft-del="draft-toggle" onclick="${DRAFT_BLOCK_DELETE_CLICK}" contenteditable="false" title="Remove this toggle" style="${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button></summary><div contenteditable="true" style="padding:10px 14px 14px 44px;font-size:14px;color:#6B6560;line-height:1.7;outline:none"><p>Answer goes here…</p></div></details>`;
+	return `<div data-block="toggle-group" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;overflow:hidden;background:#FAFAF8"><div contenteditable="false" style="padding:8px 10px 8px 14px;border-bottom:1px solid #E8E4DC;background:#F3EFE8;display:flex;align-items:center;justify-content:space-between;gap:8px"><span contenteditable="true" data-toggle-group-label data-placeholder="Group heading…" style="flex:1;min-width:0;font-size:11px;font-weight:700;color:#9A9490;text-transform:uppercase;letter-spacing:0.07em;outline:none">FAQ</span><button type="button" tabindex="-1" data-draft-del="toggle-group" onclick="${DRAFT_BLOCK_DELETE_CLICK}" contenteditable="false" title="Remove toggle group" style="${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button></div>${toggleItem("What is Inkgest?")}${toggleItem("How does the AI editor work?")}${toggleItem("Can I export to React, HTML, or Markdown?")}</div><p><br></p>`;
 }
 
 function makeCardBlockHtml() {
-	return `<div data-block="card" style="margin:16px 0;border:1.5px solid #E8E4DC;border-radius:14px;padding:20px 22px;background:#FAFAF8;display:flex;gap:14px;align-items:flex-start"><div data-card-icon data-icon-selector data-icon-type="emoji" contenteditable="false" title="Click to change icon" style="font-size:28px;line-height:1;flex-shrink:0;min-width:36px;text-align:center;cursor:pointer;user-select:none"><span style="font-size:28px;line-height:1">🎯</span></div><div style="flex:1;min-width:0"><div contenteditable="true" data-card-heading data-placeholder="Card heading" style="font-size:16px;font-weight:700;color:#37352F;margin-bottom:6px;outline:none;line-height:1.3">Card heading</div><div contenteditable="true" data-card-desc data-placeholder="Write a short description…" style="font-size:14px;color:#6B6560;line-height:1.7;outline:none">Write a short description for this card.</div></div></div><p><br></p>`;
+	return `<div data-block="card" style="margin:16px 0;border:1.5px solid #E8E4DC;border-radius:14px;padding:38px 22px 20px;background:#FAFAF8;display:flex;gap:14px;align-items:flex-start;position:relative"><button type="button" tabindex="-1" data-draft-del="card" onclick="${DRAFT_BLOCK_DELETE_CLICK}" contenteditable="false" title="Remove card" style="position:absolute;top:10px;right:10px;${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button><div data-card-icon data-icon-selector data-icon-type="emoji" contenteditable="false" title="Click to change icon" style="font-size:28px;line-height:1;flex-shrink:0;min-width:36px;text-align:center;cursor:pointer;user-select:none"><span style="font-size:28px;line-height:1">🎯</span></div><div style="flex:1;min-width:0"><div contenteditable="true" data-card-heading data-placeholder="Card heading" style="font-size:16px;font-weight:700;color:#37352F;margin-bottom:6px;outline:none;line-height:1.3">Card heading</div><div contenteditable="true" data-card-desc data-placeholder="Write a short description…" style="font-size:14px;color:#6B6560;line-height:1.7;outline:none">Write a short description for this card.</div></div></div><p><br></p>`;
 }
 
 function makeIconBlockHtml(value = "✨", type = "emoji") {
@@ -1289,17 +1312,17 @@ function makeAudioBlockHtml(src = "", name = "Audio track", caption = "") {
 }
 
 function makeDraftTabsHtml() {
-	return `<div data-block="tabs" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;background:#FAFAF8;overflow:hidden"><div contenteditable="false" style="display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid #E8E4DC;background:#F3EFE8;user-select:none;flex-wrap:wrap"><button type="button" data-action="draft-tab" data-tab-idx="0" onclick="${DRAFT_TAB_BUTTON_ONCLICK}" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.06);font-size:12px;font-weight:600;color:#37352F;cursor:pointer">Tab 1</button><button type="button" data-action="draft-tab" data-tab-idx="1" onclick="${DRAFT_TAB_BUTTON_ONCLICK}" style="padding:6px 12px;border:none;border-radius:8px;background:transparent;font-size:12px;font-weight:500;color:#7A7570;cursor:pointer">Tab 2</button></div><div data-draft-tab-panels><div data-draft-panel="0" style="padding:12px 14px;display:block;min-height:48px"><p><br></p></div><div data-draft-panel="1" style="padding:12px 14px;display:none;min-height:48px"><p><br></p></div></div></div><p><br></p>`;
+	return `<div data-block="tabs" style="margin:18px 0;border:1px solid #E8E4DC;border-radius:12px;background:#FAFAF8;overflow:hidden"><div contenteditable="false" style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #E8E4DC;background:#F3EFE8;user-select:none"><div style="display:flex;flex:1;min-width:0;flex-wrap:wrap;gap:4px"><button type="button" data-action="draft-tab" data-tab-idx="0" onclick="${DRAFT_TAB_BUTTON_ONCLICK}" style="padding:6px 12px;border:none;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.06);font-size:12px;font-weight:600;color:#37352F;cursor:pointer">Tab 1</button><button type="button" data-action="draft-tab" data-tab-idx="1" onclick="${DRAFT_TAB_BUTTON_ONCLICK}" style="padding:6px 12px;border:none;border-radius:8px;background:transparent;font-size:12px;font-weight:500;color:#7A7570;cursor:pointer">Tab 2</button></div><button type="button" tabindex="-1" data-draft-del="tabs" onclick="${DRAFT_BLOCK_DELETE_CLICK}" title="Remove tab group" style="${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button></div><div data-draft-tab-panels><div data-draft-panel="0" style="padding:12px 14px;display:block;min-height:48px"><p><br></p></div><div data-draft-panel="1" style="padding:12px 14px;display:none;min-height:48px"><p><br></p></div></div></div><p><br></p>`;
 }
 
 function makeDraftCodeGroupHtml() {
 	const preStyle =
 		"background:#1A1A1A;margin:0;padding:16px 18px;overflow-x:auto;min-height:72px;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;color:#E8D5B0;white-space:pre-wrap;outline:none;border:none;display:block;width:100%;box-sizing:border-box";
-	return `<div data-block="code-group" style="margin:16px 0;border:1px solid #E8E4DC;border-radius:10px;overflow:hidden"><div contenteditable="false" style="display:flex;gap:4px;padding:6px 8px;background:#F0ECE5;border-bottom:1px solid #E8E4DC;user-select:none"><button type="button" data-action="cg-tab" data-cg-idx="0" onclick="${DRAFT_CODEGROUP_TAB_ONCLICK}" style="padding:5px 10px;border:none;border-radius:6px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#37352F">Snippet 1</button><button type="button" data-action="cg-tab" data-cg-idx="1" onclick="${DRAFT_CODEGROUP_TAB_ONCLICK}" style="padding:5px 10px;border:none;border-radius:6px;background:transparent;font-size:11px;font-weight:600;cursor:pointer;color:#6B6560">Snippet 2</button></div><div data-cg-panel="0" style="display:block"><pre contenteditable="true" style="${preStyle}">// Snippet 1</pre></div><div data-cg-panel="1" style="display:none"><pre contenteditable="true" style="${preStyle}">// Snippet 2</pre></div></div><p><br></p>`;
+	return `<div data-block="code-group" style="margin:16px 0;border:1px solid #E8E4DC;border-radius:10px;overflow:hidden"><div contenteditable="false" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#F0ECE5;border-bottom:1px solid #E8E4DC;user-select:none"><div style="display:flex;flex:1;min-width:0;flex-wrap:wrap;gap:4px"><button type="button" data-action="cg-tab" data-cg-idx="0" onclick="${DRAFT_CODEGROUP_TAB_ONCLICK}" style="padding:5px 10px;border:none;border-radius:6px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#37352F">Snippet 1</button><button type="button" data-action="cg-tab" data-cg-idx="1" onclick="${DRAFT_CODEGROUP_TAB_ONCLICK}" style="padding:5px 10px;border:none;border-radius:6px;background:transparent;font-size:11px;font-weight:600;cursor:pointer;color:#6B6560">Snippet 2</button></div><button type="button" tabindex="-1" data-draft-del="code-group" onclick="${DRAFT_BLOCK_DELETE_CLICK}" title="Remove code group" style="${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button></div><div data-cg-panel="0" style="display:block"><pre contenteditable="true" style="${preStyle}">// Snippet 1</pre></div><div data-cg-panel="1" style="display:none"><pre contenteditable="true" style="${preStyle}">// Snippet 2</pre></div></div><p><br></p>`;
 }
 
 function makeDraftToggleHtml() {
-	return `<details data-block="draft-toggle" style="margin:16px 0;border:1px solid #E8E4DC;border-radius:10px;padding:0;overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(55,53,47,0.06)"><summary style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:#F7F5F0;color:#37352F;list-style:none;outline:none;user-select:none;-webkit-user-select:none"><span contenteditable="false" data-toggle-chevron></span><span style="flex:1;font-weight:600">Toggle</span><span contenteditable="false" data-toggle-grip title=""></span></summary><div style="padding:14px 18px 18px;border-top:1px solid #E8E4DC;background:#fff"><p style="margin:0"><br></p></div></details><p><br></p>`;
+	return `<details data-block="draft-toggle" style="margin:16px 0;border:1px solid #E8E4DC;border-radius:10px;padding:0;overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(55,53,47,0.06)"><summary style="display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:#F7F5F0;color:#37352F;list-style:none;outline:none;user-select:none;-webkit-user-select:none"><span contenteditable="false" data-toggle-chevron></span><span style="flex:1;font-weight:600;min-width:0">Toggle</span><button type="button" tabindex="-1" data-draft-del="draft-toggle" onclick="${DRAFT_BLOCK_DELETE_CLICK}" contenteditable="false" title="Remove toggle" style="${DRAFT_BLOCK_DEL_BTN_STYLE}">✕</button></summary><div style="padding:14px 18px 18px;border-top:1px solid #E8E4DC;background:#fff"><p style="margin:0"><br></p></div></details><p><br></p>`;
 }
 
 function draftSlashItemMatchesQuery(item, query) {
@@ -1847,6 +1870,8 @@ export default function DraftPage() {
 			: !docType && Array.isArray(doc?.images) && doc.images.length > 0
 				? doc
 				: null;
+
+	useMermaidHydrateEditorRoot(editorRef, Boolean(draft));
 
 	useEffect(() => {
 		if (tableDoc) {
@@ -2788,7 +2813,8 @@ export default function DraftPage() {
 	};
 
 	useEffect(() => {
-		const handleMouseUp = () => {
+		const handleMouseUp = (e) => {
+			if (e?.target?.closest?.("[data-selection-dropdown]")) return;
 			const el = editorRef.current;
 			if (!el) return;
 			const sel = window.getSelection();
@@ -3600,30 +3626,38 @@ export default function DraftPage() {
 											</div>
 											<p style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Published view theme (share link)</p>
 											<div style={{ display: "flex", gap: 8, alignItems: "stretch", marginBottom: publishThemedCopied ? 8 : (!isPublic ? 10 : 6) }}>
-												<select
-													value={publishShareTheme}
-													onChange={(e) => setPublishShareTheme(e.target.value)}
-													disabled={!isPublic}
-													style={{
-														flex: 1,
-														minWidth: 0,
-														padding: "7px 8px",
-														borderRadius: 8,
-														border: `1px solid ${T.border}`,
-														fontSize: 11,
-														fontWeight: 500,
-														background: isPublic ? T.surface : T.bg,
-														color: isPublic ? T.accent : T.muted,
-														cursor: isPublic ? "pointer" : "not-allowed",
-														opacity: isPublic ? 1 : 0.65,
-													}}
-												>
-													{Object.entries(THEMES).map(([k, t]) => (
-														<option key={k} value={k}>
-															{t.name}
-														</option>
-													))}
-												</select>
+												<div style={{ flex: 1, minWidth: 0, alignSelf: "stretch" }}>
+													<MotionSelect
+														value={publishShareTheme}
+														onChange={setPublishShareTheme}
+														disabled={!isPublic}
+														zIndex={450}
+														options={Object.entries(THEMES).map(([k, t]) => ({
+															value: k,
+															label: t.name,
+														}))}
+														triggerStyle={{
+															flex: 1,
+															minWidth: 0,
+															padding: "7px 8px",
+															borderRadius: 8,
+															border: `1px solid ${T.border}`,
+															fontSize: 11,
+															fontWeight: 500,
+															background: isPublic ? T.surface : T.bg,
+															color: isPublic ? T.accent : T.muted,
+															cursor: isPublic ? "pointer" : "not-allowed",
+														}}
+														menuStyle={{
+															border: `1px solid ${T.border}`,
+															background: T.surface,
+														}}
+														optionStyle={{
+															fontSize: 11,
+															fontWeight: 500,
+														}}
+													/>
+												</div>
 												<button
 													type="button"
 													disabled={!isPublic}
@@ -4574,6 +4608,16 @@ export default function DraftPage() {
 											}
 									}}
 								onDragOver={(e) => {
+									if (
+										e.dataTransfer?.types &&
+										Array.from(e.dataTransfer.types).includes(
+											INK_INFOGRAPHIC_DRAG_MIME,
+										)
+									) {
+										e.preventDefault();
+										e.dataTransfer.dropEffect = "copy";
+										return;
+									}
 									if (!dragSrcRef.current) return;
 									e.preventDefault();
 									e.dataTransfer.dropEffect = "move";
@@ -4602,15 +4646,54 @@ export default function DraftPage() {
 									}
 								}}
 								onDrop={(e) => {
+									const editor = editorRef.current;
+									if (
+										editor &&
+										tryInsertMermaidFromDragData(
+											editor,
+											e.dataTransfer,
+										)
+									) {
+										e.preventDefault();
+										if (dragSrcRef.current) {
+											dragSrcRef.current.style.opacity = "";
+											dragSrcRef.current.style.outline = "";
+										}
+										dragSrcRef.current = null;
+										dragOverRef.current = null;
+										setDragHandle(null);
+										setDropIndicator(null);
+										countWords();
+										return;
+									}
+									if (
+										editor &&
+										tryInsertInfographicFromDragData(
+											editor,
+											e.dataTransfer,
+										)
+									) {
+										e.preventDefault();
+										if (dragSrcRef.current) {
+											dragSrcRef.current.style.opacity = "";
+											dragSrcRef.current.style.outline = "";
+										}
+										dragSrcRef.current = null;
+										dragOverRef.current = null;
+										setDragHandle(null);
+										setDropIndicator(null);
+										countWords();
+										return;
+									}
 									const src = dragSrcRef.current;
 									if (!src) return;
 									e.preventDefault();
-									const editor = editorRef.current;
-									if (!editor) return;
+									const dropEditor = editorRef.current;
+									if (!dropEditor) return;
 									const over = dragOverRef.current;
 									if (over?.block && over.block !== src) {
-										if (over.before) editor.insertBefore(src, over.block);
-										else editor.insertBefore(src, over.block.nextSibling);
+										if (over.before) dropEditor.insertBefore(src, over.block);
+										else dropEditor.insertBefore(src, over.block.nextSibling);
 									}
 									src.style.opacity = "";
 									src.style.outline = "";
@@ -5479,7 +5562,13 @@ export default function DraftPage() {
 													alignItems: "stretch",
 													gap: 0,
 													maxWidth: 700,
-													minWidth: selectionSubtool ? 280 : 200,
+													minWidth:
+														selectionSubtool === "infographics" ||
+														selectionSubtool === "mermaid"
+															? 360
+															: selectionSubtool
+																? 280
+																: 200,
 												}}
 											>
 												<div
@@ -5544,7 +5633,7 @@ export default function DraftPage() {
 													I
 												</motion.button>
 												<div
-													className="w-px h-4 bg-zinc-200"
+													className="w-px h-4 bg-zinc-200 flex gap-1"
 												/>
 												{[
 													{ cmd: "p", label: "Text" },
@@ -5567,18 +5656,7 @@ export default function DraftPage() {
 															setSelectionDropdown(null);
 															countWords();
 														}}
-														style={{
-															display: "flex",
-															alignItems: "center",
-															padding: "6px 8px",
-															border: "none",
-															borderRadius: 6,
-															background: "none",
-															fontSize: 12,
-															fontWeight: 600,
-															color: T.accent,
-															cursor: "pointer",
-														}}
+														className="inline-flex items-center justify-center py-0.5 px-1 border-none rounded bg-none text-sm font-medium text-zinc-600 cursor-pointer"
 													>
 														{label}
 													</motion.button>
@@ -5644,6 +5722,42 @@ export default function DraftPage() {
 													className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-zinc-500 cursor-pointer ${selectionSubtool === "bgColor" ? "bg-zinc-100" : "bg-none"}`}
 												>
 													ab
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													title="Infographic from selection"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() =>
+														setSelectionSubtool((s) =>
+															s === "infographics" ? null : "infographics",
+														)
+													}
+													className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-accent cursor-pointer ${selectionSubtool === "infographics" ? "bg-zinc-100" : "bg-none"}`}
+												>
+													<Icon
+														d={Icons.barChart}
+														size={14}
+														stroke={T.accent}
+													/>
+												</motion.button>
+												<motion.button
+													whileHover={{ background: "#F0ECE5" }}
+													whileTap={{ scale: 0.96 }}
+													title="Mermaid diagram"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() =>
+														setSelectionSubtool((s) =>
+															s === "mermaid" ? null : "mermaid",
+														)
+													}
+													className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-sm font-medium text-accent cursor-pointer ${selectionSubtool === "mermaid" ? "bg-zinc-100" : "bg-none"}`}
+												>
+													<Icon
+														d={Icons.workflow}
+														size={14}
+														stroke={T.accent}
+													/>
 												</motion.button>
 												</div>
 
@@ -5946,6 +6060,115 @@ export default function DraftPage() {
 																</button>
 															))}
 														</div>
+													</div>
+												)}
+
+												{selectionSubtool === "infographics" && (
+													<div
+														data-selection-dropdown
+														style={{
+															marginTop: 8,
+															paddingTop: 10,
+															borderTop: `1px solid ${T.border}`,
+														}}
+													>
+														{(selectionDropdown.text || "").trim().length <
+														8 ? (
+															<p
+																style={{
+																	fontSize: 12,
+																	color: T.muted,
+																	margin: 0,
+																	lineHeight: 1.5,
+																}}
+															>
+																Select a bit more text in the draft (at least
+																8 characters) to generate infographics.
+															</p>
+														) : (
+															<InfographicInlineGeneratePanel
+																userId={reduxUser?.uid || ""}
+																sourceText={(
+																	selectionDropdown.text || ""
+																).trim()}
+																draftTitle={
+																	titleRef.current?.innerText?.trim() ||
+																	draft?.title ||
+																	"Draft"
+																}
+																requestClose={() =>
+																	setSelectionSubtool(null)
+																}
+																onInsertSpec={(spec) => {
+																	const el = editorRef.current;
+																	if (!el) return;
+																	if (!restoreEditorSelection())
+																		return;
+																	const saved =
+																		selectionSavedRangeRef.current;
+																	if (
+																		saved &&
+																		insertInfographicAfterCollapsedRange(
+																			el,
+																			saved.cloneRange(),
+																			spec,
+																			false,
+																		)
+																	) {
+																		countWords();
+																	}
+																	setSelectionDropdown(null);
+																	setSelectionSubtool(null);
+																}}
+															/>
+														)}
+													</div>
+												)}
+
+												{selectionSubtool === "mermaid" && (
+													<div
+														data-selection-dropdown
+														style={{
+															marginTop: 8,
+															paddingTop: 10,
+															borderTop: `1px solid ${T.border}`,
+														}}
+													>
+														<MermaidInlineGeneratePanel
+															userId={reduxUser?.uid || ""}
+															sourceText={(
+																selectionDropdown.text || ""
+															).trim()}
+															draftTitle={
+																titleRef.current?.innerText?.trim() ||
+																draft?.title ||
+																"Draft"
+															}
+															requestClose={() =>
+																setSelectionSubtool(null)
+															}
+															onInsert={(payload) => {
+																const el = editorRef.current;
+																if (!el) return;
+																if (!restoreEditorSelection()) return;
+																const saved =
+																	selectionSavedRangeRef.current;
+																if (
+																	saved &&
+																	insertMermaidAfterCollapsedRange(
+																		el,
+																		saved.cloneRange(),
+																		payload.code,
+																		payload.title || "",
+																		false,
+																	)
+																) {
+																	countWords();
+																}
+																setSelectionDropdown(null);
+																setSelectionSubtool(null);
+															}}
+														/>
 													</div>
 												)}
 											</motion.div>
@@ -6793,10 +7016,16 @@ export default function DraftPage() {
 												>
 													Translate
 												</p>
-												<select
+												<MotionSelect
 													value={translationLang}
-													onChange={(e) => setTranslationLang(e.target.value)}
-													style={{
+													onChange={setTranslationLang}
+													zIndex={500}
+													options={TRANSLATION_LANGUAGES.map((l) => ({
+														value: l.code,
+														label: `${l.flag} ${l.label}`,
+													}))}
+													style={{ width: "100%", marginBottom: 8 }}
+													triggerStyle={{
 														width: "100%",
 														background: T.surface,
 														border: `1px solid ${T.border}`,
@@ -6805,16 +7034,15 @@ export default function DraftPage() {
 														fontSize: 12,
 														color: T.accent,
 														cursor: "pointer",
-														outline: "none",
-														marginBottom: 8,
 													}}
-												>
-													{TRANSLATION_LANGUAGES.map((l) => (
-														<option key={l.code} value={l.code}>
-															{l.flag} {l.label}
-														</option>
-													))}
-												</select>
+													menuStyle={{
+														border: `1px solid ${T.border}`,
+														background: T.surface,
+													}}
+													optionStyle={{
+														fontSize: 12,
+													}}
+												/>
 												<motion.button
 													whileTap={{ scale: 0.97 }}
 													onClick={() => handleTranslate(translationLang)}

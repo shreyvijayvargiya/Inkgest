@@ -596,10 +596,10 @@ const CodeGroupComponent = ({
 						</button>
 						<button
 							onClick={deleteNode}
-							className="p-1.5 text-zinc-600 hover:bg-zinc-200 rounded transition-colors"
+							className="p-1.5 text-zinc-600 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
 							title="Delete code group"
 						>
-							<X className="w-3.5 h-3.5" />
+							<TrashIcon className="w-3.5 h-3.5" />
 						</button>
 					</div>
 				</div>

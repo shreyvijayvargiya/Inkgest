@@ -17,6 +17,7 @@ import {
 	TableHead,
 	TableCell,
 } from "./Table";
+import MotionSelect from "./MotionSelect";
 
 const T = {
 	base: "#F7F5F0",
@@ -25,7 +26,7 @@ const T = {
 	warm: "#C17B2F",
 	muted: "#7A7570",
 	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
+	sidebar: "#FFFFFF",
 };
 
 const Ic = ({ d, d2, size = 16, stroke = T.muted, sw = 1.75 }) => (
@@ -764,10 +765,17 @@ export default function TableView({
 									>
 										Type
 									</label>
-									<select
+									<MotionSelect
 										value={newColType}
-										onChange={(e) => setNewColType(e.target.value)}
-										style={{
+										onChange={setNewColType}
+										options={[
+											{ value: "text", label: "Text" },
+											{ value: "number", label: "Number" },
+											{ value: "url", label: "URL" },
+											{ value: "date", label: "Date" },
+											{ value: "percentage", label: "Percentage" },
+										]}
+										triggerStyle={{
 											width: "100%",
 											border: `1.5px solid ${T.border}`,
 											borderRadius: 8,
@@ -776,13 +784,14 @@ export default function TableView({
 											color: T.accent,
 											background: T.surface,
 										}}
-									>
-										<option value="text">Text</option>
-										<option value="number">Number</option>
-										<option value="url">URL</option>
-										<option value="date">Date</option>
-										<option value="percentage">Percentage</option>
-									</select>
+										menuStyle={{
+											border: `1.5px solid ${T.border}`,
+											background: T.surface,
+										}}
+										optionStyle={{
+											fontSize: 13,
+										}}
+									/>
 								</div>
 							</div>
 							<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
