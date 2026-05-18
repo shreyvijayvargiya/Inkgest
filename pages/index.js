@@ -9,14 +9,14 @@ import {
 import { useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import LoginModal from "../lib/ui/LoginModal";
-import { getUserCredits, FREE_CREDIT_LIMIT } from "../lib/utils/credits";
+import { FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 import { getTheme } from "../lib/utils/theme";
-import { CreditCardIcon, SparkleIcon, XCircleIcon, LinkIcon, FileTextIcon, CodeIcon, MessageSquareIcon, ZapIcon } from "lucide-react";
+import { CreditCardIcon, SparkleIcon, XCircleIcon } from "lucide-react";
 import Footer from "../app/components/Footer";
 /* ── Google Fonts injected once ── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Comic+Sans:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body { background: #F7F5F0; }
@@ -201,14 +201,19 @@ function Nav() {
 	);
 
 	return (
-		<motion.nav
-			style={{ boxShadow: shadow, fontFamily: "'Comic', sans-serif" }}
-			className="fixed top-0 left-0 right-0 z-50 "
-			initial={{ y: -60, opacity: 0 }}
-			animate={{ y: 0, opacity: 1 }}
-			transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-			css={{ borderColor: T.border }}
+		<header
+			className="fixed top-0 left-0 right-0 z-50"
+			style={{ fontFamily: "'Comic', sans-serif" }}
 		>
+			<motion.nav
+				aria-label="Primary"
+				style={{ boxShadow: shadow }}
+				className=""
+				initial={{ y: -60, opacity: 0 }}
+				animate={{ y: 0, opacity: 1 }}
+				transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+				css={{ borderColor: T.border }}
+			>
 			<div
 				style={{
 					background: "rgba(247,245,240,0.88)",
@@ -216,13 +221,12 @@ function Nav() {
 				}}
 			>
 				<div
-					className="max-w-7xl mx-auto px-6 flex items-center justify-between"
-					style={{ height: 60 }}
+					className="max-w-7xl mx-auto px-6 flex items-center justify-between min-h-[60px]"
 				>
 					{/* Logo */}
 					<a
-						href="#"
-						className="flex items-center gap-2 no-underline"
+						href="/"
+						className="flex items-center gap-2 no-underline min-h-12 min-w-12 px-2 -ml-2 rounded-xl justify-center sm:justify-start"
 						style={{
 							fontFamily: "'Comic', sans-serif",
 							fontSize: 22,
@@ -243,7 +247,7 @@ function Nav() {
 					</a>
 
 					{/* Links */}
-					<div className="hidden md:flex items-center gap-8">
+					<div className="hidden md:flex items-center gap-2 lg:gap-4">
 						{["Features", "Export", "How it works", "Pricing", "FAQ"].map((l) => (
 							<a
 								key={l}
@@ -252,7 +256,7 @@ function Nav() {
 										? "/blog"
 										: `#${l.toLowerCase().replace(/ /g, "-")}`
 								}
-								className="no-underline text-sm font-medium transition-colors"
+								className="no-underline text-sm font-medium transition-colors inline-flex items-center justify-center min-h-12 min-w-12 px-3 rounded-xl"
 								style={{ color: T.muted, fontFamily: "'Comic', sans-serif" }}
 								onMouseEnter={(e) => (e.target.style.color = T.accent)}
 								onMouseLeave={(e) => (e.target.style.color = T.muted)}
@@ -263,12 +267,12 @@ function Nav() {
 					</div>
 
 					{/* CTAs */}
-					<div className="flex items-center gap-3">
+					<div className="flex items-center gap-2 sm:gap-3">
 						<motion.a
 							href="/login"
 							whileHover={{ scale: 1.02 }}
 							whileTap={{ scale: 0.97 }}
-							className="hidden md:inline-flex text-sm font-semibold no-underline px-4 py-2 rounded-xl border transition-all"
+							className="hidden md:inline-flex text-sm font-semibold no-underline min-h-12 px-5 rounded-xl border transition-all items-center justify-center"
 							style={{
 								fontFamily: "'Comic', sans-serif",
 								color: T.accent,
@@ -286,7 +290,7 @@ function Nav() {
 								boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
 							}}
 							whileTap={{ scale: 0.96 }}
-							className="inline-flex text-sm font-semibold no-underline px-5 py-2.5 rounded-xl text-white"
+							className="inline-flex text-sm font-semibold no-underline min-h-12 px-6 rounded-xl text-white items-center justify-center"
 							style={{
 								fontFamily: "'Comic', sans-serif",
 								background: T.accent,
@@ -298,13 +302,12 @@ function Nav() {
 				</div>
 			</div>
 		</motion.nav>
+		</header>
 	);
 }
 
 /* ── Hero with AI draft form ── */
 function Hero() {
-	const router = useRouter();
-	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const heroRef = useRef(null);
 	const { scrollYProgress } = useScroll({
 		target: heroRef,
@@ -355,7 +358,7 @@ function Hero() {
 		<section
 			ref={heroRef}
 			className="relative overflow-hidden"
-			style={{ paddingTop: 140, paddingBottom: 80, background: T.base }}
+			style={{ paddingTop: 140, paddingBottom: 80, background: "white" }}
 		>
 			{/* Ambient orb */}
 			<motion.div
@@ -379,12 +382,12 @@ function Hero() {
 				className="relative max-w-5xl mx-auto px-6 text-left"
 			>
 				<a
-					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto p-2 mb-4 border border-amber-200 rounded-full flex gap-2 items-center"
+					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto mb-4 border border-amber-200 rounded-full flex gap-2 items-center min-h-12 px-4 py-2"
 					href="https://www.producthunt.com/products/inkgest-link-to-gest"
 					target="_blank"
 					rel="noopener noreferrer"
 				>
-					<SparkleIcon className="w-3 h-3" />
+					<SparkleIcon className="w-3 h-3 shrink-0" aria-hidden />
 					We are live on Product Hunt
 				</a>
 		<motion.div className="max-w-5xl mx-auto my-10">
@@ -395,12 +398,24 @@ function Hero() {
 				transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
 				style={{ textAlign: "center", marginBottom: 16, position: "relative" }}
 			>
-				{/* Line 1 — plain large heading */}
-				<div style={{ fontSize: "clamp(36px,5.5vw,68px)", fontWeight: 800, color: T.accent, lineHeight: 1.05, letterSpacing: "-2px", marginBottom: 6 }}>
-					Futuristic Agentic editor
-				</div>
+				<h1
+					style={{
+						fontSize: "clamp(34px,5.2vw,58px)",
+						fontWeight: 800,
+						color: T.accent,
+						lineHeight: 1.08,
+						letterSpacing: "-2px",
+						marginBottom: 14,
+						textAlign: "center",
+						maxWidth: "22ch",
+						marginLeft: "auto",
+						marginRight: "auto",
+					}}
+				>
+					Futuristic Agentic Editor for 
+				</h1>
 
-				{/* Line 2 — "for content creators" with bounding-box treatment */}
+				{/* Tagline — decorative bounding-box treatment */}
 				<div style={{ position: "relative", display: "inline-block", marginBottom: 4 }}>
 					{/* Annotation label top-left — font style */}
 					<motion.div
@@ -423,6 +438,7 @@ function Hero() {
 							boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
 						}}
 					>
+						<span className="w-2 h-2 mx-1 inline-block rounded-full bg-amber-100" />
 						AI chatbot
 					</motion.div>
 
@@ -451,7 +467,7 @@ function Hero() {
 						}}
 					>
 						<span style={{ width: 8, height: 8, borderRadius: "50%", background: T.warm, display: "inline-block", flexShrink: 0 }} />
-						{T.warm}
+						Customisation
 					</motion.div>
 					<br />
 					{/* The text with selection border */}
@@ -472,8 +488,8 @@ function Hero() {
 							<div key={`${v}-${h}`} style={{ position: "absolute", [v]: -2, [h]: -2, width: 7, height: 7, borderRadius: 2, background: "white", border: `1.5px solid ${T.warm}` }} />
 						))}
 						
-						<span style={{ fontStyle: "italic", fontSize: "clamp(36px,5.5vw,68px)", fontWeight: 400, color: T.warm, lineHeight: 1.05, letterSpacing: "-2px" }} className="text-amber-500">
-							for content creators
+						<span style={{ fontStyle: "italic", fontSize: "48px", fontWeight: 400, color: T.warm, lineHeight: 1.05, letterSpacing: "-2px" }} className="text-amber-500 text-4xl">
+							content creators
 						</span>
 					</motion.div>
 
@@ -499,6 +515,7 @@ function Hero() {
 							boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
 						}}
 					>
+						<span className="w-2 h-2 mx-1 inline-block rounded-full bg-green-100" />
 						Advance Editor
 					</motion.div>
 				</div>
@@ -794,31 +811,26 @@ const FEATURES = [
 	{
 		title: "Scrape any URL — blog, news, research, Substack — and draft instantly",
 		word: "Scrape & Generate",
-		image: "/features/feature-1.png",
 		emoji: "⚡",
 	},
 	{
 		title: "AI chatbot sidebar — rewrite, expand, or change tone without leaving the editor",
 		word: "AI Chat",
-		image: "/features/feature-2.png",
 		emoji: "💬",
 	},
 	{
 		title: "Preview your content in beautiful themes before exporting",
 		word: "Theme Preview",
-		image: "/features/feature-3.png",
 		emoji: "🎨",
 	},
 	{
 		title: "AI-generated infographics and tables from any source URL",
 		word: "Visualize",
-		image: "/features/feature-4.png",
 		emoji: "📊",
 	},
 	{
 		title: "Advanced rich-text editor with slash commands, code blocks, and autosave",
 		word: "Advanced Editor",
-		image: "/features/feature-5.png",
 		emoji: "✏️",
 	},
 ];
@@ -913,43 +925,12 @@ function Features() {
 								}}
 							>
 								<div
-									style={{
-										aspectRatio: i < 2 ? "16/10" : "16/9",
-										background: T.border,
-										position: "relative",
-										overflow: "hidden",
-									}}
+									className="bg-zinc-50 rounded-xl p-2 flex flex-col justify-center items-center h-32"
 								>
-									{/* eslint-disable-next-line @next/next/no-img-element */}
-									<img
-										src={f.image}
-										alt={f.title}
-										style={{
-											width: "100%",
-											height: "100%",
-											objectFit: "cover",
-										}}
-										onError={(e) => {
-											e.target.style.display = "none";
-											const fb =
-												e.target.parentElement?.querySelector(
-													"[data-fallback]",
-												);
-											if (fb) fb.style.display = "flex";
-										}}
-									/>
+									
 									<div
 										data-fallback
-										style={{
-											display: "none",
-											position: "absolute",
-											inset: 0,
-											alignItems: "center",
-											justifyContent: "center",
-											background: "#F0ECE5",
-											fontSize: 48,
-											color: T.muted,
-										}}
+										className="text-zinc-400 text-4xl flex items-center justify-center"
 									>
 									{f.emoji}
 									</div>
@@ -1055,11 +1036,6 @@ function ExportFormats() {
 					}}
 					className="export-grid"
 				>
-					<style>{`
-						@media (max-width: 768px) {
-							.export-grid { grid-template-columns: 1fr !important; }
-						}
-					`}</style>
 					{/* Selector */}
 					<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 						{EXPORT_FORMATS.map((f, i) => (
@@ -1808,15 +1784,19 @@ function Pricing() {
 								))}
 							</ul>
 							<motion.button
+								type="button"
 								whileHover={{ scale: 1.02, background: "#f5f0e8" }}
 								whileTap={{ scale: 0.97 }}
 								onClick={() => router.push("/pricing")}
 								style={{
-									display: "block",
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
 									width: "100%",
+									minHeight: 48,
 									background: "white",
 									color: T.accent,
-									padding: "13px",
+									padding: "14px 16px",
 									borderRadius: 10,
 									fontSize: 14,
 									fontWeight: 700,
@@ -1910,7 +1890,9 @@ function OpenSource() {
 									style={{
 										display: "inline-flex",
 										alignItems: "center",
+										justifyContent: "center",
 										gap: 9,
+										minHeight: 48,
 										background: T.accent,
 										color: "white",
 										padding: "12px 24px",
@@ -1936,7 +1918,9 @@ function OpenSource() {
 									style={{
 										display: "inline-flex",
 										alignItems: "center",
+										justifyContent: "center",
 										gap: 8,
+										minHeight: 48,
 										background: "transparent",
 										color: T.accent,
 										padding: "12px 24px",
@@ -2126,7 +2110,8 @@ function FAQ() {
 						Still curious?{" "}
 						<a
 							href="mailto:shreyvijayvargiya26@gmail.com"
-							style={{ color: T.accent, textDecoration: "underline" }}
+							className="inline-flex items-center min-h-12 py-2 rounded-lg underline underline-offset-4"
+							style={{ color: T.accent }}
 						>
 							Drop us an email.
 						</a>
@@ -2218,16 +2203,17 @@ export default function inkgestLanding() {
 		<div style={{ fontFamily: "'Comic', sans-serif", background: T.base }}>
 			<FontLink />
 			<Nav />
-			<Hero />
-			<AIFeaturesSection />
-			<Features />
-			<ExportFormats />
-			<HowItWorks />
-			<StatsStrip />
-			<UseCasesStrip />
-			<Pricing />
-			<OpenSource />
-			<FAQ />
+			<main id="main-content">
+				<Hero />
+				<AIFeaturesSection />
+				<Features />
+				<ExportFormats />
+				<HowItWorks />
+				<UseCasesStrip />
+				<Pricing />
+				<OpenSource />
+				<FAQ />
+			</main>
 			<Footer />
 		</div>
 	);

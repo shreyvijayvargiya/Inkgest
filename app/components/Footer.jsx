@@ -56,8 +56,14 @@ export default function Footer() {
 							{
 								title: "Connect",
 								links: [
-									"https://x.com/treyvijay",
-									"mailto:shreyvijayvargiya26@gmail.com",
+									{
+										href: "https://x.com/treyvijay",
+										label: "X (@treyvijay)",
+									},
+									{
+										href: "mailto:shreyvijayvargiya26@gmail.com",
+										label: "Email",
+									},
 								],
 							},
 						].map((col) => (
@@ -75,16 +81,26 @@ export default function Footer() {
 								>
 									{col.title}
 								</p>
-								{col.links.map((l) => (
+								{col.links.map((item) => (
 									<a
-										key={l}
-										href={l}
+										key={item.href}
+										href={item.href}
+										target={
+											item.href.startsWith("mailto:") ? undefined : "_blank"
+										}
+										rel={
+											item.href.startsWith("mailto:")
+												? undefined
+												: "noopener noreferrer"
+										}
 										style={{
-											display: "block",
+											display: "flex",
+											alignItems: "center",
+											minHeight: 48,
 											fontSize: 14,
 											color: "rgba(255,255,255,0.6)",
 											textDecoration: "none",
-											marginBottom: 10,
+											marginBottom: 4,
 											fontFamily: "'Comic', sans-serif",
 											transition: "color 0.2s",
 										}}
@@ -93,7 +109,7 @@ export default function Footer() {
 											(e.target.style.color = "rgba(255,255,255,0.6)")
 										}
 									>
-										{l}
+										{item.label}
 									</a>
 								))}
 							</div>
@@ -130,7 +146,7 @@ export default function Footer() {
 						<a
 							href="https://buildsaas.dev"
 							target="_blank"
-							className="text-orange-500"
+							className="inline-flex items-center min-h-12 px-0.5 rounded-sm underline-offset-2"
 							style={{ color: T.surface }}
 							rel="noopener noreferrer"
 						>
@@ -142,7 +158,20 @@ export default function Footer() {
 			<div className="flex items-center justify-between gap-2 my-4 max-w-6xl mx-auto border-t border-white/10 pt-4">
 				<p className="text-sm text-white">Listed/Features on</p>
 				<div className="flex items-center gap-2">
-					<a href="https://startupfa.me/s/inkgest?utm_source=inkgest.com" target="_blank"><img src="https://startupfa.me/badges/featured/default-small.webp" alt="Inkgest - Featured on Startup Fame" width="224" height="36" /></a>
+					<a
+						href="https://startupfa.me/s/inkgest?utm_source=inkgest.com"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center justify-center min-h-12 py-2 px-1 rounded-lg"
+					>
+						<img
+							src="https://startupfa.me/badges/featured/default-small.webp"
+							alt="Inkgest — Featured on Startup Fame"
+							width={224}
+							height={36}
+							className="block max-h-9 w-auto"
+						/>
+					</a>
 				</div>
 			</div>
 		</footer>

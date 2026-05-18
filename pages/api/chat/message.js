@@ -23,7 +23,7 @@ const SCRAPE_TOOLS = [
 		function: {
 			name: "scrape_url",
 			description:
-				"Fetch readable markdown/content from ONE public HTTPS page. Use when the user shares a link, asks to summarise a page, or you need actual page text (not guesses). Prefer this over saying you cannot browse.",
+				"Fetch readable markdown/content from ONE public HTTPS page. Use when the user shares a link, asks to summarise a page, or you need actual page text (not guesses). For YouTube video URLs use scrape_youtube instead.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -41,7 +41,7 @@ const SCRAPE_TOOLS = [
 		function: {
 			name: "scrape_urls",
 			description:
-				"Fetch multiple public web pages in parallel. Use when the user provides several links or asks to compare, merge, or summarise multiple sources.",
+				"Fetch multiple public web pages in parallel. Use when the user provides several links or asks to compare, merge, or summarise multiple sources. Do not use for YouTube watch/shorts URLs — use scrape_youtube instead.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -56,6 +56,24 @@ const SCRAPE_TOOLS = [
 			},
 		},
 	},
+	{
+		type: "function",
+		function: {
+			name: "scrape_youtube",
+			description:
+				"Fetch the spoken transcript/captions for ONE YouTube video (youtube.com, youtu.be, Shorts). Prefer this over scrape_url for video links — page scrape often has no usable text. Returns full transcript text for summaries and drafting.",
+			parameters: {
+				type: "object",
+				properties: {
+					url: {
+						type: "string",
+						description: "Full YouTube video URL (https://)",
+					},
+				},
+				required: ["url"],
+			},
+		},
+	},
 ];
 
 const SYSTEM = `You are Inkgest — an expert AI writing assistant for newsletter writers, bloggers, and indie founders.
@@ -63,7 +81,8 @@ Help users draft, rewrite, expand, outline and polish content. Output clean mark
 
 TOOLS — Page content:
 • You MAY call scrape_url with a single URL or scrape_urls with an array when the user gives link(s), asks for a summary of a site/article, or you need factual text from a page.
-• After tool results arrive, answer from the scraped markdown; cite sources by domain or title when helpful.
+• For **YouTube** (watch, embed, Shorts, youtu.be), call **scrape_youtube** with that URL — not scrape_url — so you get the real transcript.
+• After tool results arrive, answer from the scraped markdown or transcript; cite sources by domain or title when helpful.
 • If a scrape fails, say so briefly and proceed with whatever context you still have — do not pretend you scraped successfully.
 
 Rules:
@@ -103,12 +122,22 @@ const AGENT_MODE_APPEND = `
 AGENT MODE — Inkgest workspace (client-executed tools):
 • search_user_assets — fuzzy search the user's drafts and tables by title/preview. Use when they ask to find a note, draft, or "that table about X".
 • read_user_asset — load stored content for one asset id from search results. Drafts return markdown body (truncated in tool result). Tables return a short JSON summary of columns/rows.
-• propose_create_draft — when the user wants a **new** draft/note saved to their library. Put the full draft in bodyMarkdown and a clear title. The app will show **Approve / Decline**; nothing is saved until they approve. Still write a helpful reply in your message (e.g. the paragraph they asked for).
+• propose_create_draft — when the user wants a **new** draft/note/blog **saved to their library**. Put the **entire** article in bodyMarkdown and a clear title. The app will show **Approve / Decline**; nothing is saved until they approve. You may still write a short reply in normal text.
 • You still have scrape_url / scrape_urls for live web pages when needed.
 
 Rules for propose_create_draft:
-• Call it only when the user explicitly wants a new saved draft or similar.
-• After calling it, briefly say the user can approve below to save (do not repeat the entire body if it is long).`;
+• Call it when the user asks for a **new** saved item: e.g. "save as draft", "new blog", "add to my library", "create a post from this link", or summarize a pasted URL **into** something they keep.
+• If they paste an https URL and want that content turned into a saved draft: **(1)** call scrape_url, scrape_urls, or **scrape_youtube** (for YouTube) first **(2)** then call propose_create_draft with the **full** blog/article markdown (from the scrape + your edits)—do **not** stop after only scraping or only chatting in text; the UI card appears only when you call this tool.
+• After calling it, briefly say they can approve below to save (do not repeat the entire body if it is long).`;
+
+const ASK_MODE_APPEND = `
+
+ASK MODE — User's saved library (same as Agent for search/read):
+• search_user_assets — fuzzy search this user's drafts and tables (titles + previews). Use when they look for **their own** content: "find my blog about…", "draft related to buildsaas", "where's my note on…", "show my table about…".
+• read_user_asset — load one asset by id from search_user_assets results to quote or summarise it.
+• Do **not** use scrape_url / scrape_urls to "find" the user's drafts — scraping is only for **public https URLs** the user pasted or when they explicitly want live web page text.
+• For **YouTube** links, use **scrape_youtube** (not scrape_url) for the transcript.
+• You still may use scrape_url / scrape_urls when they share a non-YouTube link or ask about a website.`;
 
 const AGENT_TOOLS = [
 	{
@@ -152,7 +181,7 @@ const AGENT_TOOLS = [
 		function: {
 			name: "propose_create_draft",
 			description:
-				"Stage a NEW draft for user approval — not saved until they click Approve. Include complete bodyMarkdown.",
+				"REQUIRED for any request to save a new blog/draft/post to the user's library. Stage a NEW draft for approval — not saved until they click Approve. Always pass complete bodyMarkdown (full article). After scrape_url, scrape_youtube, or scrape_urls, call this in the same turn or the next with the full draft text.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -167,6 +196,9 @@ const AGENT_TOOLS = [
 		},
 	},
 ];
+
+/** Ask mode: library search + read only (no propose_create_draft). */
+const ASK_LIBRARY_TOOLS = AGENT_TOOLS.slice(0, 2);
 
 export default async function handler(req, res) {
 	if (req.method !== "POST") {
@@ -234,7 +266,9 @@ export default async function handler(req, res) {
 		: String(process.env.OPENROUTER_MODEL || "").trim() || "openai/gpt-4o";
 
 	const enableScrapeTools = true;
-	const systemContent = isAgent ? SYSTEM + AGENT_MODE_APPEND : SYSTEM;
+	const systemContent = isAgent
+		? SYSTEM + AGENT_MODE_APPEND
+		: SYSTEM + ASK_MODE_APPEND;
 	const payloadBody = {
 		model,
 		messages: [
@@ -242,13 +276,14 @@ export default async function handler(req, res) {
 			...messages.slice(-24),
 		],
 		stream: true,
-		max_tokens: 2800,
+		// Agent + propose_create_draft can emit very large tool-call JSON; keep headroom.
+		max_tokens: isAgent ? 8192 : 2800,
 		temperature: 0.72,
 	};
 	if (enableScrapeTools) {
 		payloadBody.tools = isAgent
 			? [...SCRAPE_TOOLS, ...AGENT_TOOLS]
-			: SCRAPE_TOOLS;
+			: [...SCRAPE_TOOLS, ...ASK_LIBRARY_TOOLS];
 		payloadBody.tool_choice = "auto";
 	}
 
@@ -287,11 +322,23 @@ export default async function handler(req, res) {
 		/** @type {Record<number, { id: string, type: string, function: { name: string, arguments: string } }>} */
 		const toolCallsByIndex = {};
 		let lastFinishReason = null;
+		/** Some providers omit `index` on continuation chunks; others default parallel calls to index 0 and corrupt merges. */
+		let lastToolCallStreamIndex = 0;
 
 		const mergeToolCallDeltas = (deltas) => {
 			if (!Array.isArray(deltas)) return;
 			for (const tc of deltas) {
-				const i = typeof tc.index === "number" ? tc.index : 0;
+				let i;
+				if (typeof tc.index === "number") {
+					i = tc.index;
+					lastToolCallStreamIndex = i;
+				} else if (tc.function?.name) {
+					const keys = Object.keys(toolCallsByIndex).map(Number);
+					i = keys.length > 0 ? Math.max(...keys) + 1 : 0;
+					lastToolCallStreamIndex = i;
+				} else {
+					i = lastToolCallStreamIndex;
+				}
 				if (!toolCallsByIndex[i]) {
 					toolCallsByIndex[i] = {
 						id: "",
@@ -308,6 +355,26 @@ export default async function handler(req, res) {
 					toolCallsByIndex[i].function.arguments += tc.function.arguments;
 				}
 			}
+		};
+
+		/** Final chunk may include full tool_calls on `message` (some OpenRouter / model paths). */
+		const ingestMessageToolCalls = (toolCalls) => {
+			if (!Array.isArray(toolCalls)) return;
+			toolCalls.forEach((tc, ord) => {
+				const i = typeof tc.index === "number" ? tc.index : ord;
+				const fn = tc.function || {};
+				toolCallsByIndex[i] = {
+					id: tc.id || toolCallsByIndex[i]?.id || "",
+					type: tc.type || "function",
+					function: {
+						name: String(fn.name ?? toolCallsByIndex[i]?.function?.name ?? ""),
+						arguments: String(
+							fn.arguments ?? toolCallsByIndex[i]?.function?.arguments ?? "",
+						),
+					},
+				};
+				lastToolCallStreamIndex = i;
+			});
 		};
 
 		const emitToolCallsIfNeeded = () => {
@@ -368,6 +435,9 @@ export default async function handler(req, res) {
 					}
 					if (enableScrapeTools && delta?.tool_calls) {
 						mergeToolCallDeltas(delta.tool_calls);
+					}
+					if (enableScrapeTools && choice?.message?.tool_calls?.length) {
+						ingestMessageToolCalls(choice.message.tool_calls);
 					}
 				} catch {
 					// skip malformed chunks

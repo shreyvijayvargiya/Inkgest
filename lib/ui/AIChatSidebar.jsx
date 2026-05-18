@@ -32,6 +32,7 @@ import {
 } from "./AIChatSidebarAgentBar";
 import { searchAssetsWithFuse } from "../agent/searchUserAssetsWithFuse";
 import { buildAgentDraftRecord } from "../agent/buildAgentDraftRecord";
+import router from "next/router";
 
 /* ─── Inline CSS for chat prose and cursor animation ─── */
 const ChatStyles = () => (
@@ -81,6 +82,37 @@ function linkifyBareUrls(s) {
 	);
 }
 
+/** Link `/app/{draftOrTableId}` so users can open library items from assistant text. */
+function linkifyInternalAppPaths(s) {
+	if (!s || /<a\s/i.test(s)) return s;
+	return s.replace(
+		/\B(\/app\/[a-zA-Z0-9_-]+)\b/g,
+		(path) =>
+			`<a href="${path}" class="ai-chat-src-link" title="Open in Inkgest">${path}</a>`,
+	);
+}
+
+function formatChatInline(s) {
+	return linkifyInternalAppPaths(linkifyBareUrls(s));
+}
+
+/** Dedupe by id — accumulates assets surfaced via search_user_assets. */
+function mergeAssetLinks(prev = [], rows = []) {
+	const seen = new Set(prev.map((r) => r.id).filter(Boolean));
+	const out = [...prev];
+	for (const r of rows) {
+		const id = r?.id;
+		if (!id || seen.has(id)) continue;
+		seen.add(id);
+		out.push({
+			id,
+			title: r.title || "(untitled)",
+			type: r.type || "draft",
+		});
+	}
+	return out;
+}
+
 /* ─── Markdown → display HTML (for chat bubbles) ─── */
 function md(text = "") {
 	const lines = text.split("\n");
@@ -102,15 +134,15 @@ function md(text = "") {
 			out.push(`<h1>${l.replace(/^# /, "")}</h1>`);
 		} else if (/^> /.test(raw)) {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<blockquote><p>${linkifyBareUrls(l.slice(2))}</p></blockquote>`);
+			out.push(`<blockquote><p>${formatChatInline(l.slice(2))}</p></blockquote>`);
 		} else if (/^- /.test(raw)) {
 			if (!ul) { out.push("<ul>"); ul = true; }
-			out.push(`<li>${linkifyBareUrls(l.slice(2))}</li>`);
+			out.push(`<li>${formatChatInline(l.slice(2))}</li>`);
 		} else if (!raw.trim()) {
 			if (ul) { out.push("</ul>"); ul = false; }
 		} else {
 			if (ul) { out.push("</ul>"); ul = false; }
-			out.push(`<p>${linkifyBareUrls(l)}</p>`);
+			out.push(`<p>${formatChatInline(l)}</p>`);
 		}
 	}
 	if (ul) out.push("</ul>");
@@ -153,6 +185,96 @@ const AI_CHAT_OVERLAY_W_MAX =
 	AI_CHAT_OVERLAY_W_DEFAULT + AI_CHAT_OVERLAY_DRAG_MAX_EXTRA_PX;
 /** Resize grip height — matches Tailwind h-24 (6rem → 96px). */
 const AI_CHAT_RESIZE_HANDLE_H = 96;
+
+function LibraryAssetLinksPanel({ links }) {
+	if (!links?.length) return null;
+	return (
+		<div
+			style={{
+				marginBottom: 10,
+				borderRadius: 10,
+				border: "1px solid #D4E4DC",
+				background: "linear-gradient(180deg, #F8FDF9 0%,rgb(251, 251, 251) 100%)",
+				overflow: "hidden",
+			}}
+		>
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					padding: "8px 10px",
+					borderBottom: "1px solid #E0EBE3",
+					background: "#FFFFFF95",
+				}}
+			>
+				<span style={{ fontSize: 11, fontWeight: 700, color: "#1E4630" }}>
+					Your library
+				</span>
+				<span style={{ fontSize: 10.5, color: "#5C8A6E" }}>
+					{links.length} match{links.length === 1 ? "" : "es"}
+				</span>
+			</div>
+			<div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
+				{links.map((a) => (
+					<div
+						key={a.id}
+						style={{
+							display: "flex",
+							alignItems: "center",
+							justifyContent: "space-between",
+							gap: 8,
+							flexWrap: "wrap",
+						}}
+					>
+						<span
+							style={{
+								fontSize: 12,
+								fontWeight: 600,
+								color: "#3D3A36",
+								lineHeight: 1.35,
+								flex: "1 1 120px",
+								minWidth: 0,
+								wordBreak: "break-word",
+							}}
+						>
+							{a.title}
+							<span
+								style={{
+									marginLeft: 6,
+									fontSize: 10,
+									fontWeight: 600,
+									color: "#7A9685",
+									textTransform: "uppercase",
+									letterSpacing: "0.04em",
+								}}
+							>
+								{a.type}
+							</span>
+						</span>
+						<button
+							onClick={() => router.push(`/app/${a.id}`,undefined ,{ shallow: false})}
+							className="ai-chat-src-link"
+							style={{
+								fontSize: 11,
+								fontWeight: 700,
+								flexShrink: 0,
+								padding: "4px 10px",
+								borderRadius: 8,
+								border: "1px solid #C9E0CF",
+								background: "#FFFFFF",
+								textDecoration: "none",
+								color: "#C17B2F",
+							}}
+						>
+							Open
+						</button>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
 
 function ScrapedSourcesPanel({ sources }) {
 	const [tab, setTab] = useState(0);
@@ -434,18 +556,20 @@ export default function AIChatSidebar({
 	const bottomRef = useRef(null);
 	const taRef     = useRef(null);
 	const abortRef  = useRef(null);
-	const { scrapeOne, scrapeMany } = useInkgestScrape();
+	const { scrapeOne, scrapeMany, scrapeYoutube } = useInkgestScrape();
 	const queryClient = useQueryClient();
 	const effectiveUserId =
 		userIdProp || auth.currentUser?.uid || "";
 
+	const libraryToolsActive =
+		open &&
+		Boolean(effectiveUserId) &&
+		(chatMode === CHAT_MODE_AGENT || chatMode === CHAT_MODE_ASK);
+
 	const { data: agentAssets = [] } = useQuery({
 		queryKey: ["assets", effectiveUserId],
 		queryFn: () => listAssets(effectiveUserId),
-		enabled:
-			open &&
-			Boolean(effectiveUserId) &&
-			chatMode === CHAT_MODE_AGENT,
+		enabled: libraryToolsActive,
 		staleTime: 45_000,
 	});
 
@@ -530,6 +654,7 @@ export default function AIChatSidebar({
 				content: "",
 				scrapeSources: [],
 				agentTrace: [],
+				assetLinks: [],
 			},
 		]);
 		setInput("");
@@ -548,6 +673,9 @@ export default function AIChatSidebar({
 		if (chatMode === CHAT_MODE_AGENT) {
 			contextPrefix +=
 				"[Assistant mode: Agent — workspace search, read saved drafts/tables, scrape links, and propose new drafts for user approval.]\n\n";
+		} else if (chatMode === CHAT_MODE_ASK) {
+			contextPrefix +=
+				"[Assistant mode: Ask — search the user's saved drafts/tables for 'find my…' / 'my blog about…'; use web scrape only for pasted https URLs.]\n\n";
 		}
 		if (plainContext) contextPrefix += `[Editor context — current draft: "${plainContext}"]\n\n`;
 		if (selectionPlain) contextPrefix += `[User-selected text for focus: "${selectionPlain}"]\n\n`;
@@ -661,6 +789,23 @@ export default function AIChatSidebar({
 					},
 				}));
 
+				const toolRunOrder = (name) => {
+					if (
+						name === "scrape_url" ||
+						name === "scrape_urls" ||
+						name === "scrape_youtube"
+					)
+						return 0;
+					if (name === "search_user_assets") return 1;
+					if (name === "read_user_asset") return 2;
+					if (name === "propose_create_draft") return 3;
+					return 4;
+				};
+				normalised.sort(
+					(a, b) =>
+						toolRunOrder(a.function.name) - toolRunOrder(b.function.name),
+				);
+
 				thread = [
 					...thread,
 					{
@@ -673,6 +818,7 @@ export default function AIChatSidebar({
 				const traceBatch = [];
 				let proposalThisRound = null;
 				let haltAfterTools = false;
+				let roundAssetLinks = [];
 
 				const toolMsgs = [];
 				for (let i = 0; i < normalised.length; i++) {
@@ -716,35 +862,53 @@ export default function AIChatSidebar({
 									markdown: (r.markdown || "").slice(0, 80_000),
 								})),
 							});
-						} else if (
-							chatMode === CHAT_MODE_AGENT &&
-							name === "search_user_assets"
-						) {
+						} else if (name === "scrape_youtube") {
+							const data = await scrapeYoutube.mutateAsync(args.url);
+							const row = {
+								url: data.url,
+								title: data.title || "YouTube transcript",
+								markdown: data.markdown || "",
+							};
+							aggregatedSources = mergeSource(aggregatedSources, row);
+							const segments = Array.isArray(data.transcript)
+								? data.transcript
+								: [];
+							payload = JSON.stringify({
+								ok: true,
+								url: data.url,
+								title: row.title,
+								source: "youtube_transcript",
+								segmentCount: segments.length,
+								markdown: (data.markdown || "").slice(0, 100_000),
+								transcript: segments.slice(0, 400),
+							});
+						} else if (name === "search_user_assets") {
 							const hits = searchAssetsWithFuse(
 								agentAssets || [],
 								args.query ?? "",
 								12,
 							);
-							traceBatch.push({
-								title: `Workspace search`,
-								sub: String(args.query ?? "").slice(0, 120),
-								lines:
-									hits.length > 0
-										? hits.map(
-												h =>
-													`${h.title} (${h.type}) · /app/${h.id}`,
-											)
-										: ["No matching drafts or tables."],
-							});
+							roundAssetLinks = mergeAssetLinks(
+								roundAssetLinks,
+								hits.map((h) => ({
+									id: h.id,
+									title: h.title,
+									type: h.type,
+								})),
+							);
+							if (hits.length === 0) {
+								traceBatch.push({
+									title: `Workspace search`,
+									sub: String(args.query ?? "").slice(0, 120),
+									lines: ["No matching drafts or tables."],
+								});
+							}
 							payload = JSON.stringify({
 								ok: true,
 								count: hits.length,
 								results: hits,
 							});
-						} else if (
-							chatMode === CHAT_MODE_AGENT &&
-							name === "read_user_asset"
-						) {
+						} else if (name === "read_user_asset") {
 							const assetId = args.asset_id;
 							const got =
 								assetId && effectiveUserId
@@ -761,6 +925,13 @@ export default function AIChatSidebar({
 									error: "Asset not found",
 								});
 							} else if (got.type === "draft") {
+								roundAssetLinks = mergeAssetLinks(roundAssetLinks, [
+									{
+										id: assetId,
+										title: got.doc.title || "(untitled)",
+										type: "draft",
+									},
+								]);
 								const b = String(got.doc.body ?? "");
 								traceBatch.push({
 									title: `Read draft`,
@@ -777,6 +948,13 @@ export default function AIChatSidebar({
 									body: b.slice(0, 24_000),
 								});
 							} else if (got.type === "table") {
+								roundAssetLinks = mergeAssetLinks(roundAssetLinks, [
+									{
+										id: assetId,
+										title: got.doc.title || "(untitled)",
+										type: "table",
+									},
+								]);
 								const cols = Array.isArray(got.doc.columns)
 									? got.doc.columns.map(c =>
 											typeof c === "object"
@@ -836,7 +1014,19 @@ export default function AIChatSidebar({
 								error: e?.message || "Scrape failed",
 							});
 						}
-						if (chatMode === CHAT_MODE_AGENT) {
+						if (name === "scrape_youtube" && args.url) {
+							aggregatedSources = mergeSource(aggregatedSources, {
+								url: String(args.url),
+								title: "",
+								markdown: "",
+								error: e?.message || "YouTube transcript failed",
+							});
+						}
+						if (
+							chatMode === CHAT_MODE_AGENT ||
+							name === "search_user_assets" ||
+							name === "read_user_asset"
+						) {
 							traceBatch.push({
 								title: `Tool error: ${name}`,
 								sub: "",
@@ -862,6 +1052,14 @@ export default function AIChatSidebar({
 							? {
 									...m,
 									scrapeSources: [...aggregatedSources],
+									...(roundAssetLinks.length > 0
+										? {
+												assetLinks: mergeAssetLinks(
+													m.assetLinks || [],
+													roundAssetLinks,
+												),
+											}
+										: {}),
 									...(traceBatch.length > 0
 										? {
 												agentTrace: [...(m.agentTrace || []), ...traceBatch],
@@ -939,6 +1137,7 @@ export default function AIChatSidebar({
 		selectionContext,
 		scrapeOne,
 		scrapeMany,
+		scrapeYoutube,
 		refreshCredits,
 		chatMode,
 		effectiveUserId,
@@ -1328,6 +1527,9 @@ export default function AIChatSidebar({
 															{msg.scrapeSources?.length > 0 && (
 																<ScrapedSourcesPanel sources={msg.scrapeSources} />
 															)}
+															{msg.assetLinks?.length > 0 && (
+																<LibraryAssetLinksPanel links={msg.assetLinks} />
+															)}
 															{msg.agentTrace?.length > 0 && (
 																<div style={{ marginBottom: 10 }}>
 																	{msg.agentTrace.map((t, i) => (
@@ -1414,8 +1616,8 @@ export default function AIChatSidebar({
 																	{msg.draftProposal.createdId ? (
 																		<>
 																			{" · "}
-																			<a
-																				href={`/app/${msg.draftProposal.createdId}`}
+																			<button
+																				onClick={() => router.push(`/app/${msg.draftProposal.createdId}`,undefined ,{ shallow: false})}
 																				style={{
 																					color: "#C17B2F",
 																					fontWeight: 700,
@@ -1423,7 +1625,7 @@ export default function AIChatSidebar({
 																				}}
 																			>
 																				Open in app
-																			</a>
+																			</button>
 																		</>
 																	) : null}
 																</p>

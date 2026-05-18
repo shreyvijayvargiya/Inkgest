@@ -4,6 +4,7 @@ import StarterKit from "@tiptap/starter-kit";
 import BulletList from "@tiptap/extension-bullet-list";
 import OrderedList from "@tiptap/extension-ordered-list";
 import { Node, Extension } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
 import { CustomImage } from "../../../lib/ui/TiptapImageExtension";
 import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
@@ -52,6 +53,7 @@ import {
 	ArrowDown,
 	ArrowLeft,
 	ArrowRight,
+	CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
@@ -83,6 +85,134 @@ const TiptapTableHeaderShortcuts = Extension.create({
 		};
 	},
 });
+
+function inkClosestTaskLiFromCheckbox(checkboxEl) {
+	if (!checkboxEl?.closest) return null;
+	return checkboxEl.closest('li[data-type="taskItem"]');
+}
+
+function inkTaskItemDocPos(editor, taskLiDom) {
+	if (!editor?.view || !taskLiDom) return null;
+
+	let hit = null;
+	editor.state.doc.descendants((node, pos) => {
+		if (node.type.name !== "taskItem") return true;
+		const dom = editor.view.nodeDOM(pos);
+		if (dom === taskLiDom) {
+			hit = pos;
+			return false;
+		}
+		return true;
+	});
+
+	return hit;
+}
+
+function inkDeleteTaskRow(editor, checkboxEl) {
+	const root = editor?.view?.dom;
+	if (!(root instanceof HTMLElement) || !root.contains(checkboxEl)) return false;
+
+	const liDom = inkClosestTaskLiFromCheckbox(checkboxEl);
+	if (!liDom) return false;
+	const nodePos = inkTaskItemDocPos(editor, liDom);
+	if (nodePos == null) return false;
+	const row = editor.state.doc.nodeAt(nodePos);
+	if (!row || row.type.name !== "taskItem") return false;
+
+	const from = nodePos;
+	const to = nodePos + row.nodeSize;
+
+	return editor.chain().focus(undefined, { scrollIntoView: true }).deleteRange(from, to).run();
+}
+
+/**
+ * Reliable task checklist Backspace/delete: lifts empty rows out of lists, merges when there is text,
+ * deletes the row when Backspace/remove is fired from the task checkbox DOM (normally ignored by PM).
+ */
+const InkTaskListKeyboardFix = Extension.create({
+	name: "inkTaskListKeyboardFix",
+	priority: 1200,
+
+	addKeyboardShortcuts() {
+		const handleRemove = ({ editor }) => inkHandleTaskItemBackspace(editor);
+
+		return {
+			Backspace: handleRemove,
+		};
+	},
+
+	addProseMirrorPlugins() {
+		const extensionSelf = this;
+		const plugin = new Plugin({
+			props: {
+				handleDOMEvents: {
+					keydown(_view, event) {
+						if (event.key !== "Backspace" && event.key !== "Delete") return false;
+
+						const t = event.target;
+						if (!(t instanceof HTMLInputElement) || t.type !== "checkbox") return false;
+
+						const editor = extensionSelf.editor;
+						const root = editor?.view?.dom;
+						if (!(root instanceof HTMLElement)) return false;
+
+						const li = inkClosestTaskLiFromCheckbox(t);
+						if (!li || !root.contains(t)) return false;
+
+						event.preventDefault();
+						event.stopPropagation();
+
+						return inkDeleteTaskRow(editor, t);
+					},
+				},
+			},
+		});
+
+		return [plugin];
+	},
+});
+
+function inkHandleTaskItemBackspace(editor) {
+	if (!editor || editor.isDestroyed) return false;
+
+	const { state } = editor;
+	const { selection } = state;
+	if (!(selection.empty && editor.isActive("taskItem"))) return false;
+
+	const { $from } = selection;
+	if (!$from.parent.isTextblock || $from.parentOffset !== 0) return false;
+
+	let taskDepth = null;
+	for (let d = $from.depth; d >= 0; d--) {
+		if ($from.node(d).type.name === "taskItem") {
+			taskDepth = d;
+			break;
+		}
+	}
+
+	if (taskDepth == null) return false;
+
+	// Only steer the caret backspace/delete at the beginning of this task row’s primary textblock
+	if ($from.index(taskDepth) !== 0) return false;
+
+	const isEmpty = $from.parent.content.size === 0;
+
+	if (isEmpty) {
+		const lifted = editor.chain().focus(undefined, { scrollIntoView: true }).liftListItem("taskItem").run();
+
+		if (lifted) return true;
+
+		if (editor.chain().focus().liftEmptyBlock().run()) return true;
+
+		if (editor.chain().focus().toggleTaskList().run()) return true;
+
+		return false;
+	}
+
+	return (
+		editor.commands.joinBackward() || editor.commands.joinTextblockBackward()
+	);
+}
 
 // Create DetailsSummary and DetailsContent nodes (required by Details extension)
 // These are not exported from @tiptap/extension-details in v2, so we create them manually
@@ -289,11 +419,12 @@ const TiptapEditor = ({
 				},
 			}),
 			TaskItem.configure({
-				nested: false,
+				nested: true,
 				HTMLAttributes: {
 					class: "task-item",
 				},
 			}),
+			InkTaskListKeyboardFix,
 			CodeBlock,
 			CodeGroup,
 			TiptapSlashDropdownExtension,
@@ -777,9 +908,9 @@ const TiptapEditor = ({
 							? "bg-zinc-200 text-zinc-900"
 							: "text-zinc-600 hover:bg-zinc-100"
 						}`}
-					title="Task List"
+					title="Checklist"
 				>
-					<CheckSquare2 className="w-3.5 h-3.5" />
+					<CheckSquare className="w-3.5 h-3.5" />
 				</motion.button>
 				<div className="w-px h-5 bg-zinc-200 mx-1" />
 				<motion.button

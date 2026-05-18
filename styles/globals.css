@@ -5,6 +5,10 @@
 /* Leaflet CSS for map components */
 @import "leaflet/dist/leaflet.css";
 
+@media (max-width: 768px) {
+	.export-grid { grid-template-columns: 1fr !important; }
+}
+
 .blog-content {
 	line-height: 1;
 	color: #3f3f46;
@@ -357,25 +361,40 @@
 
 .ProseMirror ul[data-type="taskList"] li > label input {
 	cursor: pointer;
-	width: 1em;
-	height: 1em;
-	border-radius: 0.25rem;
-	background-color: #f0f0f0;
-	border: 1px solid black;
-	color: black;
+	box-sizing: border-box;
+	flex-shrink: 0;
+	position: relative;
+	margin: 0;
+	display: inline-block;
+	vertical-align: middle;
 	appearance: none;
 	-webkit-appearance: none;
 	-moz-appearance: none;
-	position: relative;
-	margin: 0;
-	flex-shrink: 0;
-	transition: all 0.2s ease;
-	display: inline-block;
-	vertical-align: middle;
+	width: 1.0625rem;
+	height: 1.0625rem;
+	border-radius: 0.25rem;
+	background-color: #ffffff;
+	border: 1.5px solid #d4d4d8;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		box-shadow 0.15s ease;
 }
 
-.ProseMirror ul[data-type="taskList"] > label input[type="checkbox"]:hover {
-	border-color: #71717a; /* zinc-500 */
+.ProseMirror ul[data-type="taskList"] li > label input:focus {
+	outline: none;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px #ffffff,
+		0 0 0 4px rgb(56 189 248 / 0.45);
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input:hover:not(:checked) {
+	border-color: #a1a1aa;
+	background-color: #fafafa;
 }
 
 .ProseMirror
@@ -383,23 +402,26 @@
 	li
 	> label
 	input[type="checkbox"]:checked {
-	background-color: black; /* zinc-400 */
-	border-color: #a1a1aa; /* zinc-400 */
+	background-color: #0ea5e9;
+	border-color: #0284c7;
+	box-shadow: 0 1px 2px rgb(24 24 27 / 0.06);
 }
 
 .ProseMirror
-ul[data-type="taskList"]
-li
-> label
-input[type="checkbox"]:checked::after {
-	content: "✓";
+	ul[data-type="taskList"]
+	li
+	> label
+	input[type="checkbox"]:checked::after {
+	content: "";
 	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	color: white;
-	font-size: 0.875rem;
-	font-weight: bold;
+	inset: 0;
+	margin: auto;
+	width: 0.3125rem;
+	height: 0.5625rem;
+	border-right: 2px solid #ffffff;
+	border-bottom: 2px solid #ffffff;
+	transform: translate(-1px, -1px) rotate(45deg);
+	border-radius: 0.0625rem;
 }
 
 .ProseMirror ul[data-type="taskList"] li[data-type="taskItem"] > div {
@@ -435,8 +457,11 @@ input[type="checkbox"]:checked::after {
 	ul[data-type="taskList"]
 	li[data-type="taskItem"][data-checked="true"]
 	> div {
-	opacity: 0.6;
-	text-decoration: line-through;
+	opacity: 0.88;
+	text-decoration-thickness: 1px;
+	text-decoration-color: #d4d4d8; /* thinner, softer strike */
+	color: #71717a; /* muted body for completed rows */
+	text-decoration-line: line-through;
 }
 
 .hidescrollbar::-webkit-scrollbar {

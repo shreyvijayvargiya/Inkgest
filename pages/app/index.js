@@ -31,11 +31,11 @@ import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
-    body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
-    textarea, input, button { font-family: 'Outfit', sans-serif; }
+    body { font-family: 'Comic', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
+    textarea, input, button { font-family: 'Comic', sans-serif; }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #E8E4DC; border-radius: 10px; }

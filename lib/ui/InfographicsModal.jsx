@@ -37,11 +37,11 @@ function wrapStandaloneHTML(innerHTML, igType = "") {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Infographic — ${igType}</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Comic', sans-serif;
     background: #ffffff;
     -webkit-font-smoothing: antialiased;
     display: flex;
@@ -381,7 +381,7 @@ function BarChart({ data }) {
 								x={pad - 6}
 								y={y + 4}
 								textAnchor="end"
-								style={{ fontSize: 9, fill: D.muted, fontFamily: "Outfit" }}
+								style={{ fontSize: 9, fill: D.muted, fontFamily: "Comic" }}
 							>
 								{Math.round((max * pct) / 100)}
 								{yLabel || ""}
@@ -418,7 +418,7 @@ function BarChart({ data }) {
 									fontSize: 10,
 									fill: col,
 									fontWeight: 700,
-									fontFamily: "Outfit",
+									fontFamily: "Comic",
 								}}
 							>
 								{b.value}
@@ -428,7 +428,7 @@ function BarChart({ data }) {
 								x={x + barW / 2}
 								y={H + 18}
 								textAnchor="middle"
-								style={{ fontSize: 10, fill: D.muted, fontFamily: "Outfit" }}
+								style={{ fontSize: 10, fill: D.muted, fontFamily: "Comic" }}
 							>
 								{b.label}
 							</text>
@@ -1432,9 +1432,9 @@ export default function InfographicsModal({
 		if (!el || !ig) return null;
 		return (
 			`<!-- Infographic: ${ig.type} -->\n` +
-			`<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">\n` +
+			`<link href="https://fonts.googleapis.com/css2?family=Comic:wght@400;600;700&display=swap" rel="stylesheet">\n` +
 			`<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}` +
-			`body{font-family:'Outfit',sans-serif;-webkit-font-smoothing:antialiased}</style>\n` +
+			`body{font-family:'Comic',sans-serif;-webkit-font-smoothing:antialiased}</style>\n` +
 			`<div style="max-width:520px;">\n${el.innerHTML}\n</div>`
 		);
 	};

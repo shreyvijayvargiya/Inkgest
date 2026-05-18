@@ -7,6 +7,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
+import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds";
 
 /* ── Fetch helper ── */
 async function fetchPublicDoc(slug) {
@@ -32,7 +33,8 @@ export async function getServerSideProps(ctx) {
 		);
 		if (!res.ok) return { notFound: true };
 		const data = await res.json();
-		return { props: { initialData: data, slug } };
+		const body = normalizeYoutubeEmbedsInHtml(data.body || "");
+		return { props: { initialData: { ...data, body }, slug } };
 	} catch {
 		return { notFound: true };
 	}
@@ -40,9 +42,9 @@ export async function getServerSideProps(ctx) {
 
 /* ── Styles ── */
 const PAGE_STYLE = `
-	@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+	@import url('https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&family=Comic:wght@400;500;600;700&display=swap');
 	*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-	body { font-family: 'Outfit', sans-serif; background: #F7F5F0; color: #57534E; -webkit-font-smoothing: antialiased; }
+	body { font-family: 'Comic', sans-serif; background: #F7F5F0; color: #57534E; -webkit-font-smoothing: antialiased; }
 	::-webkit-scrollbar { width: 5px; }
 	::-webkit-scrollbar-thumb { background: #E8E4DC; border-radius: 10px; }
 
@@ -64,6 +66,7 @@ const PAGE_STYLE = `
 	.ink-prose th   { background: #F0ECE5; padding: 8px 12px; text-align: left; font-weight: 600; border: 1px solid #E7E2DA; }
 	.ink-prose td   { padding: 8px 12px; border: 1px solid #E7E2DA; }
 	.ink-prose figure { margin: 16px 0; }
+	.ink-prose iframe { max-width: 100%; width: 100%; aspect-ratio: 16 / 9; height: auto; min-height: 200px; border: 0; border-radius: 10px; display: block; }
 
 	/* Toggle group */
 	details[data-block="draft-toggle"] summary::-webkit-details-marker { display: none; }
@@ -122,6 +125,7 @@ export default function PublicBlogPage({ initialData, slug }) {
 	}
 
 	const { title, description, body, publishedAt, updatedAt } = data;
+	const safeBody = normalizeYoutubeEmbedsInHtml(body || "");
 	const publishDate = publishedAt
 		? new Date(publishedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
 		: null;
@@ -130,13 +134,13 @@ export default function PublicBlogPage({ initialData, slug }) {
 		<>
 			<Head>
 				<title>{title ? `${title} — Inkgest` : "Inkgest Blog"}</title>
-				<meta name="description" content={description || (body ? body.replace(/<[^>]+>/g, "").slice(0, 155) : "A blog post published on Inkgest")} />
+				<meta name="description" content={description || (safeBody ? safeBody.replace(/<[^>]+>/g, "").slice(0, 155) : "A blog post published on Inkgest")} />
 				<link rel="canonical" href={canonicalUrl} />
 
 				{/* Open Graph */}
 				<meta property="og:type" content="article" />
 				<meta property="og:title" content={title || "Inkgest Blog"} />
-				<meta property="og:description" content={description || (body ? body.replace(/<[^>]+>/g, "").slice(0, 155) : "")} />
+				<meta property="og:description" content={description || (safeBody ? safeBody.replace(/<[^>]+>/g, "").slice(0, 155) : "")} />
 				<meta property="og:url" content={canonicalUrl} />
 				<meta property="og:site_name" content="Inkgest" />
 				{publishedAt && <meta property="article:published_time" content={publishedAt} />}
@@ -145,7 +149,7 @@ export default function PublicBlogPage({ initialData, slug }) {
 				{/* Twitter Card */}
 				<meta name="twitter:card" content="summary_large_image" />
 				<meta name="twitter:title" content={title || "Inkgest Blog"} />
-				<meta name="twitter:description" content={description || (body ? body.replace(/<[^>]+>/g, "").slice(0, 155) : "")} />
+				<meta name="twitter:description" content={description || (safeBody ? safeBody.replace(/<[^>]+>/g, "").slice(0, 155) : "")} />
 
 				{/* JSON-LD structured data */}
 				<script
@@ -176,7 +180,7 @@ export default function PublicBlogPage({ initialData, slug }) {
 				<nav style={{ background: "#FFFFFF", borderBottom: "1px solid #E7E2DA", padding: "12px 0", position: "sticky", top: 0, zIndex: 10 }}>
 					<div style={{ maxWidth: 760, margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
 						<Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
-							<span style={{ fontSize: 18, fontWeight: 800, color: "#D97706", fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.5px" }}>Inkgest</span>
+							<span style={{ fontSize: 18, fontWeight: 800, color: "#D97706", fontFamily: "'Comic', sans-serif", letterSpacing: "-0.5px" }}>Inkgest</span>
 						</Link>
 						<Link
 							href="/"
@@ -192,7 +196,7 @@ export default function PublicBlogPage({ initialData, slug }) {
 				<main style={{ maxWidth: 760, margin: "0 auto", padding: "48px 24px 96px" }}>
 					{/* Header */}
 					<header style={{ marginBottom: 36 }}>
-						<h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#1C1917", lineHeight: 1.2, marginBottom: 14, fontFamily: "'Outfit', sans-serif" }}>
+						<h1 style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 800, color: "#1C1917", lineHeight: 1.2, marginBottom: 14, fontFamily: "'Comic', sans-serif" }}>
 							{title || "Untitled"}
 						</h1>
 						{description && (
@@ -217,7 +221,7 @@ export default function PublicBlogPage({ initialData, slug }) {
 					{/* Body content */}
 					<article
 						className="ink-prose"
-						dangerouslySetInnerHTML={{ __html: body || "" }}
+						dangerouslySetInnerHTML={{ __html: safeBody }}
 					/>
 
 					{/* Footer */}

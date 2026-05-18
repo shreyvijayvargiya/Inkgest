@@ -1,4 +1,4 @@
-import {
+import React, {
 	useState,
 	useRef,
 	useEffect,
@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
 import InfographicsModal from "../../lib/ui/InfographicsModal";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
+import AnimatedDropdown from "../../lib/ui/AnimatedDropdown";
 import TableView from "../../lib/ui/TableView";
 import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
 import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
@@ -30,16 +31,17 @@ import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { getTheme } from "../../lib/utils/theme";
 import { formatInkDateLong, TiptapSlashDatePicker } from "../../lib/ui/TiptapSlashDatePicker.jsx";
 import { htmlToMarkdown } from "../../lib/utils/htmlToMarkdown";
+import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds";
 import IconSelectorDropdown, { lucideToSvgString } from "../../lib/ui/IconSelectorDropdown.jsx";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&family=Comic:wght@400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
-    body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
-    textarea, input, button { font-family: 'Outfit', sans-serif; }
+    body { font-family: 'Comic', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
+    textarea, input, button { font-family: 'Comic', sans-serif; }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #E8E4DC; border-radius: 10px; }
@@ -224,15 +226,15 @@ const THEMES = {
 		label: "Warm editorial · Sans",
 		palette: ["#F7F5F0", "#1A1A1A", "#C17B2F", "#7A7570"],
 		fontUrl:
-			"https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap",
+			"https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&display=swap",
 		bodyFont: "'Comic', sans-serif",
 		bg: "#F7F5F0",
 		text: "#3A3530",
 		container:
-			"max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Outfit',sans-serif;",
-		h1: "font-family:'Outfit',sans-serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
-		h2: "font-family:'Outfit',sans-serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
-		h3: "font-family:'Outfit',sans-serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
+			"max-width:720px;margin:0 auto;padding:48px 56px;background:#F7F5F0;font-family:'Comic',sans-serif;",
+		h1: "font-family:'Comic',sans-serif;font-size:34px;color:#1A1A1A;line-height:1.2;margin:0 0 16px;font-weight:400;",
+		h2: "font-family:'Comic',sans-serif;font-size:24px;color:#1A1A1A;line-height:1.3;margin:32px 0 12px;font-weight:400;",
+		h3: "font-family:'Comic',sans-serif;font-size:19px;color:#3A3530;margin:22px 0 8px;font-weight:400;",
 		p: "font-size:16px;line-height:1.85;color:#3A3530;margin:0 0 14px;",
 		blockquote:
 			"border-left:3px solid #C17B2F;padding:4px 0 4px 20px;color:#7A7570;font-style:italic;margin:20px 0;",
@@ -247,15 +249,15 @@ const THEMES = {
 		label: "Dark minimal · Sans",
 		palette: ["#0D0D0D", "#E8E8E8", "#7C7CFF", "#444444"],
 		fontUrl:
-			"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap",
+			"https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&display=swap",
 		bodyFont: "'Comic', sans-serif",
 		bg: "#0D0D0D",
 		text: "#A8A8A8",
 		container:
-			"max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Inter',sans-serif;",
-		h1: "font-family:'Inter',sans-serif;font-size:30px;color:#FFFFFF;line-height:1.2;margin:0 0 16px;font-weight:600;",
-		h2: "font-family:'Inter',sans-serif;font-size:20px;color:#D4D4D4;line-height:1.3;margin:32px 0 12px;font-weight:500;border-bottom:1px solid #222222;padding-bottom:8px;",
-		h3: "font-family:'Inter',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:;letter-spacing:0.06em;",
+			"max-width:720px;margin:0 auto;padding:48px 56px;background:#0D0D0D;font-family:'Comic',sans-serif;",
+		h1: "font-family:'Comic',sans-serif;font-size:30px;color:#FFFFFF;line-height:1.2;margin:0 0 16px;font-weight:600;",
+		h2: "font-family:'Comic',sans-serif;font-size:20px;color:#D4D4D4;line-height:1.3;margin:32px 0 12px;font-weight:500;border-bottom:1px solid #222222;padding-bottom:8px;",
+		h3: "font-family:'Comic',sans-serif;font-size:14px;color:#888888;margin:22px 0 8px;font-weight:500;text-transform:;letter-spacing:0.06em;",
 		p: "font-size:15px;line-height:1.9;color:#A8A8A8;margin:0 0 14px;",
 		blockquote:
 			"border-left:3px solid #7C7CFF;padding:4px 0 4px 20px;color:#666666;font-style:italic;margin:20px 0;",
@@ -1221,7 +1223,7 @@ const LANG_OPTIONS = [
 
 function makeCalloutHtml(type, text = "") {
 	const c = CALLOUT_CONFIGS[type] || CALLOUT_CONFIGS.info;
-	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:;letter-spacing:0.1em;margin:0 0 5px;font-family:'Outfit',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Outfit',sans-serif">${text}</div></div></div>`;
+	return `<div data-block="callout-${type}" style="border-left:4px solid ${c.border};background:${c.bg};border-radius:0 8px 8px 0;padding:13px 16px;margin:14px 0;display:flex;gap:12px;align-items:flex-start"><span style="font-size:17px;flex-shrink:0;line-height:1.6;margin-top:2px">${c.emoji}</span><div style="flex:1"><p style="font-weight:700;color:${c.textColor};font-size:10.5px;text-transform:;letter-spacing:0.1em;margin:0 0 5px;font-family:'Comic',sans-serif">${c.label}</p><div style="color:${c.textColor};font-size:14px;line-height:1.65;font-family:'Comic',sans-serif">${text}</div></div></div>`;
 }
 
 function makeCodeBlockHtml(
@@ -1233,11 +1235,11 @@ function makeCodeBlockHtml(
 		(l) =>
 			`<option value="${l}" ${l === lang ? "selected" : ""}>${l?.charAt(0).toLowerCase() + l.slice(1)}</option>`,
 	).join("");
-	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Outfit',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
+	return `<div data-block="code" style="margin:16px 0;border-radius:10px;overflow:hidden;border:1px solid #E8E4DC"><div contenteditable="false" style="background:#F0ECE5;padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E8E4DC;user-select:none"><select data-action="change-lang" style="background:none;border:none;font-size:11px;font-weight:700;color:#5A5550;text-transform:;letter-spacing:0.06em;cursor:pointer;outline:none;font-family:'Comic',sans-serif">${opts}</select><button data-action="copy-code" style="background:#FFFFFF;border:1px solid #E8E4DC;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:#7A7570;cursor:pointer;font-family:'Comic',sans-serif;transition:all 0.15s">Copy</button></div><pre style="background:#1A1A1A;margin:0;padding:18px 20px;overflow-x:auto"><code style="color:#E8D5B0;font-family:'Fira Code','Cascadia Code','Courier New',monospace;font-size:13px;line-height:1.75;white-space:pre;display:block">${code}</code></pre></div>`;
 }
 
 function makeButtonBlockHtml(text = "Click here →", href = "#") {
-	return `<p style="margin:16px 0"><a href="${href}" style="display:inline-block;background:#C17B2F;color:#FFFFFF;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;font-family:'Outfit',sans-serif;letter-spacing:0.01em">${text}</a></p>`;
+	return `<p style="margin:16px 0"><a href="${href}" style="display:inline-block;background:#C17B2F;color:#FFFFFF;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:700;font-family:'Comic',sans-serif;letter-spacing:0.01em">${text}</a></p>`;
 }
 
 const MAX_TABS = 5;
@@ -1298,13 +1300,37 @@ function normalizeTodoLists(root) {
 	}
 }
 
+/**
+ * Walk up from the caret to find the text "block" for slash matching.
+ * `Element.closest()` cannot express `summary > editable span`, and leaf fields
+ * (figcaption, card heading, table cells, etc.) are often not `<p>` — without this,
+ * block is null and the slash menu never opens.
+ */
+const DRAFT_SLASH_BLOCK_SEL =
+	"p,h1,h2,h3,h4,li,blockquote,figcaption,td,th,pre,code," +
+	"[data-card-heading],[data-card-desc],[data-audio-name],[data-audio-caption],[data-toggle-group-label]," +
+	"div[data-draft-panel],div[data-block]";
+
 function getDraftBlockFromSelection(editorRoot, range) {
 	if (!editorRoot || !range) return null;
 	let n = range.commonAncestorContainer;
-	if (n.nodeType === 3) n = n.parentElement;
-	const block = n?.closest?.("p,h1,h2,h3,h4,li,blockquote,div[data-block]");
-	if (!block || !editorRoot.contains(block)) return null;
-	return block;
+	let el = n.nodeType === 3 ? n.parentElement : n;
+	while (el && editorRoot.contains(el)) {
+		if (
+			el.matches?.("span[contenteditable='true']") &&
+			el.closest?.("summary") &&
+			editorRoot.contains(el.closest("summary"))
+		) {
+			return el;
+		}
+		try {
+			if (el.matches?.(DRAFT_SLASH_BLOCK_SEL)) return el;
+		} catch {
+			/* ignore */
+		}
+		el = el.parentElement;
+	}
+	return null;
 }
 
 function getTextFromBlockStartToCaret(block, range) {
@@ -1393,9 +1419,14 @@ function syncDraftSlashQueryHighlight(editorRoot) {
 	}
 	if (
 		block.closest?.(
-			"pre, code, summary, [contenteditable='false']",
+			"pre, code, [contenteditable='false']",
 		)
 	) {
+		unwrapAllDraftSlashQuerySpans(editorRoot);
+		return;
+	}
+	const inSummary = block.closest?.("summary");
+	if (inSummary && !block.matches?.("span[contenteditable='true']")) {
 		unwrapAllDraftSlashQuerySpans(editorRoot);
 		return;
 	}
@@ -1632,34 +1663,133 @@ function deleteDraftSlashFromCaret(editorEl) {
 	if (slash) deleteDraftSlashToken(block, range, slash.slashToken.length);
 }
 
-function youtubeIdFromUrl(raw) {
+/**
+ * Universal social-media embed resolver.
+ *
+ * Returns one of two shapes:
+ *   { platform, label, color, iframeSrc, aspectRatio }  — iframeable platforms
+ *   { platform, label, color, cardEmbed: true, url }    — non-iframeable (X, IG, Gist…)
+ *     → inserted as a styled link card; no <script> tags, works with execCommand
+ */
+function resolveEmbed(raw) {
 	try {
 		const u = String(raw || "").trim();
 		if (!u) return null;
-		const tryUrl = new URL(u.includes("://") ? u : `https://${u}`);
-		const host = tryUrl.hostname.replace(/^www\./, "");
-		if (host === "youtu.be") {
-			const id = tryUrl.pathname.replace(/^\//, "").split("/")[0];
-			return id || null;
+		const url = new URL(u.includes("://") ? u : `https://${u}`);
+		const host = url.hostname.replace(/^www\./, "");
+
+		/* ── YouTube ── */
+		if (host === "youtu.be" || host.includes("youtube.com")) {
+			let id = null;
+			if (host === "youtu.be") id = url.pathname.replace(/^\//, "").split(/[?#]/)[0];
+			else {
+				id = url.searchParams.get("v")
+					|| url.pathname.match(/\/embed\/([^/?#]+)/)?.[1]
+					|| url.pathname.match(/\/shorts\/([^/?#]+)/)?.[1]
+					|| url.pathname.match(/\/live\/([^/?#]+)/)?.[1];
+			}
+			if (!id) return null;
+			return { platform: "YouTube", label: "YouTube", color: "#FF0000", iframeSrc: `https://www.youtube.com/embed/${id}?rel=0`, aspectRatio: "16/9" };
 		}
-		if (host.includes("youtube.com")) {
-			const v = tryUrl.searchParams.get("v");
-			if (v) return v;
-			const embed = tryUrl.pathname.match(/\/embed\/([^/]+)/);
-			if (embed) return embed[1];
-			const shorts = tryUrl.pathname.match(/\/shorts\/([^/]+)/);
-			if (shorts) return shorts[1];
+
+		/* ── Twitter / X — blocks iframes; use a link card ── */
+		if (host === "twitter.com" || host === "x.com") {
+			return { platform: "Twitter/X", label: "Twitter / X", color: "#000000", cardEmbed: true, url: u };
 		}
+
+		/* ── Instagram — blocks iframes; use a link card ── */
+		if (host === "instagram.com" || host === "instagr.am") {
+			return { platform: "Instagram", label: "Instagram", color: "#E1306C", cardEmbed: true, url: u };
+		}
+
+		/* ── Reddit — use redditmedia embed endpoint ── */
+		if (host === "reddit.com" || host === "redd.it") {
+			// redditmedia allows iframing; convert the URL
+			const clean = u.split("?")[0].replace(/\/$/, "");
+			const embedSrc = clean.replace("www.reddit.com", "www.redditmedia.com")
+				.replace("reddit.com", "www.redditmedia.com")
+				+ "?ref_source=embed&ref=share&embed=true&theme=light";
+			return { platform: "Reddit", label: "Reddit", color: "#FF4500", iframeSrc: embedSrc, aspectRatio: "4/3" };
+		}
+
+		/* ── TikTok ── */
+		if (host === "tiktok.com" || host === "vm.tiktok.com") {
+			const videoId = url.pathname.match(/\/video\/(\d+)/)?.[1];
+			if (!videoId) return null;
+			return { platform: "TikTok", label: "TikTok", color: "#010101", iframeSrc: `https://www.tiktok.com/embed/v2/${videoId}`, aspectRatio: "9/16" };
+		}
+
+		/* ── Spotify ── */
+		if (host === "open.spotify.com" || host === "spotify.com") {
+			const path = url.pathname;
+			const embedPath = path
+				.replace(/^\/(track|album|playlist|episode|show)\//, "/embed/$1/");
+			const src = `https://open.spotify.com${embedPath}`;
+			return { platform: "Spotify", label: "Spotify", color: "#1DB954", iframeSrc: src, aspectRatio: "80px" };
+		}
+
+		/* ── Vimeo ── */
+		if (host === "vimeo.com" || host === "player.vimeo.com") {
+			const id = url.pathname.match(/\/(\d+)/)?.[1];
+			if (!id) return null;
+			return { platform: "Vimeo", label: "Vimeo", color: "#1AB7EA", iframeSrc: `https://player.vimeo.com/video/${id}`, aspectRatio: "16/9" };
+		}
+
+		/* ── GitHub Gist — blocks iframes; link card ── */
+		if (host === "gist.github.com") {
+			return { platform: "GitHub Gist", label: "GitHub Gist", color: "#24292E", cardEmbed: true, url: u };
+		}
+
+		/* ── CodeSandbox ── */
+		if (host === "codesandbox.io") {
+			const src = u.replace(/codesandbox\.io\/s\//, "codesandbox.io/embed/");
+			return { platform: "CodeSandbox", label: "CodeSandbox", color: "#151515", iframeSrc: src, aspectRatio: "16/9" };
+		}
+
+		/* ── Loom ── */
+		if (host === "loom.com" || host === "www.loom.com") {
+			const id = url.pathname.match(/\/share\/([a-z0-9]+)/i)?.[1];
+			if (!id) return null;
+			return { platform: "Loom", label: "Loom", color: "#625DF5", iframeSrc: `https://www.loom.com/embed/${id}`, aspectRatio: "16/9" };
+		}
+
+		/* ── Figma ── */
+		if (host === "figma.com" || host === "www.figma.com") {
+			const src = `https://www.figma.com/embed?embed_host=inkgest&url=${encodeURIComponent(u)}`;
+			return { platform: "Figma", label: "Figma", color: "#F24E1E", iframeSrc: src, aspectRatio: "4/3" };
+		}
+
+		/* ── Generic iframe fallback ── */
+		return { platform: "Embed", label: "Embed", color: "#5A5550", iframeSrc: u, aspectRatio: "16/9" };
 	} catch {
-		/* ignore */
-	}
 	return null;
+	}
 }
 
-function makeEmbedIframeHtml(videoId) {
-	if (!videoId) return "";
-	const src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`;
-	return `<p style="margin:16px 0"><iframe src="${src}" width="560" height="315" style="max-width:100%;aspect-ratio:16/9;height:auto;min-height:200px;border:0;border-radius:8px" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></p>`;
+const EMBED_ICONS = {
+	"YouTube": "▶", "Twitter/X": "𝕏", "Instagram": "📸", "Reddit": "🤖",
+	"TikTok": "♪", "Spotify": "🎵", "Vimeo": "🎬", "GitHub Gist": "📋",
+	"CodeSandbox": "📦", "Loom": "🎥", "Figma": "🎨", "Embed": "🔗",
+};
+
+function makeEmbedHtml(embed) {
+	if (!embed) return "";
+
+	/* Card embed (non-iframeable: X, Instagram, Gist…)
+	   Uses only plain HTML — no <script> tags — so execCommand works. */
+	if (embed.cardEmbed) {
+		const icon = EMBED_ICONS[embed.platform] || "🔗";
+		const displayUrl = embed.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60);
+		return `<div style="margin:16px 0;border:1.5px solid #E8E4DC;border-radius:12px;overflow:hidden;display:flex;align-items:center;gap:14px;padding:14px 18px;background:#FAFAF8;text-decoration:none;max-width:560px"><span style="font-size:24px;flex-shrink:0;line-height:1">${icon}</span><div style="flex:1;min-width:0"><p style="font-size:13px;font-weight:700;color:#37352F;margin:0 0 2px">${embed.label}</p><a href="${embed.url}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#C17B2F;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${displayUrl}</a></div><a href="${embed.url}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:#9A9490;text-decoration:none;white-space:nowrap;padding:5px 10px;border:1px solid #E8E4DC;border-radius:6px;background:#fff">Open ↗</a></div><p><br></p>`;
+	}
+
+	/* iframeable platforms */
+	const ar = embed.aspectRatio || "16/9";
+	// Spotify uses a fixed px height, others use aspect-ratio
+	const heightStyle = ar.includes("px")
+		? `height:${ar};min-height:unset`
+		: `aspect-ratio:${ar};height:auto;min-height:180px`;
+	return `<p style="margin:16px 0"><iframe src="${embed.iframeSrc}" style="max-width:100%;width:100%;${heightStyle};border:0;border-radius:10px;display:block" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></p>`;
 }
 
 function escapeAttr(s) {
@@ -1986,211 +2116,44 @@ function execDraftHiliteColor(hex) {
 }
 
 /** Slash menu rows (filter by query after `/`, no spaces in query). */
+// subSection gives finer grouping inside the slash dropdown
 const DRAFT_SLASH_BASE_ITEMS = [
-	{
-		id: "text",
-		label: "Text",
-		icon: "T",
-		section: "style",
-		keywords: ["text", "paragraph", "p", "plain", "body"],
-	},
-	{
-		id: "h1",
-		label: "Heading 1",
-		icon: "H₁",
-		section: "style",
-		keywords: ["h1", "heading", "title", "one", "1"],
-	},
-	{
-		id: "h2",
-		label: "Heading 2",
-		icon: "H₂",
-		section: "style",
-		keywords: ["h2", "heading", "two", "subtitle", "2"],
-	},
-	{
-		id: "h3",
-		label: "Heading 3",
-		icon: "H₃",
-		section: "style",
-		keywords: ["h3", "heading", "three", "3"],
-	},
-	{
-		id: "bullet",
-		label: "Bullet List",
-		icon: "list",
-		section: "style",
-		keywords: ["bullet", "ul", "unordered", "list"],
-	},
-	{
-		id: "numbered",
-		label: "Numbered List",
-		icon: "list",
-		section: "style",
-		keywords: ["numbered", "ordered", "ol", "list"],
-	},
-	{
-		id: "todo",
-		label: "To-do list",
-		icon: "☐",
-		section: "style",
-		keywords: [
-			"todo",
-			"task",
-			"check",
-			"list",
-			"checkout",
-			"checkbox",
-			"checklist",
-		],
-	},
-	{
-		id: "quote",
-		label: "Quote",
-		icon: "❝",
-		section: "style",
-		keywords: ["quote", "blockquote", "pull", "bq"],
-	},
-	{
-		id: "image",
-		label: "Image",
-		icon: "image",
-		section: "blocks",
-		keywords: ["image", "img", "photo", "picture", "upload"],
-	},
-	{
-		id: "table",
-		label: "Table",
-		icon: "table",
-		section: "blocks",
-		keywords: ["table", "grid", "rows", "sheet", "csv"],
-	},
-	{
-		id: "embed",
-		label: "Embed (YouTube)",
-		icon: "embed",
-		section: "blocks",
-		keywords: ["embed", "youtube", "video", "iframe", "movie"],
-	},
-	{
-		id: "divider",
-		label: "Divider — Solid",
-		icon: "—",
-		section: "blocks",
-		keywords: ["divider", "horizontal", "hr", "rule", "separator", "---", "solid"],
-	},
-	{
-		id: "divider-dashed",
-		label: "Divider — Dashed",
-		icon: "╌",
-		section: "blocks",
-		keywords: ["divider", "dashed", "hr", "separator", "line"],
-	},
-	{
-		id: "divider-dotted",
-		label: "Divider — Dotted",
-		icon: "···",
-		section: "blocks",
-		keywords: ["divider", "dotted", "hr", "separator", "dots"],
-	},
-	{
-		id: "toggle-group",
-		label: "Toggle Group (FAQ)",
-		icon: "☰",
-		section: "blocks",
-		keywords: ["faq", "toggle group", "accordion", "collapse", "questions"],
-	},
-	{
-		id: "card",
-		label: "Card",
-		icon: "▭",
-		section: "blocks",
-		keywords: ["card", "box", "panel", "feature", "icon card"],
-	},
-	{
-		id: "icon-block",
-		label: "Icon",
-		icon: "✦",
-		section: "blocks",
-		keywords: ["icon", "emoji", "symbol", "glyph", "svg"],
-	},
-	{
-		id: "audio",
-		label: "Audio",
-		icon: "♪",
-		section: "blocks",
-		keywords: ["audio", "music", "mp3", "sound", "track", "podcast"],
-	},
-	{
-		id: "record",
-		label: "Record Audio",
-		icon: "⏺",
-		section: "blocks",
-		keywords: ["record", "recording", "microphone", "mic", "voice", "capture"],
-	},
-	{
-		id: "code",
-		label: "Code block",
-		icon: "{ }",
-		section: "blocks",
-		keywords: ["code", "codeblock", "snippet", "pre", "program"],
-	},
-	{
-		id: "codeGroup",
-		label: "Code group",
-		icon: "▤",
-		section: "blocks",
-		keywords: ["codegroup", "code group", "snippets", "multi", "gist"],
-	},
-	{
-		id: "tabs",
-		label: "Tabs",
-		icon: "▦",
-		section: "blocks",
-		keywords: ["tabs", "tab", "panels", "tabgroup"],
-	},
-	{
-		id: "toggle",
-		label: "Toggle",
-		icon: "▸",
-		section: "blocks",
-		keywords: ["toggle", "details", "collapse", "accordion", "disclosure"],
-	},
-	{
-		id: "callout-info",
-		label: "Info callout",
-		icon: "ℹ️",
-		section: "blocks",
-		keywords: ["info", "information", "note", "blue", "tip"],
-	},
-	{
-		id: "callout-warning",
-		label: "Callout",
-		icon: "⚠️",
-		section: "blocks",
-		keywords: ["callout", "warning", "caution", "yellow", "attention"],
-	},
-	{
-		id: "callout-success",
-		label: "Success callout",
-		icon: "✅",
-		section: "blocks",
-		keywords: ["success", "done", "green", "check", "positive"],
-	},
-	{
-		id: "callout-danger",
-		label: "Danger callout",
-		icon: "🚨",
-		section: "blocks",
-		keywords: ["danger", "error", "red", "alert", "critical", "block"],
-	},
-	{
-		id: "date",
-		label: "Date",
-		icon: "📅",
-		section: "blocks",
-		keywords: ["date", "today", "calendar", "time"],
-	},
+	/* ── Typography ── */
+	{ id: "text",     label: "Text",          icon: "T",    section: "style",  subSection: "Typography",  keywords: ["text", "paragraph", "p", "plain", "body"] },
+	{ id: "h1",       label: "Heading 1",     icon: "H₁",   section: "style",  subSection: "Typography",  keywords: ["h1", "heading", "title", "one", "1"] },
+	{ id: "h2",       label: "Heading 2",     icon: "H₂",   section: "style",  subSection: "Typography",  keywords: ["h2", "heading", "two", "subtitle", "2"] },
+	{ id: "h3",       label: "Heading 3",     icon: "H₃",   section: "style",  subSection: "Typography",  keywords: ["h3", "heading", "three", "3"] },
+	{ id: "quote",    label: "Quote",         icon: "❝",    section: "style",  subSection: "Typography",  keywords: ["quote", "blockquote", "pull", "bq"] },
+	/* ── Lists ── */
+	{ id: "bullet",   label: "Bullet List",   icon: "list", section: "style",  subSection: "Lists",       keywords: ["bullet", "ul", "unordered", "list"] },
+	{ id: "numbered", label: "Numbered List", icon: "list", section: "style",  subSection: "Lists",       keywords: ["numbered", "ordered", "ol", "list"] },
+	{ id: "todo",     label: "To-do List",    icon: "☐",    section: "style",  subSection: "Lists",       keywords: ["todo", "task", "check", "list", "checkbox", "checklist"] },
+	/* ── Media ── */
+	{ id: "image",    label: "Image",         icon: "image",  section: "blocks", subSection: "Media",     keywords: ["image", "img", "photo", "picture", "upload"] },
+	{ id: "embed",    label: "Embed",           icon: "embed", section: "blocks", subSection: "Media",    keywords: ["embed", "youtube", "twitter", "x", "instagram", "reddit", "tiktok", "spotify", "vimeo", "loom", "figma", "video", "social", "iframe"] },
+	{ id: "audio",    label: "Audio File",    icon: "♪",    section: "blocks", subSection: "Media",       keywords: ["audio", "music", "mp3", "sound", "track", "podcast"] },
+	{ id: "record",   label: "Record Audio",  icon: "⏺",    section: "blocks", subSection: "Media",       keywords: ["record", "recording", "microphone", "mic", "voice", "capture"] },
+	/* ── Data ── */
+	{ id: "table",    label: "Table",         icon: "table", section: "blocks", subSection: "Data",       keywords: ["table", "grid", "rows", "sheet", "csv"] },
+	{ id: "date",     label: "Date",          icon: "📅",    section: "blocks", subSection: "Data",        keywords: ["date", "today", "calendar", "time"] },
+	/* ── Components ── */
+	{ id: "card",         label: "Card",               icon: "▭", section: "blocks", subSection: "Components", keywords: ["card", "box", "panel", "feature", "icon card"] },
+	{ id: "toggle-group", label: "Toggle Group (FAQ)", icon: "☰", section: "blocks", subSection: "Components", keywords: ["faq", "toggle group", "accordion", "collapse", "questions"] },
+	{ id: "toggle",       label: "Toggle",             icon: "▸", section: "blocks", subSection: "Components", keywords: ["toggle", "details", "collapse", "accordion", "disclosure"] },
+	{ id: "tabs",         label: "Tabs",               icon: "▦", section: "blocks", subSection: "Components", keywords: ["tabs", "tab", "panels", "tabgroup"] },
+	{ id: "icon-block",   label: "Icon",               icon: "✦", section: "blocks", subSection: "Components", keywords: ["icon", "emoji", "symbol", "glyph", "svg"] },
+	/* ── Callouts ── */
+	{ id: "callout-info",    label: "Info Callout",    icon: "ℹ️",  section: "blocks", subSection: "Callouts", keywords: ["info", "information", "note", "blue", "tip"] },
+	{ id: "callout-warning", label: "Warning Callout", icon: "⚠️",  section: "blocks", subSection: "Callouts", keywords: ["callout", "warning", "caution", "attention"] },
+	{ id: "callout-success", label: "Success Callout", icon: "✅",  section: "blocks", subSection: "Callouts", keywords: ["success", "done", "green", "check", "positive"] },
+	{ id: "callout-danger",  label: "Danger Callout",  icon: "🚨",  section: "blocks", subSection: "Callouts", keywords: ["danger", "error", "red", "alert", "critical"] },
+	/* ── Code ── */
+	{ id: "code",      label: "Code Block", icon: "{ }", section: "blocks", subSection: "Code", keywords: ["code", "codeblock", "snippet", "pre", "program"] },
+	{ id: "codeGroup", label: "Code Group", icon: "▤",   section: "blocks", subSection: "Code", keywords: ["codegroup", "code group", "snippets", "multi", "gist"] },
+	/* ── Dividers ── */
+	{ id: "divider",        label: "Solid Line",  icon: "—",   section: "blocks", subSection: "Dividers", keywords: ["divider", "horizontal", "hr", "rule", "separator", "solid"] },
+	{ id: "divider-dashed", label: "Dashed Line", icon: "╌",   section: "blocks", subSection: "Dividers", keywords: ["divider", "dashed", "hr", "separator", "line"] },
+	{ id: "divider-dotted", label: "Dotted Line", icon: "···", section: "blocks", subSection: "Dividers", keywords: ["divider", "dotted", "hr", "separator", "dots"] },
 ];
 
 const DRAFT_SLASH_AI_KEYWORDS = ["ai", "ask", "chat", "gpt", "assistant", "magic"];
@@ -2204,14 +2167,7 @@ function getDraftSlashFlatRows(query) {
 	);
 	if (aiHit) rows.push({ id: "ask-ai" });
 	for (const it of DRAFT_SLASH_BASE_ITEMS) {
-		if (it.section === "style" && draftSlashItemMatchesQuery(it, q)) {
-			rows.push({ id: it.id });
-		}
-	}
-	for (const it of DRAFT_SLASH_BASE_ITEMS) {
-		if (it.section === "blocks" && draftSlashItemMatchesQuery(it, q)) {
-			rows.push({ id: it.id });
-		}
+		if (draftSlashItemMatchesQuery(it, q)) rows.push({ id: it.id });
 	}
 	return rows;
 }
@@ -2294,7 +2250,7 @@ export default function DraftPage() {
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
-	const [copiedTheme, setCopiedTheme] = useState(null); // { key, format: 'html' | 'react' }
+	const [copiedTheme, setCopiedTheme] = useState(null); // { key, format: 'html' | 'react' | 'markdown' | 'text' }
 	const [previewTheme, setPreviewTheme] = useState("ink");
 	const [translationLang, setTranslationLang] = useState("en");
 	const [translating, setTranslating] = useState(false);
@@ -2324,6 +2280,10 @@ export default function DraftPage() {
 	const [audioModalOpen, setAudioModalOpen] = useState(false);
 	const [audioUploading, setAudioUploading] = useState(false);
 	const audioFileInputRef = useRef(null);
+	const [embedModalOpen, setEmbedModalOpen] = useState(false);
+	const [embedUrlInput, setEmbedUrlInput] = useState("");
+	const [embedResolved, setEmbedResolved] = useState(null); // resolved embed object
+	const embedRangeRef = useRef(null); // saved cursor range before modal opened
 	const [recordingOpen, setRecordingOpen] = useState(false);
 	const [recordingState, setRecordingState] = useState("idle"); // idle | requesting | recording | uploading
 	const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -2338,6 +2298,15 @@ export default function DraftPage() {
 	const [draftSlashDatePickerPos, setDraftSlashDatePickerPos] = useState(null);
 	const [datePickerInitial, setDatePickerInitial] = useState(new Date());
 	const dateEditTargetRef = useRef(null);
+	// ── Details drawer + export dropdown ──
+	const [detailsOpen, setDetailsOpen] = useState(false);
+	const [exportDropOpen, setExportDropOpen] = useState(false);
+	const exportDropRef = useRef(null);
+	// ── Navbar block-menu ──
+	const [blocksMenuOpen, setBlocksMenuOpen] = useState(false);
+	const blocksMenuRef = useRef(null);
+	const [detailFontOpen, setDetailFontOpen] = useState(false);
+	const [detailStyleOpen, setDetailStyleOpen] = useState(false);
 	// ── Publish settings ──
 	const [isPublic, setIsPublic] = useState(false);
 	const [slugInput, setSlugInput] = useState("");
@@ -2346,6 +2315,7 @@ export default function DraftPage() {
 	const [publishCopied, setPublishCopied] = useState(false);
 	const publishDropRef = useRef(null);
 	const [previewOpen, setPreviewOpen] = useState(false);
+	const [translationModalOpen, setTranslationModalOpen] = useState(false);
 	const [previewCopied, setPreviewCopied] = useState(null);
 	const [previewExportOpen, setPreviewExportOpen] = useState(false);
 	const previewExportRef = useRef(null);
@@ -2355,8 +2325,12 @@ export default function DraftPage() {
 		markdown: "",
 		reactSnippet: "",
 	});
-	const [editorFont, setEditorFont] = useState("Outfit");
+	const [editorFont, setEditorFont] = useState("Comic");
+	useEffect(() => {
+		setEditorFont((f) => (f === "Inter" ? "Comic" : f));
+	}, []);
 	const [editorFontSize, setEditorFontSize] = useState(15);
+	const [editorVariant, setEditorVariant] = useState("default"); // "default" | "paper" | "typewriter" | "terminal" | "minimal"
 	const [localTableData, setLocalTableData] = useState(null);
 	const [iconSelector, setIconSelector] = useState(null); // { x, y, target: DOM element }
 	const iconSelectorRef = useRef(null);
@@ -2570,11 +2544,11 @@ export default function DraftPage() {
 		let i = 0;
 
 		const h1Style =
-			"font-family:'Outfit',sans-serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2;font-weight:700";
+			"font-family:'Comic',sans-serif;font-size:26px;color:#1A1A1A;margin:24px 0 10px;line-height:1.2;font-weight:700";
 		const h2Style =
-			"font-family:'Outfit',sans-serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3;font-weight:650";
+			"font-family:'Comic',sans-serif;font-size:20px;color:#1A1A1A;margin:20px 0 8px;line-height:1.3;font-weight:650";
 		const h3Style =
-			"font-family:'Outfit',sans-serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px;font-weight:600";
+			"font-family:'Comic',sans-serif;font-size:17px;color:#1A1A1A;margin:16px 0 7px;font-weight:600";
 		const pStyle =
 			"font-size:15px;line-height:1.75;color:#37352F;margin:0 0 6px;min-height:1.4em";
 		const bqStyle =
@@ -2737,6 +2711,28 @@ export default function DraftPage() {
 		return () => document.removeEventListener("mousedown", handler);
 	}, [publishDropOpen]);
 
+	/* Close export dropdown on outside click */
+	useEffect(() => {
+		const handler = (e) => {
+			if (exportDropRef.current && !exportDropRef.current.contains(e.target)) {
+				setExportDropOpen(false);
+			}
+		};
+		if (exportDropOpen) document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
+	}, [exportDropOpen]);
+
+	/* Close blocks menu on outside click */
+	useEffect(() => {
+		const handler = (e) => {
+			if (blocksMenuRef.current && !blocksMenuRef.current.contains(e.target)) {
+				setBlocksMenuOpen(false);
+			}
+		};
+		if (blocksMenuOpen) document.addEventListener("mousedown", handler);
+		return () => document.removeEventListener("mousedown", handler);
+	}, [blocksMenuOpen]);
+
 	const countWords = () => {
 		const text = editorRef.current?.innerText || "";
 		setWordCount(text.trim() ? text.trim().split(/\s+/).length : 0);
@@ -2746,34 +2742,53 @@ export default function DraftPage() {
 		normalizeTodoLists(editorRef.current);
 		syncDraftSlashQueryHighlight(editorRef.current);
 		countWords();
-		const sel = window.getSelection();
-		if (!editorRef.current || !sel?.rangeCount) {
-			setSlashCommand(null);
-			return;
-		}
-		const range = sel.getRangeAt(0);
-		const block = getDraftBlockFromSelection(editorRef.current, range);
-		if (!block) {
-			setSlashCommand(null);
-			return;
-		}
-		const text = getTextFromBlockStartToCaret(block, range);
-		const slash = matchDraftSlashQuery(text);
-		if (!slash) {
-			setSlashCommand(null);
-			return;
-		}
-		const pos = measureDraftSlashMenuPosition(
-			block,
-			range,
-			editorRef.current,
-			editorFontSize,
-		);
-		if (!pos) {
-			setSlashCommand(null);
-			return;
-		}
-		setSlashCommand({ x: pos.x, y: pos.y, query: slash.query });
+		const updateSlashMenu = () => {
+			const sel = window.getSelection();
+			if (!editorRef.current || !sel?.rangeCount) {
+				setSlashCommand(null);
+				return;
+			}
+			const range = sel.getRangeAt(0);
+			const block = getDraftBlockFromSelection(editorRef.current, range);
+			if (!block) {
+				setSlashCommand(null);
+				return;
+			}
+			if (
+				block.closest?.(
+					"pre, code, [contenteditable='false']",
+				)
+			) {
+				setSlashCommand(null);
+				return;
+			}
+			const inSummary = block.closest?.("summary");
+			if (
+				inSummary &&
+				!block.matches?.("span[contenteditable='true']")
+			) {
+				setSlashCommand(null);
+				return;
+			}
+			const text = getTextFromBlockStartToCaret(block, range);
+			const slash = matchDraftSlashQuery(text);
+			if (!slash) {
+				setSlashCommand(null);
+				return;
+			}
+			const pos = measureDraftSlashMenuPosition(
+				block,
+				range,
+				editorRef.current,
+				editorFontSize,
+			);
+			if (!pos) {
+				setSlashCommand(null);
+				return;
+			}
+			setSlashCommand({ x: pos.x, y: pos.y, query: slash.query });
+		};
+		queueMicrotask(updateSlashMenu);
 	};
 
 	const restoreEditorSelection = () => {
@@ -2852,7 +2867,9 @@ export default function DraftPage() {
 			const { db: fsDb } = await import("../../lib/config/firebase");
 			const oldSlug = draft?.slug;
 			if (nextPublic) {
-				const html = editorRef.current?.innerHTML || draft?.body || "";
+				const rawHtml =
+					editorRef.current?.innerHTML || draft?.body || "";
+				const html = normalizeYoutubeEmbedsInHtml(rawHtml);
 				const title = titleRef.current?.innerText?.trim() || draft?.title || "Untitled";
 				await fsSetDoc(fsDoc(fsDb, "published_blogs", slug), {
 					userId: reduxUser.uid,
@@ -3718,14 +3735,14 @@ export default function DraftPage() {
 			insertDraftRichBlock(editorRef.current, makeSimpleTableHtml());
 		} else if (action === "embed") {
 			deleteDraftSlashFromCaret(editorRef.current);
-			const raw =
-				typeof window !== "undefined"
-					? window.prompt("Paste a YouTube link")
-					: "";
-			const id = youtubeIdFromUrl(raw);
-			if (id) {
-				document.execCommand("insertHTML", false, makeEmbedIframeHtml(id));
+			// Save cursor position BEFORE modal steals focus
+			const sel = window.getSelection();
+			if (sel && sel.rangeCount > 0) {
+				embedRangeRef.current = sel.getRangeAt(0).cloneRange();
 			}
+			setEmbedUrlInput("");
+			setEmbedResolved(null);
+			setEmbedModalOpen(true);
 		}
 		countWords();
 		setSlashCommand(null);
@@ -3862,6 +3879,8 @@ export default function DraftPage() {
 					paddingLeft: 20,
 					paddingRight: 20,
 					paddingTop: 4,
+					paddingBottom: 6,
+					minHeight: 46,
 					zIndex: 50,
 				}}
 			>
@@ -3924,7 +3943,7 @@ export default function DraftPage() {
 							minWidth: 0,
 							overflowX: "auto",
 							paddingRight: 8,
-							marginLeft: 120,
+							marginLeft: 10,
 						}}
 					>
 						{openTabs.map((tabId) => {
@@ -3943,14 +3962,9 @@ export default function DraftPage() {
 										alignItems: "center",
 										gap: 6,
 										padding: "6px 10px 6px 12px",
-										borderTopLeftRadius: 8,
-										borderTopRightRadius: 8,
-										borderBottomRightRadius: 0,
-										borderBottomLeftRadius: 0,
+										borderRadius: 8,
 										background: isActive ? T.warmBg : "transparent",
-										borderTop: `1px solid ${isActive ? T.border : "transparent"}`,
-										borderLeft: `1px solid ${isActive ? T.border : "transparent"}`,
-										borderRight: `1px solid ${isActive ? T.border : "transparent"}`,
+										border: `1px solid ${isActive ? T.border : "transparent"}`,
 										cursor: isActive ? "default" : "pointer",
 										flexShrink: 0,
 										maxWidth: 160,
@@ -4005,140 +4019,213 @@ export default function DraftPage() {
 					</div>
 				)}
 
-				{/* Right side: Credits | Upgrade | New draft | User */}
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						flexShrink: 0,
-					}}
-				>
-					{reduxUser && (
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								background: creditRemaining === 0 ? "#FEF3E2" : T.base,
-								border: `1px solid ${creditRemaining === 0 ? "#F5C97A" : T.border}`,
-								borderRadius: 100,
-								padding: "4px 12px",
-							}}
-						>
-							{credits?.plan === "pro" ? (
-								<span style={{ fontSize: 12, color: T.warm, fontWeight: 700 }}>
-									∞ Pro
-								</span>
-							) : (
-								<span style={{ fontSize: 12, color: T.muted, fontWeight: 500 }}>
-									<span
-										style={{
-											fontWeight: 700,
-											color: creditRemaining === 0 ? "#EF4444" : T.accent,
-										}}
-									>
-										{credits
-											? `${credits.creditsUsed.toFixed(2).replace(/\.?0+$/, "")}/${credits.creditsLimit}`
-											: `0/${FREE_CREDIT_LIMIT}`}
-									</span>
-								</span>
-							)}
-						</div>
-					)}
-					{reduxUser && (
-						<motion.button
-							whileHover={{ scale: 1.04 }}
-							whileTap={{ scale: 0.97 }}
-							onClick={() => router.push("/pricing")}
-							style={{
-								background: T.accent,
-								color: "white",
-								border: "none",
-								padding: "6px 12px",
-								borderRadius: 8,
-								fontSize: 12,
-								fontWeight: 600,
-								cursor: "pointer",
-							}}
-						>
-							{credits?.plan === "pro" ? "Manage" : "Upgrade"}
-						</motion.button>
-					)}
-					{/* New draft button */}
-					<motion.button
-						whileHover={{
-							scale: 1.03,
-							y: -1,
-							boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-						}}
-						whileTap={{ scale: 0.97 }}
-						onClick={() => router.push("/app")}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 6,
-							background: T.accent,
-							color: "white",
-							border: "none",
-							padding: "6px 12px",
-							borderRadius: 9,
-							fontSize: 12,
-							fontWeight: 600,
-							cursor: "pointer",
-						}}
-					>
-						<Icon d={Icons.plus} size={14} stroke="white" /> New draft
-					</motion.button>
 
-					{/* User avatar / login */}
-					<motion.button
-						whileHover={{ scale: 1.08 }}
-						whileTap={{ scale: 0.95 }}
-						onClick={() => setLoginModalOpen(true)}
-						style={{
-							background: "none",
-							border: "none",
-							padding: 0,
-							cursor: "pointer",
-							borderRadius: "50%",
-						}}
-					>
-						{reduxUser?.photoURL ? (
-							<img
-								src={reduxUser.photoURL}
-								alt={reduxUser.displayName || "User"}
-								style={{
-									width: 34,
-									height: 34,
-									borderRadius: "50%",
-									objectFit: "cover",
-									border: `2px solid ${T.border}`,
-									display: "block",
-								}}
-							/>
-						) : (
-							<div
-								style={{
-									width: 34,
-									height: 34,
-									borderRadius: "50%",
-									background: T.border,
-									border: `2px solid ${T.border}`,
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "center",
-								}}
-							>
-								<Icon d={Icons.settings} size={16} stroke={T.muted} />
+				{draft && (() => {
+					const insertBlock = (id) => {
+						editorRef.current?.focus();
+						const sel = window.getSelection();
+						if (!sel || sel.rangeCount === 0) {
+							const range = document.createRange();
+							const el = editorRef.current;
+							if (el) { range.selectNodeContents(el); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range); }
+						}
+						handleSlashCommand(id);
+						setBlocksMenuOpen(false);
+					};
+					const getContent = () => {
+						const raw = stripDraftSlashQueryFromHtmlString(editorRef.current?.innerHTML || draft?.body || "");
+						return raw.trim().startsWith("<") ? raw : formatBody(raw);
+					};
+					const getTitle = () => titleRef.current?.innerText?.trim() || draft?.title || "Untitled draft";
+					const gIconBtn = (onClick, title, children, active = false) => (
+						<motion.button type="button" onClick={onClick} title={title} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+							style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid ${active ? "#111" : "transparent"}`, background: active ? "#111" : "transparent", cursor: "pointer", color: active ? "#fff" : T.muted, transition: "all 0.15s", flexShrink: 0 }}>
+							{children}
+						</motion.button>
+					);
+					const ADV_CATEGORIES = [
+						{ key: "media",      label: "Media",      ids: ["image","embed","audio","record"] },
+						{ key: "components", label: "Components", ids: ["card","toggle-group","toggle","tabs","icon-block"] },
+						{ key: "callouts",   label: "Callouts",   ids: ["callout-info","callout-warning","callout-success","callout-danger"] },
+						{ key: "data",       label: "Data",       ids: ["table","date"] },
+						{ key: "dividers",   label: "Dividers",   ids: ["divider","divider-dashed","divider-dotted"] },
+						{ key: "code",       label: "Code",       ids: ["code","codeGroup"] },
+					];
+					const QUICK_BLOCKS = [
+						{ id: "h1", tip: "Heading 1",
+						  svgEl: <svg width="22" height="18" viewBox="0 0 22 18"><text x="1" y="14" style={{fontSize:13,fontWeight:800,fill:"currentColor",fontFamily:"system-ui,sans-serif"}}>H<tspan fontSize="9" dy="3">1</tspan></text></svg> },
+						{ id: "h2", tip: "Heading 2",
+						  svgEl: <svg width="22" height="18" viewBox="0 0 22 18"><text x="1" y="14" style={{fontSize:13,fontWeight:800,fill:"currentColor",fontFamily:"system-ui,sans-serif"}}>H<tspan fontSize="9" dy="3">2</tspan></text></svg> },
+						null,
+						{ id: "text", tip: "Paragraph",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg> },
+						{ id: "quote", tip: "Blockquote",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg> },
+						null,
+						{ id: "bullet", tip: "Bullet list",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg> },
+						{ id: "numbered", tip: "Numbered list",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke="currentColor" strokeWidth="1.8"/><path d="M4 10h2" stroke="currentColor" strokeWidth="1.8"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke="currentColor" strokeWidth="1.8"/></svg> },
+						{ id: "todo", tip: "To-do list",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="5" width="6" height="6" rx="1"/><polyline points="4 14 6 16 9 13" strokeWidth="2"/><line x1="13" y1="8" x2="21" y2="8"/><line x1="13" y1="15" x2="21" y2="15"/></svg> },
+						null,
+						{ id: "code", tip: "Code block",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> },
+						{ id: "table", tip: "Table",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg> },
+						{ id: "image", tip: "Image",
+						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> },
+					];
+					const sep = () => <div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />;
+					return (
+						<>
+							<div ref={blocksMenuRef} style={{ display: "flex", alignItems: "center", gap: 0, background: "#eee", border: "1px solid #E2E2E2", borderRadius: 12, padding: "0 6px", height: 38, flexShrink: 0 }}>
+								{QUICK_BLOCKS.map((item, i) =>
+									item === null ? <React.Fragment key={`sep-${i}`}>{sep()}</React.Fragment> : (
+										<motion.button key={item.id} type="button" title={item.tip} onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+											style={{ height: 30, minWidth: 30, padding: "0 5px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", color: "#555", cursor: "pointer", flexShrink: 0 }}>
+											{item.svgEl}
+										</motion.button>
+									)
+								)}
+								<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
+								{ADV_CATEGORIES.map(cat => {
+									const isOpen = blocksMenuOpen === cat.key;
+									const catItems = DRAFT_SLASH_BASE_ITEMS.filter(i => cat.ids.includes(i.id));
+									return (
+										<div key={cat.key} style={{ position: "relative" }}>
+											<motion.button type="button" onClick={() => setBlocksMenuOpen(v => v === cat.key ? false : cat.key)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+												style={{ height: 30, padding: "0 9px", display: "flex", alignItems: "center", gap: 4, borderRadius: 7, border: "none", background: isOpen ? "#111" : "transparent", color: isOpen ? "#fff" : "#555", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.13s", flexShrink: 0 }}>
+												{cat.label}
+												<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+											</motion.button>
+											<AnimatePresence>
+											{isOpen && (
+												<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
+													style={{ position: "absolute", top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", minWidth: 180, background: "#fff", border: "1px solid #E2E2E2", borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.1)", zIndex: 300, padding: "6px" }}>
+													{catItems.map(item => (
+														<motion.button key={item.id} type="button" onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.97 }}
+															style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 13, cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" }}>
+															<span style={{ fontSize: 14, minWidth: 20, textAlign: "center", color: "#888" }}>{item.icon}</span>
+															{item.label}
+														</motion.button>
+													))}
+												</motion.div>
+											)}
+											</AnimatePresence>
+						</div>
+									);
+								})}
+								<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />
+								<motion.button type="button" onClick={() => insertBlock("ask-ai")} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+									style={{ height: 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 5, borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+									✦ AI
+								</motion.button>
 							</div>
-						)}
+							<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: "auto" }}>
+								{gIconBtn(() => setDetailsOpen(v => !v), "Document details",
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+									detailsOpen
+								)}
+								{gIconBtn(() => setThemeDrawerOpen(true), "Themes — preview, download & copy",
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>,
+									themeDrawerOpen
+								)}
+								{gIconBtn(() => {
+									const content = getContent(); const title = getTitle();
+									setPreviewData({ title, htmlDoc: buildThemedHTML(content, THEMES.ink, title), markdown: htmlToMarkdown(content) || "", reactSnippet: buildThemedReactSnippet(content, "ink", title) });
+									setPreviewOpen(true);
+								}, "Preview",
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+								)}
+								{gIconBtn(() => setTranslationModalOpen(true), "Theme preview — pick a theme",
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="11" rx="1"/><path d="M7 19h10"/><path d="M12 16v3"/><circle cx="12" cy="10.5" r="2"/></svg>,
+									translationModalOpen
+								)}
+								<motion.button type="button" onClick={handleSave} whileHover={{ scale: 1.02, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }} whileTap={{ scale: 0.96 }}
+									style={{ height: 30, display: "flex", alignItems: "center", gap: 5, background: saved ? "#EFF6EE" : T.accent, border: "none", borderRadius: 8, padding: "0 12px", fontSize: 12, fontWeight: 700, color: saved ? "#3D7A35" : "white", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+									<Icon d={Icons.save} size={12} stroke={saved ? "#3D7A35" : "white"} />
+									{saved ? "Saved!" : "Save"}
+						</motion.button>
+								<div style={{ position: "relative" }} ref={exportDropRef}>
+									{gIconBtn(() => setExportDropOpen(v => !v), "Export",
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+										exportDropOpen
+									)}
+									<AnimatePresence>
+									{exportDropOpen && (
+										<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
+											style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 200, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, boxShadow: "0 10px 28px rgba(0,0,0,0.12)", zIndex: 400, padding: "6px" }}>
+											{[
+												{ icon: "📋", label: "Copy as text", action: () => { handleCopy(); setExportDropOpen(false); } },
+												{ icon: "🌐", label: "Copy HTML", action: () => { navigator.clipboard.writeText(buildThemedHTML(getContent(), THEMES.ink, getTitle())); setExportDropOpen(false); } },
+												{ icon: "⚛️", label: "Copy React", action: () => { navigator.clipboard.writeText(buildThemedReactSnippet(getContent(), "ink", getTitle())); setExportDropOpen(false); } },
+												{ icon: "📝", label: "Copy Markdown", action: () => { navigator.clipboard.writeText(htmlToMarkdown(getContent()) || ""); setExportDropOpen(false); } },
+											].map(item => (
+												<button key={item.label} type="button" onClick={item.action}
+													style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 8, border: "none", background: "transparent", fontSize: 12, color: T.accent, cursor: "pointer" }}
+													onMouseEnter={e => { e.currentTarget.style.background = "#F0F0F0"; }}
+													onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+													<span>{item.icon}</span>{item.label}
+												</button>
+											))}
+										</motion.div>
+									)}
+									</AnimatePresence>
+								</div>
+								<div style={{ position: "relative" }} ref={publishDropRef}>
+									<motion.button type="button" onClick={() => setPublishDropOpen(v => !v)} whileHover={{ background: isPublic ? "#EFF6EE" : "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+										style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 9px", borderRadius: 8, border: `1px solid ${isPublic ? "#8BC57E" : T.border}`, background: isPublic ? "#EFF6EE" : "transparent", color: isPublic ? "#3D7A35" : T.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+										<span style={{ width: 6, height: 6, borderRadius: "50%", background: isPublic ? "#3D7A35" : T.border, flexShrink: 0, display: "inline-block" }} />
+										{isPublic ? "Published" : "Private"}
+										<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
 					</motion.button>
+									<AnimatePresence>
+									{publishDropOpen && (
+										<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
+											style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 300, padding: "16px 16px 14px" }}>
+											<p style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>Visibility</p>
+											<div className="flex gap-2 mb-4 bg-zinc-50 rounded-xl p-1">
+												{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map(opt => (
+													<button key={String(opt.val)} type="button" onClick={() => setIsPublic(opt.val)}
+													className={`flex-1 flex items-center justify-center gap-2 p-1.5 rounded-xl text-sm font-medium ${isPublic === opt.val ? (opt.val ? "bg-amber-50 text-amber-700" : "bg-zinc-50 text-zinc-900") : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"}`}>
+														{opt.icon} {opt.label}
+													</button>
+												))}
+							</div>
+											<p style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Page URL</p>
+											<div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+												<span style={{ padding: "7px 8px 7px 10px", fontSize: 11, color: T.muted, whiteSpace: "nowrap", flexShrink: 0 }}>/p/</span>
+												<input value={slugInput} onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-"))} placeholder={toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId}
+													style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, fontWeight: 500, color: T.accent, padding: "7px 4px", outline: "none", minWidth: 0 }} />
+												<button type="button" onClick={() => { navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput)||undefined)); setPublishCopied(true); setTimeout(()=>setPublishCopied(false),2000); }}
+													style={{ padding: "7px 10px", background: "transparent", border: "none", borderLeft: `1px solid ${T.border}`, cursor: "pointer", color: publishCopied ? "#3D7A35" : T.muted, display: "flex", alignItems: "center" }}>
+													{publishCopied ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}
+												</button>
+											</div>
+											{isPublic && <a href={getPublicUrl(draft?.slug||undefined)} target="_blank" rel="noopener noreferrer" style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#555",textDecoration:"none",marginBottom:12 }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> View live page</a>}
+											<div style={{ display: "flex", justifyContent: "flex-end" }}>
+												<button type="button" disabled={publishSaving} onClick={() => savePublishSettings(isPublic, slugInput)}
+													style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: isPublic ? "#3D7A35" : T.accent, color: "white", fontWeight: 700, fontSize: 12, cursor: publishSaving ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: publishSaving ? 0.7 : 1 }}>
+													{publishSaving && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation:"recSpin 0.7s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>}
+													{publishSaving ? "Saving…" : isPublic ? "Publish" : "Save as Private"}
+												</button>
+											</div>
+										</motion.div>
+									)}
+									</AnimatePresence>
+								</div>
+							</div>
+						</>
+					);
+				})()}
+
+			</div>
+
 					<LoginModal
 						isOpen={loginModalOpen}
 						onClose={() => setLoginModalOpen(false)}
 					/>
-				</div>
-			</div>
 
 			{/* ── MAIN BODY ── */}
 			<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -4166,8 +4253,9 @@ export default function DraftPage() {
 									flexShrink: 0,
 								}}
 							>
-								{/* Search */}
-								<div style={{ position: "relative" }}>
+								{/* Search + new draft */}
+								<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+									<div style={{ position: "relative", flex: 1, minWidth: 0 }}>
 									<div
 										style={{
 											position: "absolute",
@@ -4197,6 +4285,28 @@ export default function DraftPage() {
 										onFocus={(e) => (e.target.style.borderColor = T.warm)}
 										onBlur={(e) => (e.target.style.borderColor = T.border)}
 									/>
+									</div>
+									<motion.button
+										type="button"
+										title="New draft"
+										whileHover={{ opacity: 0.92 }}
+										whileTap={{ scale: 0.96 }}
+										onClick={() => router.push("/app")}
+										style={{
+											flexShrink: 0,
+											width: 34,
+											height: 34,
+											borderRadius: 9,
+											border: `1px solid ${T.border}`,
+											background: T.accent,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											cursor: "pointer",
+										}}
+									>
+										<Icon d={Icons.plus} size={17} stroke="#fff" strokeWidth={2} />
+									</motion.button>
 								</div>
 							</div>
 
@@ -4224,7 +4334,7 @@ export default function DraftPage() {
 												style={{
 													fontSize: 12,
 													fontWeight: 600,
-													color: T.warm,
+											color: "#111",
 													background: "transparent",
 													border: `1px solid ${T.border}`,
 													borderRadius: 8,
@@ -4249,31 +4359,58 @@ export default function DraftPage() {
 								</AnimatePresence>
 							</div>
 
-							{/* Sidebar footer */}
-							<div
+						{/* Sidebar footer — credits + upgrade */}
+						{reduxUser && (
+							<div style={{ padding: "10px 14px", borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
+								{/* Credit bar */}
+								<div style={{ marginBottom: 8 }}>
+									<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+										<span style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+											{credits?.plan === "pro" ? "Pro plan" : "Free credits"}
+										</span>
+										<span style={{ fontSize: 11, fontWeight: 700, color: creditRemaining === 0 ? "#EF4444" : T.accent }}>
+											{credits?.plan === "pro" ? "∞" : `${credits ? credits.creditsUsed.toFixed(1) : "0"}/${credits?.creditsLimit ?? FREE_CREDIT_LIMIT}`}
+										</span>
+									</div>
+									{credits?.plan !== "pro" && (
+										<div style={{ height: 4, background: T.border, borderRadius: 4, overflow: "hidden" }}>
+											<div style={{
+												height: "100%",
+												borderRadius: 4,
+												background: creditRemaining === 0 ? "#EF4444" : T.warm,
+												width: `${Math.min(100, ((credits?.creditsUsed ?? 0) / (credits?.creditsLimit ?? FREE_CREDIT_LIMIT)) * 100)}%`,
+												transition: "width 0.3s",
+											}} />
+										</div>
+									)}
+								</div>
+								{/* Account — opens same LoginModal account panel as /app */}
+								<motion.button
+									type="button"
+									whileHover={{ opacity: 0.9 }}
+									whileTap={{ scale: 0.99 }}
+									onClick={() => setLoginModalOpen(true)}
 								style={{
-									padding: "12px 14px",
-									borderTop: `1px solid ${T.border}`,
-									flexShrink: 0,
-								}}
-							>
-								<motion.div
-									style={{
+										width: "100%",
 										display: "flex",
 										alignItems: "center",
-										gap: 8,
+										gap: 10,
+										padding: "8px 10px",
+										marginBottom: 8,
+										borderRadius: 8,
+										border: `1px solid ${T.border}`,
+										background: T.surface,
 										cursor: "pointer",
+										textAlign: "left",
 									}}
-									onClick={() => setLoginModalOpen(true)}
-									whileHover={{ opacity: 0.8 }}
 								>
-									{reduxUser?.photoURL ? (
+									{reduxUser.photoURL ? (
 										<img
 											src={reduxUser.photoURL}
 											alt={reduxUser.displayName || "User"}
 											style={{
-												width: 28,
-												height: 28,
+												width: 30,
+												height: 30,
 												borderRadius: "50%",
 												objectFit: "cover",
 												flexShrink: 0,
@@ -4282,8 +4419,8 @@ export default function DraftPage() {
 									) : (
 										<div
 											style={{
-												width: 28,
-												height: 28,
+												width: 30,
+												height: 30,
 												borderRadius: "50%",
 												background: T.border,
 												display: "flex",
@@ -4292,7 +4429,7 @@ export default function DraftPage() {
 												flexShrink: 0,
 											}}
 										>
-											<Icon d={Icons.settings} size={13} stroke={T.muted} />
+											<Icon d={Icons.settings} size={14} stroke={T.muted} />
 										</div>
 									)}
 									<div style={{ flex: 1, minWidth: 0 }}>
@@ -4305,9 +4442,10 @@ export default function DraftPage() {
 												overflow: "hidden",
 												textOverflow: "ellipsis",
 												whiteSpace: "nowrap",
+												margin: 0,
 											}}
 										>
-											{reduxUser?.displayName || "Sign in"}
+											{reduxUser.displayName || reduxUser.email?.split("@")[0] || "Account"}
 										</p>
 										<p
 											style={{
@@ -4316,28 +4454,25 @@ export default function DraftPage() {
 												overflow: "hidden",
 												textOverflow: "ellipsis",
 												whiteSpace: "nowrap",
+												margin: 0,
 											}}
 										>
-											{reduxUser?.email || "Click to log in"}
+											{reduxUser.email}
 										</p>
 									</div>
-									{reduxUser && (
-										<span
-											style={{
-												fontSize: 10.5,
-												fontWeight: 700,
-												background: "#FEF3E2",
-												color: "#92400E",
-												padding: "2px 8px",
-												borderRadius: 100,
-												flexShrink: 0,
-											}}
-										>
-											FREE
-										</span>
-									)}
-								</motion.div>
+								</motion.button>
+								{/* Upgrade button */}
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.97 }}
+									onClick={() => router.push("/pricing")}
+									style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "none", background: credits?.plan === "pro" ? T.base : T.accent, color: credits?.plan === "pro" ? T.muted : "white", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+								>
+									{credits?.plan === "pro" ? "Manage plan" : "Upgrade to Pro"}
+								</motion.button>
 							</div>
+						)}
 						</motion.aside>
 					)}
 				</AnimatePresence>
@@ -4354,10 +4489,6 @@ export default function DraftPage() {
 				>
 					{((!router.isReady || loadingDraft) &&
 						!draft &&
-						!tableDoc &&
-						!infographicsDoc &&
-						!landingPageDoc &&
-						!imageGalleryDoc &&
 						draftId) && (
 							<div
 								style={{
@@ -4368,13 +4499,31 @@ export default function DraftPage() {
 									background: T.surface,
 								}}
 							>
-								<motion.div
-									animate={{ opacity: [0.4, 1, 0.4] }}
-									transition={{ duration: 1.2, repeat: Infinity }}
-									style={{ fontSize: 13, color: T.muted }}
+								<div
+									style={{
+										display: "flex",
+										flexDirection: "column",
+										alignItems: "center",
+										justifyContent: "center",
+										gap: 14,
+									}}
 								>
+									<div
+										style={{
+											width: 32,
+											height: 32,
+											borderRadius: "50%",
+											border: `3px solid ${T.muted}33`,
+											borderTop: `3px solid ${T.accent}`,
+											animation: "spin 0.8s linear infinite",
+											marginBottom: 2,
+										}}
+									/>
+									<div style={{ fontSize: 13, color: T.muted }}>
 									Loading…
-								</motion.div>
+									</div>
+								</div>
+		
 							</div>
 						)}
 					{draft && (
@@ -4390,468 +4539,195 @@ export default function DraftPage() {
 								overflow: "hidden",
 							}}
 						>
-							{/* Editor top bar */}
-							<div
-								style={{
-									padding: "12px 24px",
-									borderBottom: `1px solid ${T.border}`,
-									background: T.surface,
-									display: "flex",
-									justifyContent: "space-between",
-									alignItems: "center",
-									gap: 8,
-									flexShrink: 0,
-								}}
-							>
-
-								<div className="flex items-center gap-2">
-									{/* ── Inline draft meta ── */}
-								{draft?.tag && (
-									<span
-										style={{
-											fontSize: 11,
-											fontWeight: 700,
-											background: "#F0ECE5",
-											color: T.muted,
-											padding: "2px 8px",
-											borderRadius: 100,
-											whiteSpace: "nowrap",
-										}}
-									>
-										{draft.tag}
-									</span>
-								)}
-								{draft?.style && (
-									<span
-										style={{
-											fontSize: 11,
-											fontWeight: 600,
-											background: "#FEF3E2",
-											color: T.warm,
-											padding: "2px 8px",
-											borderRadius: 100,
-											textTransform: "capitalize",
-											whiteSpace: "nowrap",
-										}}
-									>
-										{draft.style}
-									</span>
-								)}
-								{draft?.date && (
-									<span
-										style={{
-											fontSize: 11,
-											color: T.muted,
-											whiteSpace: "nowrap",
-										}}
-									>
-										{draft.date}
-									</span>
-								)}
-								{sourceUrl && (
-									<>
-										<div
-											style={{ width: 1, height: 14, background: T.border }}
-										/>
-										<a
-											href={sourceUrl}
-											target="_blank"
-											rel="noopener noreferrer"
-											style={{
-												display: "inline-flex",
-												alignItems: "center",
-												gap: 4,
-												fontSize: 11,
-												color: T.warm,
-												textDecoration: "none",
-												whiteSpace: "nowrap",
-												maxWidth: 160,
-												overflow: "hidden",
-												textOverflow: "ellipsis",
-											}}
-											title={sourceUrl}
-										>
-											<Icon d={Icons.link2} size={11} stroke={T.warm} />
-											{(() => {
-												try {
-													return new URL(sourceUrl).hostname.replace(
-														/^www\./,
-														"",
-													);
-												} catch {
-													return sourceUrl.slice(0, 30);
-												}
-											})()}
-										</a>
-									</>
-								)}
-								{assetPrompt && (
-									<>
-										<div
-											style={{ width: 1, height: 14, background: T.border }}
-										/>
-										<span
-											style={{
-												fontSize: 11,
-												color: T.muted,
-												maxWidth: 200,
-												overflow: "hidden",
-												textOverflow: "ellipsis",
-												whiteSpace: "nowrap",
-											}}
-											title={assetPrompt}
-										>
-											{assetPrompt.length > 40
-												? assetPrompt.slice(0, 37) + "…"
-												: assetPrompt}
-										</span>
-									</>
-								)}
+						{/* ── Details side drawer ── */}
+						<AnimatePresence>
+						{detailsOpen && (
+							<motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", stiffness: 320, damping: 32 }}
+								style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: 280, background: T.surface, borderLeft: `1px solid ${T.border}`, zIndex: 50, display: "flex", flexDirection: "column", boxShadow: "-8px 0 24px rgba(0,0,0,0.06)", overflowY: "auto" }}>
+								{/* Drawer header */}
+								<div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+									<span style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>Document Details</span>
+									<button type="button" onClick={() => setDetailsOpen(false)} style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>✕</button>
 								</div>
 
-								
-								<div className="flex items-center gap-2">
-									{/* Actions */}
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.96 }}
-									onClick={handleCopy}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 6,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "6px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: copied ? "#3D7A35" : T.muted,
-										cursor: "pointer",
-										transition: "all 0.18s",
-									}}
-								>
-									<Icon
-										d={Icons.copy}
-										size={13}
-										stroke={copied ? "#3D7A35" : T.muted}
-									/>
-									{copied ? "Copied!" : "Copy"}
-								</motion.button>
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.96 }}
-									onClick={() => {
-										const raw = stripDraftSlashQueryFromHtmlString(
-											editorRef.current?.innerHTML || draft?.body || "",
-										);
-										const content = raw.trim().startsWith("<")
-											? raw
-											: formatBody(raw);
-										const title =
-											titleRef.current?.innerText?.trim() ||
-											draft?.title ||
-											"Untitled draft";
-										const htmlDoc = buildThemedHTML(content, THEMES.ink, title);
-										const markdown = htmlToMarkdown(content) || "";
-										const reactSnippet = buildThemedReactSnippet(
-											content,
-											"ink",
-											title,
-										);
-										setPreviewData({
-											title,
-											htmlDoc,
-											markdown,
-											reactSnippet,
-										});
-										setPreviewOpen(true);
-									}}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 6,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "6px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.muted,
-										cursor: "pointer",
-										transition: "all 0.18s",
-									}}
-								>
-									<Icon d={Icons.eye} size={13} stroke={T.muted} />
-									Preview
-								</motion.button>
-							{/* ── Publish dropdown ── */}
-							<div style={{ position: "relative" }} ref={publishDropRef}>
-								<motion.button
-									whileHover={{ background: isPublic ? "#EFF6EE" : "#F0ECE5" }}
-									whileTap={{ scale: 0.96 }}
-									onClick={() => setPublishDropOpen((v) => !v)}
-									style={{ display: "flex", alignItems: "center", gap: 6, background: isPublic ? "#EFF6EE" : T.base, border: `1px solid ${isPublic ? "#8BC57E" : T.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 600, color: isPublic ? "#3D7A35" : T.muted, cursor: "pointer", transition: "all 0.18s" }}
-								>
-									<span style={{ width: 7, height: 7, borderRadius: "50%", background: isPublic ? "#3D7A35" : T.border, display: "inline-block", flexShrink: 0 }} />
-									{isPublic ? "Published" : "Private"}
-									<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-								</motion.button>
-
-								<AnimatePresence>
-								{publishDropOpen && (
-									<motion.div
-										initial={{ opacity: 0, y: -6, scale: 0.97 }}
-										animate={{ opacity: 1, y: 0, scale: 1 }}
-										exit={{ opacity: 0, y: -6, scale: 0.97 }}
-										transition={{ duration: 0.15 }}
-										style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 340, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 200, padding: "16px 16px 14px" }}
-									>
-										{/* Visibility toggle */}
-										<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Visibility</p>
-										<div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-											{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map((opt) => (
-												<button
-													key={String(opt.val)}
-													type="button"
-													onClick={() => setIsPublic(opt.val)}
-													style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 0", borderRadius: 8, border: `1.5px solid ${isPublic === opt.val ? (opt.val ? "#8BC57E" : T.warm) : T.border}`, background: isPublic === opt.val ? (opt.val ? "#EFF6EE" : "#FEF3E2") : "transparent", color: isPublic === opt.val ? (opt.val ? "#3D7A35" : T.warm) : T.muted, fontWeight: 600, fontSize: 12, cursor: "pointer", transition: "all 0.15s" }}
-												>
-													{opt.icon} {opt.label}
-												</button>
-											))}
-										</div>
-
-										{/* Slug / URL */}
-										<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Page URL</p>
-										<div style={{ display: "flex", alignItems: "center", gap: 0, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 6 }}>
-											<span style={{ padding: "7px 8px 7px 10px", fontSize: 11, color: T.muted, whiteSpace: "nowrap", flexShrink: 0 }}>/p/</span>
-											<input
-												value={slugInput}
-												onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))}
-												placeholder={toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId}
-												style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, fontWeight: 500, color: T.accent, padding: "7px 4px", outline: "none", minWidth: 0 }}
-											/>
-											<button
-												type="button"
-												title="Copy link"
-												onClick={() => {
-													navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput) || undefined));
-													setPublishCopied(true);
-													setTimeout(() => setPublishCopied(false), 2000);
-												}}
-												style={{ padding: "7px 10px", background: "transparent", border: "none", borderLeft: `1px solid ${T.border}`, cursor: "pointer", color: publishCopied ? "#3D7A35" : T.muted, display: "flex", alignItems: "center", flexShrink: 0 }}
-											>
-												{publishCopied
-													? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-													: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-												}
-											</button>
-										</div>
-										{isPublic && (
-											<a
-												href={getPublicUrl(draft?.slug || undefined)}
-												target="_blank"
-												rel="noopener noreferrer"
-												style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: T.warm, textDecoration: "none", marginBottom: 14 }}
-											>
-												<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-												View live page
-											</a>
-										)}
-
-										{/* Save button */}
-										<div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
-											<button
-												type="button"
-												disabled={publishSaving}
-												onClick={() => savePublishSettings(isPublic, slugInput)}
-												style={{ padding: "7px 18px", borderRadius: 8, border: "none", background: isPublic ? "#3D7A35" : T.accent, color: "white", fontWeight: 700, fontSize: 12, cursor: publishSaving ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: publishSaving ? 0.7 : 1 }}
-											>
-												{publishSaving && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "recSpin 0.7s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>}
-												{publishSaving ? "Saving…" : isPublic ? "Publish" : "Save as Private"}
-											</button>
-										</div>
-									</motion.div>
-								)}
-								</AnimatePresence>
-							</div>
-
-							<motion.button
-								whileHover={{
-									scale: 1.03,
-									y: -1,
-									boxShadow: "0 4px 12px rgba(0,0,0,0.14)",
-								}}
-								whileTap={{ scale: 0.96 }}
-								onClick={handleSave}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 6,
-									background: saved ? "#EFF6EE" : T.accent,
-									border: "none",
-									borderRadius: 8,
-									padding: "6px 14px",
-									fontSize: 12,
-									fontWeight: 700,
-									color: saved ? "#3D7A35" : "white",
-									cursor: "pointer",
-									transition: "all 0.2s",
-								}}
-							>
-								<Icon
-									d={Icons.save}
-									size={13}
-									stroke={saved ? "#3D7A35" : "white"}
-								/>
-								{saved ? "Saved!" : "Save draft"}
-							</motion.button>
+								{/* Stats */}
+								<div style={{ padding: "14px 16px" }}>
+									<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Stats</p>
+									<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+										{[
+											{ label: "Words", value: wordCount },
+											{ label: "Read time", value: `~${Math.max(1, Math.round(wordCount / 200))} min` },
+											{ label: "Characters", value: (editorRef.current?.innerText || "").replace(/\s/g, "").length },
+											{ label: "Paragraphs", value: (editorRef.current?.querySelectorAll("p") || []).length },
+										].map((s) => (
+											<div key={s.label} style={{ background: T.bg, borderRadius: 8, padding: "8px 10px", border: `1px solid ${T.border}` }}>
+												<p style={{ fontSize: 18, fontWeight: 700, color: T.accent, lineHeight: 1, marginBottom: 2 }}>{s.value}</p>
+												<p style={{ fontSize: 10, color: T.muted }}>{s.label}</p>
+											</div>
+										))}
 								</div>
-							</div>
 
-							<div className="overflow-y-auto flex flex-col h-full">
-								{/* Draft title */}
-								<div
-									style={{
-										padding: "16px 40px 14px",
-										background: T.surface,
-										borderBottom: `1px solid ${T.border}`,
-										flexShrink: 0,
-									}}
-								>
-									<div
-										style={{
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "space-between",
-											gap: 12,
-											flexWrap: "wrap",
-										}}
-									>
-										<div
-											ref={titleRef}
-											contentEditable
-											suppressContentEditableWarning
-											data-placeholder="Untitled draft"
-											style={{
-												flex: 1,
-												minWidth: 120,
-												fontSize: "clamp(22px, 3vw, 30px)",
-												color: T.accent,
-												lineHeight: 1.2,
-												letterSpacing: "-0.5px",
-												outline: "none",
-												marginBottom: 8,
-												minHeight: 36,
-												fontFamily:
-													editorFont === "Inter"
-														? "'Comic', sans-serif"
-														: editorFont === "Georgia"
-															? "Georgia, serif"
-															: editorFont === "system-ui"
-																? "system-ui, sans-serif"
-																: "'Comic', sans-serif",
-											}}
-											dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
-										/>
-										<div
-											style={{
-												display: "flex",
-												alignItems: "center",
-												gap: 6,
-												marginBottom: 8,
-											}}
-										>
-											{/* Font family */}
-											<select
-												value={editorFont}
-												onChange={(e) => setEditorFont(e.target.value)}
-												style={{
-													padding: "4px 8px",
-													border: `1px solid ${T.border}`,
-													borderRadius: 6,
-													fontSize: 11,
-													fontWeight: 600,
-													background: T.base,
-													color: T.accent,
-													cursor: "pointer",
-													fontFamily: "inherit",
-												}}
-											>
-												<option value="Outfit">Outfit</option>
-												<option value="Inter">Inter</option>
-												<option value="Georgia">Georgia</option>
-												<option value="system-ui">System</option>
-											</select>
-											{/* Font size */}
-											<div
-												style={{
-													display: "flex",
-													alignItems: "center",
-													gap: 2,
-												}}
-											>
-												<motion.button
-													whileHover={{ background: "#F0ECE5" }}
-													whileTap={{ scale: 0.95 }}
-													onClick={() =>
-														setEditorFontSize((s) => Math.max(12, s - 2))
-													}
-													style={{
-														width: 26,
-														height: 26,
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														border: `1px solid ${T.border}`,
-														borderRadius: 6,
-														background: T.base,
-														fontSize: 12,
-														fontWeight: 700,
-														color: T.accent,
-														cursor: "pointer",
-													}}
-												>
-													A-
-												</motion.button>
-												<motion.button
-													whileHover={{ background: "#F0ECE5" }}
-													whileTap={{ scale: 0.95 }}
-													onClick={() =>
-														setEditorFontSize((s) => Math.min(24, s + 2))
-													}
-													style={{
-														width: 26,
-														height: 26,
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														border: `1px solid ${T.border}`,
-														borderRadius: 6,
-														background: T.base,
-														fontSize: 12,
-														fontWeight: 700,
-														color: T.accent,
-														cursor: "pointer",
-													}}
-												>
-													A+
-												</motion.button>
+									{/* Meta */}
+									<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Meta</p>
+									<div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+										{draft?.date && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, color: T.muted }}>Created</span><span style={{ fontSize: 11, fontWeight: 600, color: T.accent }}>{draft.date}</span></div>}
+										{draft?.tag && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, color: T.muted }}>Tag</span><span style={{ fontSize: 11, fontWeight: 600, color: T.accent }}>{draft.tag}</span></div>}
+										{draft?.style && <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, color: T.muted }}>Style</span><span style={{ fontSize: 11, fontWeight: 600, color: T.accent, textTransform: "capitalize" }}>{draft.style}</span></div>}
+										{sourceUrl && <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>Source</span><a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.warm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}>{sourceUrl.replace(/^https?:\/\/(www\.)?/, "").slice(0, 30)}</a></div>}
+									</div>
+
+									{/* Prompt */}
+								{assetPrompt && (<>
+									<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>AI Prompt</p>
+									<div style={{ background: "#F5F5F5", border: `1px solid #E2E2E2`, borderRadius: 8, padding: "8px 10px", marginBottom: 16 }}>
+										<p style={{ fontSize: 11, color: "#444", lineHeight: 1.6 }}>{assetPrompt}</p>
+									</div>
+								</>)}
+
+									{/* Editor appearance */}
+									<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Appearance</p>
+									<div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+										{/* Font family — AnimatedDropdown */}
+										<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+											<span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>Font</span>
+											<div style={{ flex: 1, maxWidth: 140 }}>
+												<AnimatedDropdown
+													isOpen={detailFontOpen}
+													onToggle={() => setDetailFontOpen(v => !v)}
+													onSelect={(val) => { setEditorFont(val); setDetailFontOpen(false); }}
+													value={editorFont}
+													options={[
+														{ value: "Comic", label: "Comic" },
+														{ value: "Georgia", label: "Georgia" },
+														{ value: "system-ui", label: "System" },
+													]}
+													buttonClassName="!py-1 !px-2 !rounded-xl !text-xs"
+													dropdownClassName="!rounded-xl !shadow-md"
+													optionClassName="!py-1 !px-2 !text-xs !rounded-md"
+												/>
 											</div>
 										</div>
-									</div>
+										{/* Font size */}
+										<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+											<span style={{ fontSize: 11, color: T.muted }}>Font size</span>
+											<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+												<button type="button" onClick={() => setEditorFontSize((s) => Math.max(12, s - 2))} style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg, fontSize: 11, fontWeight: 700, color: T.accent, cursor: "pointer" }}>−</button>
+												<span style={{ fontSize: 12, fontWeight: 600, color: T.accent, minWidth: 26, textAlign: "center" }}>{editorFontSize}px</span>
+												<button type="button" onClick={() => setEditorFontSize((s) => Math.min(24, s + 2))} style={{ width: 24, height: 24, borderRadius: 6, border: `1px solid ${T.border}`, background: T.bg, fontSize: 11, fontWeight: 700, color: T.accent, cursor: "pointer" }}>+</button>
+											</div>
+										</div>
+										{/* Editor style / variant — AnimatedDropdown */}
+										<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+											<span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>Style</span>
+											<div style={{ flex: 1, maxWidth: 140 }}>
+												<AnimatedDropdown
+													isOpen={detailStyleOpen}
+													onToggle={() => setDetailStyleOpen(v => !v)}
+													onSelect={(val) => { setEditorVariant(val); setDetailStyleOpen(false); }}
+													value={editorVariant}
+													options={[
+														{ value: "default",    label: "Default" },
+														{ value: "paper",      label: "Paper Lines" },
+														{ value: "typewriter", label: "Typewriter" },
+														{ value: "terminal",   label: "Dark" },
+														{ value: "minimal",    label: "Minimal" },
+													]}
+													buttonClassName="!py-1 !px-2 !rounded-xl !text-xs"
+													dropdownClassName="!rounded-xl !shadow-md"
+													optionClassName="!py-1 !px-2 !text-xs !rounded-md"
+												/>
+											</div>
 								</div>
+							</div>
 
-								{/* Editor body */}
+								{/* AI chat shortcut */}
+								<button type="button" onClick={() => { setChatOpen(true); setDetailsOpen(false); }}
+									style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid #222`, background: "#111", cursor: "pointer", marginBottom: 8 }}>
+									<span style={{ fontSize: 16, color: "#fff" }}>✦</span>
+									<div style={{ textAlign: "left" }}>
+										<p style={{ fontSize: 12, fontWeight: 700, color: "#fff", margin: 0 }}>Open AI Chat</p>
+										<p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>Ask AI to help with this draft</p>
+									</div>
+								</button>
+								</div>
+							</motion.div>
+						)}
+						</AnimatePresence>
+
+						<div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+					{/* Draft title — inherits variant background so it blends seamlessly */}
+					{(() => {
+						const variantBg =
+							editorVariant === "terminal"   ? "#0D1117" :
+							editorVariant === "typewriter" ? "#EDE3CC" :
+							editorVariant === "paper"      ? "#FEFDF4" :
+							editorVariant === "minimal"    ? "#FAFAF8" :
+							T.surface;
+						const variantColor =
+							editorVariant === "terminal" ? "#A8FF78" : T.accent;
+						const variantFont =
+							editorVariant === "typewriter" ? "'Courier New', Courier, monospace" :
+							editorVariant === "minimal"    ? "Georgia, 'Times New Roman', serif" :
+							editorFont === "Georgia"       ? "Georgia, serif" :
+							editorFont === "system-ui"     ? "system-ui, sans-serif" :
+							"'Comic', sans-serif";
+						const dividerColor =
+							editorVariant === "terminal"   ? "rgba(168,255,120,0.2)" :
+							editorVariant === "typewriter" ? "rgba(100,80,50,0.25)" :
+							editorVariant === "paper"      ? "rgba(180,150,100,0.3)" :
+							T.border;
+						return (
+							<div
+								style={{ padding: "36px 0 18px", background: variantBg, display: "flex", flexDirection: "column", alignItems: "center" }}
+								onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus(); }}
+							>
+								<div style={{ width: "100%", maxWidth: 720, padding: "0 48px" }}>
+									<div ref={titleRef} contentEditable suppressContentEditableWarning data-placeholder="Untitled draft"
+										onKeyDown={(e) => {
+											if (e.key === "Enter") {
+												e.preventDefault();
+												editorRef.current?.focus();
+												const sel = window.getSelection();
+												const el = editorRef.current;
+												if (sel && el) {
+													const range = document.createRange();
+													range.setStart(el, 0);
+													range.collapse(true);
+													sel.removeAllRanges();
+													sel.addRange(range);
+												}
+											}
+										}}
+										style={{ fontSize: "clamp(24px, 3.5vw, 34px)", color: variantColor, lineHeight: 1.2, letterSpacing: "-0.6px", outline: "none", fontWeight: 700, fontFamily: variantFont }}
+										dangerouslySetInnerHTML={{ __html: draft?.title || "" }}
+									/>
+
+											</div>
+										</div>
+						);
+					})()}
+
+					{/* Editor body — no independent scroll; parent container scrolls */}
 								<div
 									ref={editorContainerRef}
 									data-editor-root
+					data-editor-variant={editorVariant}
 									style={{
 										flex: 1,
-										overflowY: "auto",
-										background: T.surface,
 										position: "relative",
+							backgroundColor:
+								editorVariant === "terminal"   ? "#0D1117" :
+								editorVariant === "typewriter" ? "#EDE3CC" :
+								editorVariant === "paper"      ? "#FEFDF4" :
+								editorVariant === "minimal"    ? "#FAFAF8" :
+								T.surface,
+							// Terminal: faint scanlines via CSS gradient on the container
+							backgroundImage:
+								editorVariant === "terminal"
+									? "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,0,0.015) 2px, rgba(0,255,0,0.015) 4px)"
+									: editorVariant === "typewriter"
+										? "none"
+										: "none",
 									}}
 								>
 									<style>{`
@@ -4861,6 +4737,104 @@ export default function DraftPage() {
 										[data-editor-root] [contenteditable="true"] h1 { font-size: ${Math.round(editorFontSize * 1.73)}px !important; }
 										[data-editor-root] [contenteditable="true"] h2 { font-size: ${Math.round(editorFontSize * 1.33)}px !important; }
 										[data-editor-root] [contenteditable="true"] h3 { font-size: ${Math.round(editorFontSize * 1.13)}px !important; }
+
+							/* ══ Paper Lines ══
+								background-image applied here — does NOT conflict with
+								inline backgroundColor:transparent on the element       */
+							[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] {
+								background-image:
+									linear-gradient(90deg, #E05555 0px, #E05555 1px, transparent 1px),
+									repeating-linear-gradient(
+										transparent,
+										transparent ${Math.round(editorFontSize * 1.75) - 1}px,
+										#C9C3B8 ${Math.round(editorFontSize * 1.75) - 1}px,
+										#C9C3B8 ${Math.round(editorFontSize * 1.75)}px
+									);
+								background-size: 100% 100%, 100% ${Math.round(editorFontSize * 1.75)}px;
+								background-attachment: local;
+								background-position: 52px 0, 0 0;
+								padding-left: 72px !important;
+								line-height: ${Math.round(editorFontSize * 1.75)}px !important;
+								caret-color: #8B4513;
+							}
+							[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] p,
+							[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] li,
+							[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] h1,
+							[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] h2,
+							[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] h3 {
+								line-height: ${Math.round(editorFontSize * 1.75)}px !important;
+								margin: 0 !important;
+								padding: 0 !important;
+							}
+
+							/* ══ Typewriter ══ */
+							[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] {
+								caret-color: #5C3D1E;
+								letter-spacing: 0.04em;
+							}
+							[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] h1,
+							[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] h2,
+							[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] h3 {
+								border-bottom: 2px solid #8B6914;
+								padding-bottom: 4px;
+								margin-bottom: 12px;
+							}
+							[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] blockquote {
+								border-left: 4px double #8B6914 !important;
+								background: #EDE3CC !important;
+								color: #5C3D1E !important;
+							}
+
+							/* ══ Terminal / Dark ══ */
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] {
+								caret-color: #57FF57;
+							}
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"]:empty:before {
+								color: #2A4A2A !important;
+							}
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] h1,
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] h2,
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] h3 {
+								color: #79C0FF !important;
+								border-bottom: 1px solid #1E3A1E;
+								padding-bottom: 6px;
+							}
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] blockquote {
+								border-left: 3px solid #238636 !important;
+								background: #0D2818 !important;
+								color: #8B949E !important;
+							}
+							[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] code {
+								background: #161B22 !important;
+								color: #F78166 !important;
+								border: 1px solid #30363D !important;
+							}
+
+							/* ══ Minimal / Serif ══ */
+							[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] {
+								caret-color: #C17B2F;
+							}
+							[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] h1,
+							[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] h2,
+							[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] h3 {
+								font-weight: 400 !important;
+								letter-spacing: -0.02em;
+								border-bottom: 1px solid #E0D8CC;
+								padding-bottom: 6px;
+								margin-bottom: 14px;
+							}
+							[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] blockquote {
+								border-left: 2px solid #C17B2F !important;
+								background: transparent !important;
+								font-style: italic;
+								color: #8B7355 !important;
+								padding: 2px 16px !important;
+							}
+							[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] p {
+								line-height: 2 !important;
+								margin-bottom: 18px !important;
+							}
+						
 										[data-editor-root] [contenteditable="true"] blockquote,
 										[data-editor-root] [contenteditable="true"] blockquote *,
 										[data-editor-root] [contenteditable="true"] [data-block],
@@ -4944,46 +4918,46 @@ export default function DraftPage() {
 											width: 100% !important;
 											margin: 0 !important;
 										}
-										[data-editor-root] [contenteditable="true"] [data-card-icon]:empty:before,
-										[data-editor-root] [contenteditable="true"] [data-card-heading]:empty:before,
-										[data-editor-root] [contenteditable="true"] [data-card-desc]:empty:before {
-											content: attr(data-placeholder);
-											color: #B0AAA3;
-											pointer-events: none;
-										}
-										[data-editor-root] [contenteditable="true"] [data-placeholder]:empty:before {
-											content: attr(data-placeholder);
-											color: #B0AAA3;
-											pointer-events: none;
-										}
-										[data-editor-root] [contenteditable="true"] [data-icon-selector]:hover {
-											background: rgba(193,123,47,0.08);
-											border-radius: 4px;
-										}
-										[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary::-webkit-details-marker { display: none; }
-										[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary { list-style: none; }
-										[data-editor-root] [contenteditable="true"] > *:hover ~ [data-drag-handle] { opacity: 1 !important; }
-										[data-editor-root] [contenteditable="true"] [data-audio-name]:empty:before,
-										[data-editor-root] [contenteditable="true"] [data-audio-caption]:empty:before {
-											content: attr(data-placeholder);
-											color: #C8C4BC;
-											pointer-events: none;
-										}
-										[data-editor-root] [contenteditable="true"] [data-audio-name]:focus:before,
-										[data-editor-root] [contenteditable="true"] [data-audio-caption]:focus:before {
-											content: none !important;
-										}
-										@keyframes spin { to { transform: rotate(360deg); } }
-										[data-editor-root] [contenteditable="true"] [data-block="audio-block"] audio::-webkit-media-controls-panel {
-											background: #F7F5F0;
-										}
-										[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:empty:before {
-											content: attr(data-placeholder);
-											color: #C8C4BC;
-											pointer-events: none;
-										}
-										[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:focus:before {
-											content: none !important;
+									[data-editor-root] [contenteditable="true"] [data-card-icon]:empty:before,
+									[data-editor-root] [contenteditable="true"] [data-card-heading]:empty:before,
+									[data-editor-root] [contenteditable="true"] [data-card-desc]:empty:before {
+										content: attr(data-placeholder);
+										color: #B0AAA3;
+										pointer-events: none;
+									}
+									[data-editor-root] [contenteditable="true"] [data-placeholder]:empty:before {
+										content: attr(data-placeholder);
+										color: #B0AAA3;
+										pointer-events: none;
+									}
+									[data-editor-root] [contenteditable="true"] [data-icon-selector]:hover {
+										background: rgba(193,123,47,0.08);
+										border-radius: 4px;
+									}
+									[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary::-webkit-details-marker { display: none; }
+									[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary { list-style: none; }
+									[data-editor-root] [contenteditable="true"] > *:hover ~ [data-drag-handle] { opacity: 1 !important; }
+									[data-editor-root] [contenteditable="true"] [data-audio-name]:empty:before,
+									[data-editor-root] [contenteditable="true"] [data-audio-caption]:empty:before {
+										content: attr(data-placeholder);
+										color: #C8C4BC;
+										pointer-events: none;
+									}
+									[data-editor-root] [contenteditable="true"] [data-audio-name]:focus:before,
+									[data-editor-root] [contenteditable="true"] [data-audio-caption]:focus:before {
+										content: none !important;
+									}
+									@keyframes spin { to { transform: rotate(360deg); } }
+									[data-editor-root] [contenteditable="true"] [data-block="audio-block"] audio::-webkit-media-controls-panel {
+										background: #F7F5F0;
+									}
+									[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:empty:before {
+										content: attr(data-placeholder);
+										color: #C8C4BC;
+										pointer-events: none;
+									}
+									[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:focus:before {
+										content: none !important;
 										}
 									`}</style>
 									<div
@@ -4991,6 +4965,7 @@ export default function DraftPage() {
 										contentEditable
 										suppressContentEditableWarning
 										onInput={onEditorInput}
+										onCompositionEnd={onEditorInput}
 										onKeyDown={(e) => {
 											if ((e.key === " " || e.code === "Space") && !e.defaultPrevented) {
 												const root = editorRef.current;
@@ -5125,89 +5100,107 @@ export default function DraftPage() {
 													}
 												}
 											}
-										}}
-									onDragOver={(e) => {
-										if (!dragSrcRef.current) return;
-										e.preventDefault();
-										e.dataTransfer.dropEffect = "move";
-										const editor = editorRef.current;
-										const container = editorContainerRef.current;
-										if (!editor || !container) return;
-										let target = e.target;
-										if (target.nodeType === 3) target = target.parentElement;
-										while (target && target.parentElement !== editor) target = target.parentElement;
-										if (!target || target === dragSrcRef.current) { setDropIndicator(null); return; }
-										const tgtRect = target.getBoundingClientRect();
-										const containerRect = container.getBoundingClientRect();
-										const before = e.clientY < tgtRect.top + tgtRect.height / 2;
-										const editorRect = editor.getBoundingClientRect();
-										dragOverRef.current = { block: target, before };
-										setDropIndicator({
-											top: (before ? tgtRect.top : tgtRect.bottom) - containerRect.top + container.scrollTop,
-											left: editorRect.left - containerRect.left,
-											width: editorRect.width,
-										});
 									}}
-									onDragLeave={(e) => {
-										if (!editorRef.current?.contains(e.relatedTarget)) {
-											setDropIndicator(null);
-											dragOverRef.current = null;
-										}
-									}}
-									onDrop={(e) => {
-										const src = dragSrcRef.current;
-										if (!src) return;
-										e.preventDefault();
-										const editor = editorRef.current;
-										if (!editor) return;
-										const over = dragOverRef.current;
-										if (over?.block && over.block !== src) {
-											if (over.before) editor.insertBefore(src, over.block);
-											else editor.insertBefore(src, over.block.nextSibling);
-										}
-										src.style.opacity = "";
-										src.style.outline = "";
-										dragSrcRef.current = null;
-										dragOverRef.current = null;
-										setDragHandle(null);
+								onDragOver={(e) => {
+									if (!dragSrcRef.current) return;
+									e.preventDefault();
+									e.dataTransfer.dropEffect = "move";
+									const editor = editorRef.current;
+									const container = editorContainerRef.current;
+									if (!editor || !container) return;
+									let target = e.target;
+									if (target.nodeType === 3) target = target.parentElement;
+									while (target && target.parentElement !== editor) target = target.parentElement;
+									if (!target || target === dragSrcRef.current) { setDropIndicator(null); return; }
+									const tgtRect = target.getBoundingClientRect();
+									const containerRect = container.getBoundingClientRect();
+									const before = e.clientY < tgtRect.top + tgtRect.height / 2;
+									const editorRect = editor.getBoundingClientRect();
+									dragOverRef.current = { block: target, before };
+									setDropIndicator({
+										top: (before ? tgtRect.top : tgtRect.bottom) - containerRect.top + container.scrollTop,
+										left: editorRect.left - containerRect.left,
+										width: editorRect.width,
+									});
+								}}
+								onDragLeave={(e) => {
+									if (!editorRef.current?.contains(e.relatedTarget)) {
 										setDropIndicator(null);
-										countWords();
-									}}
-									data-placeholder="Write, or type / for commands…"
-									style={{
-										maxWidth: 720,
-										margin: "0 auto",
-										padding: "36px 48px 100px",
-										minHeight: "100%",
-										outline: "none",
+										dragOverRef.current = null;
+									}
+								}}
+								onDrop={(e) => {
+									const src = dragSrcRef.current;
+									if (!src) return;
+									e.preventDefault();
+									const editor = editorRef.current;
+									if (!editor) return;
+									const over = dragOverRef.current;
+									if (over?.block && over.block !== src) {
+										if (over.before) editor.insertBefore(src, over.block);
+										else editor.insertBefore(src, over.block.nextSibling);
+									}
+									src.style.opacity = "";
+									src.style.outline = "";
+									dragSrcRef.current = null;
+									dragOverRef.current = null;
+									setDragHandle(null);
+									setDropIndicator(null);
+									countWords();
+										}}
+										data-placeholder="Write, or type / for commands…"
+										style={{
+							maxWidth:
+								editorVariant === "minimal" ? 620 :
+								editorVariant === "paper"   ? 760 : 720,
+											margin: "0 auto",
+							padding:
+								editorVariant === "minimal"    ? "48px 72px 120px" :
+								editorVariant === "paper"      ? "0 48px 100px 0" :
+								editorVariant === "typewriter" ? "36px 56px 100px" :
+								"36px 48px 100px",
+											minHeight: "100%",
+											outline: "none",
 											fontSize: `${editorFontSize}px`,
-											lineHeight: 1.75,
-											color: "#37352F",
+							lineHeight:
+								editorVariant === "paper"   ? `${Math.round(editorFontSize * 1.75)}px` :
+								editorVariant === "minimal" ? 2 : 1.75,
+							color:
+								editorVariant === "terminal"   ? "#57FF57" :
+								editorVariant === "typewriter" ? "#2C1A0E" :
+								editorVariant === "paper"      ? "#2A2018" :
+								editorVariant === "minimal"    ? "#3D3530" :
+								"#37352F",
 											fontFamily:
-												editorFont === "Inter"
-													? "'Comic', sans-serif"
-													: editorFont === "Georgia"
-														? "Georgia, serif"
-														: editorFont === "system-ui"
-															? "system-ui, sans-serif"
-															: "'Comic', sans-serif",
+								editorVariant === "typewriter" ? "'Courier New', Courier, monospace" :
+								editorVariant === "terminal"   ? "'Fira Code', 'Cascadia Code', 'Courier New', monospace" :
+								editorVariant === "minimal"    ? "Georgia, 'Times New Roman', serif" :
+								editorFont === "Georgia"       ? "Georgia, serif" :
+								editorFont === "system-ui"     ? "system-ui, sans-serif" :
+								"'Comic', sans-serif",
+							letterSpacing:
+								editorVariant === "typewriter" ? "0.06em" :
+								editorVariant === "terminal"   ? "0.03em" :
+								editorVariant === "minimal"    ? "0.01em" : "normal",
+							// backgroundColor (not background shorthand) so CSS background-image for paper lines is NOT overridden
+							backgroundColor: "transparent",
 										}}
 									/>
-								<input
-									ref={imageFileInputRef}
-									type="file"
-									accept="image/*,video/*"
-									style={{ display: "none" }}
-									onChange={handleImageFileSelect}
-								/>
-								<input
-									ref={audioFileInputRef}
-									type="file"
-									accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
-									style={{ display: "none" }}
-									onChange={handleAudioFileSelect}
-								/>
-								{/* Slash command dropdown */}
+									<input
+										ref={imageFileInputRef}
+										type="file"
+										accept="image/*,video/*"
+										style={{ display: "none" }}
+										onChange={handleImageFileSelect}
+									/>
+							<input
+								ref={audioFileInputRef}
+								type="file"
+								accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
+								style={{ display: "none" }}
+								onChange={handleAudioFileSelect}
+									/>
+									{/* Slash command dropdown */}
 									<AnimatePresence>
 										{slashCommand && (
 											<motion.div
@@ -5243,133 +5236,65 @@ export default function DraftPage() {
 														},
 														q,
 													);
-													const styleItems = DRAFT_SLASH_BASE_ITEMS.filter(
-														(it) =>
-															it.section === "style" &&
-															draftSlashItemMatchesQuery(it, q),
-													);
-													const blockItems = DRAFT_SLASH_BASE_ITEMS.filter(
-														(it) =>
-															it.section === "blocks" &&
-															draftSlashItemMatchesQuery(it, q),
-													);
-													const flatRows = getDraftSlashFlatRows(
-														slashCommand.query,
-													);
-													const activeIdx =
-														flatRows.length > 0
-															? Math.min(
-																	slashListIndex,
-																	flatRows.length - 1,
-																)
-															: 0;
-													const styleRowOffset = aiHit ? 1 : 0;
-													const blockRowOffset =
-														styleRowOffset + styleItems.length;
-													if (
-														!aiHit &&
-														styleItems.length === 0 &&
-														blockItems.length === 0
-													) {
+											const allMatching = DRAFT_SLASH_BASE_ITEMS.filter(
+												(it) => draftSlashItemMatchesQuery(it, q),
+											);
+											const flatRows = getDraftSlashFlatRows(slashCommand.query);
+											const activeIdx = flatRows.length > 0 ? Math.min(slashListIndex, flatRows.length - 1) : 0;
+											const aiRowOffset = aiHit ? 1 : 0;
+											// Build ordered sub-section groups
+											const SUB_ORDER = ["Typography", "Lists", "Media", "Data", "Components", "Callouts", "Code", "Dividers"];
+											const grouped = {};
+											allMatching.forEach((it) => {
+												const s = it.subSection || it.section;
+												if (!grouped[s]) grouped[s] = [];
+												grouped[s].push(it);
+											});
+											const orderedGroups = SUB_ORDER.filter((s) => grouped[s]?.length > 0).map((s) => ({ label: s, items: grouped[s] }));
+
+											if (!aiHit && allMatching.length === 0) {
 														return (
-															<div
-																style={{
-																	padding: "10px 12px",
-																	fontSize: 13,
-																	color: T.muted,
-																}}
-															>
+													<div style={{ padding: "10px 12px", fontSize: 13, color: T.muted }}>
 																No matching commands
 															</div>
 														);
 													}
 													const sectionTitleStyle = {
-														fontSize: 10,
+												fontSize: 9.5,
 														fontWeight: 700,
-														color: "#B0AAA3",
-														textTransform: "",
-														letterSpacing: "0.1em",
-														margin: "0 0 6px 4px",
+												color: "#C4BDB5",
+												letterSpacing: "0.08em",
+												textTransform: "uppercase",
+												margin: "8px 0 4px 6px",
 													};
 													const rowBtnStyle = {
 														width: "100%",
 														display: "flex",
 														alignItems: "center",
 														gap: 10,
-														padding: "8px 10px",
+												padding: "7px 10px",
 														border: "none",
-														borderRadius: 8,
+												borderRadius: 7,
 														background: "none",
-														fontSize: 14,
+												fontSize: 13,
 														fontWeight: 500,
 														color: T.accent,
 														cursor: "pointer",
 														textAlign: "left",
 													};
-													const divider = (
-														<div
-															style={{
-																height: 1,
-																background: T.border,
-																margin: "8px 0",
-															}}
-														/>
-													);
 													const renderIcon = (item) => {
 														const ic = item.icon;
-														if (ic === "list")
-															return (
-																<Icon
-																	d={Icons.list}
-																	size={16}
-																	stroke={T.muted}
-																/>
-															);
-														if (ic === "image")
-															return (
-																<Icon
-																	d={Icons.image}
-																	size={16}
-																	stroke={T.muted}
-																/>
-															);
-														if (ic === "table")
-															return (
-																<Icon
-																	d={Icons.table}
-																	size={16}
-																	stroke={T.muted}
-																/>
-															);
-														if (ic === "embed")
-															return (
-																<Icon
-																	d={Icons.video}
-																	size={16}
-																	stroke={T.muted}
-																/>
-															);
-														if (
-															typeof ic === "string" &&
-															!ic.startsWith("M")
-														) {
-															return (
-																<span
-																	style={{
-																		fontSize: 14,
-																		fontWeight: 600,
-																		width: 20,
-																		textAlign: "center",
-																	}}
-																>
-																	{ic}
-																</span>
-															);
-														}
-														return (
-															<Icon d={ic} size={16} stroke={T.muted} />
-														);
-													};
+												if (ic === "list") return <Icon d={Icons.list} size={15} stroke={T.muted} />;
+												if (ic === "image") return <Icon d={Icons.image} size={15} stroke={T.muted} />;
+												if (ic === "table") return <Icon d={Icons.table} size={15} stroke={T.muted} />;
+												if (ic === "embed") return <Icon d={Icons.video} size={15} stroke={T.muted} />;
+												if (typeof ic === "string" && !ic.startsWith("M")) {
+													return <span style={{ fontSize: 13, fontWeight: 600, width: 18, textAlign: "center", flexShrink: 0 }}>{ic}</span>;
+												}
+												return <Icon d={ic} size={15} stroke={T.muted} />;
+											};
+											// Build flat index for keyboard nav (ai first, then items in group order)
+											let navIdx = aiHit ? 1 : 0;
 													return (
 														<>
 															{aiHit && (
@@ -5378,262 +5303,197 @@ export default function DraftPage() {
 																	<motion.button
 																		whileHover={{ background: "#F0ECE5" }}
 																		whileTap={{ scale: 0.98 }}
-																		onClick={() =>
-																			handleSlashCommand("ask-ai")
-																		}
-																		data-slash-active={
-																			activeIdx === 0
-																				? "true"
-																				: undefined
-																		}
-																		style={{
-																			...rowBtnStyle,
-																			...(activeIdx === 0
-																				? { background: "#EDE8E0" }
-																				: {}),
-																		}}
-																	>
-																		<Icon
-																			d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z"
-																			size={14}
-																			stroke="#C17B2F"
-																		/>
+																onClick={() => handleSlashCommand("ask-ai")}
+																data-slash-active={activeIdx === 0 ? "true" : undefined}
+																style={{ ...rowBtnStyle, ...(activeIdx === 0 ? { background: "#EDE8E0" } : {}) }}
+															>
+																<Icon d="M12 3l1.8 5.4L19.2 9l-5.4 1.8L12 16.2l-1.8-5.4L4.8 9l5.4-1.8L12 3z" size={13} stroke="#C17B2F" />
 																		Ask AI
 																	</motion.button>
 																</>
 															)}
-															{aiHit &&
-																(styleItems.length > 0 ||
-																	blockItems.length > 0) &&
-																divider}
-															{styleItems.length > 0 && (
-																<>
-																	<p style={sectionTitleStyle}>Style</p>
-																	{styleItems.map((item, i) => {
-																		const isActive =
-																			activeIdx === styleRowOffset + i;
+													{orderedGroups.map((group, gi) => {
+														return (
+															<div key={group.label}>
+																{(gi > 0 || aiHit) && <div style={{ height: 1, background: T.border, margin: "6px 0" }} />}
+																<p style={sectionTitleStyle}>{group.label}</p>
+																{group.items.map((item) => {
+																	const myIdx = aiRowOffset + flatRows.slice(aiHit ? 1 : 0).findIndex((r) => r.id === item.id);
+																	const isActive = activeIdx === (aiHit ? 1 : 0) + allMatching.findIndex((x) => x.id === item.id);
 																		return (
 																		<motion.button
 																			key={item.id}
-																			whileHover={{
-																				background: "#F0ECE5",
-																			}}
+																			whileHover={{ background: "#F0ECE5" }}
 																			whileTap={{ scale: 0.98 }}
-																			onClick={() =>
-																				handleSlashCommand(item.id)
-																			}
-																			data-slash-active={
-																				isActive ? "true" : undefined
-																			}
-																			style={{
-																				...rowBtnStyle,
-																				...(isActive
-																					? { background: "#EDE8E0" }
-																					: {}),
-																			}}
+																			onClick={() => handleSlashCommand(item.id)}
+																			data-slash-active={isActive ? "true" : undefined}
+																			style={{ ...rowBtnStyle, ...(isActive ? { background: "#EDE8E0" } : {}) }}
 																		>
 																			{renderIcon(item)}
 																			{item.label}
 																		</motion.button>
 																	);
-																	})}
-																</>
-															)}
-															{styleItems.length > 0 &&
-																blockItems.length > 0 &&
-																divider}
-															{blockItems.length > 0 && (
-																<>
-																	<p style={sectionTitleStyle}>
-																		Blocks
-																	</p>
-																	{blockItems.map((item, i) => {
-																		const isActive =
-																			activeIdx === blockRowOffset + i;
-																		return (
-																		<motion.button
-																			key={item.id}
-																			whileHover={{
-																				background: "#F0ECE5",
-																			}}
-																			whileTap={{ scale: 0.98 }}
-																			onClick={() =>
-																				handleSlashCommand(item.id)
-																			}
-																			data-slash-active={
-																				isActive ? "true" : undefined
-																			}
-																			style={{
-																				...rowBtnStyle,
-																				...(isActive
-																					? { background: "#EDE8E0" }
-																					: {}),
-																			}}
-																		>
-																			{renderIcon(item)}
-																			{item.label}
-																		</motion.button>
+																})}
+															</div>
 																	);
 																	})}
 																</>
-															)}
-														</>
-													);
-												})()}
-											</motion.div>
-										)}
-									</AnimatePresence>
-
-									{/* ── Drag handle ── */}
-									{dragHandle && dragHandle.block && (
-										<div
-											contentEditable={false}
-											draggable
-											onDragStart={(e) => {
-												dragSrcRef.current = dragHandle.block;
-												e.dataTransfer.effectAllowed = "move";
-												/* Ghost image: small translucent clone */
-												try {
-													const ghost = dragHandle.block.cloneNode(true);
-													ghost.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0.7;pointer-events:none;max-width:400px;background:#fff;border-radius:8px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,0.12)";
-													document.body.appendChild(ghost);
-													e.dataTransfer.setDragImage(ghost, 20, 20);
-													setTimeout(() => document.body.removeChild(ghost), 0);
-												} catch (_) {}
-												dragHandle.block.style.opacity = "0.35";
-												dragHandle.block.style.outline = `2px dashed ${T.border}`;
-												dragHandle.block.style.borderRadius = "6px";
-											}}
-											onDragEnd={() => {
-												if (dragSrcRef.current) {
-													dragSrcRef.current.style.opacity = "";
-													dragSrcRef.current.style.outline = "";
-													dragSrcRef.current.style.borderRadius = "";
-												}
-												dragSrcRef.current = null;
-												dragOverRef.current = null;
-												setDropIndicator(null);
-											}}
-											style={{
-												position: "absolute",
-												left: dragHandle.handleLeft,
-												top: dragHandle.top + (dragHandle.height / 2) - 11,
-												width: 22,
-												height: 22,
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "center",
-												cursor: "grab",
-												opacity: 0,
-												borderRadius: 5,
-												background: "transparent",
-												transition: "opacity 0.12s, background 0.12s",
-												userSelect: "none",
-												zIndex: 20,
-												color: "#B0AAA3",
-											}}
-											title="Drag to reorder"
-											onMouseEnter={(e) => {
-												e.currentTarget.style.opacity = "1";
-												e.currentTarget.style.background = "#F0ECE5";
-											}}
-											onMouseLeave={(e) => {
-												e.currentTarget.style.opacity = "0";
-												e.currentTarget.style.background = "transparent";
-											}}
-											/* make it visible when parent block is hovered */
-											ref={(el) => {
-												if (el && dragHandle.block) {
-													const show = () => { el.style.opacity = "1"; };
-													const hide = () => { if (!dragSrcRef.current) el.style.opacity = "0"; };
-													dragHandle.block.addEventListener("mouseenter", show);
-													dragHandle.block.addEventListener("mouseleave", hide);
-												}
-											}}
-										>
-											{/* 6-dot grip */}
-											<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-												<circle cx="4.5" cy="3.5" r="1.2" fill="#9A9490"/>
-												<circle cx="4.5" cy="7" r="1.2" fill="#9A9490"/>
-												<circle cx="4.5" cy="10.5" r="1.2" fill="#9A9490"/>
-												<circle cx="9.5" cy="3.5" r="1.2" fill="#9A9490"/>
-												<circle cx="9.5" cy="7" r="1.2" fill="#9A9490"/>
-												<circle cx="9.5" cy="10.5" r="1.2" fill="#9A9490"/>
-											</svg>
-										</div>
+											);
+											})()}
+										</motion.div>
 									)}
+								</AnimatePresence>
 
-									{/* ── Drop indicator line ── */}
-									{dropIndicator && (
-										<div
-											contentEditable={false}
-											style={{
-												position: "absolute",
-												top: dropIndicator.top - 1,
-												left: dropIndicator.left,
-												width: dropIndicator.width,
-												height: 2,
-												background: T.warm,
-												borderRadius: 2,
-												zIndex: 30,
-												pointerEvents: "none",
-												boxShadow: `0 0 0 3px ${T.warm}22`,
+								{/* ── Drag handle ── */}
+								{dragHandle && dragHandle.block && (
+									<div
+										contentEditable={false}
+										draggable
+										onDragStart={(e) => {
+											dragSrcRef.current = dragHandle.block;
+											e.dataTransfer.effectAllowed = "move";
+											/* Ghost image: small translucent clone */
+											try {
+												const ghost = dragHandle.block.cloneNode(true);
+												ghost.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0.7;pointer-events:none;max-width:400px;background:#fff;border-radius:8px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,0.12)";
+												document.body.appendChild(ghost);
+												e.dataTransfer.setDragImage(ghost, 20, 20);
+												setTimeout(() => document.body.removeChild(ghost), 0);
+											} catch (_) {}
+											dragHandle.block.style.opacity = "0.35";
+											dragHandle.block.style.outline = `2px dashed ${T.border}`;
+											dragHandle.block.style.borderRadius = "6px";
+										}}
+										onDragEnd={() => {
+											if (dragSrcRef.current) {
+												dragSrcRef.current.style.opacity = "";
+												dragSrcRef.current.style.outline = "";
+												dragSrcRef.current.style.borderRadius = "";
+											}
+											dragSrcRef.current = null;
+											dragOverRef.current = null;
+											setDropIndicator(null);
+										}}
+																			style={{
+											position: "absolute",
+											left: dragHandle.handleLeft,
+											top: dragHandle.top + (dragHandle.height / 2) - 11,
+											width: 22,
+											height: 22,
+											display: "flex",
+											alignItems: "center",
+											justifyContent: "center",
+											cursor: "grab",
+											opacity: 0,
+											borderRadius: 5,
+											background: "transparent",
+											transition: "opacity 0.12s, background 0.12s",
+											userSelect: "none",
+											zIndex: 20,
+											color: "#B0AAA3",
+										}}
+										title="Drag to reorder"
+										onMouseEnter={(e) => {
+											e.currentTarget.style.opacity = "1";
+											e.currentTarget.style.background = "#F0ECE5";
+										}}
+										onMouseLeave={(e) => {
+											e.currentTarget.style.opacity = "0";
+											e.currentTarget.style.background = "transparent";
+										}}
+										/* make it visible when parent block is hovered */
+										ref={(el) => {
+											if (el && dragHandle.block) {
+												const show = () => { el.style.opacity = "1"; };
+												const hide = () => { if (!dragSrcRef.current) el.style.opacity = "0"; };
+												dragHandle.block.addEventListener("mouseenter", show);
+												dragHandle.block.addEventListener("mouseleave", hide);
+											}
+										}}
+									>
+										{/* 6-dot grip */}
+										<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+											<circle cx="4.5" cy="3.5" r="1.2" fill="#9A9490"/>
+											<circle cx="4.5" cy="7" r="1.2" fill="#9A9490"/>
+											<circle cx="4.5" cy="10.5" r="1.2" fill="#9A9490"/>
+											<circle cx="9.5" cy="3.5" r="1.2" fill="#9A9490"/>
+											<circle cx="9.5" cy="7" r="1.2" fill="#9A9490"/>
+											<circle cx="9.5" cy="10.5" r="1.2" fill="#9A9490"/>
+										</svg>
+									</div>
+								)}
+
+								{/* ── Drop indicator line ── */}
+								{dropIndicator && (
+									<div
+										contentEditable={false}
+										style={{
+											position: "absolute",
+											top: dropIndicator.top - 1,
+											left: dropIndicator.left,
+											width: dropIndicator.width,
+											height: 2,
+											background: T.warm,
+											borderRadius: 2,
+											zIndex: 30,
+											pointerEvents: "none",
+											boxShadow: `0 0 0 3px ${T.warm}22`,
+										}}
+									/>
+								)}
+
+								{/* ── Icon selector popup ── */}
+								{iconSelector && createPortal(
+									<div
+										ref={iconSelectorRef}
+										style={{
+											position: "fixed",
+											left: Math.min(iconSelector.x, window.innerWidth - 310),
+											top: Math.min(iconSelector.y, window.innerHeight - 390),
+											zIndex: 200,
+										}}
+									>
+										<IconSelectorDropdown
+											onSelect={({ type, value, icon }) => {
+												const target = iconSelector.target;
+												if (!target) return;
+												if (type === "emoji") {
+													target.setAttribute("data-icon-type", "emoji");
+													target.innerHTML = `<span style="font-size:28px;line-height:1">${value}</span>`;
+												} else if (type === "lucide" && icon) {
+													target.setAttribute("data-icon-type", "lucide");
+													target.innerHTML = lucideToSvgString(icon, 26, "#37352F");
+												}
 											}}
+											onClose={() => setIconSelector(null)}
 										/>
-									)}
+									</div>,
+									document.body
+								)}
 
-									{/* ── Icon selector popup ── */}
-									{iconSelector && createPortal(
-										<div
-											ref={iconSelectorRef}
-											style={{
-												position: "fixed",
-												left: Math.min(iconSelector.x, window.innerWidth - 310),
-												top: Math.min(iconSelector.y, window.innerHeight - 390),
-												zIndex: 200,
-											}}
-										>
-											<IconSelectorDropdown
-												onSelect={({ type, value, icon }) => {
-													const target = iconSelector.target;
-													if (!target) return;
-													if (type === "emoji") {
-														target.setAttribute("data-icon-type", "emoji");
-														target.innerHTML = `<span style="font-size:28px;line-height:1">${value}</span>`;
-													} else if (type === "lucide" && icon) {
-														target.setAttribute("data-icon-type", "lucide");
-														target.innerHTML = lucideToSvgString(icon, 26, "#37352F");
-													}
+									{draftSlashDatePickerPos &&
+										createPortal(
+											<div
+												data-draft-date-picker
+												style={{
+													position: "fixed",
+													left: draftSlashDatePickerPos.left,
+													top: draftSlashDatePickerPos.top,
+													zIndex: 120,
 												}}
-												onClose={() => setIconSelector(null)}
-											/>
-										</div>,
-										document.body
-									)}
-
-								{draftSlashDatePickerPos &&
-									createPortal(
-										<div
-											data-draft-date-picker
-											style={{
-												position: "fixed",
-												left: draftSlashDatePickerPos.left,
-												top: draftSlashDatePickerPos.top,
-												zIndex: 120,
+											>
+												<TiptapSlashDatePicker
+											key={datePickerInitial.toISOString()}
+											initialDate={datePickerInitial}
+													onSelect={insertDraftDateAtCursor}
+											onClose={() => {
+												dateEditTargetRef.current = null;
+												setDraftSlashDatePickerPos(null);
 											}}
-										>
-											<TiptapSlashDatePicker
-												key={datePickerInitial.toISOString()}
-												initialDate={datePickerInitial}
-												onSelect={insertDraftDateAtCursor}
-												onClose={() => {
-													dateEditTargetRef.current = null;
-													setDraftSlashDatePickerPos(null);
-												}}
-											/>
-										</div>,
-										document.body,
-									)}
+												/>
+											</div>,
+											document.body,
+										)}
 									{draftImageModalOpen &&
 										createPortal(
 											<div
@@ -5791,201 +5651,342 @@ export default function DraftPage() {
 											</div>,
 											document.body,
 										)}
-								{/* ── Audio upload modal ── */}
-								{audioModalOpen && createPortal(
-									<div
-										role="presentation"
-										style={{ position: "fixed", inset: 0, zIndex: 130, background: "rgba(55,53,47,0.40)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-										onMouseDown={(e) => { if (e.target === e.currentTarget) setAudioModalOpen(false); }}
-									>
-										<div
-											role="dialog"
-											aria-modal="true"
-											aria-label="Insert audio"
-											onMouseDown={(e) => e.stopPropagation()}
-											style={{ background: T.surface, borderRadius: 14, padding: 24, width: "100%", maxWidth: 400, boxShadow: "0 16px 48px rgba(0,0,0,0.18)", border: `1px solid ${T.border}` }}
-										>
-											{/* Header */}
-											<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-												<div style={{ width: 36, height: 36, borderRadius: 9, background: "#FEF3E2", border: "1px solid #F6D9A8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-													<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C17B2F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-												</div>
-												<div>
-													<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, lineHeight: 1.2 }}>Insert Audio</p>
-													<p style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>MP3, WAV, OGG, M4A supported</p>
-												</div>
-											</div>
-
-											{/* Upload button */}
-											<button
-												type="button"
-												onClick={() => audioFileInputRef.current?.click()}
-												disabled={audioUploading}
-												style={{ width: "100%", padding: "12px 14px", borderRadius: 9, border: `1.5px dashed ${T.border}`, background: "#F7F5F0", fontWeight: 600, fontSize: 14, color: T.accent, cursor: audioUploading ? "wait" : "pointer", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-											>
-												{audioUploading ? (
-													<>
-														<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-														Uploading…
-													</>
-												) : (
-													<>
-														<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-														Choose audio file from computer
-													</>
-												)}
-											</button>
-											<p style={{ fontSize: 11, color: T.muted, textAlign: "center", marginBottom: 16 }}>
-												File will be uploaded and an audio player inserted into your draft.
-											</p>
-
-											<div style={{ display: "flex", justifyContent: "flex-end" }}>
-												<button
-													type="button"
-													onClick={() => setAudioModalOpen(false)}
-													style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "transparent", color: T.muted, fontWeight: 500, cursor: "pointer", fontSize: 13 }}
-												>
-													Cancel
-												</button>
-											</div>
-										</div>
-									</div>,
-									document.body
-								)}
-
-						{/* ── Recording modal ── */}
-							{recordingOpen && createPortal(
+							{/* ── Audio upload modal ── */}
+							{audioModalOpen && createPortal(
 								<div
 									role="presentation"
-									style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(30,28,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
+									style={{ position: "fixed", inset: 0, zIndex: 130, background: "rgba(55,53,47,0.40)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+									onMouseDown={(e) => { if (e.target === e.currentTarget) setAudioModalOpen(false); }}
 								>
-									<style>{`
-										@keyframes recBar { 0%,100%{transform:scaleY(0.3)} 50%{transform:scaleY(1)} }
-										@keyframes recPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
-										@keyframes recSpin { to{transform:rotate(360deg)} }
-									`}</style>
-									<motion.div
-										initial={{ opacity: 0, scale: 0.92, y: 16 }}
-										animate={{ opacity: 1, scale: 1, y: 0 }}
-										exit={{ opacity: 0, scale: 0.92, y: 16 }}
-										transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-										style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "28px 28px 22px", width: "100%", maxWidth: 460, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", display: "flex", flexDirection: "column", gap: 0 }}
+									<div
+										role="dialog"
+										aria-modal="true"
+										aria-label="Insert audio"
+										onMouseDown={(e) => e.stopPropagation()}
+										style={{ background: T.surface, borderRadius: 14, padding: 24, width: "100%", maxWidth: 400, boxShadow: "0 16px 48px rgba(0,0,0,0.18)", border: `1px solid ${T.border}` }}
 									>
-										{/* Mode toggle */}
-										<div style={{ display: "flex", gap: 0, background: T.bg, borderRadius: 10, padding: 3, marginBottom: 22, alignSelf: "center", border: `1px solid ${T.border}` }}>
-											{[{ id: "audio", label: "Audio Player", icon: "♪" }, { id: "text", label: "Transcript to Text", icon: "T" }].map((m) => (
-												<button
-													key={m.id}
-													type="button"
-													onClick={() => { if (recordingState !== "uploading") setRecordingMode(m.id); }}
-													style={{ padding: "6px 16px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 12, cursor: recordingState === "uploading" ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s", background: recordingMode === m.id ? T.surface : "transparent", color: recordingMode === m.id ? T.accent : T.muted, boxShadow: recordingMode === m.id ? `0 1px 4px rgba(0,0,0,0.1)` : "none" }}
-												>
-													<span style={{ fontSize: 11 }}>{m.icon}</span>{m.label}
-												</button>
-											))}
+										{/* Header */}
+										<div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+											<div style={{ width: 36, height: 36, borderRadius: 9, background: "#FEF3E2", border: "1px solid #F6D9A8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+												<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C17B2F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+											</div>
+											<div>
+												<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, lineHeight: 1.2 }}>Insert Audio</p>
+												<p style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>MP3, WAV, OGG, M4A supported</p>
+											</div>
 										</div>
 
-										{/* Animated waveform bars */}
-										<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 52, marginBottom: 16 }}>
-											{[0.4,0.7,1,0.8,0.6,0.9,1,0.7,0.5,0.8,0.6,1,0.4,0.75,0.9,0.55,0.85].map((h, i) => (
-												<div
-													key={i}
-													style={{
-														width: recordingState === "recording" ? 4 : 3,
-														borderRadius: 3,
-														background: recordingState === "uploading" ? T.border : recordingState === "recording" ? (recordingMode === "text" ? "#6366F1" : T.warm) : T.border,
-														height: `${Math.round(h * 42)}px`,
-														transformOrigin: "center",
-														animation: recordingState === "recording"
-															? `recBar ${0.55 + (i % 5) * 0.12}s ${(i * 0.06).toFixed(2)}s ease-in-out infinite alternate`
-															: "none",
-														opacity: recordingState === "uploading" ? 0.35 : 1,
-														transition: "background 0.3s, opacity 0.3s",
-													}}
-												/>
-											))}
-										</div>
-
-										{/* Status row: dot + label + timer */}
-										<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}>
-											{recordingState === "recording" && (
-												<div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", flexShrink: 0, animation: "recPulse 1.2s ease-in-out infinite" }} />
+										{/* Upload button */}
+										<button
+											type="button"
+											onClick={() => audioFileInputRef.current?.click()}
+											disabled={audioUploading}
+											style={{ width: "100%", padding: "12px 14px", borderRadius: 9, border: `1.5px dashed ${T.border}`, background: "#F7F5F0", fontWeight: 600, fontSize: 14, color: T.accent, cursor: audioUploading ? "wait" : "pointer", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+										>
+											{audioUploading ? (
+												<>
+													<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+													Uploading…
+												</>
+											) : (
+												<>
+													<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+													Choose audio file from computer
+												</>
 											)}
-											{recordingState === "uploading" && (
-												<div style={{ width: 13, height: 13, border: `2px solid ${T.warm}`, borderTopColor: "transparent", borderRadius: "50%", flexShrink: 0, animation: "recSpin 0.7s linear infinite" }} />
-											)}
-											<span style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
-												{recordingState === "idle" || recordingState === "requesting"
-													? "Starting microphone…"
-													: recordingState === "recording"
-														? `Recording${recordingMode === "text" ? " & Transcribing" : ""}`
-														: recordingMode === "text" ? "Inserting text…" : "Uploading audio…"}
-											</span>
-											{recordingState === "recording" && (
-												<span style={{ fontSize: 13, fontWeight: 700, color: recordingMode === "text" ? "#6366F1" : T.warm, fontVariantNumeric: "tabular-nums", marginLeft: 4 }}>
-													{String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:{String(recordingSeconds % 60).padStart(2, "0")}
-												</span>
-											)}
-										</div>
-
-										{/* Caption */}
-										<p style={{ fontSize: 11, color: T.muted, textAlign: "center", lineHeight: 1.6, marginBottom: recordingMode === "text" ? 14 : 22 }}>
-											{recordingState === "recording"
-												? recordingMode === "text"
-													? "Speak clearly — your words are being transcribed live below."
-													: "Speak clearly into your microphone. Click Done when finished."
-												: recordingState === "uploading"
-													? recordingMode === "text" ? "Inserting your transcript into the editor…" : "Processing and uploading your recording…"
-													: "Requesting microphone access…"}
+										</button>
+										<p style={{ fontSize: 11, color: T.muted, textAlign: "center", marginBottom: 16 }}>
+											File will be uploaded and an audio player inserted into your draft.
 										</p>
 
-										{/* Live transcript textarea — text mode only */}
-										{recordingMode === "text" && (
-											<div style={{ width: "100%", marginBottom: 20 }}>
-												<div style={{ fontSize: 11, fontWeight: 600, color: T.muted, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
-													<span style={{ width: 6, height: 6, borderRadius: "50%", background: recordingState === "recording" ? "#6366F1" : T.border, display: "inline-block", animation: recordingState === "recording" ? "recPulse 1.5s ease-in-out infinite" : "none" }} />
-													Live transcript
-												</div>
-												<textarea
-													readOnly
-													value={(transcriptFinal + transcriptInterim)}
-													placeholder="Your speech will appear here as you speak…"
-													style={{ width: "100%", minHeight: 110, maxHeight: 200, resize: "vertical", borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg, color: T.accent, fontSize: 13, lineHeight: 1.65, padding: "10px 12px", fontFamily: "inherit", outline: "none", boxSizing: "border-box", overflowY: "auto" }}
-												/>
-												<p style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
-													You can edit the transcript above after clicking Done — it will be inserted as editable text in the editor.
-												</p>
-											</div>
-										)}
-
-										{/* Action buttons */}
-										<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+										<div style={{ display: "flex", justifyContent: "flex-end" }}>
 											<button
 												type="button"
-												onClick={handleRecordingCancel}
-												disabled={recordingState === "uploading"}
-												style={{ padding: "8px 18px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontWeight: 500, fontSize: 13, cursor: recordingState === "uploading" ? "wait" : "pointer" }}
+												onClick={() => setAudioModalOpen(false)}
+												style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "transparent", color: T.muted, fontWeight: 500, cursor: "pointer", fontSize: 13 }}
 											>
 												Cancel
 											</button>
-											<button
-												type="button"
-												onClick={handleRecordingDone}
-												disabled={recordingState !== "recording"}
-												style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: recordingState === "recording" ? (recordingMode === "text" ? "#6366F1" : T.warm) : T.border, color: recordingState === "recording" ? "white" : T.muted, fontWeight: 700, fontSize: 13, cursor: recordingState === "recording" ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }}
-											>
-												<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-												{recordingMode === "text" ? "Insert Text" : "Done"}
-											</button>
 										</div>
-									</motion.div>
+									</div>
 								</div>,
 								document.body
 							)}
 
-							{/* Text selection dropdown (Notion-style) */}
-							<AnimatePresence>
-									{selectionDropdown && (
+					{/* ── Recording modal ── */}
+						{recordingOpen && createPortal(
+							<div
+								role="presentation"
+								style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(30,28,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
+							>
+								<style>{`
+									@keyframes recBar { 0%,100%{transform:scaleY(0.3)} 50%{transform:scaleY(1)} }
+									@keyframes recPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
+									@keyframes recSpin { to{transform:rotate(360deg)} }
+								`}</style>
+								<motion.div
+									initial={{ opacity: 0, scale: 0.92, y: 16 }}
+									animate={{ opacity: 1, scale: 1, y: 0 }}
+									exit={{ opacity: 0, scale: 0.92, y: 16 }}
+									transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+									style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "28px 28px 22px", width: "100%", maxWidth: 460, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", display: "flex", flexDirection: "column", gap: 0 }}
+								>
+									{/* Mode toggle */}
+									<div style={{ display: "flex", gap: 0, background: T.bg, borderRadius: 10, padding: 3, marginBottom: 22, alignSelf: "center", border: `1px solid ${T.border}` }}>
+										{[{ id: "audio", label: "Audio Player", icon: "♪" }, { id: "text", label: "Transcript to Text", icon: "T" }].map((m) => (
+											<button
+												key={m.id}
+												type="button"
+												onClick={() => { if (recordingState !== "uploading") setRecordingMode(m.id); }}
+												style={{ padding: "6px 16px", borderRadius: 8, border: "none", fontWeight: 600, fontSize: 12, cursor: recordingState === "uploading" ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s", background: recordingMode === m.id ? T.surface : "transparent", color: recordingMode === m.id ? T.accent : T.muted, boxShadow: recordingMode === m.id ? `0 1px 4px rgba(0,0,0,0.1)` : "none" }}
+											>
+												<span style={{ fontSize: 11 }}>{m.icon}</span>{m.label}
+											</button>
+										))}
+									</div>
+
+									{/* Animated waveform bars */}
+									<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, height: 52, marginBottom: 16 }}>
+										{[0.4,0.7,1,0.8,0.6,0.9,1,0.7,0.5,0.8,0.6,1,0.4,0.75,0.9,0.55,0.85].map((h, i) => (
+											<div
+												key={i}
+												style={{
+													width: recordingState === "recording" ? 4 : 3,
+													borderRadius: 3,
+													background: recordingState === "uploading" ? T.border : recordingState === "recording" ? (recordingMode === "text" ? "#6366F1" : T.warm) : T.border,
+													height: `${Math.round(h * 42)}px`,
+													transformOrigin: "center",
+													animation: recordingState === "recording"
+														? `recBar ${0.55 + (i % 5) * 0.12}s ${(i * 0.06).toFixed(2)}s ease-in-out infinite alternate`
+														: "none",
+													opacity: recordingState === "uploading" ? 0.35 : 1,
+													transition: "background 0.3s, opacity 0.3s",
+												}}
+											/>
+										))}
+									</div>
+
+									{/* Status row: dot + label + timer */}
+									<div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}>
+										{recordingState === "recording" && (
+											<div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", flexShrink: 0, animation: "recPulse 1.2s ease-in-out infinite" }} />
+										)}
+										{recordingState === "uploading" && (
+											<div style={{ width: 13, height: 13, border: `2px solid ${T.warm}`, borderTopColor: "transparent", borderRadius: "50%", flexShrink: 0, animation: "recSpin 0.7s linear infinite" }} />
+										)}
+										<span style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
+											{recordingState === "idle" || recordingState === "requesting"
+												? "Starting microphone…"
+												: recordingState === "recording"
+													? `Recording${recordingMode === "text" ? " & Transcribing" : ""}`
+													: recordingMode === "text" ? "Inserting text…" : "Uploading audio…"}
+										</span>
+										{recordingState === "recording" && (
+											<span style={{ fontSize: 13, fontWeight: 700, color: recordingMode === "text" ? "#6366F1" : T.warm, fontVariantNumeric: "tabular-nums", marginLeft: 4 }}>
+												{String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:{String(recordingSeconds % 60).padStart(2, "0")}
+											</span>
+										)}
+									</div>
+
+									{/* Caption */}
+									<p style={{ fontSize: 11, color: T.muted, textAlign: "center", lineHeight: 1.6, marginBottom: recordingMode === "text" ? 14 : 22 }}>
+										{recordingState === "recording"
+											? recordingMode === "text"
+												? "Speak clearly — your words are being transcribed live below."
+												: "Speak clearly into your microphone. Click Done when finished."
+											: recordingState === "uploading"
+												? recordingMode === "text" ? "Inserting your transcript into the editor…" : "Processing and uploading your recording…"
+												: "Requesting microphone access…"}
+									</p>
+
+									{/* Live transcript textarea — text mode only */}
+									{recordingMode === "text" && (
+										<div style={{ width: "100%", marginBottom: 20 }}>
+											<div style={{ fontSize: 11, fontWeight: 600, color: T.muted, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+												<span style={{ width: 6, height: 6, borderRadius: "50%", background: recordingState === "recording" ? "#6366F1" : T.border, display: "inline-block", animation: recordingState === "recording" ? "recPulse 1.5s ease-in-out infinite" : "none" }} />
+												Live transcript
+											</div>
+											<textarea
+												readOnly
+												value={(transcriptFinal + transcriptInterim)}
+												placeholder="Your speech will appear here as you speak…"
+												style={{ width: "100%", minHeight: 110, maxHeight: 200, resize: "vertical", borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg, color: T.accent, fontSize: 13, lineHeight: 1.65, padding: "10px 12px", fontFamily: "inherit", outline: "none", boxSizing: "border-box", overflowY: "auto" }}
+											/>
+											<p style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
+												You can edit the transcript above after clicking Done — it will be inserted as editable text in the editor.
+											</p>
+										</div>
+									)}
+
+									{/* Action buttons */}
+									<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+										<button
+											type="button"
+											onClick={handleRecordingCancel}
+											disabled={recordingState === "uploading"}
+											style={{ padding: "8px 18px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontWeight: 500, fontSize: 13, cursor: recordingState === "uploading" ? "wait" : "pointer" }}
+										>
+											Cancel
+										</button>
+										<button
+											type="button"
+											onClick={handleRecordingDone}
+											disabled={recordingState !== "recording"}
+											style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: recordingState === "recording" ? (recordingMode === "text" ? "#6366F1" : T.warm) : T.border, color: recordingState === "recording" ? "white" : T.muted, fontWeight: 700, fontSize: 13, cursor: recordingState === "recording" ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }}
+										>
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+											{recordingMode === "text" ? "Insert Text" : "Done"}
+										</button>
+									</div>
+								</motion.div>
+							</div>,
+							document.body
+						)}
+
+						{/* ── Embed modal ── */}
+					{embedModalOpen && createPortal(
+						<div
+							role="dialog"
+							aria-modal="true"
+							style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(28,26,24,0.6)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
+							onClick={(e) => { if (e.target === e.currentTarget) { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); } }}
+						>
+							<motion.div
+								initial={{ opacity: 0, scale: 0.93, y: 18 }}
+								animate={{ opacity: 1, scale: 1, y: 0 }}
+								exit={{ opacity: 0, scale: 0.93, y: 18 }}
+								transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+								style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "24px 24px 20px", width: "100%", maxWidth: 560, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", display: "flex", flexDirection: "column", gap: 0 }}
+							>
+								{(() => {
+									const doInsert = () => {
+										const html = makeEmbedHtml(embedResolved);
+										if (!html || !editorRef.current) return;
+										editorRef.current.focus();
+										// Restore saved cursor position so content lands in the right spot
+										if (embedRangeRef.current) {
+											const sel = window.getSelection();
+											if (sel) {
+												sel.removeAllRanges();
+												sel.addRange(embedRangeRef.current);
+											}
+											embedRangeRef.current = null;
+										}
+										document.execCommand("insertHTML", false, html);
+										countWords();
+										setEmbedModalOpen(false);
+										setEmbedResolved(null);
+										setEmbedUrlInput("");
+									};
+									const eColor = embedResolved?.color ?? T.border;
+									const btnBg = embedResolved
+										? (embedResolved.color === "#000000" || embedResolved.color === "#010101" ? "#1A1A1A" : embedResolved.color)
+										: T.border;
+									return (
+										<>
+											{/* Header */}
+											<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+												<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+													<div style={{ width: 34, height: 34, borderRadius: 9, background: embedResolved ? eColor + "18" : "#F0ECE5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, transition: "background 0.2s", flexShrink: 0 }}>
+														{(embedResolved && EMBED_ICONS[embedResolved.platform]) || "🔗"}
+													</div>
+													<div>
+														<p style={{ fontSize: 14, fontWeight: 700, color: T.accent, lineHeight: 1.2 }}>
+															{embedResolved ? `${embedResolved.label} Embed` : "Embed Content"}
+														</p>
+														<p style={{ fontSize: 11, color: T.muted }}>YouTube · X · Instagram · Reddit · TikTok · Spotify · Vimeo · Loom · Figma</p>
+													</div>
+												</div>
+												<button type="button" onClick={() => { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); }} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✕</button>
+											</div>
+
+											{/* URL input */}
+											<p style={{ fontSize: 10.5, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Paste a link</p>
+											<input
+												autoFocus
+												value={embedUrlInput}
+												onChange={(e) => {
+													const val = e.target.value;
+													setEmbedUrlInput(val);
+													setEmbedResolved(val.trim() ? resolveEmbed(val.trim()) : null);
+												}}
+												onKeyDown={(e) => { if (e.key === "Enter" && embedResolved) doInsert(); }}
+												placeholder="https://youtube.com/watch?v=... or any social link"
+												style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${embedResolved ? eColor : T.border}`, background: T.bg, color: T.accent, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 14, transition: "border-color 0.2s" }}
+											/>
+
+											{/* Platform chips — shown when no URL yet */}
+											{!embedResolved && (
+												<div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
+													{[
+														{ label: "YouTube", color: "#FF0000" }, { label: "X / Twitter", color: "#000" },
+														{ label: "Instagram", color: "#E1306C" }, { label: "Reddit", color: "#FF4500" },
+														{ label: "TikTok", color: "#010101" }, { label: "Spotify", color: "#1DB954" },
+														{ label: "Vimeo", color: "#1AB7EA" }, { label: "Loom", color: "#625DF5" },
+														{ label: "Figma", color: "#F24E1E" }, { label: "CodeSandbox", color: "#333" },
+													].map((p) => (
+														<span key={p.label} style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100, background: p.color + "12", color: ["#000", "#010101"].includes(p.color) ? "#333" : p.color, border: `1px solid ${p.color}20` }}>{p.label}</span>
+													))}
+												</div>
+											)}
+
+											{/* Preview */}
+											{embedResolved && (
+												<div style={{ marginBottom: 18 }}>
+													<p style={{ fontSize: 10.5, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Preview</p>
+													{embedResolved.cardEmbed ? (
+														/* Non-iframeable: show exact card that will be inserted */
+														<div style={{ border: `1.5px solid #E8E4DC`, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", background: "#FAFAF8" }}>
+															<span style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>{EMBED_ICONS[embedResolved.platform] || "🔗"}</span>
+															<div style={{ flex: 1, minWidth: 0 }}>
+																<p style={{ fontSize: 13, fontWeight: 700, color: "#37352F", margin: "0 0 2px" }}>{embedResolved.label}</p>
+																<p style={{ fontSize: 11, color: "#C17B2F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>{embedUrlInput.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}</p>
+															</div>
+															<span style={{ fontSize: 11, color: "#9A9490", whiteSpace: "nowrap", padding: "5px 10px", border: "1px solid #E8E4DC", borderRadius: 6, background: "#fff" }}>Open ↗</span>
+														</div>
+													) : (
+														<div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${T.border}`, background: "#F7F5F0", position: "relative" }}>
+															<iframe
+																key={embedResolved.iframeSrc}
+																src={embedResolved.iframeSrc}
+																style={{ width: "100%", aspectRatio: embedResolved.aspectRatio?.includes("px") ? undefined : (embedResolved.aspectRatio || "16/9"), height: embedResolved.aspectRatio?.includes("px") ? embedResolved.aspectRatio : undefined, minHeight: embedResolved.aspectRatio?.includes("px") ? undefined : 200, border: "none", display: "block" }}
+																loading="lazy"
+																allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+																allowFullScreen
+															/>
+														</div>
+													)}
+													<p style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
+														<span style={{ color: eColor, fontWeight: 700 }}>{embedResolved.label}</span>
+														{embedResolved.cardEmbed ? " · inserted as a link card" : " · live embed"}
+													</p>
+												</div>
+											)}
+
+											{/* Actions */}
+											<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+												<button type="button" onClick={() => { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); }} style={{ padding: "8px 18px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+											<button
+													type="button"
+													disabled={!embedResolved}
+													onClick={doInsert}
+													style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: embedResolved ? btnBg : T.border, color: embedResolved ? "white" : T.muted, fontWeight: 700, fontSize: 13, cursor: embedResolved ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }}
+												>
+													<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+													Add to Editor
+												</button>
+											</div>
+										</>
+									);
+								})()}
+							</motion.div>
+						</div>,
+						document.body
+					)}
+
+									{/* Text selection dropdown (Notion-style) */}
+									<AnimatePresence>
+										{selectionDropdown && (
 											<motion.div
 												data-selection-dropdown
 												initial={{ opacity: 0, y: 4, scale: 0.96 }}
@@ -6481,235 +6482,9 @@ export default function DraftPage() {
 								</div>
 							</div>
 
-							{/* Bottom status bar */}
-							<div
-								style={{
-									padding: "8px 24px",
-									borderTop: `1px solid ${T.border}`,
-									background: T.surface,
-									display: "flex",
-									alignItems: "center",
-									gap: 16,
-									flexShrink: 0,
-								}}
-							>
-								<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-									<motion.div
-										animate={{ scale: [1, 1.2, 1] }}
-										transition={{ duration: 2, repeat: Infinity }}
-										style={{
-											width: 6,
-											height: 6,
-											borderRadius: "50%",
-											background: "#3D7A35",
-										}}
-									/>
-									<span style={{ fontSize: 12, color: T.muted }}>
-										Auto-saved
-									</span>
-								</div>
-								<span style={{ fontSize: 12, color: T.muted }}>·</span>
-								<span style={{ fontSize: 12, color: T.muted }}>
-									{wordCount} words · ~{Math.ceil(wordCount / 200)} min read
-								</span>
-								<div style={{ flex: 1 }} />
-
-								{/* Themes button */}
-								<motion.button
-									whileHover={{ background: "#F0ECE5" }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => setThemeDrawerOpen(true)}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 5,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "5px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.accent,
-										cursor: "pointer",
-									}}
-								>
-									{/* Palette icon */}
-									<svg
-										width={12}
-										height={12}
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke={T.accent}
-										strokeWidth={2}
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<circle cx="13.5" cy="6.5" r=".5" fill={T.accent} />
-										<circle cx="17.5" cy="10.5" r=".5" fill={T.accent} />
-										<circle cx="8.5" cy="7.5" r=".5" fill={T.accent} />
-										<circle cx="6.5" cy="12.5" r=".5" fill={T.accent} />
-										<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-									</svg>
-									Themes
-								</motion.button>
-
-								
-
-								{/* AI Chat button */}
-								<motion.button
-									whileHover={{ background: chatOpen ? "#C17B2F" : "#F0ECE5" }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => setChatOpen((v) => !v)}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 5,
-										background: chatOpen ? T.warm : T.base,
-										border: `1px solid ${chatOpen ? T.warm : T.border}`,
-										borderRadius: 8,
-										padding: "5px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: chatOpen ? "#FFFFFF" : T.accent,
-										cursor: "pointer",
-										transition: "all 0.18s",
-									}}
-								>
-									{/* Chat bubble icon */}
-									<svg
-										width={12}
-										height={12}
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke={chatOpen ? "#FFFFFF" : T.accent}
-										strokeWidth={2}
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-									</svg>
-									AI Chat
-								</motion.button>
-
-								<motion.button
-									whileHover={{ scale: 1.03 }}
-									whileTap={{ scale: 0.97 }}
-									onClick={() => router.push("/app")}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 6,
-										background: T.base,
-										border: `1px solid ${T.border}`,
-										borderRadius: 8,
-										padding: "5px 12px",
-										fontSize: 12,
-										fontWeight: 600,
-										color: T.muted,
-										cursor: "pointer",
-									}}
-								>
-									<Icon d={Icons.refresh} size={12} stroke={T.muted} /> New
-									draft
-								</motion.button>
-							</div>
 						</motion.div>
 					)}
-					{tableDoc && tableDataForView && (
-						<motion.div
-							key={`table-${draftId}`}
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							transition={{ duration: 0.2 }}
-							style={{
-								flex: 1,
-								display: "flex",
-								flexDirection: "column",
-								overflow: "hidden",
-							}}
-						>
-							<div
-								style={{
-									flex: 1,
-									overflowY: "auto",
-									maxWidth: 1100,
-									margin: "0 auto",
-									width: "100%",
-									padding: "28px 20px",
-								}}
-							>
-								<TableView
-									tableId={draftId}
-									tableData={tableDataForView}
-									setTableData={setLocalTableData}
-									reduxUser={reduxUser}
-									tableDocRef={
-										docData?.source === "assets" && reduxUser?.uid
-											? assetRef(reduxUser.uid, draftId)
-											: null
-									}
-								/>
-							</div>
-						</motion.div>
-					)}
-					{infographicsDoc && (
-						<motion.div
-							key={`infographics-${draftId}`}
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							transition={{ duration: 0.2 }}
-							style={{
-								flex: 1,
-								display: "flex",
-								flexDirection: "column",
-								overflow: "hidden",
-							}}
-						>
-							<InfographicsAssetView
-								doc={infographicsDoc}
-								userId={reduxUser?.uid}
-								assetId={draftId}
-								docSource={docData?.source || "assets"}
-								onUpdate={() =>
-									queryClient.invalidateQueries({
-										queryKey: ["doc", draftId, reduxUser?.uid],
-									})
-								}
-							/>
-						</motion.div>
-					)}
-					{landingPageDoc && (
-						<motion.div
-							key={`landing-${draftId}`}
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							transition={{ duration: 0.2 }}
-							style={{
-								flex: 1,
-								display: "flex",
-								flexDirection: "column",
-								overflow: "hidden",
-							}}
-						>
-							<LandingPageAssetView doc={landingPageDoc} />
-						</motion.div>
-					)}
-					{imageGalleryDoc && (
-						<motion.div
-							key={`gallery-${draftId}`}
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							transition={{ duration: 0.2 }}
-							style={{
-								flex: 1,
-								display: "flex",
-								flexDirection: "column",
-								overflow: "hidden",
-							}}
-						>
-							<ImageGalleryAssetView doc={imageGalleryDoc} />
-						</motion.div>
-					)}
+					
 				</div>
 
 				{/* ── RIGHT PANEL — AI Chat (inline, not overlay) ── */}
@@ -6734,24 +6509,52 @@ export default function DraftPage() {
 				/>
 			</div>
 
+			{typeof document !== "undefined" &&
+				createPortal(
+					<>
 			{/* ── THEMES MODAL ── full-screen two-panel preview */}
 			<AnimatePresence>
-			{themeDrawerOpen &&
-				(() => {
-					const activeTheme = THEMES[previewTheme];
-					const currentHTML = stripDraftSlashQueryFromHtmlString(
-						editorRef.current?.innerHTML || draft?.body || "",
-					);
+				{themeDrawerOpen &&
+					(() => {
+						const activeTheme = THEMES[previewTheme] || THEMES.ink;
+						const currentHTML = stripDraftSlashQueryFromHtmlString(
+							editorRef.current?.innerHTML || draft?.body || "",
+						);
 					const htmlForPreview = translatedHTML || currentHTML;
-					const themedDoc = activeTheme
-						? buildThemedHTML(htmlForPreview, activeTheme, draft?.title || "")
-						: "";
+						const previewDocTitle =
+							titleRef.current?.innerText?.trim() || draft?.title || "";
+						const themedDoc =
+							activeTheme && htmlForPreview.trim()
+								? buildThemedHTML(htmlForPreview, activeTheme, previewDocTitle)
+							: "";
 						const isCopiedHtml =
 							copiedTheme?.key === previewTheme &&
 							copiedTheme?.format === "html";
 						const isCopiedReact =
 							copiedTheme?.key === previewTheme &&
 							copiedTheme?.format === "react";
+						const isCopiedMd =
+							copiedTheme?.key === previewTheme &&
+							copiedTheme?.format === "markdown";
+						const isCopiedTxt =
+							copiedTheme?.key === previewTheme &&
+							copiedTheme?.format === "text";
+						const markdownExport = htmlForPreview.trim()
+							? htmlToMarkdown(htmlForPreview) || ""
+							: "";
+						const plainTextExport = (() => {
+							if (!htmlForPreview.trim()) return "";
+							try {
+								const d = document.createElement("div");
+								d.innerHTML = htmlForPreview;
+								return (d.innerText || "").trim();
+							} catch {
+								return "";
+							}
+						})();
+						const slugBase = (draft?.title || "draft")
+							.replace(/[^a-z0-9]/gi, "-")
+							.toLowerCase();
 						return (
 							<>
 								{/* Backdrop */}
@@ -6765,13 +6568,13 @@ export default function DraftPage() {
 									setTranslatedHTML("");
 									setTranslationLang("en");
 								}}
-								style={{
-									position: "fixed",
-									inset: 0,
-									background: "rgba(0,0,0,0.5)",
-									zIndex: 300,
-									backdropFilter: "blur(4px)",
-								}}
+									style={{
+										position: "fixed",
+										inset: 0,
+										background: "rgba(0,0,0,0.5)",
+										zIndex: 300,
+										backdropFilter: "blur(4px)",
+									}}
 								/>
 
 								{/* Centering shell — flexbox positions the modal, pointer-events:none lets backdrop work */}
@@ -6835,9 +6638,9 @@ export default function DraftPage() {
 												Export themes
 											</p>
 											<p style={{ fontSize: 12, color: T.muted }}>
-												— pick a theme, then copy HTML or a React embed
+												— choose a theme; preview updates live. Export HTML, React, Markdown, or text.
 											</p>
-										<div style={{ flex: 1 }} />
+											<div style={{ flex: 1 }} />
 
 										{/* Export dropdown */}
 										<div
@@ -6897,7 +6700,7 @@ export default function DraftPage() {
 															top: "100%",
 															right: 0,
 															marginTop: 6,
-															minWidth: 230,
+															minWidth: 260,
 															background: T.surface,
 															border: `1px solid ${T.border}`,
 															borderRadius: 10,
@@ -6909,49 +6712,49 @@ export default function DraftPage() {
 														{/* Download HTML */}
 														<button
 															type="button"
-															onClick={() => {
-																if (!themedDoc) return;
-																const blob = new Blob([themedDoc], {
-																	type: "text/html;charset=utf-8",
-																});
-																const a = document.createElement("a");
-																a.href = URL.createObjectURL(blob);
-																a.download = `${(draft?.title || "draft").replace(/[^a-z0-9]/gi, "-").toLowerCase()}-${activeTheme?.name?.toLowerCase() || "theme"}.html`;
-																a.click();
-																URL.revokeObjectURL(a.href);
+												onClick={() => {
+													if (!themedDoc) return;
+													const blob = new Blob([themedDoc], {
+														type: "text/html;charset=utf-8",
+													});
+													const a = document.createElement("a");
+													a.href = URL.createObjectURL(blob);
+													a.download = `${slugBase}-${(activeTheme?.name || "theme").toLowerCase().replace(/\s+/g, "-")}.html`;
+													a.click();
+													URL.revokeObjectURL(a.href);
 																setThemeExportOpen(false);
-															}}
-															style={{
+												}}
+												style={{
 																width: "100%",
 																textAlign: "left",
 																padding: "9px 12px",
 																border: "none",
 																borderRadius: 8,
 																background: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
+													fontSize: 13,
+													fontWeight: 600,
 																color: T.accent,
-																cursor: "pointer",
+													cursor: "pointer",
 																display: "flex",
 																alignItems: "center",
 																gap: 9,
-															}}
-														>
-															<svg
-																width={13}
-																height={13}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2}
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															>
-																<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-																<polyline points="7 10 12 15 17 10" />
-																<line x1="12" y1="15" x2="12" y2="3" />
-															</svg>
-															Download .html
+												}}
+											>
+												<svg
+													width={13}
+													height={13}
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													strokeWidth={2}
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												>
+													<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+													<polyline points="7 10 12 15 17 10" />
+													<line x1="12" y1="15" x2="12" y2="3" />
+												</svg>
+												Download .html
 														</button>
 
 														{/* Copy HTML */}
@@ -6961,7 +6764,7 @@ export default function DraftPage() {
 																handleCopyThemeHTML(previewTheme);
 																setThemeExportOpen(false);
 															}}
-															style={{
+												style={{
 																width: "100%",
 																textAlign: "left",
 																padding: "9px 12px",
@@ -6974,8 +6777,8 @@ export default function DraftPage() {
 																fontWeight: 600,
 																color: isCopiedHtml ? "#2D6A4F" : T.accent,
 																cursor: "pointer",
-																display: "flex",
-																alignItems: "center",
+													display: "flex",
+													alignItems: "center",
 																gap: 9,
 															}}
 														>
@@ -7003,48 +6806,194 @@ export default function DraftPage() {
 																width: "100%",
 																textAlign: "left",
 																padding: "9px 12px",
-																border: "none",
+													border: "none",
 																borderRadius: 8,
 																background: isCopiedReact
 																	? "rgba(30,58,95,0.1)"
 																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
+													fontSize: 13,
+													fontWeight: 600,
 																color: isCopiedReact
 																	? "#1E3A5F"
 																	: T.accent,
-																cursor: "pointer",
+													cursor: "pointer",
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+												}}
+											>
+														<svg
+															width={13}
+															height={13}
+															viewBox="0 0 24 24"
+															fill="none"
+																stroke="currentColor"
+															strokeWidth={2}
+															strokeLinecap="round"
+															strokeLinejoin="round"
+														>
+																<polyline points="16 18 22 12 16 6" />
+																<polyline points="8 6 2 12 8 18" />
+														</svg>
+															{isCopiedReact
+																? "React copied!"
+																: `Copy React — ${activeTheme?.name}`}
+														</button>
+
+														{/* Download Markdown */}
+														<button
+															type="button"
+															onClick={() => {
+																if (!markdownExport.trim()) return;
+																const blob = new Blob([markdownExport], {
+																	type: "text/markdown;charset=utf-8",
+																});
+																const a = document.createElement("a");
+																a.href = URL.createObjectURL(blob);
+																a.download = `${slugBase}.md`;
+																a.click();
+																URL.revokeObjectURL(a.href);
+																setThemeExportOpen(false);
+															}}
+												style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: T.accent,
+																cursor: markdownExport.trim() ? "pointer" : "not-allowed",
+																opacity: markdownExport.trim() ? 1 : 0.45,
+													display: "flex",
+													alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
+															Download .md
+														</button>
+
+														{/* Download plain text */}
+														<button
+															type="button"
+															onClick={() => {
+																if (!plainTextExport.trim()) return;
+																const blob = new Blob([plainTextExport], {
+																	type: "text/plain;charset=utf-8",
+																});
+																const a = document.createElement("a");
+																a.href = URL.createObjectURL(blob);
+																a.download = `${slugBase}.txt`;
+																a.click();
+																URL.revokeObjectURL(a.href);
+																setThemeExportOpen(false);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: "transparent",
+													fontSize: 13,
+													fontWeight: 600,
+																color: T.accent,
+																cursor: plainTextExport.trim() ? "pointer" : "not-allowed",
+																opacity: plainTextExport.trim() ? 1 : 0.45,
 																display: "flex",
 																alignItems: "center",
 																gap: 9,
 															}}
 														>
-															<svg
-																width={13}
-																height={13}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2}
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															>
-																<polyline points="16 18 22 12 16 6" />
-																<polyline points="8 6 2 12 8 18" />
-															</svg>
-															{isCopiedReact
-																? "React copied!"
-																: `Copy React — ${activeTheme?.name}`}
+															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
+															Download .txt
+														</button>
+
+														{/* Copy Markdown */}
+														<button
+															type="button"
+															onClick={() => {
+																if (!markdownExport.trim()) return;
+																navigator.clipboard.writeText(markdownExport).catch(() => {});
+																setCopiedTheme({ key: previewTheme, format: "markdown" });
+																setThemeExportOpen(false);
+																setTimeout(() => setCopiedTheme(null), 2200);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: isCopiedMd
+																	? "rgba(45,106,79,0.1)"
+																	: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: isCopiedMd ? "#2D6A4F" : T.accent,
+																cursor: markdownExport.trim() ? "pointer" : "not-allowed",
+																opacity: markdownExport.trim() ? 1 : 0.45,
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon
+																d={Icons.copy}
+																size={13}
+																stroke={isCopiedMd ? "#2D6A4F" : T.accent}
+															/>
+															{isCopiedMd ? "Markdown copied!" : "Copy Markdown"}
+														</button>
+
+														{/* Copy plain text */}
+														<button
+															type="button"
+															onClick={() => {
+																if (!plainTextExport.trim()) return;
+																navigator.clipboard.writeText(plainTextExport).catch(() => {});
+																setCopiedTheme({ key: previewTheme, format: "text" });
+																setThemeExportOpen(false);
+																setTimeout(() => setCopiedTheme(null), 2200);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: isCopiedTxt
+																	? "rgba(45,106,79,0.1)"
+																	: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: isCopiedTxt ? "#2D6A4F" : T.accent,
+																cursor: plainTextExport.trim() ? "pointer" : "not-allowed",
+																opacity: plainTextExport.trim() ? 1 : 0.45,
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon
+																d={Icons.copy}
+																size={13}
+																stroke={isCopiedTxt ? "#2D6A4F" : T.accent}
+															/>
+															{isCopiedTxt ? "Text copied!" : "Copy plain text"}
 														</button>
 													</motion.div>
 												)}
 											</AnimatePresence>
 										</div>
 
-										{/* Close */}
-										<motion.button
-											whileHover={{ background: "#F0ECE5" }}
-											whileTap={{ scale: 0.93 }}
+											{/* Close */}
+											<motion.button
+												whileHover={{ background: "#F0ECE5" }}
+												whileTap={{ scale: 0.93 }}
 											onClick={() => {
 												setThemeDrawerOpen(false);
 												setTranslatedHTML("");
@@ -7095,6 +7044,19 @@ export default function DraftPage() {
 													gap: 3,
 												}}
 											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: T.muted,
+														textTransform: "uppercase",
+														letterSpacing: "0.08em",
+														marginBottom: 8,
+														paddingLeft: 4,
+													}}
+												>
+													Themes
+												</p>
 												{Object.entries(THEMES).map(([key, theme]) => {
 													const isActive = previewTheme === key;
 													const hColor =
@@ -7339,9 +7301,9 @@ export default function DraftPage() {
 													</motion.button>
 												)}
 											</div>
-										</div>
+											</div>
 
-										{/* Right: iframe live preview */}
+											{/* Right: iframe live preview */}
 											<div
 												style={{
 													flex: 1,
@@ -7349,10 +7311,10 @@ export default function DraftPage() {
 													background: "#e5e7eb",
 												}}
 											>
-											{themedDoc ? (
-												<iframe
+												{themedDoc ? (
+													<iframe
 													key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}`}
-													srcDoc={themedDoc}
+														srcDoc={themedDoc}
 														title={`Preview — ${activeTheme?.name}`}
 														sandbox="allow-same-origin"
 														style={{
@@ -7386,6 +7348,288 @@ export default function DraftPage() {
 						);
 					})()}
 			</AnimatePresence>
+
+			{/* ── THEME PREVIEW MODAL (projector) — theme list + themed iframe (translate UI hidden) ── */}
+			<AnimatePresence>
+				{translationModalOpen &&
+					(() => {
+						const rawHtml = stripDraftSlashQueryFromHtmlString(
+							editorRef.current?.innerHTML || draft?.body || "",
+						);
+						const htmlSrc = translatedHTML || rawHtml;
+						const titleText =
+							titleRef.current?.innerText?.trim() || draft?.title || "Untitled";
+						const themeObj = THEMES[previewTheme] || THEMES.ink;
+						const themedDoc = htmlSrc
+							? buildThemedHTML(htmlSrc, themeObj, titleText)
+							: "";
+						return (
+							<>
+								<motion.div
+									key="trans-backdrop"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
+									onClick={() => setTranslationModalOpen(false)}
+									style={{
+										position: "fixed",
+										inset: 0,
+										background: "rgba(0,0,0,0.5)",
+										zIndex: 302,
+										backdropFilter: "blur(4px)",
+									}}
+								/>
+								<motion.div
+									key="trans-shell"
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 1 }}
+									exit={{ opacity: 0 }}
+									transition={{ duration: 0.2 }}
+									style={{
+										position: "fixed",
+										inset: 0,
+										zIndex: 303,
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "center",
+										pointerEvents: "none",
+									}}
+								>
+									<motion.div
+										initial={{ scale: 0.96, y: 16 }}
+										animate={{ scale: 1, y: 0 }}
+										exit={{ scale: 0.96, y: 16 }}
+										transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+										onClick={(e) => e.stopPropagation()}
+										style={{
+											width: "min(94vw, 1000px)",
+											height: "min(86vh, 720px)",
+											background: T.surface,
+											borderRadius: 16,
+											border: `1px solid ${T.border}`,
+											boxShadow: "0 28px 72px rgba(0,0,0,0.22)",
+											display: "flex",
+											flexDirection: "column",
+											overflow: "hidden",
+											pointerEvents: "auto",
+										}}
+									>
+										<div
+											style={{
+												minHeight: 52,
+												borderBottom: `1px solid ${T.border}`,
+												display: "flex",
+												alignItems: "center",
+												padding: "10px 16px",
+												gap: 10,
+												flexShrink: 0,
+											}}
+										>
+											<div style={{ flex: 1, minWidth: 0 }}>
+												<span
+													style={{
+														fontSize: 14,
+														fontWeight: 700,
+														color: T.accent,
+														display: "block",
+													}}
+												>
+													Export themes
+												</span>
+												<span
+													style={{
+														fontSize: 11,
+														color: T.muted,
+														display: "block",
+														marginTop: 2,
+														lineHeight: 1.35,
+													}}
+												>
+													— pick a theme, then copy HTML or a React embed.
+												</span>
+											</div>
+											<motion.button
+												type="button"
+												whileHover={{ background: "#F0F0F0" }}
+												whileTap={{ scale: 0.93 }}
+												onClick={() => setTranslationModalOpen(false)}
+												style={{
+													width: 32,
+													height: 32,
+													borderRadius: 8,
+													border: `1px solid ${T.border}`,
+													background: "transparent",
+													cursor: "pointer",
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "center",
+													color: T.muted,
+													flexShrink: 0,
+													alignSelf: "flex-start",
+												}}
+												title="Close"
+											>
+												<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+											</motion.button>
+										</div>
+										<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+											<div
+												style={{
+													width: 210,
+													borderRight: `1px solid ${T.border}`,
+													overflowY: "auto",
+													flexShrink: 0,
+													background: T.base,
+													padding: "12px 10px",
+													display: "flex",
+													flexDirection: "column",
+													gap: 3,
+												}}
+											>
+												<p
+													style={{
+														fontSize: 10,
+														fontWeight: 700,
+														color: T.muted,
+														textTransform: "uppercase",
+														letterSpacing: "0.08em",
+														marginBottom: 8,
+														paddingLeft: 4,
+													}}
+												>
+													Themes
+												</p>
+												{Object.entries(THEMES).map(([key, theme]) => {
+													const isActive = previewTheme === key;
+													const hColor =
+														parseCSSProp(theme.h1, "color") || theme.text;
+													return (
+														<motion.button
+															key={key}
+															whileTap={{ scale: 0.97 }}
+															onClick={() => setPreviewTheme(key)}
+															style={{
+																background: isActive
+																	? T.surface
+																	: "transparent",
+																border: `1.5px solid ${isActive ? T.border : "transparent"}`,
+																borderRadius: 10,
+																padding: "10px 12px",
+																cursor: "pointer",
+																display: "flex",
+																alignItems: "center",
+																gap: 10,
+																textAlign: "left",
+																boxShadow: isActive
+																	? "0 1px 6px rgba(0,0,0,0.07)"
+																	: "none",
+															}}
+														>
+															<div
+																style={{
+																	width: 28,
+																	height: 28,
+																	borderRadius: 7,
+																	background: theme.bg,
+																	border: "1px solid rgba(0,0,0,0.1)",
+																	flexShrink: 0,
+																	display: "flex",
+																	alignItems: "center",
+																	justifyContent: "center",
+																	overflow: "hidden",
+																}}
+															>
+																<div
+																	style={{
+																		width: 10,
+																		height: 10,
+																		borderRadius: "50%",
+																		background: hColor,
+																	}}
+																/>
+															</div>
+															<div style={{ minWidth: 0 }}>
+																<p
+																	style={{
+																		fontSize: 12,
+																		fontWeight: isActive ? 700 : 500,
+																		color: isActive ? T.accent : "#555",
+																		lineHeight: 1.3,
+																	}}
+																>
+																	{theme.name}
+																</p>
+																<p
+																	style={{
+																		fontSize: 10,
+																		color: T.muted,
+																		overflow: "hidden",
+																		whiteSpace: "nowrap",
+																		textOverflow: "ellipsis",
+																		marginTop: 1,
+																	}}
+																>
+																	{theme.label}
+																</p>
+															</div>
+															{isActive && (
+																<div
+																	style={{
+																		marginLeft: "auto",
+																		width: 6,
+																		height: 6,
+																		borderRadius: "50%",
+																		background: T.warm,
+																		flexShrink: 0,
+																	}}
+																/>
+															)}
+														</motion.button>
+													);
+												})}
+											</div>
+											<div style={{ flex: 1, position: "relative", background: "#e5e7eb" }}>
+												{themedDoc ? (
+													<iframe
+														key={`theme-prev-${previewTheme}-${translatedHTML ? "t" : "o"}`}
+														srcDoc={themedDoc}
+														title="Theme preview"
+														sandbox="allow-same-origin"
+														style={{
+															width: "100%",
+															height: "100%",
+															border: "none",
+															display: "block",
+														}}
+													/>
+												) : (
+													<div
+														style={{
+															height: "100%",
+															display: "flex",
+															alignItems: "center",
+															justifyContent: "center",
+															color: T.muted,
+															fontSize: 14,
+															padding: 24,
+															textAlign: "center",
+														}}
+													>
+														No content to preview — write in the editor first.
+													</div>
+												)}
+											</div>
+										</div>
+									</motion.div>
+								</motion.div>
+							</>
+						);
+					})()}
+			</AnimatePresence>
+
+					</>,
+					document.body,
+				)}
 
 			{/* ── PREVIEW MODAL (centered overlay) ── */}
 			<AnimatePresence>
@@ -7802,24 +8046,6 @@ export default function DraftPage() {
 				)}
 			</AnimatePresence>
 
-			{/* ── INFOGRAPHICS MODAL ── */}
-			<InfographicsModal
-				open={infographicsOpen}
-				onClose={() => setInfographicsOpen(false)}
-				content={stripDraftSlashQueryFromHtmlString(
-					editorRef.current?.innerHTML || draft?.body || "",
-				)}
-				title={draft?.title || "Draft"}
-				userId={reduxUser?.uid || ""}
-				draftId={draftId}
-				docSource={docData?.source || "drafts"}
-				savedInfographics={draft?.infographics || []}
-				onInsertToEditor={(html) => {
-					editorRef.current?.focus();
-					document.execCommand("insertHTML", false, html + "<p><br></p>");
-					countWords();
-				}}
-			/>
 		</div>
 	);
 }

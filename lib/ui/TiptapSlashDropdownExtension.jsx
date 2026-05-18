@@ -319,8 +319,8 @@ export function defaultItems() {
 		},
 		{
 			id: "task",
-			title: "Task List",
-			keywords: ["task", "todo", "check", "tl", "checklist"],
+			title: "Checklist",
+			keywords: ["task", "todo", "check", "tl", "checklist", "tasks"],
 			run: (editor, range) =>
 				chainForSlash(editor, range).toggleTaskList().run(),
 		},
