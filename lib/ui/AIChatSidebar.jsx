@@ -677,6 +677,8 @@ export default function AIChatSidebar({
 	selectionContext = "",
 	onClearSelectionContext,
 	asPanel = false,
+	/** When overlay mode (`!asPanel`), cap width so small viewports aren’t clipped. */
+	clampOverlayToViewport = false,
 	userId: userIdProp = "",
 	onAgentDraftCreated,
 }) {
@@ -1785,21 +1787,39 @@ export default function AIChatSidebar({
 				overflow: "hidden",
 				fontFamily: "'Comic', sans-serif",
 			}
-		: {
-				position: "fixed",
-				right: 0,
-				top: 0,
-				bottom: 0,
-				width: overlayWidth,
-				background: "#FFFFFF",
-				borderLeft: "1px solid #E8E4DC",
-				display: "flex",
-				flexDirection: "column",
-				zIndex: 150,
-				overflow: "visible",
-				boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
-				fontFamily: "'Comic', sans-serif",
-			};
+		: clampOverlayToViewport
+			? {
+					position: "fixed",
+					right: 0,
+					top: 0,
+					bottom: 0,
+					width: `min(${overlayWidth}px, calc(100vw - 12px))`,
+					maxWidth: "100vw",
+					boxSizing: "border-box",
+					background: "#FFFFFF",
+					borderLeft: "1px solid #E8E4DC",
+					display: "flex",
+					flexDirection: "column",
+					zIndex: 150,
+					overflow: "visible",
+					boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
+					fontFamily: "'Comic', sans-serif",
+				}
+			: {
+					position: "fixed",
+					right: 0,
+					top: 0,
+					bottom: 0,
+					width: overlayWidth,
+					background: "#FFFFFF",
+					borderLeft: "1px solid #E8E4DC",
+					display: "flex",
+					flexDirection: "column",
+					zIndex: 150,
+					overflow: "visible",
+					boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
+					fontFamily: "'Comic', sans-serif",
+				};
 
 	const sidebarContent = (
 		<>
@@ -1848,7 +1868,7 @@ export default function AIChatSidebar({
 									: { overflow: "visible" }),
 							}}
 						>
-							{!asPanel && (
+							{!asPanel && !clampOverlayToViewport && (
 								<div
 									role="separator"
 									aria-orientation="vertical"

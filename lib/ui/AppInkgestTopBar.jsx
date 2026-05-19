@@ -58,6 +58,7 @@ export default function AppInkgestTopBar({
 			{reduxUser && showSidebarToggle && (
 				<motion.button
 					type="button"
+					title="Your drafts & assets"
 					whileHover={{ background: "#F0ECE5" }}
 					whileTap={{ scale: 0.93 }}
 					onClick={onSidebarToggle}

@@ -32,6 +32,7 @@ import { getTheme } from "../../lib/utils/theme";
 import { formatInkDateLong, TiptapSlashDatePicker } from "../../lib/ui/TiptapSlashDatePicker.jsx";
 import { htmlToMarkdown } from "../../lib/utils/htmlToMarkdown";
 import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds";
+import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
 import InfographicInlineGeneratePanel from "../../lib/ui/InfographicInlineGeneratePanel";
 import MermaidInlineGeneratePanel from "../../lib/ui/MermaidInlineGeneratePanel";
 import MotionSelect from "../../lib/ui/MotionSelect";
@@ -1875,6 +1876,31 @@ export default function DraftPage() {
 
 	useMermaidHydrateEditorRoot(editorRef, Boolean(draft));
 
+	const compactAssetsNav = useCompactAssetsNav();
+	const draftNavHeaderStackRef = useRef(null);
+	const [compactNavTopInset, setCompactNavTopInset] = useState(56);
+	useLayoutEffect(() => {
+		const measure = () => {
+			const el = draftNavHeaderStackRef.current;
+			const n = el ? Math.round(el.getBoundingClientRect().bottom) : 56;
+			setCompactNavTopInset(Math.max(n, 48));
+		};
+		measure();
+		let ro;
+		if (
+			typeof ResizeObserver !== "undefined" &&
+			draftNavHeaderStackRef.current
+		) {
+			ro = new ResizeObserver(measure);
+			ro.observe(draftNavHeaderStackRef.current);
+		}
+		window.addEventListener("resize", measure);
+		return () => {
+			window.removeEventListener("resize", measure);
+			ro?.disconnect();
+		};
+	}, [compactAssetsNav, draft?.id, draftId]);
+
 	useEffect(() => {
 		if (tableDoc) {
 			setLocalTableData({
@@ -3277,7 +3303,7 @@ export default function DraftPage() {
 			: asset?.url || "";
 	const assetPrompt = asset?.prompt || "";
 
-	const TopToolbar = ({ draft}) => {
+	const TopToolbar = ({ draft: _draft, compactToolbar }) => {
 		const insertBlock = (id) => {
 			editorRef.current?.focus();
 			const sel = window.getSelection();
@@ -3334,9 +3360,9 @@ export default function DraftPage() {
 			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> },
 		];
 		const sep = () => <div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />;
-		return (
-			<>
-				<div ref={blocksMenuRef} className="mr-40" style={{ display: "flex", alignItems: "center", gap: 0, background: "#ffffff", borderLeft: "1px solid #eeeeee", borderRight: "1px solid #ffffff", padding: "0 6px", height: 38, flexShrink: 0 }}>
+		const blocksToolbar = (
+				<div ref={blocksMenuRef} className="2xl:mr-40 md:mr-0 sm:mr-0 xxs:mr-0" style={{ display: "flex", alignItems: "center", gap: 0, background: "#ffffff", padding: "0 6px", height: 38, flexShrink: 0 }}>
+				<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
 					{QUICK_BLOCKS.map((item, i) =>
 						item === null ? <React.Fragment key={`sep-${i}`}>{sep()}</React.Fragment> : (
 							<motion.button key={item.id} type="button" title={item.tip} onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
@@ -3373,13 +3399,17 @@ export default function DraftPage() {
 					</div>
 						);
 					})}
+					
 					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />
 					<motion.button type="button" onClick={() => insertBlock("ask-ai")} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
 						style={{ height: 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 5, borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
 						✦ AI
 					</motion.button>
+					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
 				</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: "auto" }}>
+		);
+		const actionsToolbar = (
+				<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, ...(compactToolbar ? {} : { marginLeft: "auto" }) }}>
 					{gIconBtn(() => setDetailsOpen(v => !v), "Document details",
 						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
 						detailsOpen
@@ -3545,6 +3575,24 @@ export default function DraftPage() {
 						</AnimatePresence>
 					</div>
 				</div>
+		);
+
+		if (compactToolbar) {
+			return (
+				<div
+					className="hidescrollbar flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-px"
+					style={{ WebkitOverflowScrolling: "touch" }}
+				>
+					<div style={{ flexShrink: 0 }}>{blocksToolbar}</div>
+					{actionsToolbar}
+				</div>
+			);
+		}
+
+		return (
+			<>
+				{blocksToolbar}
+				{actionsToolbar}
 			</>
 		);
 	};
@@ -3561,23 +3609,26 @@ export default function DraftPage() {
 		>
 			<FontLink />
 
-			{/* ── TOP BAR ── */}
-			<div
-				style={{
-					background: T.surface,
-					borderBottom: `1px solid ${T.border}`,
-					display: "flex",
-					alignItems: "center",
-					gap: 12,
-					flexShrink: 0,
-					paddingLeft: 20,
-					paddingRight: 20,
-					paddingTop: 4,
-					paddingBottom: 6,
-					minHeight: 46,
-					zIndex: 50,
-				}}
-			>
+			{/* ── TOP BAR (stack: row 1 tabs + toolbar on wide; row 2 toolbar on compact) ── */}
+			<div ref={draftNavHeaderStackRef} style={{ flexShrink: 0, zIndex: 50 }}>
+				<div
+					style={{
+						background: T.surface,
+						borderBottom: `1px solid ${T.border}`,
+						display: "flex",
+						alignItems: "center",
+						gap: 12,
+						flexShrink: 0,
+						flexWrap: "nowrap",
+						minWidth: 0,
+						overflow: "hidden",
+						paddingLeft: 20,
+						paddingRight: 20,
+						paddingTop: 4,
+						paddingBottom: 6,
+						minHeight: 46,
+					}}
+				>
 				{/* Logo */}
 				<a
 					href="/"
@@ -3611,6 +3662,11 @@ export default function DraftPage() {
 					<motion.button
 						whileHover={{ background: "#F0ECE5" }}
 						whileTap={{ scale: 0.93 }}
+						title={
+							sidebarOpen
+								? "Close drafts & assets"
+								: "Open drafts & assets"
+						}
 						onClick={() => setSidebarOpen((s) => !s)}
 						style={{
 							background: "transparent",
@@ -3629,15 +3685,11 @@ export default function DraftPage() {
 				{/* Tabs — inline in navbar */}
 				{draftId && openTabs.length > 0 && (
 					<div
+						className="flex hidescrollbar min-w-0 flex-1 flex-nowrap gap-2 items-center overflow-x-auto overscroll-x-contain ml-2 pr-2 sm:ml-8 sm:pr-4 md:ml-10"
 						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 2,
-							flex: 1,
-							minWidth: 0,
-							overflowX: "auto",
-							paddingRight: 8,
-							marginLeft: 10,
+							scrollbarWidth: "thin",
+							WebkitOverflowScrolling: "touch",
+							maxHeight: 40,
 						}}
 					>
 						{openTabs.map((tabId) => {
@@ -3713,8 +3765,30 @@ export default function DraftPage() {
 					</div>
 				)}
 
+				{draft && !(compactAssetsNav && draft) && (
+						<TopToolbar draft={draft} compactToolbar={false} />
+					)}
 
-				{draft && <TopToolbar draft={draft} />}
+				</div>
+
+				{compactAssetsNav && draft && (
+					<div
+						style={{
+							display: "flex",
+							alignItems: "center",
+							background: T.surface,
+							borderBottom: `1px solid ${T.border}`,
+							paddingLeft: 12,
+							paddingRight: 12,
+							paddingTop: 2,
+							paddingBottom: 8,
+							minWidth: 0,
+							overflow: "hidden",
+						}}
+					>
+						<TopToolbar draft={draft} compactToolbar />
+					</div>
+				)}
 
 			</div>
 
@@ -3725,15 +3799,59 @@ export default function DraftPage() {
 
 			{/* ── MAIN BODY ── */}
 			<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+				<AnimatePresence>
+					{reduxUser && sidebarOpen && compactAssetsNav && (
+						<motion.div
+							key="draft-assets-backdrop"
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							transition={{ duration: 0.2 }}
+							onClick={() => setSidebarOpen(false)}
+							style={{
+								position: "fixed",
+								inset: 0,
+								top: compactNavTopInset,
+								background: "rgba(0,0,0,0.35)",
+								zIndex: 40,
+								backdropFilter: "blur(2px)",
+							}}
+						/>
+					)}
+				</AnimatePresence>
 				{/* ── LEFT SIDEBAR — only for logged-in users ── */}
 				<AnimatePresence initial={false}>
 					{reduxUser && sidebarOpen && (
 						<motion.aside
-							initial={{ width: 0, opacity: 0 }}
-							animate={{ width: 280, opacity: 1 }}
-							exit={{ width: 0, opacity: 0 }}
+							key="draft-sidebar"
+							initial={
+								compactAssetsNav
+									? { x: -300, opacity: 0 }
+									: { width: 0, opacity: 0 }
+							}
+							animate={
+								compactAssetsNav
+									? { x: 0, opacity: 1 }
+									: { width: 280, opacity: 1 }
+							}
+							exit={
+								compactAssetsNav
+									? { x: -300, opacity: 0 }
+									: { width: 0, opacity: 0 }
+							}
 							transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
 							style={{
+								...(compactAssetsNav
+									? {
+											position: "fixed",
+											top: compactNavTopInset,
+											left: 0,
+											bottom: 0,
+											width: 280,
+											zIndex: 45,
+											boxShadow: "8px 0 32px rgba(0,0,0,0.12)",
+										}
+									: {}),
 								background: T.sidebar,
 								borderRight: `1px solid ${T.border}`,
 								display: "flex",
@@ -3847,7 +3965,11 @@ export default function DraftPage() {
 												key={d.id}
 												item={d}
 												active={d.id === draftId}
-												onClick={() => openDraftInTab(d.id)}
+												onClick={() => {
+													openDraftInTab(d.id);
+													if (compactAssetsNav)
+														setSidebarOpen(false);
+												}}
 												onDelete={handleDelete}
 											/>
 										))
@@ -6185,7 +6307,8 @@ export default function DraftPage() {
 						router.push(`/app/${newDraftId}`)
 					}
 					selectionContext={selectionContext}
-					asPanel
+					asPanel={!compactAssetsNav}
+					clampOverlayToViewport={compactAssetsNav}
 				/>
 			</div>
 

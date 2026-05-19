@@ -280,7 +280,11 @@ export default function GenerateAssetPanel({
 				<div
 					role="tablist"
 					aria-label="Asset output type"
-					className="flex flex-nowrap gap-0.5 overflow-x-auto w-fit"
+					className={
+						isApp
+							? "flex min-w-0 max-w-full w-full flex-nowrap gap-0.5 hidescrollbar overflow-x-auto"
+							: "flex w-fit flex-nowrap gap-0.5 overflow-x-auto"
+					}
 					style={{
 						padding: 4,
 						borderRadius: 14,

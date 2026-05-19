@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
@@ -27,6 +27,7 @@ import { persistGenerateResponse } from "../../lib/utils/persistGenerateResponse
 import { requestGenerate } from "../../lib/api/generateClient";
 import { listCanvasProjects } from "../../lib/api/canvasProjects";
 import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
+import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -497,6 +498,18 @@ export default function inkgestApp() {
 	const [style, setStyle] = useState("casual");
 	const [generating, setGenerating] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
+	const compactAssetsNav = useCompactAssetsNav();
+	const sidebarOpenPrefsReady = useRef(false);
+	useLayoutEffect(() => {
+		if (sidebarOpenPrefsReady.current) return;
+		sidebarOpenPrefsReady.current = true;
+		if (
+			typeof window !== "undefined" &&
+			window.matchMedia("(max-width: 767px)").matches
+		) {
+			setSidebarOpen(false);
+		}
+	}, []);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
 	const [generateError, setGenerateError] = useState(null);
@@ -834,16 +847,56 @@ export default function inkgestApp() {
 
 			{/* ── MAIN BODY ── */}
 			<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+				{/* Dimmed overlay behind assets drawer — narrow viewports only */}
+				<AnimatePresence>
+					{reduxUser && sidebarOpen && compactAssetsNav && (
+						<motion.div
+							key="app-assets-backdrop"
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							transition={{ duration: 0.2 }}
+							onClick={() => setSidebarOpen(false)}
+							style={{
+								position: "fixed",
+								inset: 0,
+								top: 56,
+								background: "rgba(0,0,0,0.35)",
+								zIndex: 40,
+								backdropFilter: "blur(2px)",
+							}}
+						/>
+					)}
+				</AnimatePresence>
 				{/* ── LEFT SIDEBAR — only for logged-in users ── */}
 				<AnimatePresence initial={false}>
 					{reduxUser && sidebarOpen && (
 						<motion.aside
-							initial={{ width: 0, opacity: 0 }}
-							animate={{ width: 280, opacity: 1 }}
-							exit={{ width: 0, opacity: 0 }}
+							key="app-sidebar"
+							initial={
+								compactAssetsNav
+									? { x: -300, opacity: 0 }
+									: { width: 0, opacity: 0 }
+							}
+							animate={
+								compactAssetsNav
+									? { x: 0, opacity: 1 }
+									: { width: 280, opacity: 1 }
+							}
+							exit={
+								compactAssetsNav
+									? { x: -300, opacity: 0 }
+									: { width: 0, opacity: 0 }
+							}
 							transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-							className="fixed top-12 left-0 bottom-0"
 							style={{
+								position: "fixed",
+								top: 56,
+								left: 0,
+								bottom: 0,
+								...(compactAssetsNav
+									? { width: 280, zIndex: 45, boxShadow: "8px 0 32px rgba(0,0,0,0.12)" }
+									: {}),
 								background: T.sidebar,
 								borderRight: `1px solid ${T.border}`,
 								display: "flex",
@@ -936,9 +989,11 @@ export default function inkgestApp() {
 														key={item.id}
 														item={item}
 														active={false}
-														onClick={() =>
-															router.push(`/app/${item.id}`)
-														}
+														onClick={() => {
+															router.push(`/app/${item.id}`);
+															if (compactAssetsNav)
+																setSidebarOpen(false);
+														}}
 														onDelete={handleDelete}
 													/>
 												))}
@@ -1048,7 +1103,8 @@ export default function inkgestApp() {
 						flexDirection: "column",
 						overflow: "hidden",
 						minWidth: 0,
-						marginLeft: reduxUser && sidebarOpen ? 280 : 0,
+						marginLeft:
+							reduxUser && sidebarOpen && !compactAssetsNav ? 280 : 0,
 						transition: "margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
 					}}
 				>
