@@ -1563,12 +1563,14 @@ function getDraftSlashFlatRows(query) {
 	return rows;
 }
 
+
 /* ─── Draft Page ─── */
 export default function DraftPage() {
 	const router = useRouter();
 	const { draftId, tabs: tabsQuery } = router.query;
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 
+	
 	/* Open tabs from URL query (?tabs=id1,id2,id3) — active tab = draftId from path */
 	const openTabs = (() => {
 		if (!draftId) return [];
@@ -3275,6 +3277,277 @@ export default function DraftPage() {
 			: asset?.url || "";
 	const assetPrompt = asset?.prompt || "";
 
+	const TopToolbar = ({ draft}) => {
+		const insertBlock = (id) => {
+			editorRef.current?.focus();
+			const sel = window.getSelection();
+			if (!sel || sel.rangeCount === 0) {
+				const range = document.createRange();
+				const el = editorRef.current;
+				if (el) { range.selectNodeContents(el); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range); }
+			}
+			handleSlashCommand(id);
+			setBlocksMenuOpen(false);
+		};
+		const getContent = () => {
+			const raw = stripDraftSlashQueryFromHtmlString(editorRef.current?.innerHTML || draft?.body || "");
+			return raw.trim().startsWith("<") ? raw : formatBody(raw);
+		};
+		const getTitle = () => titleRef.current?.innerText?.trim() || draft?.title || "Untitled draft";
+		const gIconBtn = (onClick, title, children, active = false) => (
+			<motion.button type="button" onClick={onClick} title={title} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+				style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid ${active ? "#111" : "transparent"}`, background: active ? "#111" : "transparent", cursor: "pointer", color: active ? "#fff" : T.muted, transition: "all 0.15s", flexShrink: 0 }}>
+				{children}
+			</motion.button>
+		);
+		const ADV_CATEGORIES = [
+			{ key: "media",      label: "Media",      ids: ["image","embed","audio","record"] },
+			{ key: "components", label: "Components", ids: ["card","toggle-group","toggle","tabs","icon-block"] },
+			{ key: "callouts",   label: "Callouts",   ids: ["callout-info","callout-warning","callout-success","callout-danger"] },
+			{ key: "data",       label: "Data",       ids: ["table","date"] },
+			{ key: "dividers",   label: "Dividers",   ids: ["divider","divider-dashed","divider-dotted"] },
+			{ key: "code",       label: "Code",       ids: ["code","codeGroup"] },
+		];
+		const QUICK_BLOCKS = [
+			{ id: "h1", tip: "Heading 1",
+			  svgEl: <svg width="22" height="18" viewBox="0 0 22 18"><text x="1" y="14" style={{fontSize:13,fontWeight:800,fill:"currentColor",fontFamily:"system-ui,sans-serif"}}>H<tspan fontSize="9" dy="3">1</tspan></text></svg> },
+			{ id: "h2", tip: "Heading 2",
+			  svgEl: <svg width="22" height="18" viewBox="0 0 22 18"><text x="1" y="14" style={{fontSize:13,fontWeight:800,fill:"currentColor",fontFamily:"system-ui,sans-serif"}}>H<tspan fontSize="9" dy="3">2</tspan></text></svg> },
+			null,
+			{ id: "text", tip: "Paragraph",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg> },
+			{ id: "quote", tip: "Blockquote",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg> },
+			null,
+			{ id: "bullet", tip: "Bullet list",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg> },
+			{ id: "numbered", tip: "Numbered list",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke="currentColor" strokeWidth="1.8"/><path d="M4 10h2" stroke="currentColor" strokeWidth="1.8"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke="currentColor" strokeWidth="1.8"/></svg> },
+			{ id: "todo", tip: "To-do list",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="5" width="6" height="6" rx="1"/><polyline points="4 14 6 16 9 13" strokeWidth="2"/><line x1="13" y1="8" x2="21" y2="8"/><line x1="13" y1="15" x2="21" y2="15"/></svg> },
+			null,
+			{ id: "code", tip: "Code block",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> },
+			{ id: "table", tip: "Table",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg> },
+			{ id: "image", tip: "Image",
+			  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> },
+		];
+		const sep = () => <div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />;
+		return (
+			<>
+				<div ref={blocksMenuRef} className="mr-40" style={{ display: "flex", alignItems: "center", gap: 0, background: "#ffffff", borderLeft: "1px solid #eeeeee", borderRight: "1px solid #ffffff", padding: "0 6px", height: 38, flexShrink: 0 }}>
+					{QUICK_BLOCKS.map((item, i) =>
+						item === null ? <React.Fragment key={`sep-${i}`}>{sep()}</React.Fragment> : (
+							<motion.button key={item.id} type="button" title={item.tip} onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+								style={{ height: 30, minWidth: 30, padding: "0 5px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", color: "#555", cursor: "pointer", flexShrink: 0 }}>
+								{item.svgEl}
+							</motion.button>
+						)
+					)}
+					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
+					{ADV_CATEGORIES.map(cat => {
+						const isOpen = blocksMenuOpen === cat.key;
+						const catItems = DRAFT_SLASH_BASE_ITEMS.filter(i => cat.ids.includes(i.id));
+						return (
+							<div key={cat.key} style={{ position: "relative" }}>
+								<motion.button type="button" onClick={() => setBlocksMenuOpen(v => v === cat.key ? false : cat.key)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+									style={{ height: 30, padding: "0 9px", display: "flex", alignItems: "center", gap: 4, borderRadius: 7, border: "none", background: isOpen ? "#111" : "transparent", color: isOpen ? "#fff" : "#555", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.13s", flexShrink: 0 }}>
+									{cat.label}
+									<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+								</motion.button>
+								<AnimatePresence>
+								{isOpen && (
+									<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
+										style={{ position: "absolute", top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", minWidth: 180, background: "#fff", border: "1px solid #E2E2E2", borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.1)", zIndex: 300, padding: "6px" }}>
+										{catItems.map(item => (
+											<motion.button key={item.id} type="button" onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.97 }}
+												style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 13, cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" }}>
+												<span style={{ fontSize: 14, minWidth: 20, textAlign: "center", color: "#888" }}>{item.icon}</span>
+												{item.label}
+											</motion.button>
+										))}
+									</motion.div>
+								)}
+								</AnimatePresence>
+					</div>
+						);
+					})}
+					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />
+					<motion.button type="button" onClick={() => insertBlock("ask-ai")} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+						style={{ height: 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 5, borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+						✦ AI
+					</motion.button>
+				</div>
+				<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: "auto" }}>
+					{gIconBtn(() => setDetailsOpen(v => !v), "Document details",
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+						detailsOpen
+					)}
+					{gIconBtn(() => setThemeDrawerOpen(true), "Themes — preview, download & copy",
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="11" rx="1"/><path d="M7 19h10"/><path d="M12 16v3"/><circle cx="12" cy="10.5" r="2"/></svg>,
+						themeDrawerOpen
+					)}
+					
+					<motion.button type="button" onClick={handleSave} whileHover={{ scale: 1.02, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }} whileTap={{ scale: 0.96 }}
+						style={{ height: 30, display: "flex", alignItems: "center", gap: 5, background: saved ? "#EFF6EE" : T.accent, border: "none", borderRadius: 8, padding: "0 12px", fontSize: 12, fontWeight: 700, color: saved ? "#3D7A35" : "white", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+						<Icon d={Icons.save} size={12} stroke={saved ? "#3D7A35" : "white"} />
+						{saved ? "Saved!" : "Save"}
+					</motion.button>
+					<div style={{ position: "relative" }} ref={exportDropRef}>
+						
+						<AnimatePresence>
+						{exportDropOpen && (
+							<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
+								style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 200, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, boxShadow: "0 10px 28px rgba(0,0,0,0.12)", zIndex: 400, padding: "6px" }}>
+								{[
+									{ icon: "📋", label: "Copy as text", action: () => { handleCopy(); setExportDropOpen(false); } },
+									{ icon: "🌐", label: "Copy HTML", action: () => { navigator.clipboard.writeText(buildThemedHTML(getContent(), THEMES.ink, getTitle())); setExportDropOpen(false); } },
+									{ icon: "⚛️", label: "Copy React", action: () => { navigator.clipboard.writeText(buildThemedReactSnippet(getContent(), "ink", getTitle())); setExportDropOpen(false); } },
+									{ icon: "📝", label: "Copy Markdown", action: () => { navigator.clipboard.writeText(htmlToMarkdown(getContent()) || ""); setExportDropOpen(false); } },
+								].map(item => (
+									<button key={item.label} type="button" onClick={item.action}
+										style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 8, border: "none", background: "transparent", fontSize: 12, color: T.accent, cursor: "pointer" }}
+										onMouseEnter={e => { e.currentTarget.style.background = "#F0F0F0"; }}
+										onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+										<span>{item.icon}</span>{item.label}
+									</button>
+								))}
+							</motion.div>
+						)}
+						</AnimatePresence>
+					</div>
+					<div style={{ position: "relative" }} ref={publishDropRef}>
+						<motion.button type="button" onClick={() => setPublishDropOpen(v => !v)} whileHover={{ background: isPublic ? "#EFF6EE" : "#F0F0F0" }} whileTap={{ scale: 0.93 }}
+							style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 9px", borderRadius: 8, border: `1px solid ${isPublic ? "#8BC57E" : T.border}`, background: isPublic ? "#EFF6EE" : "transparent", color: isPublic ? "#3D7A35" : T.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+							<span style={{ width: 6, height: 6, borderRadius: "50%", background: isPublic ? "#3D7A35" : T.border, flexShrink: 0, display: "inline-block" }} />
+							{isPublic ? "Published" : "Private"}
+							<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+						</motion.button>
+						<AnimatePresence>
+						{publishDropOpen && (
+							<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
+								style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 300, padding: "16px 16px 14px" }}>
+								<p style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>Visibility</p>
+								<div className="flex gap-2 mb-4 bg-zinc-50 rounded-xl p-1">
+									{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map(opt => (
+										<button key={String(opt.val)} type="button" onClick={() => setIsPublic(opt.val)}
+										className={`flex-1 flex items-center justify-center gap-2 p-1.5 rounded-xl text-sm font-medium ${isPublic === opt.val ? (opt.val ? "bg-amber-50 text-amber-700" : "bg-zinc-50 text-zinc-900") : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"}`}>
+											{opt.icon} {opt.label}
+										</button>
+									))}
+				</div>
+								<p style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Page URL</p>
+								<div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
+									<span style={{ padding: "7px 8px 7px 10px", fontSize: 11, color: T.muted, whiteSpace: "nowrap", flexShrink: 0 }}>/p/</span>
+									<input value={slugInput} onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-"))} placeholder={toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId}
+										style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, fontWeight: 500, color: T.accent, padding: "7px 4px", outline: "none", minWidth: 0 }} />
+									<button type="button" onClick={() => { navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput)||undefined)); setPublishCopied(true); setTimeout(()=>setPublishCopied(false),2000); }}
+										style={{ padding: "7px 10px", background: "transparent", border: "none", borderLeft: `1px solid ${T.border}`, cursor: "pointer", color: publishCopied ? "#3D7A35" : T.muted, display: "flex", alignItems: "center" }}>
+										{publishCopied ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}
+									</button>
+								</div>
+								<p style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Published view theme (share link)</p>
+								<div style={{ display: "flex", gap: 8, alignItems: "stretch", marginBottom: publishThemedCopied ? 8 : (!isPublic ? 10 : 6) }}>
+									<div style={{ flex: 1, minWidth: 0, alignSelf: "stretch" }}>
+										<MotionSelect
+											value={publishShareTheme}
+											onChange={setPublishShareTheme}
+											disabled={!isPublic}
+											zIndex={450}
+											options={Object.entries(THEMES).map(([k, t]) => ({
+												value: k,
+												label: t.name,
+											}))}
+											triggerStyle={{
+												flex: 1,
+												minWidth: 0,
+												padding: "7px 8px",
+												borderRadius: 8,
+												border: `1px solid ${T.border}`,
+												fontSize: 11,
+												fontWeight: 500,
+												background: isPublic ? T.surface : T.bg,
+												color: isPublic ? T.accent : T.muted,
+												cursor: isPublic ? "pointer" : "not-allowed",
+											}}
+											menuStyle={{
+												border: `1px solid ${T.border}`,
+												background: T.surface,
+											}}
+											optionStyle={{
+												fontSize: 11,
+												fontWeight: 500,
+											}}
+										/>
+									</div>
+									<button
+										type="button"
+										disabled={!isPublic}
+										onClick={() => {
+											if (!isPublic) return;
+											navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput) || undefined, publishShareTheme));
+											setPublishThemedCopied(true);
+											setTimeout(() => setPublishThemedCopied(false), 2000);
+										}}
+										style={{
+											flexShrink: 0,
+											padding: "7px 12px",
+											borderRadius: 8,
+											border: `1px solid ${isPublic ? T.border : T.border}`,
+											background: publishThemedCopied ? "#EFF6EE" : T.surface,
+											color: publishThemedCopied ? "#3D7A35" : T.accent,
+											fontWeight: 600,
+											fontSize: 11,
+											cursor: isPublic ? "pointer" : "not-allowed",
+											whiteSpace: "nowrap",
+											opacity: isPublic ? 1 : 0.55,
+										}}
+									>
+										{publishThemedCopied ? "Copied" : "Copy themed link"}
+									</button>
+								</div>
+								{!isPublic && (
+									<p style={{ fontSize: 10, color: T.muted, marginTop: -4, marginBottom: 10 }}>
+										Publish the post first to generate a shareable theme URL.
+									</p>
+								)}
+								{isPublic && (
+									<div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+										<a
+											href={getPublicUrl(draft?.slug || undefined, publishShareTheme)}
+											target="_blank"
+											rel="noopener noreferrer"
+											style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#555",textDecoration:"none" }}
+										>
+											<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+											Open themed page
+										</a>
+										<a
+											href={getPublicUrl(draft?.slug || undefined)}
+											target="_blank"
+											rel="noopener noreferrer"
+											style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#A8A29E",textDecoration:"underline" }}
+										>
+											Open default layout
+										</a>
+									</div>
+								)}
+								<div style={{ display: "flex", justifyContent: "flex-end" }}>
+									<button type="button" disabled={publishSaving} onClick={() => savePublishSettings(isPublic, slugInput)}
+										style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: isPublic ? "#3D7A35" : T.accent, color: "white", fontWeight: 700, fontSize: 12, cursor: publishSaving ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: publishSaving ? 0.7 : 1 }}>
+										{publishSaving && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation:"recSpin 0.7s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>}
+										{publishSaving ? "Saving…" : isPublic ? "Publish" : "Save as Private"}
+									</button>
+								</div>
+							</motion.div>
+						)}
+						</AnimatePresence>
+					</div>
+				</div>
+			</>
+		);
+	};
 	return (
 		<div
 			style={{
@@ -3441,290 +3714,7 @@ export default function DraftPage() {
 				)}
 
 
-				{draft && (() => {
-					const insertBlock = (id) => {
-						editorRef.current?.focus();
-						const sel = window.getSelection();
-						if (!sel || sel.rangeCount === 0) {
-							const range = document.createRange();
-							const el = editorRef.current;
-							if (el) { range.selectNodeContents(el); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range); }
-						}
-						handleSlashCommand(id);
-						setBlocksMenuOpen(false);
-					};
-					const getContent = () => {
-						const raw = stripDraftSlashQueryFromHtmlString(editorRef.current?.innerHTML || draft?.body || "");
-						return raw.trim().startsWith("<") ? raw : formatBody(raw);
-					};
-					const getTitle = () => titleRef.current?.innerText?.trim() || draft?.title || "Untitled draft";
-					const gIconBtn = (onClick, title, children, active = false) => (
-						<motion.button type="button" onClick={onClick} title={title} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-							style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid ${active ? "#111" : "transparent"}`, background: active ? "#111" : "transparent", cursor: "pointer", color: active ? "#fff" : T.muted, transition: "all 0.15s", flexShrink: 0 }}>
-							{children}
-						</motion.button>
-					);
-					const ADV_CATEGORIES = [
-						{ key: "media",      label: "Media",      ids: ["image","embed","audio","record"] },
-						{ key: "components", label: "Components", ids: ["card","toggle-group","toggle","tabs","icon-block"] },
-						{ key: "callouts",   label: "Callouts",   ids: ["callout-info","callout-warning","callout-success","callout-danger"] },
-						{ key: "data",       label: "Data",       ids: ["table","date"] },
-						{ key: "dividers",   label: "Dividers",   ids: ["divider","divider-dashed","divider-dotted"] },
-						{ key: "code",       label: "Code",       ids: ["code","codeGroup"] },
-					];
-					const QUICK_BLOCKS = [
-						{ id: "h1", tip: "Heading 1",
-						  svgEl: <svg width="22" height="18" viewBox="0 0 22 18"><text x="1" y="14" style={{fontSize:13,fontWeight:800,fill:"currentColor",fontFamily:"system-ui,sans-serif"}}>H<tspan fontSize="9" dy="3">1</tspan></text></svg> },
-						{ id: "h2", tip: "Heading 2",
-						  svgEl: <svg width="22" height="18" viewBox="0 0 22 18"><text x="1" y="14" style={{fontSize:13,fontWeight:800,fill:"currentColor",fontFamily:"system-ui,sans-serif"}}>H<tspan fontSize="9" dy="3">2</tspan></text></svg> },
-						null,
-						{ id: "text", tip: "Paragraph",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg> },
-						{ id: "quote", tip: "Blockquote",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg> },
-						null,
-						{ id: "bullet", tip: "Bullet list",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg> },
-						{ id: "numbered", tip: "Numbered list",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4" stroke="currentColor" strokeWidth="1.8"/><path d="M4 10h2" stroke="currentColor" strokeWidth="1.8"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" stroke="currentColor" strokeWidth="1.8"/></svg> },
-						{ id: "todo", tip: "To-do list",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="5" width="6" height="6" rx="1"/><polyline points="4 14 6 16 9 13" strokeWidth="2"/><line x1="13" y1="8" x2="21" y2="8"/><line x1="13" y1="15" x2="21" y2="15"/></svg> },
-						null,
-						{ id: "code", tip: "Code block",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> },
-						{ id: "table", tip: "Table",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg> },
-						{ id: "image", tip: "Image",
-						  svgEl: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> },
-					];
-					const sep = () => <div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />;
-					return (
-						<>
-							<div ref={blocksMenuRef} style={{ display: "flex", alignItems: "center", gap: 0, background: "#eee", border: "1px solid #E2E2E2", borderRadius: 12, padding: "0 6px", height: 38, flexShrink: 0 }}>
-								{QUICK_BLOCKS.map((item, i) =>
-									item === null ? <React.Fragment key={`sep-${i}`}>{sep()}</React.Fragment> : (
-										<motion.button key={item.id} type="button" title={item.tip} onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-											style={{ height: 30, minWidth: 30, padding: "0 5px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", color: "#555", cursor: "pointer", flexShrink: 0 }}>
-											{item.svgEl}
-										</motion.button>
-									)
-								)}
-								<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
-								{ADV_CATEGORIES.map(cat => {
-									const isOpen = blocksMenuOpen === cat.key;
-									const catItems = DRAFT_SLASH_BASE_ITEMS.filter(i => cat.ids.includes(i.id));
-									return (
-										<div key={cat.key} style={{ position: "relative" }}>
-											<motion.button type="button" onClick={() => setBlocksMenuOpen(v => v === cat.key ? false : cat.key)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-												style={{ height: 30, padding: "0 9px", display: "flex", alignItems: "center", gap: 4, borderRadius: 7, border: "none", background: isOpen ? "#111" : "transparent", color: isOpen ? "#fff" : "#555", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.13s", flexShrink: 0 }}>
-												{cat.label}
-												<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-											</motion.button>
-											<AnimatePresence>
-											{isOpen && (
-												<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
-													style={{ position: "absolute", top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", minWidth: 180, background: "#fff", border: "1px solid #E2E2E2", borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.1)", zIndex: 300, padding: "6px" }}>
-													{catItems.map(item => (
-														<motion.button key={item.id} type="button" onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.97 }}
-															style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 13, cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" }}>
-															<span style={{ fontSize: 14, minWidth: 20, textAlign: "center", color: "#888" }}>{item.icon}</span>
-															{item.label}
-														</motion.button>
-													))}
-												</motion.div>
-											)}
-											</AnimatePresence>
-						</div>
-									);
-								})}
-								<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />
-								<motion.button type="button" onClick={() => insertBlock("ask-ai")} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-									style={{ height: 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 5, borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-									✦ AI
-								</motion.button>
-							</div>
-							<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: "auto" }}>
-								{gIconBtn(() => setDetailsOpen(v => !v), "Document details",
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
-									detailsOpen
-								)}
-								{gIconBtn(() => setThemeDrawerOpen(true), "Themes — preview, download & copy",
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/></svg>,
-									themeDrawerOpen
-								)}
-								{gIconBtn(() => {
-									const content = getContent(); const title = getTitle();
-									setPreviewData({ title, htmlDoc: buildThemedHTML(content, THEMES.ink, title), markdown: htmlToMarkdown(content) || "", reactSnippet: buildThemedReactSnippet(content, "ink", title) });
-									setPreviewOpen(true);
-								}, "Preview",
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-								)}
-								{gIconBtn(() => setTranslationModalOpen(true), "Theme preview — pick a theme",
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="11" rx="1"/><path d="M7 19h10"/><path d="M12 16v3"/><circle cx="12" cy="10.5" r="2"/></svg>,
-									translationModalOpen
-								)}
-								<motion.button type="button" onClick={handleSave} whileHover={{ scale: 1.02, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }} whileTap={{ scale: 0.96 }}
-									style={{ height: 30, display: "flex", alignItems: "center", gap: 5, background: saved ? "#EFF6EE" : T.accent, border: "none", borderRadius: 8, padding: "0 12px", fontSize: 12, fontWeight: 700, color: saved ? "#3D7A35" : "white", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-									<Icon d={Icons.save} size={12} stroke={saved ? "#3D7A35" : "white"} />
-									{saved ? "Saved!" : "Save"}
-						</motion.button>
-								<div style={{ position: "relative" }} ref={exportDropRef}>
-									{gIconBtn(() => setExportDropOpen(v => !v), "Export",
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
-										exportDropOpen
-									)}
-									<AnimatePresence>
-									{exportDropOpen && (
-										<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
-											style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 200, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, boxShadow: "0 10px 28px rgba(0,0,0,0.12)", zIndex: 400, padding: "6px" }}>
-											{[
-												{ icon: "📋", label: "Copy as text", action: () => { handleCopy(); setExportDropOpen(false); } },
-												{ icon: "🌐", label: "Copy HTML", action: () => { navigator.clipboard.writeText(buildThemedHTML(getContent(), THEMES.ink, getTitle())); setExportDropOpen(false); } },
-												{ icon: "⚛️", label: "Copy React", action: () => { navigator.clipboard.writeText(buildThemedReactSnippet(getContent(), "ink", getTitle())); setExportDropOpen(false); } },
-												{ icon: "📝", label: "Copy Markdown", action: () => { navigator.clipboard.writeText(htmlToMarkdown(getContent()) || ""); setExportDropOpen(false); } },
-											].map(item => (
-												<button key={item.label} type="button" onClick={item.action}
-													style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 8, border: "none", background: "transparent", fontSize: 12, color: T.accent, cursor: "pointer" }}
-													onMouseEnter={e => { e.currentTarget.style.background = "#F0F0F0"; }}
-													onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-													<span>{item.icon}</span>{item.label}
-												</button>
-											))}
-										</motion.div>
-									)}
-									</AnimatePresence>
-								</div>
-								<div style={{ position: "relative" }} ref={publishDropRef}>
-									<motion.button type="button" onClick={() => setPublishDropOpen(v => !v)} whileHover={{ background: isPublic ? "#EFF6EE" : "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-										style={{ display: "flex", alignItems: "center", gap: 5, height: 30, padding: "0 9px", borderRadius: 8, border: `1px solid ${isPublic ? "#8BC57E" : T.border}`, background: isPublic ? "#EFF6EE" : "transparent", color: isPublic ? "#3D7A35" : T.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-										<span style={{ width: 6, height: 6, borderRadius: "50%", background: isPublic ? "#3D7A35" : T.border, flexShrink: 0, display: "inline-block" }} />
-										{isPublic ? "Published" : "Private"}
-										<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-					</motion.button>
-									<AnimatePresence>
-									{publishDropOpen && (
-										<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
-											style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 300, padding: "16px 16px 14px" }}>
-											<p style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>Visibility</p>
-											<div className="flex gap-2 mb-4 bg-zinc-50 rounded-xl p-1">
-												{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map(opt => (
-													<button key={String(opt.val)} type="button" onClick={() => setIsPublic(opt.val)}
-													className={`flex-1 flex items-center justify-center gap-2 p-1.5 rounded-xl text-sm font-medium ${isPublic === opt.val ? (opt.val ? "bg-amber-50 text-amber-700" : "bg-zinc-50 text-zinc-900") : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"}`}>
-														{opt.icon} {opt.label}
-													</button>
-												))}
-							</div>
-											<p style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Page URL</p>
-											<div style={{ display: "flex", alignItems: "center", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 10 }}>
-												<span style={{ padding: "7px 8px 7px 10px", fontSize: 11, color: T.muted, whiteSpace: "nowrap", flexShrink: 0 }}>/p/</span>
-												<input value={slugInput} onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-"))} placeholder={toSlug(titleRef.current?.innerText?.trim() || draft?.title || "") || draftId}
-													style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, fontWeight: 500, color: T.accent, padding: "7px 4px", outline: "none", minWidth: 0 }} />
-												<button type="button" onClick={() => { navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput)||undefined)); setPublishCopied(true); setTimeout(()=>setPublishCopied(false),2000); }}
-													style={{ padding: "7px 10px", background: "transparent", border: "none", borderLeft: `1px solid ${T.border}`, cursor: "pointer", color: publishCopied ? "#3D7A35" : T.muted, display: "flex", alignItems: "center" }}>
-													{publishCopied ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>}
-												</button>
-											</div>
-											<p style={{ fontSize: 12, color: T.muted, marginBottom: 6 }}>Published view theme (share link)</p>
-											<div style={{ display: "flex", gap: 8, alignItems: "stretch", marginBottom: publishThemedCopied ? 8 : (!isPublic ? 10 : 6) }}>
-												<div style={{ flex: 1, minWidth: 0, alignSelf: "stretch" }}>
-													<MotionSelect
-														value={publishShareTheme}
-														onChange={setPublishShareTheme}
-														disabled={!isPublic}
-														zIndex={450}
-														options={Object.entries(THEMES).map(([k, t]) => ({
-															value: k,
-															label: t.name,
-														}))}
-														triggerStyle={{
-															flex: 1,
-															minWidth: 0,
-															padding: "7px 8px",
-															borderRadius: 8,
-															border: `1px solid ${T.border}`,
-															fontSize: 11,
-															fontWeight: 500,
-															background: isPublic ? T.surface : T.bg,
-															color: isPublic ? T.accent : T.muted,
-															cursor: isPublic ? "pointer" : "not-allowed",
-														}}
-														menuStyle={{
-															border: `1px solid ${T.border}`,
-															background: T.surface,
-														}}
-														optionStyle={{
-															fontSize: 11,
-															fontWeight: 500,
-														}}
-													/>
-												</div>
-												<button
-													type="button"
-													disabled={!isPublic}
-													onClick={() => {
-														if (!isPublic) return;
-														navigator.clipboard.writeText(getPublicUrl(toSlug(slugInput) || undefined, publishShareTheme));
-														setPublishThemedCopied(true);
-														setTimeout(() => setPublishThemedCopied(false), 2000);
-													}}
-													style={{
-														flexShrink: 0,
-														padding: "7px 12px",
-														borderRadius: 8,
-														border: `1px solid ${isPublic ? T.border : T.border}`,
-														background: publishThemedCopied ? "#EFF6EE" : T.surface,
-														color: publishThemedCopied ? "#3D7A35" : T.accent,
-														fontWeight: 600,
-														fontSize: 11,
-														cursor: isPublic ? "pointer" : "not-allowed",
-														whiteSpace: "nowrap",
-														opacity: isPublic ? 1 : 0.55,
-													}}
-												>
-													{publishThemedCopied ? "Copied" : "Copy themed link"}
-												</button>
-											</div>
-											{!isPublic && (
-												<p style={{ fontSize: 10, color: T.muted, marginTop: -4, marginBottom: 10 }}>
-													Publish the post first to generate a shareable theme URL.
-												</p>
-											)}
-											{isPublic && (
-												<div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-													<a
-														href={getPublicUrl(draft?.slug || undefined, publishShareTheme)}
-														target="_blank"
-														rel="noopener noreferrer"
-														style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#555",textDecoration:"none" }}
-													>
-														<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-														Open themed page
-													</a>
-													<a
-														href={getPublicUrl(draft?.slug || undefined)}
-														target="_blank"
-														rel="noopener noreferrer"
-														style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#A8A29E",textDecoration:"underline" }}
-													>
-														Open default layout
-													</a>
-												</div>
-											)}
-											<div style={{ display: "flex", justifyContent: "flex-end" }}>
-												<button type="button" disabled={publishSaving} onClick={() => savePublishSettings(isPublic, slugInput)}
-													style={{ padding: "7px 16px", borderRadius: 8, border: "none", background: isPublic ? "#3D7A35" : T.accent, color: "white", fontWeight: 700, fontSize: 12, cursor: publishSaving ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: publishSaving ? 0.7 : 1 }}>
-													{publishSaving && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation:"recSpin 0.7s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>}
-													{publishSaving ? "Saving…" : isPublic ? "Publish" : "Save as Private"}
-												</button>
-											</div>
-										</motion.div>
-									)}
-									</AnimatePresence>
-								</div>
-							</div>
-						</>
-					);
-				})()}
+				{draft && <TopToolbar draft={draft} />}
 
 			</div>
 
@@ -4053,7 +4043,7 @@ export default function DraftPage() {
 								{/* Drawer header */}
 								<div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
 									<span style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>Document Details</span>
-									<button type="button" onClick={() => setDetailsOpen(false)} style={{ width: 26, height: 26, borderRadius: "50%", border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>✕</button>
+									<button type="button" onClick={() => setDetailsOpen(false)} style={{ width: 26, height: 26, borderRadius: "20%", border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>✕</button>
 								</div>
 
 								{/* Stats */}
@@ -4082,13 +4072,6 @@ export default function DraftPage() {
 										{sourceUrl && <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><span style={{ fontSize: 11, color: T.muted, flexShrink: 0 }}>Source</span><a href={sourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: T.warm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}>{sourceUrl.replace(/^https?:\/\/(www\.)?/, "").slice(0, 30)}</a></div>}
 									</div>
 
-									{/* Prompt */}
-								{assetPrompt && (<>
-									<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>AI Prompt</p>
-									<div style={{ background: "#F5F5F5", border: `1px solid #E2E2E2`, borderRadius: 8, padding: "8px 10px", marginBottom: 16 }}>
-										<p style={{ fontSize: 11, color: "#444", lineHeight: 1.6 }}>{assetPrompt}</p>
-									</div>
-								</>)}
 
 									{/* Editor appearance */}
 									<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Appearance</p>
@@ -4145,6 +4128,13 @@ export default function DraftPage() {
 											</div>
 								</div>
 							</div>
+							{/* Prompt */}
+							{assetPrompt && (<>
+										<p style={{ fontSize: 10, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>AI Prompt</p>
+										<div style={{ background: "#F5F5F5", border: `1px solid #E2E2E2`, borderRadius: 8, padding: "8px 10px", marginBottom: 16 }}>
+											<p style={{ fontSize: 11, color: "#444", lineHeight: 1.6 }}>{assetPrompt}</p>
+										</div>
+								</>)}
 
 								{/* AI chat shortcut */}
 								<button type="button" onClick={() => { setChatOpen(true); setDetailsOpen(false); }}
@@ -5274,11 +5264,6 @@ export default function DraftPage() {
 								role="presentation"
 								style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(30,28,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
 							>
-								<style>{`
-									@keyframes recBar { 0%,100%{transform:scaleY(0.3)} 50%{transform:scaleY(1)} }
-									@keyframes recPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
-									@keyframes recSpin { to{transform:rotate(360deg)} }
-								`}</style>
 								<motion.div
 									initial={{ opacity: 0, scale: 0.92, y: 16 }}
 									animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -5399,145 +5384,145 @@ export default function DraftPage() {
 						)}
 
 						{/* ── Embed modal ── */}
-					{embedModalOpen && createPortal(
-						<div
-							role="dialog"
-							aria-modal="true"
-							style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(28,26,24,0.6)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
-							onClick={(e) => { if (e.target === e.currentTarget) { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); } }}
-						>
-							<motion.div
-								initial={{ opacity: 0, scale: 0.93, y: 18 }}
-								animate={{ opacity: 1, scale: 1, y: 0 }}
-								exit={{ opacity: 0, scale: 0.93, y: 18 }}
-								transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-								style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "24px 24px 20px", width: "100%", maxWidth: 560, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", display: "flex", flexDirection: "column", gap: 0 }}
-							>
-								{(() => {
-									const doInsert = () => {
-										const html = makeEmbedHtml(embedResolved);
-										if (!html || !editorRef.current) return;
-										editorRef.current.focus();
-										// Restore saved cursor position so content lands in the right spot
-										if (embedRangeRef.current) {
-											const sel = window.getSelection();
-											if (sel) {
-												sel.removeAllRanges();
-												sel.addRange(embedRangeRef.current);
-											}
-											embedRangeRef.current = null;
-										}
-										document.execCommand("insertHTML", false, html);
-										countWords();
-										setEmbedModalOpen(false);
-										setEmbedResolved(null);
-										setEmbedUrlInput("");
-									};
-									const eColor = embedResolved?.color ?? T.border;
-									const btnBg = embedResolved
-										? (embedResolved.color === "#000000" || embedResolved.color === "#010101" ? "#1A1A1A" : embedResolved.color)
-										: T.border;
-									return (
-										<>
-											{/* Header */}
-											<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-												<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-													<div style={{ width: 34, height: 34, borderRadius: 9, background: embedResolved ? eColor + "18" : "#F0ECE5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, transition: "background 0.2s", flexShrink: 0 }}>
-														{(embedResolved && EMBED_ICONS[embedResolved.platform]) || "🔗"}
-													</div>
-													<div>
-														<p style={{ fontSize: 14, fontWeight: 700, color: T.accent, lineHeight: 1.2 }}>
-															{embedResolved ? `${embedResolved.label} Embed` : "Embed Content"}
-														</p>
-														<p style={{ fontSize: 11, color: T.muted }}>YouTube · X · Instagram · Reddit · TikTok · Spotify · Vimeo · Loom · Figma</p>
-													</div>
-												</div>
-												<button type="button" onClick={() => { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); }} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✕</button>
-											</div>
-
-											{/* URL input */}
-											<p style={{ fontSize: 10.5, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Paste a link</p>
-											<input
-												autoFocus
-												value={embedUrlInput}
-												onChange={(e) => {
-													const val = e.target.value;
-													setEmbedUrlInput(val);
-													setEmbedResolved(val.trim() ? resolveEmbed(val.trim()) : null);
-												}}
-												onKeyDown={(e) => { if (e.key === "Enter" && embedResolved) doInsert(); }}
-												placeholder="https://youtube.com/watch?v=... or any social link"
-												style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${embedResolved ? eColor : T.border}`, background: T.bg, color: T.accent, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 14, transition: "border-color 0.2s" }}
-											/>
-
-											{/* Platform chips — shown when no URL yet */}
-											{!embedResolved && (
-												<div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
-													{[
-														{ label: "YouTube", color: "#FF0000" }, { label: "X / Twitter", color: "#000" },
-														{ label: "Instagram", color: "#E1306C" }, { label: "Reddit", color: "#FF4500" },
-														{ label: "TikTok", color: "#010101" }, { label: "Spotify", color: "#1DB954" },
-														{ label: "Vimeo", color: "#1AB7EA" }, { label: "Loom", color: "#625DF5" },
-														{ label: "Figma", color: "#F24E1E" }, { label: "CodeSandbox", color: "#333" },
-													].map((p) => (
-														<span key={p.label} style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100, background: p.color + "12", color: ["#000", "#010101"].includes(p.color) ? "#333" : p.color, border: `1px solid ${p.color}20` }}>{p.label}</span>
-													))}
-												</div>
-											)}
-
-											{/* Preview */}
-											{embedResolved && (
-												<div style={{ marginBottom: 18 }}>
-													<p style={{ fontSize: 10.5, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Preview</p>
-													{embedResolved.cardEmbed ? (
-														/* Non-iframeable: show exact card that will be inserted */
-														<div style={{ border: `1.5px solid #E8E4DC`, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", background: "#FAFAF8" }}>
-															<span style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>{EMBED_ICONS[embedResolved.platform] || "🔗"}</span>
-															<div style={{ flex: 1, minWidth: 0 }}>
-																<p style={{ fontSize: 13, fontWeight: 700, color: "#37352F", margin: "0 0 2px" }}>{embedResolved.label}</p>
-																<p style={{ fontSize: 11, color: "#C17B2F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>{embedUrlInput.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}</p>
+									{embedModalOpen && createPortal(
+										<div
+											role="dialog"
+											aria-modal="true"
+											style={{ position: "fixed", inset: 0, zIndex: 140, background: "rgba(28,26,24,0.6)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)" }}
+											onClick={(e) => { if (e.target === e.currentTarget) { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); } }}
+										>
+											<motion.div
+												initial={{ opacity: 0, scale: 0.93, y: 18 }}
+												animate={{ opacity: 1, scale: 1, y: 0 }}
+												exit={{ opacity: 0, scale: 0.93, y: 18 }}
+												transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+												style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "24px 24px 20px", width: "100%", maxWidth: 560, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", display: "flex", flexDirection: "column", gap: 0 }}
+											>
+												{(() => {
+													const doInsert = () => {
+														const html = makeEmbedHtml(embedResolved);
+														if (!html || !editorRef.current) return;
+														editorRef.current.focus();
+														// Restore saved cursor position so content lands in the right spot
+														if (embedRangeRef.current) {
+															const sel = window.getSelection();
+															if (sel) {
+																sel.removeAllRanges();
+																sel.addRange(embedRangeRef.current);
+															}
+															embedRangeRef.current = null;
+														}
+														document.execCommand("insertHTML", false, html);
+														countWords();
+														setEmbedModalOpen(false);
+														setEmbedResolved(null);
+														setEmbedUrlInput("");
+													};
+													const eColor = embedResolved?.color ?? T.border;
+													const btnBg = embedResolved
+														? (embedResolved.color === "#000000" || embedResolved.color === "#010101" ? "#1A1A1A" : embedResolved.color)
+														: T.border;
+													return (
+														<>
+															{/* Header */}
+															<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+																<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+																	<div style={{ width: 34, height: 34, borderRadius: 9, background: embedResolved ? eColor + "18" : "#F0ECE5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, transition: "background 0.2s", flexShrink: 0 }}>
+																		{(embedResolved && EMBED_ICONS[embedResolved.platform]) || "🔗"}
+																	</div>
+																	<div>
+																		<p style={{ fontSize: 14, fontWeight: 700, color: T.accent, lineHeight: 1.2 }}>
+																			{embedResolved ? `${embedResolved.label} Embed` : "Embed Content"}
+																		</p>
+																		<p style={{ fontSize: 11, color: T.muted }}>YouTube · X · Instagram · Reddit · TikTok · Spotify · Vimeo · Loom · Figma</p>
+																	</div>
+																</div>
+																<button type="button" onClick={() => { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); }} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${T.border}`, background: "transparent", color: T.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✕</button>
 															</div>
-															<span style={{ fontSize: 11, color: "#9A9490", whiteSpace: "nowrap", padding: "5px 10px", border: "1px solid #E8E4DC", borderRadius: 6, background: "#fff" }}>Open ↗</span>
-														</div>
-													) : (
-														<div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${T.border}`, background: "#F7F5F0", position: "relative" }}>
-															<iframe
-																key={embedResolved.iframeSrc}
-																src={embedResolved.iframeSrc}
-																style={{ width: "100%", aspectRatio: embedResolved.aspectRatio?.includes("px") ? undefined : (embedResolved.aspectRatio || "16/9"), height: embedResolved.aspectRatio?.includes("px") ? embedResolved.aspectRatio : undefined, minHeight: embedResolved.aspectRatio?.includes("px") ? undefined : 200, border: "none", display: "block" }}
-																loading="lazy"
-																allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-																allowFullScreen
-															/>
-														</div>
-													)}
-													<p style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
-														<span style={{ color: eColor, fontWeight: 700 }}>{embedResolved.label}</span>
-														{embedResolved.cardEmbed ? " · inserted as a link card" : " · live embed"}
-													</p>
-												</div>
-											)}
 
-											{/* Actions */}
-											<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-												<button type="button" onClick={() => { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); }} style={{ padding: "8px 18px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>Cancel</button>
-											<button
-													type="button"
-													disabled={!embedResolved}
-													onClick={doInsert}
-													style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: embedResolved ? btnBg : T.border, color: embedResolved ? "white" : T.muted, fontWeight: 700, fontSize: 13, cursor: embedResolved ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }}
-												>
-													<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-													Add to Editor
-												</button>
-											</div>
-										</>
-									);
-								})()}
-							</motion.div>
-						</div>,
-						document.body
-					)}
+															{/* URL input */}
+															<p style={{ fontSize: 10.5, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>Paste a link</p>
+															<input
+																autoFocus
+																value={embedUrlInput}
+																onChange={(e) => {
+																	const val = e.target.value;
+																	setEmbedUrlInput(val);
+																	setEmbedResolved(val.trim() ? resolveEmbed(val.trim()) : null);
+																}}
+																onKeyDown={(e) => { if (e.key === "Enter" && embedResolved) doInsert(); }}
+																placeholder="https://youtube.com/watch?v=... or any social link"
+																style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: `1.5px solid ${embedResolved ? eColor : T.border}`, background: T.bg, color: T.accent, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 14, transition: "border-color 0.2s" }}
+															/>
+
+															{/* Platform chips — shown when no URL yet */}
+															{!embedResolved && (
+																<div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
+																	{[
+																		{ label: "YouTube", color: "#FF0000" }, { label: "X / Twitter", color: "#000" },
+																		{ label: "Instagram", color: "#E1306C" }, { label: "Reddit", color: "#FF4500" },
+																		{ label: "TikTok", color: "#010101" }, { label: "Spotify", color: "#1DB954" },
+																		{ label: "Vimeo", color: "#1AB7EA" }, { label: "Loom", color: "#625DF5" },
+																		{ label: "Figma", color: "#F24E1E" }, { label: "CodeSandbox", color: "#333" },
+																	].map((p) => (
+																		<span key={p.label} style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 100, background: p.color + "12", color: ["#000", "#010101"].includes(p.color) ? "#333" : p.color, border: `1px solid ${p.color}20` }}>{p.label}</span>
+																	))}
+																</div>
+															)}
+
+															{/* Preview */}
+															{embedResolved && (
+																<div style={{ marginBottom: 18 }}>
+																	<p style={{ fontSize: 10.5, fontWeight: 700, color: T.muted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Preview</p>
+																	{embedResolved.cardEmbed ? (
+																		/* Non-iframeable: show exact card that will be inserted */
+																		<div style={{ border: `1.5px solid #E8E4DC`, borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", background: "#FAFAF8" }}>
+																			<span style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>{EMBED_ICONS[embedResolved.platform] || "🔗"}</span>
+																			<div style={{ flex: 1, minWidth: 0 }}>
+																				<p style={{ fontSize: 13, fontWeight: 700, color: "#37352F", margin: "0 0 2px" }}>{embedResolved.label}</p>
+																				<p style={{ fontSize: 11, color: "#C17B2F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", margin: 0 }}>{embedUrlInput.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}</p>
+																			</div>
+																			<span style={{ fontSize: 11, color: "#9A9490", whiteSpace: "nowrap", padding: "5px 10px", border: "1px solid #E8E4DC", borderRadius: 6, background: "#fff" }}>Open ↗</span>
+																		</div>
+																	) : (
+																		<div style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${T.border}`, background: "#F7F5F0", position: "relative" }}>
+																			<iframe
+																				key={embedResolved.iframeSrc}
+																				src={embedResolved.iframeSrc}
+																				style={{ width: "100%", aspectRatio: embedResolved.aspectRatio?.includes("px") ? undefined : (embedResolved.aspectRatio || "16/9"), height: embedResolved.aspectRatio?.includes("px") ? embedResolved.aspectRatio : undefined, minHeight: embedResolved.aspectRatio?.includes("px") ? undefined : 200, border: "none", display: "block" }}
+																				loading="lazy"
+																				allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+																				allowFullScreen
+																			/>
+																		</div>
+																	)}
+																	<p style={{ fontSize: 10, color: T.muted, marginTop: 5 }}>
+																		<span style={{ color: eColor, fontWeight: 700 }}>{embedResolved.label}</span>
+																		{embedResolved.cardEmbed ? " · inserted as a link card" : " · live embed"}
+																	</p>
+																</div>
+															)}
+
+															{/* Actions */}
+															<div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+																<button type="button" onClick={() => { setEmbedModalOpen(false); setEmbedResolved(null); setEmbedUrlInput(""); }} style={{ padding: "8px 18px", borderRadius: 9, border: `1px solid ${T.border}`, background: "transparent", color: T.muted, fontWeight: 500, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+															<button
+																	type="button"
+																	disabled={!embedResolved}
+																	onClick={doInsert}
+																	style={{ padding: "8px 20px", borderRadius: 9, border: "none", background: embedResolved ? btnBg : T.border, color: embedResolved ? "white" : T.muted, fontWeight: 700, fontSize: 13, cursor: embedResolved ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: 6, transition: "background 0.2s" }}
+																>
+																	<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+																	Add to Editor
+																</button>
+															</div>
+														</>
+													);
+												})()}
+											</motion.div>
+										</div>,
+										document.body
+									)}
 
 									{/* Text selection dropdown (Notion-style) */}
 									<AnimatePresence>
@@ -6333,10 +6318,7 @@ export default function DraftPage() {
 													fontFamily: "",
 												}}
 											>
-												Export themes
-											</p>
-											<p style={{ fontSize: 12, color: T.muted }}>
-												Choose a theme; preview updates live. Export HTML, React, Markdown, text, or copy a public themed link when published.
+												Preview & Export
 											</p>
 											<div style={{ flex: 1 }} />
 
@@ -6995,165 +6977,7 @@ export default function DraftPage() {
 													);
 												})}
 
-											{/* ─ Language translation section ─ */}
-											<div
-												style={{
-													marginTop: 8,
-													borderTop: `1px solid ${T.border}`,
-													paddingTop: 12,
-												}}
-											>
-												<p
-													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: T.muted,
-														textTransform: "uppercase",
-														letterSpacing: "0.08em",
-														marginBottom: 8,
-														paddingLeft: 4,
-													}}
-												>
-													Translate
-												</p>
-												<MotionSelect
-													value={translationLang}
-													onChange={setTranslationLang}
-													zIndex={500}
-													options={TRANSLATION_LANGUAGES.map((l) => ({
-														value: l.code,
-														label: `${l.flag} ${l.label}`,
-													}))}
-													style={{ width: "100%", marginBottom: 8 }}
-													triggerStyle={{
-														width: "100%",
-														background: T.surface,
-														border: `1px solid ${T.border}`,
-														borderRadius: 8,
-														padding: "7px 10px",
-														fontSize: 12,
-														color: T.accent,
-														cursor: "pointer",
-													}}
-													menuStyle={{
-														border: `1px solid ${T.border}`,
-														background: T.surface,
-													}}
-													optionStyle={{
-														fontSize: 12,
-													}}
-												/>
-												<motion.button
-													whileTap={{ scale: 0.97 }}
-													onClick={() => handleTranslate(translationLang)}
-													disabled={translating}
-													style={{
-														width: "100%",
-														background: translating
-															? T.border
-															: translationLang === "en"
-																? T.base
-																: T.accent,
-														color: translating
-															? T.muted
-															: translationLang === "en"
-																? T.muted
-																: "white",
-														border: `1px solid ${T.border}`,
-														borderRadius: 8,
-														padding: "8px 0",
-														fontSize: 12,
-														fontWeight: 600,
-														cursor: translating ? "wait" : "pointer",
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														gap: 6,
-														transition: "background 0.2s, color 0.2s",
-													}}
-												>
-													{translating ? (
-														<>
-															<svg
-																width={12}
-																height={12}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2.5}
-																strokeLinecap="round"
-																style={{
-																	animation: "spin 1s linear infinite",
-																}}
-															>
-																<path d="M21 12a9 9 0 1 1-6.219-8.56" />
-															</svg>
-															Translating…
-														</>
-													) : translatedHTML ? (
-														<>
-															<svg
-																width={12}
-																height={12}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2.5}
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															>
-																<polyline points="20 6 9 17 4 12" />
-															</svg>
-															Translated
-														</>
-													) : (
-														<>
-															<svg
-																width={12}
-																height={12}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2}
-																strokeLinecap="round"
-																strokeLinejoin="round"
-															>
-																<path d="M5 8l6 6" />
-																<path d="M4 14l6-6 2-3" />
-																<path d="M2 5h12" />
-																<path d="M7 2h1" />
-																<path d="M22 22l-5-10-5 10" />
-																<path d="M14 18h6" />
-															</svg>
-															Translate
-														</>
-													)}
-												</motion.button>
-												{translatedHTML && (
-													<motion.button
-														whileTap={{ scale: 0.97 }}
-														initial={{ opacity: 0, y: 4 }}
-														animate={{ opacity: 1, y: 0 }}
-														onClick={() => {
-															setTranslatedHTML("");
-															setTranslationLang("en");
-														}}
-														style={{
-															width: "100%",
-															marginTop: 6,
-															background: "transparent",
-															border: `1px solid ${T.border}`,
-															borderRadius: 8,
-															padding: "6px 0",
-															fontSize: 11,
-															color: T.muted,
-															cursor: "pointer",
-														}}
-													>
-														Reset to original
-													</motion.button>
-												)}
-											</div>
+										
 											</div>
 
 											{/* Right: iframe live preview */}
@@ -7865,321 +7689,7 @@ export default function DraftPage() {
 					document.body,
 				)}
 
-			{/* ── PREVIEW MODAL (centered overlay) ── */}
-			<AnimatePresence>
-				{previewOpen && (
-					<>
-						<motion.div
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							onClick={() => setPreviewOpen(false)}
-							style={{
-								position: "fixed",
-								inset: 0,
-								background: "rgba(0,0,0,0.5)",
-								zIndex: 200,
-								backdropFilter: "blur(4px)",
-							}}
-						/>
-						<motion.div
-							initial={{ opacity: 0, scale: 0.96 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.96 }}
-							transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-							style={{
-								position: "fixed",
-								inset: 0,
-								zIndex: 201,
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-								pointerEvents: "none",
-							}}
-						>
-							<div
-								onClick={(e) => e.stopPropagation()}
-								style={{
-									pointerEvents: "auto",
-									width: "min(92vw, 900px)",
-									height: "min(88vh, 700px)",
-									background: T.surface,
-									border: `1px solid ${T.border}`,
-									borderRadius: 16,
-									boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-									display: "flex",
-									flexDirection: "column",
-									overflow: "hidden",
-								}}
-							>
-								<div
-									style={{
-										padding: "14px 20px",
-										borderBottom: `1px solid ${T.border}`,
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "space-between",
-										gap: 12,
-										flexWrap: "wrap",
-										flexShrink: 0,
-									}}
-								>
-									<span
-										style={{ fontSize: 14, fontWeight: 700, color: T.accent }}
-									>
-										Preview — {previewData.title || "Untitled"}
-									</span>
-									<div
-										ref={previewExportRef}
-										style={{
-											position: "relative",
-											display: "flex",
-											alignItems: "center",
-											gap: 8,
-										}}
-									>
-										<motion.button
-											type="button"
-											whileHover={{ background: "#F0ECE5" }}
-											whileTap={{ scale: 0.95 }}
-											onClick={() =>
-												setPreviewExportOpen((open) => !open)
-											}
-											style={{
-												display: "flex",
-												alignItems: "center",
-												gap: 6,
-												background: T.base,
-												border: `1px solid ${T.border}`,
-												borderRadius: 8,
-												padding: "6px 12px",
-												fontSize: 12,
-												fontWeight: 600,
-												color: T.muted,
-												cursor: "pointer",
-											}}
-										>
-											<Icon d={Icons.copy} size={13} stroke={T.muted} />
-											Export
-											<span
-												style={{
-													display: "inline-flex",
-													transform: previewExportOpen
-														? "rotate(180deg)"
-														: "none",
-													transition: "transform 0.18s ease",
-												}}
-											>
-												<Icon
-													d={Icons.chevronD}
-													size={14}
-													stroke={T.muted}
-												/>
-											</span>
-										</motion.button>
-										<AnimatePresence>
-											{previewExportOpen && (
-												<motion.div
-													initial={{ opacity: 0, y: -6 }}
-													animate={{ opacity: 1, y: 0 }}
-													exit={{ opacity: 0, y: -6 }}
-													transition={{
-														duration: 0.14,
-														ease: [0.16, 1, 0.3, 1],
-													}}
-													style={{
-														position: "absolute",
-														top: "100%",
-														right: 0,
-														marginTop: 6,
-														minWidth: 210,
-														background: T.surface,
-														border: `1px solid ${T.border}`,
-														borderRadius: 10,
-														boxShadow:
-															"0 12px 32px rgba(0,0,0,0.12)",
-														padding: 6,
-														zIndex: 20,
-													}}
-												>
-													<button
-														type="button"
-														onClick={() => {
-															if (!previewData.markdown?.trim())
-																return;
-															navigator.clipboard
-																.writeText(previewData.markdown)
-																.catch(() => {});
-															setPreviewCopied("md");
-															setPreviewExportOpen(false);
-															setTimeout(
-																() => setPreviewCopied(null),
-																2000,
-															);
-														}}
-														style={{
-															width: "100%",
-															textAlign: "left",
-															padding: "8px 10px",
-															border: "none",
-															borderRadius: 8,
-															background:
-																previewCopied === "md"
-																	? "rgba(61,122,53,0.12)"
-																	: "transparent",
-															fontSize: 13,
-															fontWeight: 600,
-															color:
-																previewCopied === "md"
-																	? "#3D7A35"
-																	: T.accent,
-															cursor: "pointer",
-														}}
-													>
-														{previewCopied === "md"
-															? "Markdown copied"
-															: "Copy Markdown"}
-													</button>
-													<button
-														type="button"
-														onClick={() => {
-															if (!previewData.htmlDoc) return;
-															navigator.clipboard
-																.writeText(previewData.htmlDoc)
-																.catch(() => {});
-															setPreviewCopied("html");
-															setPreviewExportOpen(false);
-															setTimeout(
-																() => setPreviewCopied(null),
-																2000,
-															);
-														}}
-														style={{
-															width: "100%",
-															textAlign: "left",
-															padding: "8px 10px",
-															border: "none",
-															borderRadius: 8,
-															background:
-																previewCopied === "html"
-																	? "rgba(61,122,53,0.12)"
-																	: "transparent",
-															fontSize: 13,
-															fontWeight: 600,
-															color:
-																previewCopied === "html"
-																	? "#3D7A35"
-																	: T.accent,
-															cursor: "pointer",
-														}}
-													>
-														{previewCopied === "html"
-															? "HTML copied"
-															: "Copy HTML"}
-													</button>
-													<button
-														type="button"
-														onClick={() => {
-															if (!previewData.reactSnippet?.trim())
-																return;
-															navigator.clipboard
-																.writeText(previewData.reactSnippet)
-																.catch(() => {});
-															setPreviewCopied("react");
-															setPreviewExportOpen(false);
-															setTimeout(
-																() => setPreviewCopied(null),
-																2000,
-															);
-														}}
-														style={{
-															width: "100%",
-															textAlign: "left",
-															padding: "8px 10px",
-															border: "none",
-															borderRadius: 8,
-															background:
-																previewCopied === "react"
-																	? "rgba(61,122,53,0.12)"
-																	: "transparent",
-															fontSize: 13,
-															fontWeight: 600,
-															color:
-																previewCopied === "react"
-																	? "#3D7A35"
-																	: T.accent,
-															cursor: "pointer",
-														}}
-													>
-														{previewCopied === "react"
-															? "React copied"
-															: "Copy React"}
-													</button>
-												</motion.div>
-											)}
-										</AnimatePresence>
-										<motion.button
-											whileHover={{ background: "#F0ECE5" }}
-											whileTap={{ scale: 0.95 }}
-											onClick={() => setPreviewOpen(false)}
-											style={{
-												background: "none",
-												border: "none",
-												borderRadius: 8,
-												width: 32,
-												height: 32,
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "center",
-												cursor: "pointer",
-												fontSize: 18,
-												color: T.muted,
-											}}
-										>
-											✕
-										</motion.button>
-									</div>
-								</div>
-								<div
-									style={{
-										flex: 1,
-										minHeight: 0,
-										background: "#e5e7eb",
-									}}
-								>
-									{previewData.htmlDoc ? (
-										<iframe
-											srcDoc={previewData.htmlDoc}
-											title={`Preview — ${previewData.title}`}
-											sandbox="allow-scripts allow-same-origin"
-											style={{
-												width: "100%",
-												height: "100%",
-												border: "none",
-												display: "block",
-											}}
-										/>
-									) : (
-										<div
-											style={{
-												height: "100%",
-												display: "flex",
-												alignItems: "center",
-												justifyContent: "center",
-												color: T.muted,
-												fontSize: 14,
-											}}
-										>
-											No content to preview
-										</div>
-									)}
-								</div>
-							</div>
-						</motion.div>
-					</>
-				)}
-			</AnimatePresence>
-
+			
 			{/* ── DELETE CONFIRM MODAL ── */}
 			<AnimatePresence>
 				{deleteConfirm && (
