@@ -32,9 +32,19 @@ export const TabPanel = Node.create({
 	},
 });
 
+function applyTabPanelVisibility(root, activeIdx) {
+	if (!root) return;
+	const panels = root.querySelectorAll(
+		'[data-type="tab-panel"], .tiptap-tab-panel',
+	);
+	const list = panels.length > 0 ? panels : root.children;
+	Array.from(list).forEach((el, i) => {
+		el.style.display = i === activeIdx ? "block" : "none";
+	});
+}
+
 function TabGroupView({ node, editor, getPos, updateAttributes }) {
 	const [menuOpen, setMenuOpen] = useState(false);
-	const [editingIndex, setEditingIndex] = useState(null);
 	const menuRef = useRef(null);
 	const panelsRootRef = useRef(null);
 
@@ -45,6 +55,25 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 		Math.max(0, childCount - 1),
 	);
 
+	const selectTab = (index) => {
+		const next = Math.min(Math.max(0, index), Math.max(0, childCount - 1));
+		const pos = typeof getPos === "function" ? getPos() : null;
+		if (pos != null) {
+			editor.commands.command(({ tr }) => {
+				const current = tr.doc.nodeAt(pos);
+				if (!current || current.type.name !== "tabGroup") return false;
+				tr.setNodeMarkup(pos, undefined, {
+					...current.attrs,
+					activeIndex: next,
+				});
+				return true;
+			});
+		} else {
+			updateAttributes({ activeIndex: next });
+		}
+		applyTabPanelVisibility(panelsRootRef.current, next);
+	};
+
 	useEffect(() => {
 		if (rawActive !== activeIdx && childCount > 0) {
 			updateAttributes({ activeIndex: activeIdx });
@@ -52,12 +81,7 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 	}, [rawActive, activeIdx, childCount, updateAttributes]);
 
 	useEffect(() => {
-		const root = panelsRootRef.current;
-		if (!root) return;
-		const panels = root.querySelectorAll('[data-type="tab-panel"]');
-		panels.forEach((el, i) => {
-			el.style.display = i === activeIdx ? "block" : "none";
-		});
+		applyTabPanelVisibility(panelsRootRef.current, activeIdx);
 	}, [activeIdx, childCount, node.content.size]);
 
 	useEffect(() => {
@@ -85,7 +109,6 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 			title: next,
 		});
 		editor.view.dispatch(tr);
-		setEditingIndex(null);
 	};
 
 	const deleteGroup = () => {
@@ -112,7 +135,7 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 				content: [{ type: "paragraph" }],
 			})
 			.run();
-		updateAttributes({ activeIndex: childCount });
+		selectTab(childCount);
 		setMenuOpen(false);
 	};
 
@@ -132,7 +155,7 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 		if (index < activeIdx) nextActive = activeIdx - 1;
 		else if (index === activeIdx) nextActive = Math.min(activeIdx, childCount - 2);
 		editor.chain().focus().deleteRange({ from, to }).run();
-		updateAttributes({ activeIndex: Math.max(0, nextActive) });
+		selectTab(Math.max(0, nextActive));
 		setMenuOpen(false);
 	};
 
@@ -142,46 +165,52 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 			data-node-type="tabGroup"
 			style={{ position: "relative" }}
 		>
-			<div className="flex items-stretch border-b border-zinc-200 bg-zinc-50 min-h-[40px]">
+			<div
+				className="flex items-stretch border-b border-zinc-200 bg-zinc-50 min-h-[40px]"
+				data-ink-tab-chrome
+				contentEditable={false}
+			>
 				<div className="flex flex-1 min-w-0 overflow-x-auto">
 					{Array.from({ length: childCount }, (_, i) => {
 						const title = node.child(i).attrs.title || `Tab ${i + 1}`;
 						const isActive = i === activeIdx;
-						if (editingIndex === i) {
-							return (
-								<input
-									key={i}
-									autoFocus
-									defaultValue={title}
-									className="shrink-0 px-3 py-2 text-xs font-medium text-zinc-900 bg-white border-r border-zinc-200 outline-none min-w-[80px]"
-									onMouseDown={(e) => e.stopPropagation()}
-									onBlur={(e) => setTabTitle(i, e.target.value)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") e.currentTarget.blur();
-										if (e.key === "Escape") setEditingIndex(null);
-									}}
-								/>
-							);
-						}
 						return (
-							<button
+							<div
 								key={i}
-								type="button"
-								className={`shrink-0 px-3 py-2 text-xs font-medium border-r border-zinc-200 transition-colors truncate max-w-[160px] ${
+								role="tab"
+								aria-selected={isActive}
+								className={`shrink-0 flex items-center border-r border-zinc-200 min-w-[88px] max-w-[200px] ${
 									isActive
-										? "bg-white text-zinc-900 border-b-2 border-b-amber-500 -mb-px"
-										: "text-zinc-600 hover:bg-zinc-100/80"
+										? "bg-white border-b-2 border-b-amber-500 -mb-px"
+										: "bg-transparent hover:bg-zinc-100/80"
 								}`}
-								onMouseDown={(e) => e.preventDefault()}
-								onClick={() => updateAttributes({ activeIndex: i })}
-								onDoubleClick={(e) => {
+								onPointerDown={(e) => {
+									if (e.target.closest("input, button")) return;
 									e.preventDefault();
-									setEditingIndex(i);
+									e.stopPropagation();
+									selectTab(i);
 								}}
-								title="Double-click to rename"
 							>
-								{title}
-							</button>
+								<input
+									type="text"
+									key={`tab-label-${i}-${title}`}
+									defaultValue={title}
+									onBlur={(e) => setTabTitle(i, e.target.value)}
+									onPointerDown={(e) => e.stopPropagation()}
+									onMouseDown={(e) => e.stopPropagation()}
+									onClick={(e) => {
+										e.stopPropagation();
+										if (!isActive) selectTab(i);
+									}}
+									onFocus={() => {
+										if (!isActive) selectTab(i);
+									}}
+									className={`w-full px-3 py-2 text-xs font-medium bg-transparent border-none outline-none min-w-0 ${
+										isActive ? "text-zinc-900" : "text-zinc-600"
+									}`}
+									aria-label={`Tab ${i + 1} name`}
+								/>
+							</div>
 						);
 					})}
 				</div>
@@ -270,7 +299,16 @@ export const TabGroup = Node.create({
 		];
 	},
 	addNodeView() {
-		return ReactNodeViewRenderer(TabGroupView);
+		return ReactNodeViewRenderer(TabGroupView, {
+			stopEvent: (event) => {
+				const t = event.target;
+				return Boolean(
+					t &&
+						typeof t.closest === "function" &&
+						t.closest("[data-ink-tab-chrome]"),
+				);
+			},
+		});
 	},
 	addCommands() {
 		return {

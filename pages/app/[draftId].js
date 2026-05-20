@@ -11,19 +11,13 @@ import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
-import InfographicsModal from "../../lib/ui/InfographicsModal";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
 import AnimatedDropdown from "../../lib/ui/AnimatedDropdown";
-import TableView from "../../lib/ui/TableView";
-import InfographicsAssetView from "../../lib/ui/assets/InfographicsAssetView";
-import LandingPageAssetView from "../../lib/ui/assets/LandingPageAssetView";
-import ImageGalleryAssetView from "../../lib/ui/assets/ImageGalleryAssetView";
 import {
 	listAssets,
 	getAsset,
 	updateAsset,
 	deleteAsset,
-	assetRef,
 } from "../../lib/api/userAssets";
 import { uploadFile } from "../../lib/api/upload";
 import { uploadInlineImagesToUploadThing } from "../../lib/fileUpload";

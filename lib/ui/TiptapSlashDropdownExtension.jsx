@@ -5,6 +5,10 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { useEditorState } from "@tiptap/react";
 import { TiptapSlashDatePicker, formatInkDateLong } from "./TiptapSlashDatePicker.jsx";
+import {
+	inkInsertToggleBlock,
+	inkFocusTaskItemText,
+} from "./TiptapInkBlockFixes";
 
 export const SlashDropdownPluginKey = new PluginKey("tiptap-slash-dropdown");
 
@@ -321,8 +325,10 @@ export function defaultItems() {
 			id: "task",
 			title: "Checklist",
 			keywords: ["task", "todo", "check", "tl", "checklist", "tasks"],
-			run: (editor, range) =>
-				chainForSlash(editor, range).toggleTaskList().run(),
+			run: (editor, range) => {
+				const ok = chainForSlash(editor, range).toggleTaskList().run();
+				if (ok) inkFocusTaskItemText(editor);
+			},
 		},
 		{
 			id: "quote",
@@ -404,8 +410,10 @@ export function defaultItems() {
 				"collapsible",
 				"accordion",
 			],
-			run: (editor, range) =>
-				chainForSlash(editor, range).setDetails().run(),
+			run: (editor, range) => {
+				applySlashTriggerDelete(editor, range);
+				inkInsertToggleBlock(editor);
+			},
 		},
 		{
 			id: "tabs",

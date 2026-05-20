@@ -450,7 +450,76 @@
 	li[data-type="taskItem"]
 	> div
 	p:empty::before {
-	content: " ";
+	content: "To-do";
+	color: #a1a1aa;
+	pointer-events: none;
+}
+
+/* TipTap Details / Toggle block */
+.ProseMirror [data-type="details"] {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: flex-start;
+	gap: 0.35rem;
+	margin: 1.25rem 0;
+	border: 1px solid #e8e4dc;
+	border-radius: 0.625rem;
+	padding: 0.5rem 0.65rem;
+	background: #f7f5f0;
+}
+
+.ProseMirror [data-type="details"] > button {
+	align-items: center;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	display: flex;
+	flex-shrink: 0;
+	font-size: 0.625rem;
+	height: 1.35rem;
+	justify-content: center;
+	line-height: 1;
+	margin-top: 0.15rem;
+	padding: 0;
+	width: 1.35rem;
+}
+
+.ProseMirror [data-type="details"] > button:hover {
+	background-color: #e8e4dc;
+}
+
+.ProseMirror [data-type="details"] > button::before {
+	content: "\25B6";
+	color: #7a7570;
+}
+
+.ProseMirror [data-type="details"].is-open > button::before {
+	transform: rotate(90deg);
+}
+
+.ProseMirror [data-type="details"] > div:last-child {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	gap: 0.35rem;
+	min-width: 0;
+	width: 100%;
+}
+
+.ProseMirror [data-type="details"] summary {
+	flex: 1;
+	font-weight: 600;
+	min-width: 0;
+	outline: none;
+}
+
+.ProseMirror [data-type="detailsContent"][hidden] {
+	display: none !important;
+}
+
+.ProseMirror [data-type="detailsContent"]:not([hidden]) {
+	display: block;
 }
 
 .ProseMirror

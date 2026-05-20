@@ -378,13 +378,27 @@ const CodeGroupComponent = ({
 		normalizeCodeGroupTabs(node.attrs.tabs),
 	);
 
-	const [activeTab, setActiveTab] = useState(0);
-	const [editingTabId, setEditingTabId] = useState(null);
-	const [editingTabName, setEditingTabName] = useState("");
+	const tabCount = tabs.length;
+	const rawActive = node.attrs.activeTabIndex ?? 0;
+	const activeTab = Math.min(
+		Math.max(0, rawActive),
+		Math.max(0, tabCount - 1),
+	);
+
+	const selectCodeTab = (index) => {
+		const next = Math.min(Math.max(0, index), Math.max(0, tabCount - 1));
+		updateAttributes({ activeTabIndex: next });
+	};
 
 	useEffect(() => {
 		setTabs(normalizeCodeGroupTabs(node.attrs.tabs));
 	}, [nodeTabsKey]);
+
+	useEffect(() => {
+		if (rawActive !== activeTab && tabCount > 0) {
+			updateAttributes({ activeTabIndex: activeTab });
+		}
+	}, [rawActive, activeTab, tabCount, updateAttributes]);
 
 	useEffect(() => {
 		const next = normalizeCodeGroupTabs(tabs);
@@ -412,16 +426,21 @@ const CodeGroupComponent = ({
 			],
 		};
 		setTabs([...tabs, newTab]);
-		setActiveTab(tabs.length);
+		selectCodeTab(tabs.length);
 	};
 
 	const removeTab = (tabId) => {
 		if (tabs.length === 1) return;
+		const removedIndex = tabs.findIndex((tab) => tab.id === tabId);
 		const newTabs = tabs.filter((tab) => tab.id !== tabId);
 		setTabs(newTabs);
-		if (activeTab >= newTabs.length) {
-			setActiveTab(newTabs.length - 1);
+		let nextActive = activeTab;
+		if (removedIndex >= 0 && removedIndex < activeTab) {
+			nextActive = activeTab - 1;
+		} else if (removedIndex === activeTab) {
+			nextActive = Math.min(activeTab, newTabs.length - 1);
 		}
+		selectCodeTab(Math.max(0, nextActive));
 	};
 
 	const updateTabName = (tabId, name) => {
@@ -477,99 +496,79 @@ const CodeGroupComponent = ({
 	const currentTab = tabs[activeTab];
 
 	return (
-		<NodeViewWrapper
-			className={`my-4`}
-			data-node-type="codeGroup"
-			onClick={(e) => {
-				// Only select if clicking on the wrapper itself, not on interactive elements
-				if (
-					e.target === e.currentTarget ||
-					e.target.closest(".node-view-wrapper") === e.currentTarget
-				) {
-					e.preventDefault();
-					e.stopPropagation();
-					if (typeof getPos === "function") {
-						const pos = getPos();
-						if (pos !== null && pos !== undefined) {
-							editor.commands.setNodeSelection(pos);
-						}
-					}
-				}
-			}}
-		>
+		<NodeViewWrapper className="my-4" data-node-type="codeGroup">
 			<div className="rounded-xl bg-zinc-100 border border-zinc-200 overflow-hidden">
 				{/* Tabs Header */}
-				<div className="flex items-center justify-between px-3 pt-2 bg-transparent border-b border-zinc-200">
+				<div
+					className="flex items-center justify-between px-3 pt-2 bg-transparent border-b border-zinc-200"
+					data-ink-tab-chrome
+					contentEditable={false}
+				>
 					<div className="flex items-center gap-0.5 overflow-x-auto flex-1">
 						{tabs.map((tab, index) => (
 							<div
 								key={tab.id}
-								className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors relative ${activeTab === index
-										? "text-zinc-900"
-										: "text-zinc-600 hover:text-zinc-900"
-									}`}
+								role="tab"
+								aria-selected={activeTab === index}
+								className={`flex items-center gap-1 shrink-0 px-1 py-1.5 text-xs font-medium transition-colors relative rounded-t-md min-w-[88px] max-w-[200px] ${
+									activeTab === index
+										? "text-zinc-900 bg-white"
+										: "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+								}`}
+								onPointerDown={(e) => {
+									if (e.target.closest("input, button")) return;
+									e.preventDefault();
+									e.stopPropagation();
+									selectCodeTab(index);
+								}}
 							>
-								{editingTabId === tab.id ? (
-									<input
-										type="text"
-										value={editingTabName}
-										onChange={(e) => setEditingTabName(e.target.value)}
-										onBlur={() => {
-											if (editingTabName.trim()) {
-												updateTabName(tab.id, editingTabName.trim());
-											}
-											setEditingTabId(null);
-											setEditingTabName("");
-										}}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") {
-												e.preventDefault();
-												if (editingTabName.trim()) {
-													updateTabName(tab.id, editingTabName.trim());
-												}
-												setEditingTabId(null);
-												setEditingTabName("");
-											} else if (e.key === "Escape") {
-												setEditingTabId(null);
-												setEditingTabName("");
-											}
-										}}
-										className="flex-1 px-1.5 py-0.5 text-xs bg-white border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-900 min-w-[60px]"
-										autoFocus
-										onClick={(e) => e.stopPropagation()}
-									/>
-								) : (
-									<button
-										onClick={() => setActiveTab(index)}
-										onDoubleClick={(e) => {
-											e.stopPropagation();
-											setEditingTabId(tab.id);
-											setEditingTabName(tab.name);
-										}}
-										className="flex-1 text-left"
-										title="Double-click to edit"
-									>
-										{tab.name}
-									</button>
-								)}
+								<input
+									type="text"
+									key={`code-tab-${tab.id}-${tab.name}`}
+									defaultValue={tab.name}
+									onBlur={(e) => {
+										const next = e.target.value.trim();
+										if (next) updateTabName(tab.id, next);
+									}}
+									onPointerDown={(e) => e.stopPropagation()}
+									onMouseDown={(e) => e.stopPropagation()}
+									onClick={(e) => {
+										e.stopPropagation();
+										if (activeTab !== index) selectCodeTab(index);
+									}}
+									onFocus={() => {
+										if (activeTab !== index) selectCodeTab(index);
+									}}
+									className="flex-1 min-w-0 px-2 py-0.5 text-xs font-medium bg-transparent border-none outline-none"
+									aria-label={`Tab ${index + 1} name`}
+								/>
 								<button
+									type="button"
+									onPointerDown={(e) => e.stopPropagation()}
+									onMouseDown={(e) => e.stopPropagation()}
 									onClick={(e) => {
 										e.stopPropagation();
 										removeTab(tab.id);
 									}}
-									className="p-0.5 hover:bg-zinc-200 rounded transition-colors ml-1"
+									className="p-0.5 hover:bg-zinc-200 rounded transition-colors shrink-0"
 									title="Remove tab"
 								>
 									<X className="w-3 h-3" />
 								</button>
 								{activeTab === index && (
-									<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900" />
+									<div className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900 pointer-events-none" />
 								)}
 							</div>
 						))}
 						<button
-							onClick={addTab}
-							className="p-1.5 text-zinc-600 hover:bg-zinc-200 rounded transition-colors ml-1"
+							type="button"
+							onPointerDown={(e) => e.stopPropagation()}
+							onMouseDown={(e) => e.stopPropagation()}
+							onClick={(e) => {
+								e.stopPropagation();
+								addTab();
+							}}
+							className="p-1.5 text-zinc-600 hover:bg-zinc-200 rounded transition-colors ml-1 shrink-0"
 							title="Add tab"
 						>
 							<Plus className="w-3.5 h-3.5" />
@@ -577,8 +576,11 @@ const CodeGroupComponent = ({
 					</div>
 					<div className="flex items-center gap-1 ml-2">
 						<button
-							onClick={() => {
-								// Duplicate current tab
+							type="button"
+							onPointerDown={(e) => e.stopPropagation()}
+							onMouseDown={(e) => e.stopPropagation()}
+							onClick={(e) => {
+								e.stopPropagation();
 								if (currentTab) {
 									const newTab = {
 										...currentTab,
@@ -586,7 +588,7 @@ const CodeGroupComponent = ({
 										name: `${currentTab.name} (copy)`,
 									};
 									setTabs([...tabs, newTab]);
-									setActiveTab(tabs.length);
+									selectCodeTab(tabs.length);
 								}
 							}}
 							className="p-1.5 text-zinc-600 hover:bg-zinc-200 rounded transition-colors"
@@ -595,7 +597,13 @@ const CodeGroupComponent = ({
 							<Files className="w-3.5 h-3.5" />
 						</button>
 						<button
-							onClick={deleteNode}
+							type="button"
+							onPointerDown={(e) => e.stopPropagation()}
+							onMouseDown={(e) => e.stopPropagation()}
+							onClick={(e) => {
+								e.stopPropagation();
+								deleteNode();
+							}}
 							className="p-1.5 text-zinc-600 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
 							title="Delete code group"
 						>
@@ -661,6 +669,7 @@ export const CodeGroup = Node.create({
 	group: "block",
 	atom: true,
 	attrs: {
+		activeTabIndex: { default: 0 },
 		tabs: {
 			default: [
 				{
@@ -683,7 +692,16 @@ export const CodeGroup = Node.create({
 		];
 	},
 	addNodeView() {
-		return ReactNodeViewRenderer(CodeGroupComponent);
+		return ReactNodeViewRenderer(CodeGroupComponent, {
+			stopEvent: (event) => {
+				const t = event.target;
+				return Boolean(
+					t &&
+						typeof t.closest === "function" &&
+						t.closest("[data-ink-tab-chrome]"),
+				);
+			},
+		});
 	},
 });
 
