@@ -97,8 +97,7 @@
 
 .ProseMirror {
 	outline: none !important;
-	focus-outline: none !important;
-	focus-visible-outline: none !important;
+	/* focus-outline / focus-visible-outline: invalid properties — use :focus rules below */
 }
 .ProseMirror:focus {
 	outline: none !important;
@@ -589,3 +588,241 @@
 @keyframes recBar { 0%,100%{transform:scaleY(0.3)} 50%{transform:scaleY(1)} }
 @keyframes recPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
 @keyframes recSpin { to{transform:rotate(360deg)} }
+
+
+/* Dynamic editor sizing — set --editor-font-size on [data-editor-root] (e.g. 15px) */
+[data-editor-root] [contenteditable="true"] {
+	font-size: var(--editor-font-size, 15px);
+}
+[data-editor-root] [contenteditable="true"] p,
+[data-editor-root] [contenteditable="true"] li {
+	font-size: var(--editor-font-size, 15px) !important;
+}
+[data-editor-root] [contenteditable="true"] h1 {
+	font-size: calc(var(--editor-font-size, 15px) * 1.73) !important;
+}
+[data-editor-root] [contenteditable="true"] h2 {
+	font-size: calc(var(--editor-font-size, 15px) * 1.33) !important;
+}
+[data-editor-root] [contenteditable="true"] h3 {
+	font-size: calc(var(--editor-font-size, 15px) * 1.13) !important;
+}
+
+[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] {
+	background-image:
+		linear-gradient(90deg, #E05555 0px, #E05555 1px, transparent 1px),
+		repeating-linear-gradient(
+			transparent,
+			transparent calc(var(--editor-font-size, 15px) * 1.75 - 1px),
+			#C9C3B8 calc(var(--editor-font-size, 15px) * 1.75 - 1px),
+			#C9C3B8 calc(var(--editor-font-size, 15px) * 1.75)
+		);
+	background-size: 100% 100%, 100% calc(var(--editor-font-size, 15px) * 1.75);
+	background-attachment: local;
+	background-position: 52px 0, 0 0;
+	padding-left: 72px !important;
+	line-height: calc(var(--editor-font-size, 15px) * 1.75) !important;
+	caret-color: #8B4513;
+}
+[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] p,
+[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] li,
+[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] h1,
+[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] h2,
+[data-editor-root][data-editor-variant="paper"] [contenteditable="true"] h3 {
+	line-height: calc(var(--editor-font-size, 15px) * 1.75) !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+/* ══ Typewriter ══ */
+[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] {
+caret-color: #5C3D1E;
+letter-spacing: 0.04em;
+}
+[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] h1,
+[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] h2,
+[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] h3 {
+border-bottom: 2px solid #8B6914;
+padding-bottom: 4px;
+margin-bottom: 12px;
+}
+[data-editor-root][data-editor-variant="typewriter"] [contenteditable="true"] blockquote {
+border-left: 4px double #8B6914 !important;
+background: #EDE3CC !important;
+color: #5C3D1E !important;
+}
+
+/* ══ Terminal / Dark ══ */
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] {
+caret-color: #57FF57;
+}
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"]:empty:before {
+color: #2A4A2A !important;
+}
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] h1,
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] h2,
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] h3 {
+color: #79C0FF !important;
+border-bottom: 1px solid #1E3A1E;
+padding-bottom: 6px;
+}
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] blockquote {
+border-left: 3px solid #238636 !important;
+background: #0D2818 !important;
+color: #8B949E !important;
+}
+[data-editor-root][data-editor-variant="terminal"] [contenteditable="true"] code {
+background: #161B22 !important;
+color: #F78166 !important;
+border: 1px solid #30363D !important;
+}
+
+/* ══ Minimal / Serif ══ */
+[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] {
+caret-color: #C17B2F;
+}
+[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] h1,
+[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] h2,
+[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] h3 {
+font-weight: 400 !important;
+letter-spacing: -0.02em;
+border-bottom: 1px solid #E0D8CC;
+padding-bottom: 6px;
+margin-bottom: 14px;
+}
+[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] blockquote {
+border-left: 2px solid #C17B2F !important;
+background: transparent !important;
+font-style: italic;
+color: #8B7355 !important;
+padding: 2px 16px !important;
+}
+[data-editor-root][data-editor-variant="minimal"] [contenteditable="true"] p {
+line-height: 2 !important;
+margin-bottom: 18px !important;
+}
+
+	[data-editor-root] [contenteditable="true"] blockquote,
+	[data-editor-root] [contenteditable="true"] blockquote *,
+	[data-editor-root] [contenteditable="true"] [data-block],
+	[data-editor-root] [contenteditable="true"] [data-block] * { font-size: inherit !important; }
+	[data-editor-root] [contenteditable="true"] a {
+		color: #0078D4;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
+	}
+	[data-editor-root] [contenteditable="true"] img {
+		max-width: 100%;
+		height: auto;
+		border-radius: 6px;
+		margin: 12px 0;
+		display: block;
+	}
+	[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] img {
+		margin: 0 !important;
+		max-width: 100%;
+	}
+	[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] details[data-draft-img-popover] > summary {
+		list-style: none;
+	}
+	[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] details[data-draft-img-popover] > summary::-webkit-details-marker {
+		display: none;
+	}
+	[data-editor-root] [contenteditable="true"] figure[data-draft-image-wrap] [data-draft-img-menu] button:hover {
+		background: #F3EFE8 !important;
+	}
+	[data-editor-root] [contenteditable="true"] [data-draft-caption]:empty:before {
+		content: attr(data-placeholder);
+		color: #B0AAA3;
+		pointer-events: none;
+	}
+	[data-editor-root] [contenteditable="true"] [data-draft-caption]:focus:before {
+		content: none !important;
+	}
+	[data-editor-root] [contenteditable="true"] ul:not([data-todo="true"]) {
+		list-style-type: disc !important;
+		list-style-position: outside !important;
+		padding-left: 1.5em !important;
+		margin: 0.5em 0 !important;
+	}
+	[data-editor-root] [contenteditable="true"] ol {
+		list-style-type: decimal !important;
+		list-style-position: outside !important;
+		padding-left: 1.5em !important;
+		margin: 0.5em 0 !important;
+	}
+	[data-editor-root] [contenteditable="true"] ul:not([data-todo="true"]) > li,
+	[data-editor-root] [contenteditable="true"] ol > li {
+		display: list-item !important;
+		margin: 0.2em 0 !important;
+	}
+	[data-editor-root] [contenteditable="true"] ul[data-todo="true"] {
+		list-style: none;
+		padding-left: 0;
+	}
+	[data-editor-root] [contenteditable="true"] ul[data-todo="true"] li {
+		list-style: none;
+	}
+	[data-editor-root] [contenteditable="true"] ul[data-todo="true"] li.todo-item span.todo-label {
+		flex: 1;
+		min-width: 0;
+	}
+	[data-editor-root] [contenteditable="true"] span[data-draft-inline] {
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+	}
+	[data-editor-root] [contenteditable="true"] [data-block="code-group"] [data-cg-panel] pre {
+		font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace !important;
+		font-size: 13px !important;
+		line-height: 1.75 !important;
+		color: #E8D5B0 !important;
+		background: #1A1A1A !important;
+		min-height: 72px !important;
+		display: block !important;
+		white-space: pre-wrap !important;
+		box-sizing: border-box !important;
+		width: 100% !important;
+		margin: 0 !important;
+	}
+[data-editor-root] [contenteditable="true"] [data-card-icon]:empty:before,
+[data-editor-root] [contenteditable="true"] [data-card-heading]:empty:before,
+[data-editor-root] [contenteditable="true"] [data-card-desc]:empty:before {
+	content: attr(data-placeholder);
+	color: #B0AAA3;
+	pointer-events: none;
+}
+[data-editor-root] [contenteditable="true"] [data-placeholder]:empty:before {
+	content: attr(data-placeholder);
+	color: #B0AAA3;
+	pointer-events: none;
+}
+[data-editor-root] [contenteditable="true"] [data-icon-selector]:hover {
+	background: rgba(193,123,47,0.08);
+	border-radius: 4px;
+}
+[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary::-webkit-details-marker { display: none; }
+[data-editor-root] [contenteditable="true"] [data-block="toggle-group"] details > summary { list-style: none; }
+[data-editor-root] [contenteditable="true"] > *:hover ~ [data-drag-handle] { opacity: 1 !important; }
+[data-editor-root] [contenteditable="true"] [data-audio-name]:empty:before,
+[data-editor-root] [contenteditable="true"] [data-audio-caption]:empty:before {
+	content: attr(data-placeholder);
+	color: #C8C4BC;
+	pointer-events: none;
+}
+[data-editor-root] [contenteditable="true"] [data-audio-name]:focus:before,
+[data-editor-root] [contenteditable="true"] [data-audio-caption]:focus:before {
+	content: none !important;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+[data-editor-root] [contenteditable="true"] [data-block="audio-block"] audio::-webkit-media-controls-panel {
+	background: #F7F5F0;
+}
+[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:empty:before {
+	content: attr(data-placeholder);
+	color: #C8C4BC;
+	pointer-events: none;
+}
+[data-editor-root] [contenteditable="true"] [data-toggle-group-label]:focus:before {
+	content: none !important;
+}
