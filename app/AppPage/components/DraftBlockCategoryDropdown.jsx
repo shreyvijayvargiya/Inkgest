@@ -42,8 +42,9 @@ export default function DraftBlockCategoryDropdown({
 		};
 	}, [isOpen]);
 
-	const menuPanel = (
-		<motion.div
+	const MenuPanel = () => {
+return (
+	<motion.div
 			data-blocks-category-menu
 			initial={{ opacity: 0, y: -6, scale: 0.97 }}
 			animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -100,7 +101,8 @@ export default function DraftBlockCategoryDropdown({
 				</motion.button>
 			))}
 		</motion.div>
-	);
+)
+	};
 
 	return (
 		<div style={{ position: "relative", flexShrink: 0 }}>
@@ -144,8 +146,7 @@ export default function DraftBlockCategoryDropdown({
 			<AnimatePresence>
 				{isOpen &&
 					menuPos &&
-					typeof document !== "undefined" &&
-					createPortal(menuPanel, document.body)}
+					<MenuPanel />}
 			</AnimatePresence>
 		</div>
 	);

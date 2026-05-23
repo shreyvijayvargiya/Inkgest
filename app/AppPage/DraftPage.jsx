@@ -1553,7 +1553,6 @@ export default function DraftPage() {
 						{saved ? "Saved!" : "Save"}
 					</motion.button>
 					<div style={{ position: "relative" }} ref={exportDropRef}>
-						
 						<AnimatePresence>
 						{exportDropOpen && (
 							<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
@@ -1585,7 +1584,7 @@ export default function DraftPage() {
 						<AnimatePresence>
 						{publishDropOpen && (
 							<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
-								style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, width: 320, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 300, padding: "16px 16px 14px" }}>
+								style={{ position: "fixed", top: "50px", right: "20px", width: 320, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.14)", zIndex: 300, padding: "16px 16px 14px" }}>
 								<p style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>Visibility</p>
 								<div className="flex gap-2 mb-4 bg-zinc-50 rounded-xl p-1">
 									{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map(opt => (
@@ -1673,15 +1672,6 @@ export default function DraftPage() {
 								{isPublic && (
 									<div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
 										<a
-											href={getPublicUrl(draft?.slug || undefined, publishShareTheme)}
-											target="_blank"
-											rel="noopener noreferrer"
-											style={{ display:"inline-flex",alignItems:"center",gap:4,fontSize:11,color:"#555",textDecoration:"none" }}
-										>
-											<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-											Open themed page
-										</a>
-										<a
 											href={getPublicUrl(draft?.slug || undefined)}
 											target="_blank"
 											rel="noopener noreferrer"
@@ -1709,7 +1699,7 @@ export default function DraftPage() {
 			return (
 				<div className="flex w-full min-w-0 items-center gap-2">
 					<div
-						className="hidescrollbar min-w-0 flex-1 overflow-x-auto overflow-y-visible pb-px"
+						className="hidescrollbar min-w-0 overflow-x-auto overflow-y-visible pb-px"
 						style={{ WebkitOverflowScrolling: "touch" }}
 					>
 						{blocksToolbar}
@@ -1720,9 +1710,9 @@ export default function DraftPage() {
 		}
 
 		return (
-			<div className="flex min-w-0 flex-1 items-center gap-2">
+			<div className="flex min-w-0 items-center gap-2 z-[1000]">
 				<div
-					className="hidescrollbar min-w-0 flex-1 overflow-x-auto overflow-y-visible"
+					className="hidescrollbar min-w-0 overflow-x-auto overflow-y-visible"
 					style={{ WebkitOverflowScrolling: "touch" }}
 				>
 					{blocksToolbar}
@@ -1746,13 +1736,14 @@ export default function DraftPage() {
 			<FontLink />
 
 			{/* ── TOP BAR (stack: row 1 tabs + toolbar on wide; row 2 toolbar on compact) ── */}
-			<div ref={draftNavHeaderStackRef} style={{ flexShrink: 0, zIndex: 50 }}>
+			<div ref={draftNavHeaderStackRef} style={{ flexShrink: 0, zIndex: 100 }}>
 				<div
 					style={{
 						background: T.surface,
 						borderBottom: `1px solid ${T.border}`,
 						display: "flex",
 						alignItems: "center",
+						justifyContent: "space-between",
 						gap: 12,
 						flexShrink: 0,
 						flexWrap: "nowrap",
@@ -1765,20 +1756,11 @@ export default function DraftPage() {
 						minHeight: 46,
 					}}
 				>
-				{/* Logo */}
-				<a
-					href="/"
-					style={{
-						fontFamily: "",
-						fontSize: 20,
-						color: T.accent,
-						textDecoration: "none",
-						display: "flex",
-						alignItems: "center",
-						gap: 7,
-						flexShrink: 0,
-						marginRight: 8,
-					}}
+				<div className="flex items-center gap-2">
+					{/* Logo */}
+				<motion.a
+					onClick={() => router.push("/")}
+					className="home-page-button-link flex items-center gap-2 cursor-pointer"
 				>
 					<motion.span
 						whileHover={{ scale: 1.3 }}
@@ -1791,7 +1773,7 @@ export default function DraftPage() {
 						}}
 					/>
 					inkgest
-				</a>
+				</motion.a>
 
 				{/* Sidebar toggle — only when logged in */}
 				{reduxUser && (
@@ -1821,7 +1803,7 @@ export default function DraftPage() {
 				{/* Tabs — inline in navbar */}
 				{draftId && openTabs.length > 0 && (
 					<div
-						className="flex hidescrollbar min-w-0 flex-1 flex-nowrap gap-2 items-center overflow-x-auto overscroll-x-contain ml-2 pr-2 sm:ml-8 sm:pr-4 md:ml-10"
+						className="flex hidescrollbar min-w-0 flex-nowrap gap-2 items-center overflow-x-auto overscroll-x-contain ml-2 pr-2 sm:ml-8 sm:pr-4"
 						style={{
 							scrollbarWidth: "thin",
 							WebkitOverflowScrolling: "touch",
@@ -1900,11 +1882,11 @@ export default function DraftPage() {
 						})}
 					</div>
 				)}
+				</div>
 
 				{draft && !(compactAssetsNav && draft) && (
 					<div
-						className="min-w-0 flex-1 overflow-visible"
-						style={{ display: "flex", alignItems: "center" }}
+						className="min-w-0 overflow-visible flex justify-between items-center"
 					>
 						<TopToolbar draft={draft} compactToolbar={false} />
 					</div>
@@ -1934,10 +1916,10 @@ export default function DraftPage() {
 
 			</div>
 
-					<LoginModal
-						isOpen={loginModalOpen}
-						onClose={() => setLoginModalOpen(false)}
-					/>
+			<LoginModal
+				isOpen={loginModalOpen}
+				onClose={() => setLoginModalOpen(false)}
+			/>
 
 			{/* ── MAIN BODY ── */}
 			<div style={{ flex: 1, display: "flex", overflow: "hidden" }}>

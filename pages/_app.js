@@ -6,7 +6,6 @@ import "../styles/globals.css";
 import { store, persistor } from "../lib/store/store";
 import SEO from "../lib/modules/SEO";
 import AnalyticsTracker from "../lib/ui/AnalyticsTracker";
-import PostHogProvider from "../lib/ui/PostHogProvider";
 import { Toaster } from "sonner";
 
 // Create a client

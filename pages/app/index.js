@@ -893,7 +893,6 @@ export default function inkgestApp() {
 								...(compactAssetsNav
 									? { width: 280, zIndex: 45, boxShadow: "8px 0 32px rgba(0,0,0,0.12)" }
 									: {}),
-								background: T.sidebar,
 								borderRight: `1px solid ${T.border}`,
 								display: "flex",
 								flexDirection: "column",
