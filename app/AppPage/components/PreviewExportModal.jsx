@@ -2,8 +2,11 @@ import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
 import { buildThemedHTML } from "../../../lib/blogExportThemes";
-import { T, Icons, Icon, parseCSSProp, stripDraftSlashQueryFromHtmlString } from "../draftPageLib";
+import { T, Icons, Icon, stripDraftSlashQueryFromHtmlString } from "../draftPageLib";
 import { THEMES } from "../../../lib/blogExportThemes";
+import { useCompactAssetsNav } from "../../../lib/hooks/useCompactAssetsNav";
+import DraftTranslationBar from "./DraftTranslationBar";
+import PreviewExportThemeList from "./PreviewExportThemeList";
 
 export default function PreviewExportModal({
 	open,
@@ -15,6 +18,16 @@ export default function PreviewExportModal({
 	setPreviewTheme,
 	translatedHTML,
 	translationLang,
+	setTranslationLang,
+	onTranslate,
+	onSaveTranslation,
+	onShowOriginal,
+	translating,
+	savingTranslation,
+	translationError,
+	translationSaved,
+	savedLangs,
+	creditEstimate,
 	themeExportOpen,
 	setThemeExportOpen,
 	themeExportRef,
@@ -29,6 +42,7 @@ export default function PreviewExportModal({
 	onCopyThemeHTML,
 	onCopyThemeReact,
 }) {
+	const isCompact = useCompactAssetsNav();
 	const activeTheme = THEMES[previewTheme] || THEMES.ink;
 	const currentHTML = stripDraftSlashQueryFromHtmlString(
 		editorRef.current?.innerHTML || draft?.body || "",
@@ -63,6 +77,18 @@ export default function PreviewExportModal({
 	const slugBase = (draft?.title || "draft")
 		.replace(/[^a-z0-9]/gi, "-")
 		.toLowerCase();
+
+	const themeListProps = {
+		previewTheme,
+		setPreviewTheme,
+		isPublic,
+		getPublicUrl,
+		toSlug,
+		slugInput,
+		draft,
+		copiedPubThemeRow,
+		setCopiedPubThemeRow,
+	};
 
 	return (
 		<AnimatePresence>
@@ -108,15 +134,20 @@ export default function PreviewExportModal({
 										exit={{ scale: 0.95, y: 24 }}
 										transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
 										style={{
-											width: "92vw",
-											maxWidth: 1280,
-											height: "90vh",
+											width: isCompact ? "100%" : "92vw",
+											maxWidth: isCompact ? "100%" : 1280,
+											height: isCompact ? "100dvh" : "90vh",
+											maxHeight: isCompact ? "100dvh" : undefined,
 											background: T.surface,
-											borderRadius: 16,
-											border: `1px solid ${T.border}`,
+											borderRadius: isCompact ? 0 : 16,
+											border: isCompact
+												? "none"
+												: `1px solid ${T.border}`,
 											display: "flex",
 											flexDirection: "column",
-											boxShadow: "0 32px 80px rgba(0,0,0,0.28)",
+											boxShadow: isCompact
+												? "none"
+												: "0 32px 80px rgba(0,0,0,0.28)",
 											overflow: "hidden",
 											pointerEvents: "all",
 										}}
@@ -124,32 +155,75 @@ export default function PreviewExportModal({
 										{/* ─ Top bar ─ */}
 										<div
 											style={{
-												height: 56,
 												borderBottom: `1px solid ${T.border}`,
-												display: "flex",
-												alignItems: "center",
-												padding: "0 20px",
-												gap: 12,
 												flexShrink: 0,
 												background: T.surface,
 											}}
 										>
-											<p
+											<div
 												style={{
-													fontSize: 15,
-													fontWeight: 700,
-													color: T.accent,
-													fontFamily: "",
+													display: "flex",
+													flexDirection: "column",
+													padding: isCompact ? "10px 12px" : "10px 20px",
+													gap: isCompact ? 10 : 0,
+													minHeight: isCompact ? undefined : 56,
 												}}
 											>
-												Preview & Export
-											</p>
-											<div style={{ flex: 1 }} />
+												{/* Row 1: title · translation (desktop) · export · close */}
+												<div
+													style={{
+														display: "flex",
+														flexDirection: "row",
+														alignItems: "center",
+														gap: 8,
+														width: "100%",
+														minWidth: 0,
+														flex: isCompact ? undefined : 1,
+													}}
+												>
+													<p
+														style={{
+															fontSize: isCompact ? 14 : 15,
+															fontWeight: 700,
+															color: T.accent,
+															margin: 0,
+															whiteSpace: "nowrap",
+															flex: isCompact ? "1 1 auto" : undefined,
+															flexShrink: isCompact ? 1 : 0,
+															minWidth: 0,
+															overflow: "hidden",
+															textOverflow: "ellipsis",
+														}}
+													>
+														Preview & Export
+													</p>
+
+													{!isCompact ? (
+														<>
+															<DraftTranslationBar
+																translationLang={translationLang}
+																setTranslationLang={setTranslationLang}
+																onTranslate={onTranslate}
+																onSaveTranslation={onSaveTranslation}
+																onShowOriginal={onShowOriginal}
+																translating={translating}
+																savingTranslation={savingTranslation}
+																translationError=""
+																translationSaved={translationSaved}
+																savedLangs={savedLangs}
+																creditEstimate={creditEstimate}
+																hasTranslatedPreview={Boolean(
+																	translatedHTML?.trim(),
+																)}
+															/>
+															<div style={{ flex: 1, minWidth: 8 }} />
+														</>
+													) : null}
 
 										{/* Export dropdown */}
 										<div
 											ref={themeExportRef}
-											style={{ position: "relative" }}
+											style={{ position: "relative", flexShrink: 0 }}
 										>
 											<motion.button
 												type="button"
@@ -163,15 +237,19 @@ export default function PreviewExportModal({
 													background: T.base,
 													border: `1px solid ${T.border}`,
 													borderRadius: 9,
-													padding: "8px 14px",
-													fontSize: 13,
+													padding: isCompact ? "7px 10px" : "8px 14px",
+													fontSize: isCompact ? 12 : 13,
 													fontWeight: 600,
 													color: T.accent,
 													cursor: "pointer",
+													flexShrink: 0,
+													whiteSpace: "nowrap",
 												}}
 											>
 												<Icon d={Icons.copy} size={13} stroke={T.accent} />
-												Export — {activeTheme?.name}
+												{isCompact
+													? "Export"
+													: `Export — ${activeTheme?.name}`}
 												<span
 													style={{
 														display: "inline-flex",
@@ -589,223 +667,80 @@ export default function PreviewExportModal({
 													<path d="M18 6L6 18M6 6l12 12" />
 												</svg>
 											</motion.button>
-										</div>
+												</div>
 
-										{/* ─ Body: sidebar + preview ─ */}
-										<div
-											style={{ flex: 1, display: "flex", overflow: "hidden" }}
-										>
-											{/* Left: theme list */}
-											<div
-												style={{
-													width: 210,
-													borderRight: `1px solid ${T.border}`,
-													overflowY: "auto",
-													flexShrink: 0,
-													background: T.base,
-													padding: "12px 10px",
-													display: "flex",
-													flexDirection: "column",
-													gap: 3,
-												}}
-											>
-												<p
+											{isCompact ? (
+												<div
+													className="hidescrollbar"
 													style={{
-														fontSize: 10,
-														fontWeight: 700,
-														color: T.muted,
-														textTransform: "uppercase",
-														letterSpacing: "0.08em",
-														marginBottom: 8,
-														paddingLeft: 4,
+														width: "100%",
+														minWidth: 0,
+														overflowX: "auto",
+														WebkitOverflowScrolling: "touch",
+														paddingBottom: 2,
 													}}
 												>
-													Themes
-												</p>
-												{Object.entries(THEMES).map(([key, theme]) => {
-													const isActive = previewTheme === key;
-													const hColor =
-														parseCSSProp(theme.h1, "color") || theme.text;
-													return (
-														<motion.div
-															key={key}
-															role="button"
-															tabIndex={0}
-															whileTap={{ scale: 0.97 }}
-															onClick={() => setPreviewTheme(key)}
-															onKeyDown={(e) => {
-																if (e.key === "Enter" || e.key === " ") {
-																	e.preventDefault();
-																	setPreviewTheme(key);
-																}
-															}}
-															style={{
-																background: isActive
-																	? T.surface
-																	: "transparent",
-																border: `1.5px solid ${isActive ? T.border : "transparent"}`,
-																borderRadius: 10,
-																padding: "10px 8px 10px 12px",
-																cursor: "pointer",
-																display: "flex",
-																alignItems: "center",
-																gap: 10,
-																textAlign: "left",
-																boxShadow: isActive
-																	? "0 1px 6px rgba(0,0,0,0.07)"
-																	: "none",
-																outline: "none",
-															}}
-														>
-															{/* Color swatch strip */}
-															<div
-																style={{
-																	width: 28,
-																	height: 28,
-																	borderRadius: 7,
-																	background: theme.bg,
-																	border: "1px solid rgba(0,0,0,0.1)",
-																	flexShrink: 0,
-																	display: "flex",
-																	alignItems: "center",
-																	justifyContent: "center",
-																	overflow: "hidden",
-																}}
-															>
-																<div
-																	style={{
-																		width: 10,
-																		height: 10,
-																		borderRadius: "50%",
-																		background: hColor,
-																	}}
-																/>
-															</div>
-															<div style={{ minWidth: 0, flex: 1 }}>
-																<p
-																	style={{
-																		fontSize: 12,
-																		fontWeight: isActive ? 700 : 500,
-																		color: isActive ? T.accent : "#555",
-																		lineHeight: 1.3,
-																	}}
-																>
-																	{theme.name}
-																</p>
-																<p
-																	style={{
-																		fontSize: 10,
-																		color: T.muted,
-																		overflow: "hidden",
-																		whiteSpace: "nowrap",
-																		textOverflow: "ellipsis",
-																		marginTop: 1,
-																	}}
-																>
-																	{theme.label}
-																</p>
-															</div>
-															<div
-																style={{
-																	display: "flex",
-																	alignItems: "center",
-																	gap: 6,
-																	flexShrink: 0,
-																	marginLeft: "auto",
-																}}
-															>
-																{isPublic ? (
-																	<button
-																		type="button"
-																		title="Copy public URL with this theme"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			navigator.clipboard
-																				.writeText(
-																					getPublicUrl(
-																						draft?.slug ||
-																							toSlug(slugInput) ||
-																							undefined,
-																						key,
-																					),
-																				)
-																				.catch(() => {});
-																			setCopiedPubThemeRow(key);
-																			setTimeout(
-																				() => setCopiedPubThemeRow(null),
-																				1600,
-																			);
-																		}}
-																		style={{
-																			width: 28,
-																			height: 28,
-																			borderRadius: 7,
-																			border: `1px solid ${T.border}`,
-																			background:
-																				copiedPubThemeRow === key
-																					? "#EFF6EE"
-																					: T.surface,
-																			cursor: "pointer",
-																			display: "flex",
-																			alignItems: "center",
-																			justifyContent: "center",
-																			padding: 0,
-																			flexShrink: 0,
-																		}}
-																	>
-																		{copiedPubThemeRow === key ? (
-																			<svg
-																				width={12}
-																				height={12}
-																				viewBox="0 0 24 24"
-																				fill="none"
-																				stroke="#3D7A35"
-																				strokeWidth={2.5}
-																				strokeLinecap="round"
-																			>
-																				<polyline points="20 6 9 17 4 12" />
-																			</svg>
-																		) : (
-																			<svg
-																				width={12}
-																				height={12}
-																				viewBox="0 0 24 24"
-																				fill="none"
-																				stroke={T.muted}
-																				strokeWidth={2}
-																				strokeLinecap="round"
-																			>
-																				<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-																				<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-																			</svg>
-																		)}
-																	</button>
-																) : null}
-																{isActive && (
-																	<div
-																		style={{
-																			width: 6,
-																			height: 6,
-																			borderRadius: "50%",
-																			background: T.warm,
-																			flexShrink: 0,
-																		}}
-																	/>
-																)}
-															</div>
-														</motion.div>
-													);
-												})}
-
-										
+													<DraftTranslationBar
+														compact
+														translationLang={translationLang}
+														setTranslationLang={setTranslationLang}
+														onTranslate={onTranslate}
+														onSaveTranslation={onSaveTranslation}
+														onShowOriginal={onShowOriginal}
+														translating={translating}
+														savingTranslation={savingTranslation}
+														translationError=""
+														translationSaved={translationSaved}
+														savedLangs={savedLangs}
+														creditEstimate={creditEstimate}
+														hasTranslatedPreview={Boolean(
+															translatedHTML?.trim(),
+														)}
+													/>
+												</div>
+											) : null}
 											</div>
 
-											{/* Right: iframe live preview */}
+											{translationError ? (
+												<div
+													style={{
+														padding: "6px 20px 10px",
+														fontSize: 11,
+														color: "#B45309",
+														lineHeight: 1.35,
+														borderTop: `1px solid ${T.border}`,
+														background: "#FFFBEB",
+													}}
+												>
+													{translationError}
+												</div>
+											) : null}
+										</div>
+
+										{/* ─ Body: themes + preview (column on mobile) ─ */}
+										<div
+											style={{
+												flex: 1,
+												display: "flex",
+												flexDirection: isCompact ? "column" : "row",
+												overflow: "hidden",
+												minHeight: 0,
+											}}
+										>
+											{!isCompact ? (
+												<PreviewExportThemeList
+													layout="sidebar"
+													{...themeListProps}
+												/>
+											) : null}
+
 											<div
 												style={{
 													flex: 1,
 													position: "relative",
 													background: "#e5e7eb",
+													minHeight: 0,
+													minWidth: 0,
 												}}
 											>
 												{themedDoc ? (
@@ -837,6 +772,13 @@ export default function PreviewExportModal({
 													</div>
 												)}
 											</div>
+
+											{isCompact ? (
+												<PreviewExportThemeList
+													layout="strip"
+													{...themeListProps}
+												/>
+											) : null}
 										</div>
 									</motion.div>
 									{/* end centering shell */}

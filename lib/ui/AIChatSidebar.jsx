@@ -24,7 +24,17 @@ import { resolveInfographicCreativeFormatId } from "../config/infographicCreativ
 import ChatInfographicsPanel from "./ChatInfographicsPanel";
 import ChatMermaidPanel from "./ChatMermaidPanel";
 import { getUserCredits } from "../utils/credits";
+import { deductCredits } from "../api/deductCredits";
+import { fetchTranslate } from "../api/inkgestScrapeClient";
 import { useInkgestScrape } from "../hooks/useInkgestScrape";
+import {
+	creditsForTranslationWords,
+	countWordsInText,
+} from "../utils/translationCredits";
+import {
+	languageCodeToApiLabel,
+	resolveTranslationLanguageLabel,
+} from "../utils/translateLanguage";
 import {
 	listAssets,
 	createDraft,
@@ -472,6 +482,98 @@ function ScrapedSourcesPanel({ sources }) {
 	);
 }
 
+function ChatTranslationsPanel({ items, copiedId, onCopy }) {
+	const [tab, setTab] = useState(0);
+	if (!items?.length) return null;
+	const safeTab = Math.min(tab, items.length - 1);
+	const cur = items[safeTab];
+	const label = cur.languageLabel || resolveTranslationLanguageLabel(cur.language);
+
+	return (
+		<div className="mb-4 rounded-xl border border-zinc-200 bg-zinc-50 overflow-hidden text-zinc-900">
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					padding: "8px 10px",
+					borderBottom: "1px solid #EDE4D6",
+					background: "#FFFFFF95",
+				}}
+			>
+				<span style={{ fontSize: 11, fontWeight: 700, color: "#5e5e5e" }}>
+					Translation
+				</span>
+				<span style={{ fontSize: 10.5, color: "#B08B5F" }}>
+					{label}
+					{items.length > 1 ? ` · ${safeTab + 1}/${items.length}` : ""}
+				</span>
+			</div>
+
+			{items.length > 1 && (
+				<div
+					style={{
+						display: "flex",
+						flexWrap: "wrap",
+						gap: 5,
+						padding: "8px 10px",
+						borderBottom: "1px solid #EDE4D6",
+					}}
+				>
+					{items.map((t, i) => {
+						const tabLabel =
+							t.languageLabel ||
+							resolveTranslationLanguageLabel(t.language);
+						const active = safeTab === i;
+						return (
+							<button
+								type="button"
+								key={t.id || `${t.language}-${i}`}
+								onClick={() => setTab(i)}
+								style={{
+									border: `1px solid ${active ? "#C17B2F" : "#E8E4DC"}`,
+									background: active ? "#C17B2F15" : "#FFFFFF",
+									color: active ? "#92400E" : "#5A5550",
+									borderRadius: 8,
+									padding: "4px 9px",
+									fontSize: 11,
+									fontWeight: 600,
+									cursor: "pointer",
+								}}
+							>
+								{tabLabel}
+							</button>
+						);
+					})}
+				</div>
+			)}
+
+			<div style={{ padding: "10px 12px" }}>
+				{cur.error ? (
+					<p style={{ margin: 0, fontSize: 12, color: "#7A7570", lineHeight: 1.55 }}>
+						{cur.error}
+					</p>
+				) : (
+					<div
+						className="ai-chat-prose"
+						dangerouslySetInnerHTML={{ __html: md(cur.markdown || "") }}
+					/>
+				)}
+				{!cur.error && cur.markdown ? (
+					<div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+						<ActionBtn
+							icon={copiedId === cur.id ? PATHS.check : PATHS.copy}
+							label={copiedId === cur.id ? "Copied" : "Copy"}
+							active={copiedId === cur.id}
+							onClick={() => onCopy(cur.id, cur.markdown)}
+						/>
+					</div>
+				) : null}
+			</div>
+		</div>
+	);
+}
+
 /* ─── Markdown → editor-safe HTML with light-theme inline styles ─── */
 function mdEditor(text = "") {
 	const lines = text.split("\n");
@@ -685,13 +787,15 @@ export default function AIChatSidebar({
 	const [messages, setMessages] = useState([{
 		id: "w0", role: "assistant", done: true,
 		content:
-			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** — it appears as a chip above the box and I'll scrape it with the Inkgest API. **Paste or attach images** (chips with preview); vision is coming soon, but filenames are included for context. Ask for **infographics** or **Mermaid diagrams** from your draft or scraped text. When you like a response use **Insert**, **Append**, or **Replace**.",
+			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** — it appears as a chip above the box and I'll scrape it with the Inkgest API. **Paste or attach images** (chips with preview); vision is coming soon, but filenames are included for context. Ask for **infographics**, **Mermaid diagrams**, or **translations** from your draft or scraped text. When you like a response use **Insert**, **Append**, or **Replace**.",
+		chatTranslations: [],
 	}]);
 	const [input, setInput]         = useState("");
 	const [attachedUrls, setAttachedUrls] = useState([]);
 	const [attachedImages, setAttachedImages] = useState([]);
 	const [streaming, setStreaming]   = useState(false);
 	const [copiedId, setCopiedId]    = useState(null);
+	const [copiedTranslationId, setCopiedTranslationId] = useState(null);
 	const [toast, setToast]          = useState("");
 	const [model, setModel]          = useState(MODELS[0]);
 	const [modelOpen, setModelOpen]  = useState(false);
@@ -982,6 +1086,12 @@ export default function AIChatSidebar({
 		setTimeout(() => setCopiedId(null), 2000);
 	};
 
+	const copyTranslation = (id, content) => {
+		navigator.clipboard.writeText(content || "").catch(() => {});
+		setCopiedTranslationId(id);
+		setTimeout(() => setCopiedTranslationId(null), 2000);
+	};
+
 	/* ── Send a message (streaming SSE + optional scrape tool rounds via OpenRouter) ── */
 	const send = useCallback(async (override) => {
 		const rawText = (override ?? input).trim();
@@ -1025,6 +1135,7 @@ export default function AIChatSidebar({
 				done: false,
 				content: "",
 				scrapeSources: [],
+				chatTranslations: [],
 				chatInfographics: [],
 				chatMermaids: [],
 				agentTrace: [],
@@ -1071,6 +1182,7 @@ export default function AIChatSidebar({
 		};
 
 		let aggregatedSources = [];
+		let aggregatedTranslations = [];
 		let aggregatedInfographics = [];
 		let aggregatedMermaids = [];
 
@@ -1177,12 +1289,13 @@ export default function AIChatSidebar({
 						name === "scrape_youtube"
 					)
 						return 0;
-					if (name === "generate_infographics") return 1;
-					if (name === "generate_mermaid") return 2;
-					if (name === "search_user_assets") return 3;
-					if (name === "read_user_asset") return 4;
-					if (name === "propose_create_draft") return 5;
-					return 6;
+					if (name === "translate_text") return 1;
+					if (name === "generate_infographics") return 2;
+					if (name === "generate_mermaid") return 3;
+					if (name === "search_user_assets") return 4;
+					if (name === "read_user_asset") return 5;
+					if (name === "propose_create_draft") return 6;
+					return 7;
 				};
 				normalised.sort(
 					(a, b) =>
@@ -1265,6 +1378,61 @@ export default function AIChatSidebar({
 								markdown: (data.markdown || "").slice(0, 100_000),
 								transcript: segments.slice(0, 400),
 							});
+						} else if (name === "translate_text") {
+							const text = String(args.text || "").trim();
+							const langRaw = String(args.language || "").trim();
+							if (!text || !langRaw) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "text and language are required",
+								});
+							} else {
+								const words = countWordsInText(text);
+								const creditsNeeded = creditsForTranslationWords(words);
+								if (
+									credits &&
+									credits.plan !== "pro" &&
+									credits.remaining < creditsNeeded
+								) {
+									throw new Error(
+										`Not enough credits for translation (need ${creditsNeeded}, have ${Number(credits.remaining).toFixed(2)}).`,
+									);
+								}
+								const apiLang = languageCodeToApiLabel(langRaw);
+								const data = await fetchTranslate({
+									idToken,
+									markdown: text.slice(0, 120_000),
+									language: apiLang,
+								});
+								deductCredits(idToken, creditsNeeded);
+								const langLabel = resolveTranslationLanguageLabel(
+									data.language || langRaw,
+								);
+								const row = {
+									id: `tr-${Date.now()}-${i}`,
+									language: data.language || apiLang,
+									languageLabel: langLabel,
+									markdown: data.markdown,
+								};
+								aggregatedTranslations = [
+									...aggregatedTranslations,
+									row,
+								];
+								traceBatch.push({
+									title: "Translation",
+									sub: langLabel,
+									lines: [
+										`${words} words · ${creditsNeeded} credit${creditsNeeded === 1 ? "" : "s"}`,
+									],
+								});
+								payload = JSON.stringify({
+									ok: true,
+									language: langLabel,
+									markdownLength: data.markdown.length,
+									creditsUsed: creditsNeeded,
+									truncatedInput: Boolean(data.truncatedInput),
+								});
+							}
 						} else if (name === "generate_infographics") {
 							if (!effectiveUserId) {
 								payload = JSON.stringify({
@@ -1562,6 +1730,7 @@ export default function AIChatSidebar({
 							? {
 									...m,
 									scrapeSources: [...aggregatedSources],
+									chatTranslations: [...aggregatedTranslations],
 									chatInfographics: [...aggregatedInfographics],
 									chatMermaids: [...aggregatedMermaids],
 									...(roundAssetLinks.length > 0
@@ -1604,6 +1773,7 @@ export default function AIChatSidebar({
 									assistantCombined ||
 									"No response.",
 								scrapeSources: [...aggregatedSources],
+								chatTranslations: [...aggregatedTranslations],
 								chatInfographics: [...aggregatedInfographics],
 								chatMermaids: [...aggregatedMermaids],
 						  }
@@ -1620,6 +1790,7 @@ export default function AIChatSidebar({
 									done: true,
 									content: m.content || "_Stopped._",
 									scrapeSources: [...aggregatedSources],
+									chatTranslations: [...aggregatedTranslations],
 									chatInfographics: [...aggregatedInfographics],
 									chatMermaids: [...aggregatedMermaids],
 							  }
@@ -1635,6 +1806,7 @@ export default function AIChatSidebar({
 									done: true,
 									content: `_Error: ${err.message}_`,
 									scrapeSources: [...aggregatedSources],
+									chatTranslations: [...aggregatedTranslations],
 									chatInfographics: [...aggregatedInfographics],
 									chatMermaids: [...aggregatedMermaids],
 							  }
@@ -1658,6 +1830,7 @@ export default function AIChatSidebar({
 		scrapeOne,
 		scrapeMany,
 		scrapeYoutube,
+		credits,
 		refreshCredits,
 		chatMode,
 		effectiveUserId,
@@ -2061,6 +2234,13 @@ export default function AIChatSidebar({
 														}}>
 															{msg.scrapeSources?.length > 0 && (
 																<ScrapedSourcesPanel sources={msg.scrapeSources} />
+															)}
+															{msg.chatTranslations?.length > 0 && (
+																<ChatTranslationsPanel
+																	items={msg.chatTranslations}
+																	copiedId={copiedTranslationId}
+																	onCopy={copyTranslation}
+																/>
 															)}
 															{msg.chatInfographics?.length > 0 && (
 																<ChatInfographicsPanel

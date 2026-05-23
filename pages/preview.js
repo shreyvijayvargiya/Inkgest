@@ -1450,7 +1450,6 @@ function CanvasTab({ nodes, setNodes, edges, setEdges }) {
 							borderRadius: 8,
 							padding: "6px 16px",
 							fontSize: 10,
-							
 							color: "rgba(255,255,255,0.4)",
 							pointerEvents: "none",
 							zIndex: 50,

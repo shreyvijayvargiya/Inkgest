@@ -189,7 +189,9 @@ export function useDraftPageRuntime({
 		}
 		if (blocksMenuOpen) {
 			handlers.push({
-				isInside: (t) => blocksMenuRef.current?.contains(t),
+				isInside: (t) =>
+					blocksMenuRef.current?.contains(t) ||
+					!!t.closest?.("[data-blocks-category-menu]"),
 				close: () => setBlocksMenuOpen(false),
 			});
 		}

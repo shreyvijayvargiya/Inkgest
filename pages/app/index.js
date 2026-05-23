@@ -8,10 +8,6 @@ import { db, auth } from "../../lib/config/firebase";
 import {
 	listAssets,
 	createDraft,
-	createTable,
-	createInfographicsAsset,
-	createLandingPageAsset,
-	createImageGalleryAsset,
 	deleteAsset,
 } from "../../lib/api/userAssets";
 import {

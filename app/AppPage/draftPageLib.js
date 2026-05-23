@@ -312,63 +312,6 @@ async function copyTextToClipboard(text) {
 	}
 }
 
-/**
- * Translate all text nodes in an HTML string to the target language
- * using the free MyMemory API (no key required, ~1 000 words/day per IP).
- * HTML structure (tags, attributes, styles) is fully preserved.
- */
-async function translateHTMLContent(html, targetLang) {
-	if (!html || targetLang === "en") return html;
-
-	const parser = new DOMParser();
-	const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
-	const root = doc.body.firstChild;
-
-	const textNodes = [];
-	function collectTextNodes(node) {
-		for (const child of node.childNodes) {
-			if (child.nodeType === 3 && child.textContent.trim()) {
-				textNodes.push(child);
-			} else if (child.nodeType === 1) {
-				collectTextNodes(child);
-			}
-		}
-	}
-	collectTextNodes(root);
-
-	if (textNodes.length === 0) return html;
-
-	/* Translate each text node individually in batches of 5 parallel requests.
-	   Avoids delimiter-splitting issues where the API modifies join markers. */
-	const CONCURRENCY = 5;
-	for (let i = 0; i < textNodes.length; i += CONCURRENCY) {
-		const slice = textNodes.slice(i, i + CONCURRENCY);
-		await Promise.all(
-			slice.map(async (node) => {
-				const text = node.textContent.trim();
-				if (!text) return;
-				try {
-					const res = await fetch(
-						`https://api.mymemory.translated.world/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`,
-					);
-					const json = await res.json();
-					const translated = json?.responseData?.translatedText;
-					if (translated && translated.toLowerCase() !== "invalid language pair") {
-						/* Decode any HTML entities the API may return (e.g. &amp; → &) */
-						const ta = document.createElement("textarea");
-						ta.innerHTML = translated;
-						node.textContent = ta.value;
-					}
-				} catch {
-					/* keep original text on network/rate-limit error */
-				}
-			}),
-		);
-	}
-
-	return root.innerHTML;
-}
-
 /* ─── Asset type labels ─── */
 const ASSET_TYPE_LABELS = {
 	table: "Table",

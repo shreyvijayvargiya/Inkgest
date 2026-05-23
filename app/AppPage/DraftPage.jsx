@@ -78,7 +78,9 @@ import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds
 import { buildThemedHTML } from "../../lib/blogExportThemes";
 import { useDraftPageRuntime } from "./hooks/useDraftPageRuntime";
 import { useDraftIconPicker } from "./hooks/useDraftIconPicker";
+import { useDraftTranslation } from "./hooks/useDraftTranslation";
 import DraftIconPickerPortal from "./components/DraftIconPickerPortal";
+import DraftBlockCategoryDropdown from "./components/DraftBlockCategoryDropdown";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import DraftDetailsDrawer from "./components/DraftDetailsDrawer";
 import DraftTitleBlock from "./components/DraftTitleBlock";
@@ -549,6 +551,22 @@ export default function DraftPage() {
 
 		return parts.join("");
 	};
+
+	const draftTranslation = useDraftTranslation({
+		reduxUser,
+		draft,
+		draftId,
+		docSource: docData?.source,
+		editorRef,
+		formatBody,
+		translationLang,
+		setTranslationLang,
+		translatedHTML,
+		setTranslatedHTML,
+		themeDrawerOpen,
+		queryClient,
+		creditRemaining,
+	});
 
 	/* Sync tabs to URL when we have draftId but no tabs query (e.g. direct link) */
 
@@ -1427,52 +1445,96 @@ export default function DraftPage() {
 		];
 		const sep = () => <div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />;
 		const blocksToolbar = (
-				<div ref={blocksMenuRef} className="2xl:mr-40 md:mr-0 sm:mr-0 xxs:mr-0" style={{ display: "flex", alignItems: "center", gap: 0, background: "#ffffff", padding: "0 6px", height: 38, flexShrink: 0 }}>
+			<div
+				ref={blocksMenuRef}
+				className="hidescrollbar flex min-w-0 flex-nowrap items-center gap-0 overflow-x-auto overflow-y-visible"
+				style={{
+					background: "#ffffff",
+					padding: "0 6px",
+					height: 38,
+					flexShrink: 0,
+					WebkitOverflowScrolling: "touch",
+				}}
+			>
 				<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
-					{QUICK_BLOCKS.map((item, i) =>
-						item === null ? <React.Fragment key={`sep-${i}`}>{sep()}</React.Fragment> : (
-							<motion.button key={item.id} type="button" title={item.tip} onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-								style={{ height: 30, minWidth: 30, padding: "0 5px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", color: "#555", cursor: "pointer", flexShrink: 0 }}>
-								{item.svgEl}
-							</motion.button>
-						)
-					)}
-					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
-					{ADV_CATEGORIES.map(cat => {
-						const isOpen = blocksMenuOpen === cat.key;
-						const catItems = DRAFT_SLASH_BASE_ITEMS.filter(i => cat.ids.includes(i.id));
-						return (
-							<div key={cat.key} style={{ position: "relative" }}>
-								<motion.button type="button" onClick={() => setBlocksMenuOpen(v => v === cat.key ? false : cat.key)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-									style={{ height: 30, padding: "0 9px", display: "flex", alignItems: "center", gap: 4, borderRadius: 7, border: "none", background: isOpen ? "#111" : "transparent", color: isOpen ? "#fff" : "#555", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.13s", flexShrink: 0 }}>
-									{cat.label}
-									<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-								</motion.button>
-								<AnimatePresence>
-								{isOpen && (
-									<motion.div initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={{ duration: 0.13 }}
-										style={{ position: "absolute", top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)", minWidth: 180, background: "#fff", border: "1px solid #E2E2E2", borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.1)", zIndex: 300, padding: "6px" }}>
-										{catItems.map(item => (
-											<motion.button key={item.id} type="button" onClick={() => insertBlock(item.id)} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.97 }}
-												style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "7px 10px", borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 13, cursor: "pointer", textAlign: "left", whiteSpace: "nowrap" }}>
-												<span style={{ fontSize: 14, minWidth: 20, textAlign: "center", color: "#888" }}>{item.icon}</span>
-												{item.label}
-											</motion.button>
-										))}
-									</motion.div>
-								)}
-								</AnimatePresence>
-					</div>
-						);
-					})}
-					
-					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />
-					<motion.button type="button" onClick={() => insertBlock("ask-ai")} whileHover={{ background: "#F0F0F0" }} whileTap={{ scale: 0.93 }}
-						style={{ height: 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 5, borderRadius: 7, border: "none", background: "transparent", color: "#111", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-						✦ AI
-					</motion.button>
-					<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
-				</div>
+				{QUICK_BLOCKS.map((item, i) =>
+					item === null ? (
+						<React.Fragment key={`sep-${i}`}>{sep()}</React.Fragment>
+					) : (
+						<motion.button
+							key={item.id}
+							type="button"
+							title={item.tip}
+							onClick={() => insertBlock(item.id)}
+							whileHover={{ background: "#F0F0F0" }}
+							whileTap={{ scale: 0.93 }}
+							style={{
+								height: 30,
+								minWidth: 30,
+								padding: "0 5px",
+								display: "flex",
+								alignItems: "center",
+								justifyContent: "center",
+								borderRadius: 7,
+								border: "none",
+								background: "transparent",
+								color: "#555",
+								cursor: "pointer",
+								flexShrink: 0,
+							}}
+						>
+							{item.svgEl}
+						</motion.button>
+					),
+				)}
+				<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
+				{ADV_CATEGORIES.map((cat) => {
+					const isOpen = blocksMenuOpen === cat.key;
+					const catItems = DRAFT_SLASH_BASE_ITEMS.filter((i) =>
+						cat.ids.includes(i.id),
+					);
+					return (
+						<DraftBlockCategoryDropdown
+							key={cat.key}
+							cat={cat}
+							isOpen={isOpen}
+							onToggle={() =>
+								setBlocksMenuOpen((v) =>
+									v === cat.key ? false : cat.key,
+								)
+							}
+							catItems={catItems}
+							onSelectItem={insertBlock}
+						/>
+					);
+				})}
+				<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 4px", flexShrink: 0 }} />
+				<motion.button
+					type="button"
+					onClick={() => insertBlock("ask-ai")}
+					whileHover={{ background: "#F0F0F0" }}
+					whileTap={{ scale: 0.93 }}
+					style={{
+						height: 30,
+						padding: "0 10px",
+						display: "flex",
+						alignItems: "center",
+						gap: 5,
+						borderRadius: 7,
+						border: "none",
+						background: "transparent",
+						color: "#111",
+						fontSize: 12,
+						fontWeight: 700,
+						cursor: "pointer",
+						whiteSpace: "nowrap",
+						flexShrink: 0,
+					}}
+				>
+					✦ AI
+				</motion.button>
+				<div style={{ width: 1, height: 20, background: "#E2E2E2", margin: "0 6px", flexShrink: 0 }} />
+			</div>
 		);
 		const actionsToolbar = (
 				<div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, ...(compactToolbar ? {} : { marginLeft: "auto" }) }}>
@@ -1645,21 +1707,28 @@ export default function DraftPage() {
 
 		if (compactToolbar) {
 			return (
-				<div
-					className="hidescrollbar flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto pb-px"
-					style={{ WebkitOverflowScrolling: "touch" }}
-				>
-					<div style={{ flexShrink: 0 }}>{blocksToolbar}</div>
+				<div className="flex w-full min-w-0 items-center gap-2">
+					<div
+						className="hidescrollbar min-w-0 flex-1 overflow-x-auto overflow-y-visible pb-px"
+						style={{ WebkitOverflowScrolling: "touch" }}
+					>
+						{blocksToolbar}
+					</div>
 					{actionsToolbar}
 				</div>
 			);
 		}
 
 		return (
-			<>
-				{blocksToolbar}
+			<div className="flex min-w-0 flex-1 items-center gap-2">
+				<div
+					className="hidescrollbar min-w-0 flex-1 overflow-x-auto overflow-y-visible"
+					style={{ WebkitOverflowScrolling: "touch" }}
+				>
+					{blocksToolbar}
+				</div>
 				{actionsToolbar}
-			</>
+			</div>
 		);
 	};
 	
@@ -1833,13 +1902,19 @@ export default function DraftPage() {
 				)}
 
 				{draft && !(compactAssetsNav && draft) && (
+					<div
+						className="min-w-0 flex-1 overflow-visible"
+						style={{ display: "flex", alignItems: "center" }}
+					>
 						<TopToolbar draft={draft} compactToolbar={false} />
-					)}
+					</div>
+				)}
 
 				</div>
 
 				{compactAssetsNav && draft && (
 					<div
+						className="overflow-x-auto overflow-y-visible"
 						style={{
 							display: "flex",
 							alignItems: "center",
@@ -1850,7 +1925,7 @@ export default function DraftPage() {
 							paddingTop: 2,
 							paddingBottom: 8,
 							minWidth: 0,
-							overflow: "hidden",
+							WebkitOverflowScrolling: "touch",
 						}}
 					>
 						<TopToolbar draft={draft} compactToolbar />
@@ -2798,6 +2873,7 @@ export default function DraftPage() {
 					setPreviewTheme,
 					translatedHTML,
 					translationLang,
+					setTranslationLang,
 					themeExportOpen,
 					setThemeExportOpen,
 					themeExportRef,
@@ -2811,6 +2887,15 @@ export default function DraftPage() {
 					getPublicUrl,
 					onCopyThemeHTML: handleCopyThemeHTML,
 					onCopyThemeReact: handleCopyThemeReact,
+					onTranslate: draftTranslation.handleTranslate,
+					onSaveTranslation: draftTranslation.handleSaveTranslation,
+					onShowOriginal: draftTranslation.handleShowOriginal,
+					translating: draftTranslation.translating,
+					savingTranslation: draftTranslation.savingTranslation,
+					translationError: draftTranslation.translationError,
+					translationSaved: draftTranslation.translationSaved,
+					savedLangs: draftTranslation.savedLangs,
+					creditEstimate: draftTranslation.creditEstimate,
 				}}
 				exportThemes={{
 					open: translationModalOpen,

@@ -77,6 +77,30 @@ const SCRAPE_TOOLS = [
 	},
 ];
 
+const TRANSLATE_TOOL = {
+	type: "function",
+	function: {
+		name: "translate_text",
+		description:
+			"Translate markdown or plain text to a target language via Inkgest (costs credits by word count). Use when the user asks to translate your reply, their message, editor context, or scraped content. Pass the full text to translate and a target language (ISO code like es, fr, or API name like spanish, french). Do not use for trivial one-word requests unless the user explicitly wants translation.",
+		parameters: {
+			type: "object",
+			properties: {
+				text: {
+					type: "string",
+					description: "Markdown or plain text to translate (include the full passage).",
+				},
+				language: {
+					type: "string",
+					description:
+						"Target language — ISO 639-1 code (es, fr, de, …) or API label (spanish, french, german, …).",
+				},
+			},
+			required: ["text", "language"],
+		},
+	},
+};
+
 const GENERATE_MERMAID_TOOL = {
 	type: "function",
 	function: {
@@ -145,6 +169,7 @@ const GENERATE_INFOGRAPHICS_TOOL = {
 
 const WEB_INGEST_TOOLS = [
 	...SCRAPE_TOOLS,
+	TRANSLATE_TOOL,
 	GENERATE_INFOGRAPHICS_TOOL,
 	GENERATE_MERMAID_TOOL,
 ];
@@ -159,6 +184,7 @@ TOOLS — Page content:
 • generate_infographics runs on the server (OpenRouter JSON → panels); after it succeeds, summarise what was generated and invite the author to inspect or drag panels into their draft.
 • Call **generate_mermaid** when the user wants a native Mermaid diagram (flowcharts, sequences, state/ER sketches). Pass **brief**, **source_text** from context/scrapes when available. After success, invite them to insert from the chat card into the draft.
 • generate_mermaid returns server-validated Mermaid source — never paste fictional URLs as links.
+• Call **translate_text** when the user wants content in another language — pass the full **text** (your last reply, their message, editor excerpt, or scrape) and **language** (e.g. es, spanish, french). The UI shows the translation inline in the chat with a copy button; mention that in a short note after calling the tool.
 
 Rules:
 • Be direct and concise. No filler phrases like "Certainly!" or "Great question!".
@@ -198,7 +224,7 @@ AGENT MODE — Inkgest workspace (client-executed tools):
 • search_user_assets — fuzzy search the user's drafts and tables by title/preview. Use when they ask to find a note, draft, or "that table about X".
 • read_user_asset — load stored content for one asset id from search results. Drafts return markdown body (truncated in tool result). Tables return a short JSON summary of columns/rows.
 • propose_create_draft — when the user wants a **new** draft/note/blog **saved to their library**. Put the **entire** article in bodyMarkdown and a clear title. The app will show **Approve / Decline**; nothing is saved until they approve. You may still write a short reply in normal text.
-• You still have scrape_url / scrape_urls / scrape_youtube, **generate_infographics**, and **generate_mermaid** when they want visuals from web or grounded text.
+• You still have scrape_url / scrape_urls / scrape_youtube, **translate_text**, **generate_infographics**, and **generate_mermaid** when they want visuals from web or grounded text.
 
 Rules for propose_create_draft:
 • Call it when the user asks for a **new** saved item: e.g. "save as draft", "new blog", "add to my library", "create a post from this link", or summarize a pasted URL **into** something they keep.
@@ -212,7 +238,7 @@ ASK MODE — User's saved library (same as Agent for search/read):
 • read_user_asset — load one asset by id from search_user_assets results to quote or summarise it.
 • Do **not** use scrape_url / scrape_urls to "find" the user's drafts — scraping is only for **public https URLs** the user pasted or when they explicitly want live web page text.
 • For **YouTube** links, use **scrape_youtube** (not scrape_url) for the transcript.
-• You still may use scrape_url / scrape_urls when they share a non-YouTube link or ask about a website — **generate_infographics** for infographic panels, **generate_mermaid** for diagram syntax blocks from grounded text.`;
+• You still may use scrape_url / scrape_urls when they share a non-YouTube link or ask about a website — **translate_text** when they want another language — **generate_infographics** for infographic panels, **generate_mermaid** for diagram syntax blocks from grounded text.`;
 
 const AGENT_TOOLS = [
 	{
