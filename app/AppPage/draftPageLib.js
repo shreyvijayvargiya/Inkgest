@@ -1,52 +1,15 @@
-import React, {
-	useState,
-	useRef,
-	useEffect,
-	useLayoutEffect,
-	useMemo,
-} from "react";
-import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/router";
-import { useSelector } from "react-redux";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import LoginModal from "../../lib/ui/LoginModal";
-import AIChatSidebar from "../../lib/ui/AIChatSidebar";
-import AnimatedDropdown from "../../lib/ui/AnimatedDropdown";
-import {
-	listAssets,
-	getAsset,
-	updateAsset,
-	deleteAsset,
-} from "../../lib/api/userAssets";
-import { uploadFile } from "../../lib/api/upload";
-import { uploadInlineImagesToUploadThing } from "../../lib/fileUpload";
-import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
+import React from "react";
 import { getTheme } from "../../lib/utils/theme";
-import { formatInkDateLong, TiptapSlashDatePicker } from "../../lib/ui/TiptapSlashDatePicker.jsx";
-import { htmlToMarkdown } from "../../lib/utils/htmlToMarkdown";
-import normalizeYoutubeEmbedsInHtml from "../../lib/utils/normalizeYoutubeEmbeds";
-import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
-import InfographicInlineGeneratePanel from "../../lib/ui/InfographicInlineGeneratePanel";
-import MermaidInlineGeneratePanel from "../../lib/ui/MermaidInlineGeneratePanel";
-import MotionSelect from "../../lib/ui/MotionSelect";
+import { formatInkDateLong } from "../../lib/ui/TiptapSlashDatePicker.jsx";
+import { lucideToSvgString } from "../../lib/ui/IconSelectorDropdown.jsx";
+import SidebarAssetCard from "../../lib/ui/SidebarAssetCard.jsx";
 import {
-	tryInsertInfographicFromDragData,
-	INK_INFOGRAPHIC_DRAG_MIME,
-	insertInfographicAfterCollapsedRange,
-} from "../../lib/ui/infographicInsertion";
-import {
-	tryInsertMermaidFromDragData,
-	insertMermaidAfterCollapsedRange,
-} from "../../lib/ui/mermaidInsertion";
-import { useMermaidHydrateEditorRoot } from "../../lib/hooks/useMermaidHydrateEditorRoot";
-import IconSelectorDropdown, { lucideToSvgString } from "../../lib/ui/IconSelectorDropdown.jsx";
-import {
-	THEMES,
+	THEMES,	
 	buildThemedHTML,
 	parseInlineMarkdown,
 	resolvePublicThemeId,
 } from "../../lib/blogExportThemes";
+import { Annoyed, AudioLinesIcon, BetweenHorizonalStart, Calendar1Icon, CheckIcon, Code2, CodeSquare, IdCard, IdCardIcon, ImageIcon, ListCheck, ListIcon, Music2Icon, Table2Icon, ToggleLeft, ToggleRightIcon, YoutubeIcon } from "lucide-react";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
@@ -322,153 +285,14 @@ const ASSET_TYPE_LABELS = {
 };
 
 /* ─── Item card in sidebar (drafts + tables + assets) ─── */
-function ItemCard({ item, active, onClick, onDelete }) {
-	const [hovering, setHovering] = useState(false);
-	const isTable = item.type === "table";
-	const isAssetWithDesc = [
-		"table",
-		"infographics",
-		"landing_page",
-		"image_gallery",
-	].includes(item.type);
-	const tag = ASSET_TYPE_LABELS[item.type] || item.tag || "Draft";
-	const preview = isAssetWithDesc ? item.description || "" : item.preview || "";
-	const meta = isTable ? "" : `${item.words ?? 0}w`;
-	const date = item.date
-		? typeof item.date === "string"
-			? item.date
-			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
-					weekday: "short",
-					month: "short",
-					day: "numeric",
-				}) ?? "")
-		: "";
+function ItemCard(props) {
 	return (
-		<motion.div
-			layout
-			initial={{ opacity: 0, x: -12 }}
-			animate={{ opacity: 1, x: 0 }}
-			exit={{ opacity: 0, x: -12, scale: 0.95 }}
-			whileHover={{ x: 2 }}
-			transition={{ duration: 0.22 }}
-			onHoverStart={() => setHovering(true)}
-			onHoverEnd={() => setHovering(false)}
-			onClick={onClick}
-			style={{
-				background: active ? T.surface : "transparent",
-				border: `1px solid ${active ? T.border : "transparent"}`,
-				borderRadius: 10,
-				padding: "12px 14px",
-				cursor: "pointer",
-				boxShadow: active ? "0 1px 8px rgba(0,0,0,0.07)" : "none",
-				position: "relative",
-				marginBottom: 4,
-				transition: "background 0.15s, border-color 0.15s",
-			}}
-		>
-			{active && (
-				<motion.div
-					layoutId="active-pill"
-					style={{
-						position: "absolute",
-						left: 0,
-						top: "50%",
-						transform: "translateY(-50%)",
-						width: 3,
-						height: 32,
-						background: T.warm,
-						borderRadius: "0 3px 3px 0",
-					}}
-				/>
-			)}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "flex-start",
-					justifyContent: "space-between",
-					gap: 8,
-				}}
-			>
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<p
-						style={{
-							fontSize: 13,
-							fontWeight: 600,
-							color: T.accent,
-							lineHeight: 1.4,
-							marginBottom: 4,
-							overflow: "hidden",
-							display: "-webkit-box",
-							WebkitLineClamp: 2,
-							WebkitBoxOrient: "vertical",
-						}}
-					>
-						{item.title || "Untitled"}
-					</p>
-					<p
-						style={{
-							fontSize: 11.5,
-							color: T.muted,
-							lineHeight: 1.5,
-							overflow: "hidden",
-							display: "-webkit-box",
-							WebkitLineClamp: 2,
-							WebkitBoxOrient: "vertical",
-							marginBottom: 6,
-						}}
-					>
-						{preview}
-					</p>
-					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-						<span
-							style={{
-								fontSize: 10.5,
-								fontWeight: 600,
-								background: "#F0ECE5",
-								color: T.muted,
-								padding: "2px 7px",
-								borderRadius: 100,
-							}}
-						>
-							{tag}
-						</span>
-						{meta && (
-							<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
-						)}
-						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
-						{date && (
-							<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
-						)}
-					</div>
-				</div>
-				<AnimatePresence>
-					{hovering && (
-						<motion.button
-							initial={{ opacity: 0, scale: 0.8 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.8 }}
-							onClick={(e) => {
-								e.stopPropagation();
-								onDelete(item.id);
-							}}
-							style={{
-								background: "none",
-								border: "none",
-								cursor: "pointer",
-								padding: 4,
-								borderRadius: 6,
-								flexShrink: 0,
-								color: "#EF4444",
-								transition: "background 0.15s",
-							}}
-							whileHover={{ background: "#FEE2E2" }}
-						>
-							<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-						</motion.button>
-					)}
-				</AnimatePresence>
-			</div>
-		</motion.div>
+		<SidebarAssetCard
+			{...props}
+			typeLabels={ASSET_TYPE_LABELS}
+			Icon={Icon}
+			Icons={Icons}
+		/>
 	);
 }
 
@@ -1553,31 +1377,31 @@ const DRAFT_SLASH_BASE_ITEMS = [
 	{ id: "h3",       label: "Heading 3",     icon: "H₃",   section: "style",  subSection: "Typography",  keywords: ["h3", "heading", "three", "3"] },
 	{ id: "quote",    label: "Quote",         icon: "❝",    section: "style",  subSection: "Typography",  keywords: ["quote", "blockquote", "pull", "bq"] },
 	/* ── Lists ── */
-	{ id: "bullet",   label: "Bullet List",   icon: "list", section: "style",  subSection: "Lists",       keywords: ["bullet", "ul", "unordered", "list"] },
-	{ id: "numbered", label: "Numbered List", icon: "list", section: "style",  subSection: "Lists",       keywords: ["numbered", "ordered", "ol", "list"] },
-	{ id: "todo",     label: "To-do List",    icon: "☐",    section: "style",  subSection: "Lists",       keywords: ["todo", "task", "check", "list", "checkbox", "checklist"] },
+	{ id: "bullet",   label: "Bullet List",   icon: <ListCheck />, section: "style",  subSection: "Lists",       keywords: ["bullet", "ul", "unordered", "list"] },
+	{ id: "numbered", label: "Numbered List", icon: <ListIcon />, section: "style",  subSection: "Lists",       keywords: ["numbered", "ordered", "ol", "list"] },
+	{ id: "todo",     label: "To-do List",    icon: <CheckIcon />,    section: "style",  subSection: "Lists",       keywords: ["todo", "task", "check", "list", "checkbox", "checklist"] },
 	/* ── Media ── */
-	{ id: "image",    label: "Image",         icon: "image",  section: "blocks", subSection: "Media",     keywords: ["image", "img", "photo", "picture", "upload"] },
-	{ id: "embed",    label: "Embed",           icon: "embed", section: "blocks", subSection: "Media",    keywords: ["embed", "youtube", "twitter", "x", "instagram", "reddit", "tiktok", "spotify", "vimeo", "loom", "figma", "video", "social", "iframe"] },
-	{ id: "audio",    label: "Audio File",    icon: "♪",    section: "blocks", subSection: "Media",       keywords: ["audio", "music", "mp3", "sound", "track", "podcast"] },
-	{ id: "record",   label: "Record Audio",  icon: "⏺",    section: "blocks", subSection: "Media",       keywords: ["record", "recording", "microphone", "mic", "voice", "capture"] },
+	{ id: "image",    label: "Image",         icon: <ImageIcon />,  section: "blocks", subSection: "Media",     keywords: ["image", "img", "photo", "picture", "upload"] },
+	{ id: "embed",    label: "Embed",           icon: <YoutubeIcon />, section: "blocks", subSection: "Media",    keywords: ["embed", "youtube", "twitter", "x", "instagram", "reddit", "tiktok", "spotify", "vimeo", "loom", "figma", "video", "social", "iframe"] },
+	{ id: "audio",    label: "Audio File",    icon: <Music2Icon />,    section: "blocks", subSection: "Media",       keywords: ["audio", "music", "mp3", "sound", "track", "podcast"] },
+	{ id: "record",   label: "Record Audio",  icon: <AudioLinesIcon />,    section: "blocks", subSection: "Media",       keywords: ["record", "recording", "microphone", "mic", "voice", "capture"] },
 	/* ── Data ── */
-	{ id: "table",    label: "Table",         icon: "table", section: "blocks", subSection: "Data",       keywords: ["table", "grid", "rows", "sheet", "csv"] },
-	{ id: "date",     label: "Date",          icon: "📅",    section: "blocks", subSection: "Data",        keywords: ["date", "today", "calendar", "time"] },
+	{ id: "table",    label: "Table",         icon: <Table2Icon />, section: "blocks", subSection: "Data",       keywords: ["table", "grid", "rows", "sheet", "csv"] },
+	{ id: "date",     label: "Date",          icon: <Calendar1Icon />,    section: "blocks", subSection: "Data",        keywords: ["date", "today", "calendar", "time"] },
 	/* ── Components ── */
-	{ id: "card",         label: "Card",               icon: "▭", section: "blocks", subSection: "Components", keywords: ["card", "box", "panel", "feature", "icon card"] },
-	{ id: "toggle-group", label: "Toggle Group (FAQ)", icon: "☰", section: "blocks", subSection: "Components", keywords: ["faq", "toggle group", "accordion", "collapse", "questions"] },
-	{ id: "toggle",       label: "Toggle",             icon: "▸", section: "blocks", subSection: "Components", keywords: ["toggle", "details", "collapse", "accordion", "disclosure"] },
-	{ id: "tabs",         label: "Tabs",               icon: "▦", section: "blocks", subSection: "Components", keywords: ["tabs", "tab", "panels", "tabgroup"] },
-	{ id: "icon-block",   label: "Icon",               icon: "✦", section: "blocks", subSection: "Components", keywords: ["icon", "emoji", "symbol", "glyph", "svg"] },
+	{ id: "card",         label: "Card",               icon: <IdCardIcon />, section: "blocks", subSection: "Components", keywords: ["card", "box", "panel", "feature", "icon card"] },
+	{ id: "toggle-group", label: "Toggle Group (FAQ)", icon: <ToggleLeft />, section: "blocks", subSection: "Components", keywords: ["faq", "toggle group", "accordion", "collapse", "questions"] },
+	{ id: "toggle",       label: "Toggle",             icon: <ToggleRightIcon />, section: "blocks", subSection: "Components", keywords: ["toggle", "details", "collapse", "accordion", "disclosure"] },
+	{ id: "tabs",         label: "Tabs",               icon: <BetweenHorizonalStart />, section: "blocks", subSection: "Components", keywords: ["tabs", "tab", "panels", "tabgroup"] },
+	{ id: "icon-block",   label: "Icon",               icon:<Annoyed />, section: "blocks", subSection: "Components", keywords: ["icon", "emoji", "symbol", "glyph", "svg"] },
 	/* ── Callouts ── */
 	{ id: "callout-info",    label: "Info Callout",    icon: "ℹ️",  section: "blocks", subSection: "Callouts", keywords: ["info", "information", "note", "blue", "tip"] },
 	{ id: "callout-warning", label: "Warning Callout", icon: "⚠️",  section: "blocks", subSection: "Callouts", keywords: ["callout", "warning", "caution", "attention"] },
 	{ id: "callout-success", label: "Success Callout", icon: "✅",  section: "blocks", subSection: "Callouts", keywords: ["success", "done", "green", "check", "positive"] },
 	{ id: "callout-danger",  label: "Danger Callout",  icon: "🚨",  section: "blocks", subSection: "Callouts", keywords: ["danger", "error", "red", "alert", "critical"] },
 	/* ── Code ── */
-	{ id: "code",      label: "Code Block", icon: "{ }", section: "blocks", subSection: "Code", keywords: ["code", "codeblock", "snippet", "pre", "program"] },
-	{ id: "codeGroup", label: "Code Group", icon: "▤",   section: "blocks", subSection: "Code", keywords: ["codegroup", "code group", "snippets", "multi", "gist"] },
+	{ id: "code",      label: "Code Block", icon: <Code2 />, section: "blocks", subSection: "Code", keywords: ["code", "codeblock", "snippet", "pre", "program"] },
+	{ id: "codeGroup", label: "Code Group", icon: <CodeSquare />,   section: "blocks", subSection: "Code", keywords: ["codegroup", "code group", "snippets", "multi", "gist"] },
 	/* ── Dividers ── */
 	{ id: "divider",        label: "Solid Line",  icon: "—",   section: "blocks", subSection: "Dividers", keywords: ["divider", "horizontal", "hr", "rule", "separator", "solid"] },
 	{ id: "divider-dashed", label: "Dashed Line", icon: "╌",   section: "blocks", subSection: "Dividers", keywords: ["divider", "dashed", "hr", "separator", "line"] },

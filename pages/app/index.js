@@ -9,6 +9,7 @@ import {
 	listAssets,
 	createDraft,
 	deleteAsset,
+	updateAsset,
 } from "../../lib/api/userAssets";
 import {
 	getUserCredits,
@@ -23,6 +24,7 @@ import { persistGenerateResponse } from "../../lib/utils/persistGenerateResponse
 import { requestGenerate } from "../../lib/api/generateClient";
 import { listCanvasProjects } from "../../lib/api/canvasProjects";
 import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
+import SidebarAssetCard from "../../lib/ui/SidebarAssetCard";
 import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
 
 /* ─── Fonts ─── */
@@ -316,168 +318,6 @@ function groupSidebarByProject(items, projects) {
 		: [{ id: "_all", name: "All assets", items }];
 }
 
-function SidebarItemCard({
-	item,
-	active,
-	onClick,
-	onDelete,
-}) {
-	const [hovering, setHovering] = useState(false);
-	const isAssetWithDesc = [
-		"table",
-		"infographics",
-		"landing_page",
-		"image_gallery",
-	].includes(item.type);
-	const tag = SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft";
-	const preview = isAssetWithDesc ? item.description || "" : item.preview || "";
-	const meta = isAssetWithDesc ? "" : `${item.words ?? 0}w`;
-	const date = item.date
-		? typeof item.date === "string"
-			? item.date
-			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
-					weekday: "short",
-					month: "short",
-					day: "numeric",
-				}) ?? "")
-		: "";
-	return (
-		<motion.div
-			layout
-			initial={{ opacity: 0, x: -12 }}
-			animate={{ opacity: 1, x: 0 }}
-			exit={{ opacity: 0, x: -12, scale: 0.95 }}
-			whileHover={{ x: 2 }}
-			transition={{ duration: 0.22 }}
-			onHoverStart={() => setHovering(true)}
-			onHoverEnd={() => setHovering(false)}
-			onClick={onClick}
-			style={{
-				background: active ? T.surface : "transparent",
-				border: `1px solid ${active ? T.border : "transparent"}`,
-				borderRadius: 10,
-				padding: "12px 14px",
-				cursor: "pointer",
-				boxShadow: active ? "0 1px 8px rgba(0,0,0,0.07)" : "none",
-				position: "relative",
-				marginBottom: 4,
-				transition: "background 0.15s, border-color 0.15s",
-			}}
-		>
-			{active && (
-				<motion.div
-					layoutId="active-pill"
-					style={{
-						position: "absolute",
-						left: 0,
-						top: "50%",
-						transform: "translateY(-50%)",
-						width: 3,
-						height: 32,
-						background: T.warm,
-						borderRadius: "0 3px 3px 0",
-					}}
-				/>
-			)}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "flex-start",
-					justifyContent: "space-between",
-					gap: 8,
-				}}
-			>
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<p
-						style={{
-							fontSize: 13,
-							fontWeight: 600,
-							color: T.accent,
-							lineHeight: 1.4,
-							marginBottom: 4,
-							overflow: "hidden",
-							display: "-webkit-box",
-							WebkitLineClamp: 2,
-							WebkitBoxOrient: "vertical",
-						}}
-					>
-						{item.title || "Untitled"}
-					</p>
-					<p
-						style={{
-							fontSize: 11.5,
-							color: T.muted,
-							lineHeight: 1.5,
-							overflow: "hidden",
-							display: "-webkit-box",
-							WebkitLineClamp: 2,
-							WebkitBoxOrient: "vertical",
-							marginBottom: 6,
-						}}
-					>
-						{preview}
-					</p>
-					<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-						<span
-							style={{
-								fontSize: 10.5,
-								fontWeight: 600,
-								background: "#F0ECE5",
-								color: T.muted,
-								padding: "2px 7px",
-								borderRadius: 100,
-							}}
-						>
-							{tag}
-						</span>
-						{meta && (
-							<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
-						)}
-						{meta && <span style={{ fontSize: 10.5, color: T.muted }}>·</span>}
-						{date && (
-							<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
-						)}
-					</div>
-				</div>
-				<AnimatePresence>
-					{hovering && (
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 2,
-								flexShrink: 0,
-							}}
-						>
-							<motion.button
-								initial={{ opacity: 0, scale: 0.8 }}
-								animate={{ opacity: 1, scale: 1 }}
-								exit={{ opacity: 0, scale: 0.8 }}
-								onClick={(e) => {
-									e.stopPropagation();
-									onDelete(item.id);
-								}}
-								style={{
-									background: "none",
-									border: "none",
-									cursor: "pointer",
-									padding: 4,
-									borderRadius: 6,
-									flexShrink: 0,
-									color: "#EF4444",
-									transition: "background 0.15s",
-								}}
-								whileHover={{ background: "#FEE2E2" }}
-							>
-								<Icon d={Icons.trash} size={14} stroke="#EF4444" />
-							</motion.button>
-						</div>
-					)}
-				</AnimatePresence>
-			</div>
-		</motion.div>
-	);
-}
 
 /* ─── Main App ─── */
 export default function inkgestApp() {
@@ -623,6 +463,24 @@ export default function inkgestApp() {
 
 	const handleDelete = (id) => {
 		setDeleteConfirm(id);
+	};
+
+	const handleSidebarIconChange = async (assetId, sidebarIcon) => {
+		if (!reduxUser) return;
+		const item = sidebarItems.find((i) => i.id === assetId);
+		const isAssetType = [
+			"table",
+			"infographics",
+			"landing_page",
+			"image_gallery",
+		].includes(item?.type);
+		const source = item?.source || (isAssetType ? "assets" : "drafts");
+		try {
+			await updateAsset(reduxUser.uid, assetId, { sidebarIcon }, source);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+		} catch (e) {
+			console.error("Sidebar icon update failed", e);
+		}
 	};
 
 	const confirmDelete = async () => {
@@ -980,10 +838,14 @@ export default function inkgestApp() {
 													</p>
 												)}
 												{section.items.map((item) => (
-													<SidebarItemCard
+													<SidebarAssetCard
 														key={item.id}
 														item={item}
 														active={false}
+														typeLabels={SIDEBAR_ASSET_LABELS}
+														Icon={Icon}
+														Icons={Icons}
+														onIconChange={handleSidebarIconChange}
 														onClick={() => {
 															router.push(`/app/${item.id}`);
 															if (compactAssetsNav)

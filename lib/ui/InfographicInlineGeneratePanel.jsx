@@ -96,8 +96,9 @@ export default function InfographicInlineGeneratePanel({
 	const baseTrim = String(sourceText || "").trim();
 
 	return (
-		<div style={{ padding: "10px 0 0", minWidth: 280, maxWidth: 360 }}>
-			<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, margin: "0 0 6px" }}>
+		<div className="p-2">
+			<p className="text-sm text-zinc-500 mb-2">Add Infographics</p>
+			<p className="text-xs text-zinc-500 mb-2">
 				Prompt <span style={{ fontWeight: 500 }}>(optional)</span>
 			</p>
 			<input
@@ -121,8 +122,8 @@ export default function InfographicInlineGeneratePanel({
 					outline: "none",
 				}}
 			/>
-			<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, margin: "0 0 8px" }}>
-				Creative direction
+			<p className="text-xs text-zinc-500 mb-2">
+				Select format
 			</p>
 			<MotionSelect
 				value={formatId}
@@ -137,7 +138,6 @@ export default function InfographicInlineGeneratePanel({
 				triggerStyle={{
 					width: "100%",
 					fontSize: 12,
-					fontWeight: 600,
 					padding: "8px 10px",
 					borderRadius: 8,
 					border: `1px solid ${T.border}`,
@@ -151,7 +151,6 @@ export default function InfographicInlineGeneratePanel({
 				}}
 				optionStyle={{
 					color: T.accent,
-					fontWeight: 600,
 				}}
 			/>
 

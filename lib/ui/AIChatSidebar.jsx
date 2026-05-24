@@ -787,7 +787,7 @@ export default function AIChatSidebar({
 	const [messages, setMessages] = useState([{
 		id: "w0", role: "assistant", done: true,
 		content:
-			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** — it appears as a chip above the box and I'll scrape it with the Inkgest API. **Paste or attach images** (chips with preview); vision is coming soon, but filenames are included for context. Ask for **infographics**, **Mermaid diagrams**, or **translations** from your draft or scraped text. When you like a response use **Insert**, **Append**, or **Replace**.",
+			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** — it appears as a chip above the box and I'll scrape it with the Inkgest API. **Paste or attach images** (chips with preview); vision is coming soon, but filenames are included for context. Ask for **infographics**, **Mermaid diagrams**, or **translations** from your draft or scraped text",
 		chatTranslations: [],
 	}]);
 	const [input, setInput]         = useState("");
@@ -2135,54 +2135,7 @@ export default function AIChatSidebar({
 							{/* ── Messages area ── */}
 							<div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 8px" }}>
 
-								{/* Starter prompts — shown only on welcome screen */}
-								{messages.length === 1 && (
-									<motion.div
-										initial={{ opacity: 0, y: 8 }}
-										animate={{ opacity: 1, y: 0 }}
-										transition={{ delay: 0.18 }}
-										style={{ marginBottom: 18 }}
-									>
-										<p style={{
-											fontSize: 10.5, fontWeight: 700,
-											textTransform: "", letterSpacing: "0.1em",
-											color: "#B0AAA3", marginBottom: 8,
-										}}>
-											Try asking…
-										</p>
-										<div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-											{STARTERS.map((s, i) => (
-												<motion.button
-													key={i}
-													initial={{ opacity: 0, x: -8 }}
-													animate={{ opacity: 1, x: 0 }}
-													transition={{ delay: i * 0.05 + 0.22 }}
-													whileHover={{ background: "#F5F2EC", x: 2 }}
-													onClick={() => send(s.q)}
-													style={{
-														background: "#FFFFFF",
-														border: "1px solid #E8E4DC",
-														borderRadius: 9, padding: "8px 11px",
-														fontSize: 12, cursor: "pointer",
-														textAlign: "left", display: "flex",
-														alignItems: "center", gap: 8,
-														transition: "all 0.14s",
-													}}
-												>
-													<span style={{ fontSize: 14, flexShrink: 0 }}>{s.e}</span>
-													<span style={{ fontWeight: 600, color: "#5A5550", flexShrink: 0 }}>{s.l}</span>
-													<span style={{
-														color: "#A8A29C", fontSize: 11, flex: 1,
-														overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-													}}>
-														{s.q.length > 52 ? s.q.slice(0, 52) + "…" : s.q}
-													</span>
-												</motion.button>
-											))}
-										</div>
-									</motion.div>
-								)}
-
+								
 								{/* Message list */}
 								<AnimatePresence initial={false}>
 									{messages.map(msg => (

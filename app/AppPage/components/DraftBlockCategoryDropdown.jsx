@@ -1,5 +1,4 @@
 import { useRef, useLayoutEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 const MENU_MIN_WIDTH = 180;

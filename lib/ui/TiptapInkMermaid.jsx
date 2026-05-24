@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
-import { Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 
-function InkMermaidView({ node, updateAttributes, editor, getPos }) {
+function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 	const code = node.attrs.code || "";
 	const caption = node.attrs.caption || "";
 	const svgHostRef = useRef(null);
@@ -56,21 +56,25 @@ function InkMermaidView({ node, updateAttributes, editor, getPos }) {
 
 	return (
 		<NodeViewWrapper
-			className="my-6 ink-mermaid-node-view"
+			className="my-6 ink-mermaid-node-view group"
 			data-node-type="inkMermaidBlock"
 			contentEditable={false}
 		>
-			<div className="rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
-				<div className="flex items-center justify-between gap-2 px-3 py-2 bg-zinc-50 border-b border-zinc-200">
+			<div className="relative rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+				<button
+					type="button"
+					onClick={deleteNode}
+					onMouseDown={(e) => e.preventDefault()}
+					title="Remove diagram"
+					className={`absolute top-2 right-2 z-10 p-1.5 rounded-full bg-white/95 border border-zinc-200 shadow-sm text-zinc-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-opacity ${
+						selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+					}`}
+				>
+					<X className="w-3.5 h-3.5" />
+					<span className="sr-only">Remove diagram</span>
+				</button>
+				<div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 border-b border-zinc-200">
 					<span className={chipStyle}>Mermaid</span>
-					<button
-						type="button"
-						onClick={deleteNode}
-						className="p-1 rounded-md hover:bg-red-50 text-red-600"
-						title="Remove diagram"
-					>
-						<Trash2 className="w-3.5 h-3.5" />
-					</button>
 				</div>
 				{caption ? (
 					<p className="text-xs text-zinc-600 px-3 pt-2 pb-1">{caption}</p>

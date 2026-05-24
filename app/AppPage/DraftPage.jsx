@@ -205,8 +205,6 @@ export default function DraftPage() {
 	const [recordingMode, setRecordingMode] = useState("audio"); // "audio" | "text"
 	const [transcriptFinal, setTranscriptFinal] = useState("");
 	const [transcriptInterim, setTranscriptInterim] = useState("");
-	const [selectionLinkOpen, setSelectionLinkOpen] = useState(false);
-	const [selectionLinkText, setSelectionLinkText] = useState("");
 	const mediaRecorderRef = useRef(null);
 	const recordingChunksRef = useRef([]);
 	const recordingStreamRef = useRef(null);
@@ -263,13 +261,6 @@ export default function DraftPage() {
 	const imageFileInputRef = useRef(null);
 	const handleSlashCommandRef = useRef(() => {});
 	const editorContainerRef = useRef(null);
-
-
-
-
-
-
-
 
 	/* All assets (drafts + tables) — from users/uid/assets or fallback to drafts+tables */
 	const { data: items = [] } = useQuery({
@@ -1303,6 +1294,23 @@ export default function DraftPage() {
 
 	const handleDelete = (id) => setDeleteConfirm(id);
 
+	const handleSidebarIconChange = async (assetId, sidebarIcon) => {
+		if (!reduxUser) return;
+		const item = items.find((i) => i.id === assetId);
+		const isAsset =
+			["infographics", "landing_page", "image_gallery"].includes(item?.type) ||
+			tables.some((t) => t.id === assetId);
+		const source =
+			item?.source ||
+			(isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
+		try {
+			await updateAsset(reduxUser.uid, assetId, { sidebarIcon }, source);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+		} catch (e) {
+			console.error("Sidebar icon update failed", e);
+		}
+	};
+
 	const confirmDelete = async () => {
 		try {
 			const item = items.find((i) => i.id === deleteConfirm);
@@ -2089,6 +2097,7 @@ export default function DraftPage() {
 												key={d.id}
 												item={d}
 												active={d.id === draftId}
+												onIconChange={handleSidebarIconChange}
 												onClick={() => {
 													openDraftInTab(d.id);
 													if (compactAssetsNav)
@@ -2790,15 +2799,14 @@ export default function DraftPage() {
 									setSelectionDropdown={setSelectionDropdown}
 									selectionSubtool={selectionSubtool}
 									setSelectionSubtool={setSelectionSubtool}
-									selectionLinkOpen={selectionLinkOpen}
-									setSelectionLinkOpen={setSelectionLinkOpen}
 									selectionLinkUrl={selectionLinkUrl}
 									setSelectionLinkUrl={setSelectionLinkUrl}
-									selectionLinkText={selectionLinkText}
-									setSelectionLinkText={setSelectionLinkText}
+									selectionLinkInputRef={selectionLinkInputRef}
 									setSelectionContext={setSelectionContext}
 									setChatOpen={setChatOpen}
 									editorRef={editorRef}
+									titleRef={titleRef}
+									draft={draft}
 									restoreEditorSelection={restoreEditorSelection}
 									selectionSavedRangeRef={selectionSavedRangeRef}
 									countWords={countWords}
@@ -2809,7 +2817,6 @@ export default function DraftPage() {
 									openIconPickerAtPoint={openIconPickerAtPoint}
 									iconPicker={iconPicker}
 									closeIconPicker={closeIconPicker}
-									draftSelectionSpansMultipleBlocks={draftSelectionSpansMultipleBlocks}
 									getSelectionLinkContext={getSelectionLinkContext}
 								/>
 

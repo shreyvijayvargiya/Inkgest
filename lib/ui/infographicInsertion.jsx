@@ -20,7 +20,7 @@ export function buildInfographicDomWidget(spec) {
 	iframe.setAttribute("data-ink-infographic", "1");
 	iframe.title = String(spec?.title || spec?.type || "Infographic");
 	iframe.style.cssText =
-		"width:100%;min-height:440px;border:0;border-radius:12px;display:block;margin:18px auto;max-width:560px;";
+		"width:-webkit-fill-available;min-height:440px;border:0;border-radius:12px;display:block;margin:18px auto;max-width:560px;";
 	iframe.sandbox =
 		"allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 	iframe.loading = "lazy";

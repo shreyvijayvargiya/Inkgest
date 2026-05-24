@@ -180,7 +180,6 @@ export default function MotionSelect({
 									background:
 										opt.value === value ? "rgba(193, 123, 47, 0.12)" : "transparent",
 									fontSize: 12,
-									fontWeight: 600,
 									color: "#1A1A1A",
 									cursor: "pointer",
 									...optionStyle,

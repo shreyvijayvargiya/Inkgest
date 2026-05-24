@@ -74,8 +74,9 @@ export default function MermaidInlineGeneratePanel({
 	};
 
 	return (
-		<div style={{ padding: "10px 0 0", minWidth: 280, maxWidth: 360 }}>
-			<p style={{ fontSize: 11, fontWeight: 700, color: T.muted, margin: "0 0 6px" }}>
+		<div className="p-2">
+			<p className="text-sm text-zinc-500 mb-2">Create Mermaid diagrams</p>
+			<p className="text-xs text-zinc-500 mb-2">
 				Describe the diagram
 			</p>
 			<textarea
@@ -124,7 +125,7 @@ export default function MermaidInlineGeneratePanel({
 				{loading ? "Generating…" : "Generate Mermaid"}
 			</button>
 
-			<p style={{ fontSize: 10, color: T.muted, margin: "8px 0 0", lineHeight: 1.45 }}>
+			<p className="text-xs text-zinc-500 my-2">
 				Uses your text selection when present; otherwise follows your prompt. One diagram per run.
 			</p>
 

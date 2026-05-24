@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import InfographicInlineGeneratePanel from "../../../lib/ui/InfographicInlineGeneratePanel";
 import MermaidInlineGeneratePanel from "../../../lib/ui/MermaidInlineGeneratePanel";
+import MotionSelect from "../../../lib/ui/MotionSelect";
 import {
   T,
   Icons,
@@ -14,6 +16,7 @@ import {
 import {
   insertMermaidAfterCollapsedRange,
 } from "../../../lib/ui/mermaidInsertion";
+import { useSelector } from "react-redux";
 
 export default function DraftSelectionToolbar(props) {
   const {
@@ -21,15 +24,14 @@ export default function DraftSelectionToolbar(props) {
     setSelectionDropdown,
     selectionSubtool,
     setSelectionSubtool,
-    selectionLinkOpen,
-    setSelectionLinkOpen,
     selectionLinkUrl,
     setSelectionLinkUrl,
-    selectionLinkText,
-    setSelectionLinkText,
+    selectionLinkInputRef,
     setSelectionContext,
     setChatOpen,
     editorRef,
+    titleRef,
+    draft,
     restoreEditorSelection,
     selectionSavedRangeRef,
     countWords,
@@ -40,9 +42,55 @@ export default function DraftSelectionToolbar(props) {
     openIconPickerAtPoint,
     iconPicker,
     closeIconPicker,
-    draftSelectionSpansMultipleBlocks,
     getSelectionLinkContext,
   } = props;
+
+  const reduxUser = useSelector((state) => state.user?.user ?? null);
+  const [blockFormat, setBlockFormat] = useState("p");
+
+  useEffect(() => {
+    if (!selectionDropdown) return;
+    try {
+      const sel = window.getSelection();
+      if (!sel?.rangeCount) return;
+      let el = sel.getRangeAt(0).commonAncestorContainer;
+      if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
+      while (el && el !== editorRef?.current) {
+        const tag = el.tagName?.toLowerCase?.();
+        if (tag === "h1") {
+          setBlockFormat("h1");
+          return;
+        }
+        if (tag === "h2") {
+          setBlockFormat("h2");
+          return;
+        }
+        if (tag === "ul" || tag === "ol") {
+          setBlockFormat("ul");
+          return;
+        }
+        el = el.parentElement;
+      }
+      setBlockFormat("p");
+    } catch {
+      setBlockFormat("p");
+    }
+  }, [selectionDropdown, editorRef]);
+
+  const applyBlockFormat = (cmd) => {
+    if (cmd === "ul") document.execCommand("insertUnorderedList");
+    else document.execCommand("formatBlock", false, cmd);
+    setBlockFormat(cmd);
+    setSelectionDropdown(null);
+    countWords();
+  };
+
+  const blockFormatOptions = [
+    { value: "p", label: "Text" },
+    { value: "h1", label: "Heading 1" },
+    { value: "h2", label: "Heading 2" },
+    { value: "ul", label: "List" },
+  ];
 
   return (
     <>
@@ -142,32 +190,28 @@ export default function DraftSelectionToolbar(props) {
     							<div
     								className="w-px h-4 bg-zinc-200 flex gap-1"
     							/>
-    							{[
-    								{ cmd: "p", label: "Text" },
-    								{ cmd: "h1", label: "H1" },
-    								{ cmd: "h2", label: "H2" },
-    								{ cmd: "ul", label: "• List" },
-    							].map(({ cmd, label }) => (
-    								<motion.button
-    									key={cmd}
-    									whileHover={{ background: "#F0ECE5" }}
-    									whileTap={{ scale: 0.96 }}
-    									onMouseDown={(e) => e.preventDefault()}
-    									onClick={() => {
-    										if (cmd === "ul")
-    											document.execCommand("insertUnorderedList");
-    										else if (cmd === "ol")
-    											document.execCommand("insertOrderedList");
-    										else
-    											document.execCommand("formatBlock", false, cmd);
-    										setSelectionDropdown(null);
-    										countWords();
-    									}}
-    									className="inline-flex items-center justify-center py-0.5 px-1 border-none rounded bg-none text-sm font-medium text-zinc-600 cursor-pointer"
-    								>
-    									{label}
-    								</motion.button>
-    							))}
+								<MotionSelect
+    								value={blockFormat}
+    								onChange={applyBlockFormat}
+    								options={blockFormatOptions}
+    								preserveEditorSelection
+    								zIndex={200}
+									alignMenu="start"
+    								triggerStyle={{
+    									padding: "4px 8px",
+    									borderRadius: 6,
+    									border: `1px solid ${T.border}`,
+    									background: "transparent",
+    									fontSize: 12,
+    									fontWeight: 600,
+    									color: "#52525b",
+    									minWidth: 96,
+    								}}
+    								menuStyle={{
+    									border: `1px solid ${T.border}`,
+    									background: T.surface,
+    								}}
+    							/>
     							<div
     								style={{
     									width: 1,
@@ -226,9 +270,10 @@ export default function DraftSelectionToolbar(props) {
     									);
     									setSelectionSubtool("icon");
     								}}
-    								className={`inline-flex items-center justify-center py-0.5 px-2 border-none rounded bg-none text-xs font-semibold text-accent cursor-pointer ${iconPicker?.mode === "inline" ? "bg-zinc-100" : "bg-none"}`}
+    								className={`inline-flex items-center justify-center w-6 h-6 p-0 border-none rounded bg-none text-base leading-none cursor-pointer ${iconPicker?.mode === "inline" ? "bg-zinc-100" : "bg-none"}`}
     							>
-    								Icon
+    								<span aria-hidden>😀</span>
+    								<span className="sr-only">Insert icon</span>
     							</motion.button>
     							<motion.button
     								whileHover={{ background: "#F0ECE5" }}
@@ -294,6 +339,8 @@ export default function DraftSelectionToolbar(props) {
     									stroke={T.accent}
     								/>
     							</motion.button>
+								
+
     							</div>
 
     							<AnimatePresence initial={false}>
