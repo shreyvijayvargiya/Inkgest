@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { X } from "lucide-react";
-import { INK_MERMAID_RENDER_CONFIG } from "../../mermaid/renderMermaidInHtmlDoc";
+import { INK_MERMAID_RENDER_CONFIG } from "../mermaid/renderMermaidInHtmlDoc";
 
 function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 	const code = node.attrs.code || "";
