@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { X } from "lucide-react";
+import { INK_MERMAID_RENDER_CONFIG } from "../../mermaid/renderMermaidInHtmlDoc";
 
 function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 	const code = node.attrs.code || "";
@@ -24,12 +25,7 @@ function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 		(async () => {
 			try {
 				const mermaid = (await import("mermaid")).default;
-				mermaid.initialize({
-					startOnLoad: false,
-					securityLevel: "strict",
-					theme: "neutral",
-					fontFamily: "inherit",
-				});
+				mermaid.initialize(INK_MERMAID_RENDER_CONFIG);
 				const { svg } = await mermaid.render(rid, code);
 				if (!cancelled && svgHostRef.current) svgHostRef.current.innerHTML = svg;
 			} catch (e) {
@@ -44,12 +40,24 @@ function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 		};
 	}, [code]);
 
-	const deleteNode = () => {
+	const deleteNode = useCallback(() => {
 		if (typeof getPos !== "function") return;
 		const pos = getPos();
 		if (pos != null)
 			editor.commands.deleteRange({ from: pos, to: pos + node.nodeSize });
-	};
+	}, [editor, getPos, node.nodeSize]);
+
+	const selectNode = useCallback(
+		(e) => {
+			if (e.target.closest("button, textarea, summary, details")) return;
+			e.preventDefault();
+			if (typeof getPos === "function") {
+				const pos = getPos();
+				if (pos != null) editor.commands.setNodeSelection(pos);
+			}
+		},
+		[editor, getPos],
+	);
 
 	const chipStyle =
 		"text-[10px] font-semibold uppercase tracking-wide text-zinc-500";
@@ -60,7 +68,19 @@ function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 			data-node-type="inkMermaidBlock"
 			contentEditable={false}
 		>
-			<div className="relative rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm">
+			<div
+				className="relative rounded-xl border border-zinc-200 bg-white overflow-hidden shadow-sm"
+				onClick={selectNode}
+				onMouseDown={(e) => {
+					if (
+						!e.target.closest(
+							"button, textarea, summary, details, a",
+						)
+					) {
+						e.preventDefault();
+					}
+				}}
+			>
 				<button
 					type="button"
 					onClick={deleteNode}

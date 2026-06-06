@@ -1,5 +1,6 @@
 import Highlight from "@tiptap/extension-highlight";
 import { Extension } from "@tiptap/core";
+import { createInkEmbedClipboardPlugin } from "./TiptapInkEmbedClipboard";
 
 /**
  * Extra classes on textStyle so Tailwind / prose text colors don’t override picked colors.
@@ -30,6 +31,15 @@ export const TiptapInkTextFgExtension = Extension.create({
 				},
 			},
 		];
+	},
+});
+
+/** Copy/cut/paste for Mermaid + infographic atom blocks in TipTap. */
+export const InkEmbedClipboard = Extension.create({
+	name: "inkEmbedClipboard",
+
+	addProseMirrorPlugins() {
+		return [createInkEmbedClipboardPlugin()];
 	},
 });
 

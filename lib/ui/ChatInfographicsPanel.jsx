@@ -8,10 +8,11 @@ import {
 	INK_INFOGRAPHIC_DRAG_MIME,
 	appendInfographicToEditor,
 	infographicDragPayloadString,
-	infographicSpecToSrcDoc,
 	infographicEmbedOuterHtml,
 	insertInfographicAfterCollapsedRange,
 } from "./infographicInsertion";
+import InfographicThumbPreview from "./InfographicThumbPreview";
+import { InfographicCard } from "./InfographicsModal";
 
 /** Matches scraped-sources strip in AIChatSidebar */
 const WARM = {
@@ -23,9 +24,6 @@ const WARM = {
 	cellBorder: "#E8E4DC",
 	accent: "#C17B2F",
 };
-
-const IFRAME_SANDBOX =
-	"allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox";
 
 function formatTypeLabel(type) {
 	if (!type) return "Visual";
@@ -147,9 +145,7 @@ export default function ChatInfographicsPanel({
 					.map((x) => x.title || formatTypeLabel(x.type))
 					.join(" · ");
 
-	const previewSrcDoc = previewIg
-		? infographicSpecToSrcDoc(previewIg)
-		: "";
+	const previewIgItem = previewIg;
 
 	return (
 		<>
@@ -346,7 +342,6 @@ export default function ChatInfographicsPanel({
 												}}
 											>
 												{items.map((ig, i) => {
-													const srcDoc = infographicSpecToSrcDoc(ig);
 													const menuOpen = menuIdx === i;
 													return (
 														<motion.div
@@ -367,31 +362,11 @@ export default function ChatInfographicsPanel({
 														>
 															<div
 																style={{
-																	height: 148,
-																	background: "#FAFAF8",
 																	borderBottom: `1px solid ${WARM.cellBorder}`,
 																	overflow: "hidden",
-																	position: "relative",
 																}}
 															>
-																<iframe
-																	title={
-																		ig.title ||
-																		formatTypeLabel(ig.type)
-																	}
-																	srcDoc={srcDoc}
-																	sandbox={IFRAME_SANDBOX}
-																	referrerPolicy="no-referrer"
-																	loading="lazy"
-																	style={{
-																		width: "100%",
-																		height: 520,
-																		border: 0,
-																		pointerEvents: "none",
-																		transform: "scale(0.28)",
-																		transformOrigin: "top left",
-																	}}
-																/>
+																<InfographicThumbPreview ig={ig} height={148} />
 															</div>
 
 															<div style={{ padding: "10px 10px 12px", flex: 1 }}>
@@ -617,23 +592,16 @@ export default function ChatInfographicsPanel({
 												Close
 											</button>
 										</div>
-										{previewSrcDoc ? (
-											<iframe
-												title={
-													previewIg.title ||
-													formatTypeLabel(previewIg.type)
-												}
-												srcDoc={previewSrcDoc}
-												sandbox={IFRAME_SANDBOX}
-												referrerPolicy="no-referrer"
+										{previewIgItem ? (
+											<div
 												style={{
 													width: "100%",
-													minHeight: 460,
-													border: 0,
-													borderRadius: 12,
-													display: "block",
+													maxWidth: 520,
+													margin: "0 auto",
 												}}
-											/>
+											>
+												<InfographicCard ig={previewIgItem} />
+											</div>
 										) : null}
 									</motion.div>
 								</motion.div>

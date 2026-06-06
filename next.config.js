@@ -6,6 +6,8 @@ const nextConfig = {
 	reactStrictMode: true,
 	poweredByHeader: false,
 	compress: true,
+	// Mermaid + jsdom need native Node resolution (DOMPurify breaks when webpack-bundled).
+	serverExternalPackages: ["mermaid", "jsdom", "dompurify"],
 	images: {
 		domains: [
 			"lh3.googleusercontent.com",

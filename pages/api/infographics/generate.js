@@ -17,6 +17,10 @@ import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
 import { INFOGRAPHIC_CREATIVE_FORMATS } from "../../../lib/config/infographicCreativeFormats";
 import { normalizeInfographicsBatch } from "../../../lib/infographics/normalizePanels";
+import {
+	openRouterChatCompletion,
+	resolveOpenRouterModels,
+} from "../../../lib/utils/openRouter";
 
 export const config = {
 	api: {
@@ -105,13 +109,6 @@ export default async function handler(req, res) {
 		});
 	}
 
-	const openRouterKey = process.env.OPENROUTER_API_KEY;
-	if (!openRouterKey) {
-		return res.status(500).json({
-			error: "OpenRouter API key not configured on the server",
-		});
-	}
-
 	const minP = Math.max(1, Math.min(5, Number(minPanels) || 1));
 	const maxP = Math.max(minP, Math.min(5, Number(maxPanels) || 5));
 	const directive = formatDirectiveSnippet(visualFormatId, minP, maxP);
@@ -125,78 +122,20 @@ ${bodyText || "(minimal source — infer carefully from title and brief only)"}
 
 Return {"infographics":[...]} with between ${minP} and ${maxP} panels. Use distinct types where possible.`;
 
-	const model =
-		String(process.env.OPENROUTER_INFOGRAPHICS_MODEL || "").trim() ||
-		"google/gemini-2.0-flash-001";
+	const models = resolveOpenRouterModels(["OPENROUTER_INFOGRAPHICS_MODEL"]);
 
 	try {
-		const payloadBase = {
-			model,
+		const { data, model } = await openRouterChatCompletion({
+			models,
 			messages: [
 				{ role: "system", content: SYSTEM },
-				{
-					role: "user",
-					content: userBlock,
-				},
+				{ role: "user", content: userBlock },
 			],
 			temperature: 0.42,
 			max_tokens: 6144,
-		};
+			preferJsonObject: true,
+		});
 
-		const headers = {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${openRouterKey}`,
-			...(process.env.OPENROUTER_HTTP_REFERER
-				? { "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER }
-				: {}),
-			...(process.env.OPENROUTER_APP_TITLE
-				? { "X-Title": process.env.OPENROUTER_APP_TITLE }
-				: {}),
-		};
-
-		let upstream = await fetch(
-			"https://openrouter.ai/api/v1/chat/completions",
-			{
-				method: "POST",
-				headers,
-				body: JSON.stringify({
-					...payloadBase,
-					response_format: { type: "json_object" },
-				}),
-			},
-		);
-
-		let errorPayload400 = null;
-		if (!upstream.ok && upstream.status === 400) {
-			errorPayload400 = await upstream.json().catch(() => ({}));
-			const errMsg = String(errorPayload400?.error?.message || "").toLowerCase();
-			if (
-				errMsg.includes("response_format") ||
-				errMsg.includes("json_object") ||
-				errMsg.includes("structured")
-			) {
-				upstream = await fetch(
-					"https://openrouter.ai/api/v1/chat/completions",
-					{
-						method: "POST",
-						headers,
-						body: JSON.stringify(payloadBase),
-					},
-				);
-				errorPayload400 = null;
-			}
-		}
-
-		if (!upstream.ok) {
-			const errData =
-				errorPayload400 ??
-				(await upstream.json().catch(() => ({})));
-			const msg =
-				errData?.error?.message || `OpenRouter error (${upstream.status})`;
-			return res.status(502).json({ error: msg });
-		}
-
-		const data = await upstream.json();
 		const text = data.choices?.[0]?.message?.content;
 		if (!text) {
 			return res.status(502).json({ error: "Empty model response" });
@@ -232,7 +171,8 @@ Return {"infographics":[...]} with between ${minP} and ${maxP} panels. Use disti
 		});
 	} catch (err) {
 		console.error("[infographics/generate]", err);
-		return res.status(500).json({
+		const status = err?.statusCode === 502 ? 502 : err?.statusCode === 500 ? 500 : 500;
+		return res.status(status).json({
 			error: err?.message || "Infographic generation failed",
 		});
 	}

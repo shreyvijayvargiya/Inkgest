@@ -4,7 +4,6 @@ import { useCallback } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { X } from "lucide-react";
-import { createInkInfographicClipboardPlugin } from "./TiptapInkInfographicClipboard";
 
 function InkInfographicView({ node, editor, getPos, selected }) {
 	const srcDoc = node.attrs.srcDoc || "";
@@ -177,7 +176,4 @@ export const InkInfographicIframe = Node.create({
 		};
 	},
 
-	addProseMirrorPlugins() {
-		return [createInkInfographicClipboardPlugin()];
-	},
 });

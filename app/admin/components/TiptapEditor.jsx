@@ -67,9 +67,11 @@ import {
 import {
 	TiptapInkHighlight,
 	TiptapInkTextFgExtension,
+	InkEmbedClipboard,
 } from "../../../lib/ui/TiptapInkEditorExtensions";
 import { InkInfographicIframe } from "../../../lib/ui/TiptapInkInfographicIframe";
 import { InkMermaidBlock } from "../../../lib/ui/TiptapInkMermaid";
+import TiptapBlockDragHandle from "../../../lib/ui/TiptapBlockDragHandle";
 import InfographicInlineGeneratePanel from "../../../lib/ui/InfographicInlineGeneratePanel";
 import MermaidInlineGeneratePanel from "../../../lib/ui/MermaidInlineGeneratePanel";
 import { infographicSpecToSrcDoc } from "../../../lib/ui/infographicInsertion";
@@ -178,6 +180,7 @@ const TiptapEditor = ({
 	const [infographicPanelOpen, setInfographicPanelOpen] = useState(false);
 	const mermaidPanelRef = useRef(null);
 	const [mermaidPanelOpen, setMermaidPanelOpen] = useState(false);
+	const editorContainerRef = useRef(null);
 	// Track if update is from editor itself (internal) vs external prop change
 	const isInternalUpdateRef = useRef(false);
 	const lastContentRef = useRef("");
@@ -253,6 +256,7 @@ const TiptapEditor = ({
 			}),
 			InkInfographicIframe,
 			InkMermaidBlock,
+			InkEmbedClipboard,
 			Details.configure({
 				persist: true,
 				HTMLAttributes: {
@@ -1015,10 +1019,17 @@ const TiptapEditor = ({
 				</motion.button>
 			</div>
 			<div
+				ref={editorContainerRef}
 				className="flex-1 overflow-y-auto relative bg-[#FAFAF8] border-t border-zinc-100/80"
 				style={{ minHeight: "100%" }}
 			>
 				<EditorContent editor={editor} />
+				{editor && (
+					<TiptapBlockDragHandle
+						editor={editor}
+						containerRef={editorContainerRef}
+					/>
+				)}
 
 				{/* Table controls (TipTap table extension): row/column/header + delete */}
 				{editor && (

@@ -8,6 +8,7 @@ import { auth } from "../config/firebase";
 import { fetchInfographicsFromAgent } from "../api/infographicsAgentClient";
 import { INFOGRAPHIC_CREATIVE_FORMATS } from "../config/infographicCreativeFormats";
 import { InfographicCard } from "./InfographicsModal";
+import InfographicThumbPreview from "./InfographicThumbPreview";
 import MotionSelect from "./MotionSelect";
 import {
 	INK_INFOGRAPHIC_DRAG_MIME,
@@ -210,18 +211,13 @@ export default function InfographicInlineGeneratePanel({
 						<div
 							style={{
 								width: 64,
-								height: 72,
+								flexShrink: 0,
 								borderRadius: 8,
 								overflow: "hidden",
-								background: "#FAFAFA",
 								border: `1px solid ${T.border}`,
-								flexShrink: 0,
-								transformOrigin: "top left",
 							}}
 						>
-							<div style={{ transform: "scale(0.22)", width: "100%", pointerEvents: "none" }}>
-								<InfographicCard ig={ig} />
-							</div>
+							<InfographicThumbPreview ig={ig} height={72} />
 						</div>
 						<div style={{ flex: 1, minWidth: 0 }}>
 							<p

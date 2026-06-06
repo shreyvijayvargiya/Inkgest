@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
 import { THEMES, buildThemedHTML } from "../../../lib/blogExportThemes";
+import { useThemedPreviewWithMermaid } from "../../../lib/hooks/useThemedPreviewWithMermaid";
 import { T, Icons, Icon, parseCSSProp, copyTextToClipboard, stripDraftSlashQueryFromHtmlString, buildThemedReactSnippet } from "../draftPageLib";
 
 export default function ExportThemesModal({
@@ -25,6 +26,8 @@ export default function ExportThemesModal({
 	const titleText = titleRef.current?.innerText?.trim() || draft?.title || "Untitled";
 	const themeObj = THEMES[previewTheme] || THEMES.ink;
 	const themedDoc = htmlSrc ? buildThemedHTML(htmlSrc, themeObj, titleText) : "";
+	const { previewSrcDoc, pending: previewMermaidPending } =
+		useThemedPreviewWithMermaid(themedDoc);
 	const markdownExport = htmlSrc.trim() ? htmlToMarkdown(htmlSrc) || "" : "";
 	const reactSnippet = htmlSrc.trim()
 		? buildThemedReactSnippet(htmlSrc, previewTheme, titleText)
@@ -628,15 +631,17 @@ export default function ExportThemesModal({
 											<div style={{ flex: 1, position: "relative", background: "#e5e7eb" }}>
 												{themedDoc ? (
 													<iframe
-														key={`theme-prev-${previewTheme}-${translatedHTML ? "t" : "o"}`}
-														srcDoc={themedDoc}
+														key={`theme-prev-${previewTheme}-${translatedHTML ? "t" : "o"}-${previewSrcDoc ? "m" : "b"}`}
+														srcDoc={previewSrcDoc}
 														title="Theme preview"
-														sandbox="allow-same-origin"
+														sandbox="allow-scripts allow-same-origin"
 														style={{
 															width: "100%",
 															height: "100%",
 															border: "none",
 															display: "block",
+															opacity: previewMermaidPending ? 0.72 : 1,
+															transition: "opacity 0.15s ease",
 														}}
 													/>
 												) : (

@@ -8,6 +8,10 @@ import { verifyFirebaseToken } from "../../../lib/utils/verifyAuth";
 import { checkAndDeductCredit } from "../../../lib/utils/credits";
 import { checkRateLimit } from "../../../lib/utils/rateLimit";
 import { normalizeAndValidateMermaid, validateMermaidParses } from "../../../lib/mermaid/normalizeMermaidOutput";
+import {
+	openRouterChatCompletion,
+	resolveOpenRouterModels,
+} from "../../../lib/utils/openRouter";
 
 export const config = {
 	api: {
@@ -71,88 +75,29 @@ export default async function handler(req, res) {
 		});
 	}
 
-	const openRouterKey = process.env.OPENROUTER_API_KEY;
-	if (!openRouterKey) {
-		return res.status(500).json({
-			error: "OpenRouter API key not configured on the server",
-		});
-	}
-
 	const brief = String(prompt || "").trim();
 	const ctx = String(contextText || "").trim().slice(0, 60_000);
 	const titleGround = String(articleTitle || "").trim().slice(0, 240);
 
 	const userBlock = `${brief ? `Creative direction:\n${brief}\n\n` : ""}${titleGround ? `Working title (context): ${titleGround}\n\n` : ""}Source material:\n---\n${ctx || "(infer carefully from creative direction only)"}\n---\n\nReturn JSON with "title" and "mermaid" only.`;
 
-	const model =
-		String(process.env.OPENROUTER_MERMAID_MODEL || "").trim() ||
-		String(process.env.OPENROUTER_INFOGRAPHICS_MODEL || "").trim() ||
-		"google/gemini-2.0-flash-001";
+	const models = resolveOpenRouterModels([
+		"OPENROUTER_MERMAID_MODEL",
+		"OPENROUTER_INFOGRAPHICS_MODEL",
+	]);
 
 	try {
-		const payloadBase = {
-			model,
+		const { data, model } = await openRouterChatCompletion({
+			models,
 			messages: [
 				{ role: "system", content: SYSTEM },
 				{ role: "user", content: userBlock },
 			],
 			temperature: 0.35,
 			max_tokens: 4096,
-		};
+			preferJsonObject: true,
+		});
 
-		const headers = {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${openRouterKey}`,
-			...(process.env.OPENROUTER_HTTP_REFERER
-				? { "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER }
-				: {}),
-			...(process.env.OPENROUTER_APP_TITLE
-				? { "X-Title": process.env.OPENROUTER_APP_TITLE }
-				: {}),
-		};
-
-		let upstream = await fetch(
-			"https://openrouter.ai/api/v1/chat/completions",
-			{
-				method: "POST",
-				headers,
-				body: JSON.stringify({
-					...payloadBase,
-					response_format: { type: "json_object" },
-				}),
-			},
-		);
-
-		let errorPayload400 = null;
-		if (!upstream.ok && upstream.status === 400) {
-			errorPayload400 = await upstream.json().catch(() => ({}));
-			const errMsg = String(errorPayload400?.error?.message || "").toLowerCase();
-			if (
-				errMsg.includes("response_format") ||
-				errMsg.includes("json_object") ||
-				errMsg.includes("structured")
-			) {
-				upstream = await fetch(
-					"https://openrouter.ai/api/v1/chat/completions",
-					{
-						method: "POST",
-						headers,
-						body: JSON.stringify(payloadBase),
-					},
-				);
-				errorPayload400 = null;
-			}
-		}
-
-		if (!upstream.ok) {
-			const errData =
-				errorPayload400 ?? (await upstream.json().catch(() => ({})));
-			const msg =
-				errData?.error?.message || `OpenRouter error (${upstream.status})`;
-			return res.status(502).json({ error: msg });
-		}
-
-		const data = await upstream.json();
 		const text = data.choices?.[0]?.message?.content;
 		if (!text) {
 			return res.status(502).json({ error: "Empty model response" });
@@ -198,59 +143,23 @@ export default async function handler(req, res) {
 				},
 			];
 
-			let repairUpstream = await fetch(
-				"https://openrouter.ai/api/v1/chat/completions",
-				{
-					method: "POST",
-					headers,
-					body: JSON.stringify({
-						...payloadBase,
-						messages: repairMessages,
-						response_format: { type: "json_object" },
-					}),
-				},
-			);
-
-			let repairErrorPayload400 = null;
-			if (!repairUpstream.ok && repairUpstream.status === 400) {
-				repairErrorPayload400 = await repairUpstream.json().catch(() => ({}));
-				const errMsg = String(
-					repairErrorPayload400?.error?.message || "",
-				).toLowerCase();
-				if (
-					errMsg.includes("response_format") ||
-					errMsg.includes("json_object") ||
-					errMsg.includes("structured")
-				) {
-					repairUpstream = await fetch(
-						"https://openrouter.ai/api/v1/chat/completions",
-						{
-							method: "POST",
-							headers,
-							body: JSON.stringify({
-								...payloadBase,
-								messages: repairMessages,
-							}),
-						},
-					);
-					repairErrorPayload400 = null;
-				}
-			}
-
-			if (!repairUpstream.ok) {
-				const errData =
-					repairErrorPayload400 ??
-					(await repairUpstream.json().catch(() => ({})));
-				const msg =
-					errData?.error?.message ||
-					`OpenRouter repair error (${repairUpstream.status})`;
+			let repairData;
+			try {
+				const repairResult = await openRouterChatCompletion({
+					models,
+					messages: repairMessages,
+					temperature: 0.35,
+					max_tokens: 4096,
+					preferJsonObject: true,
+				});
+				repairData = repairResult.data;
+			} catch (repairUpstreamErr) {
 				return res.status(502).json({
-					error: msg,
+					error: repairUpstreamErr?.message || "OpenRouter repair failed",
 					detail: parseErrMsg,
 				});
 			}
 
-			const repairData = await repairUpstream.json();
 			const repairText = repairData.choices?.[0]?.message?.content;
 			if (!repairText) {
 				return res.status(502).json({
@@ -292,7 +201,8 @@ export default async function handler(req, res) {
 		});
 	} catch (err) {
 		console.error("[mermaid/generate]", err);
-		return res.status(500).json({
+		const status = err?.statusCode === 502 ? 502 : err?.statusCode === 500 ? 500 : 500;
+		return res.status(status).json({
 			error: err?.message || "Mermaid generation failed",
 		});
 	}

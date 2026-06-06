@@ -6,6 +6,7 @@
 
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
+import { MotionConfig } from "framer-motion";
 import { InfographicCard } from "./InfographicsModal";
 
 /** Inner HTML fragment (no outer wrapper) suitable for iframe srcDoc body. */
@@ -21,7 +22,13 @@ export function renderInfographicCardInnerHtml(spec) {
 	let out = "";
 	try {
 		const root = createRoot(host);
-		flushSync(() => root.render(<InfographicCard ig={spec} />));
+		flushSync(() =>
+			root.render(
+				<MotionConfig reducedMotion="always">
+					<InfographicCard ig={spec} />
+				</MotionConfig>,
+			),
+		);
 		out = host.innerHTML || "";
 		root.unmount();
 	} catch {

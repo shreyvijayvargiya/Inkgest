@@ -2,6 +2,13 @@ import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
 import { buildThemedHTML } from "../../../lib/blogExportThemes";
+import { useThemedPreviewWithMermaid } from "../../../lib/hooks/useThemedPreviewWithMermaid";
+import {
+	extractMermaidSourcesFromHtml,
+	extractInfographicEmbedHtmlFromHtml,
+	mermaidSourcesToMarkdown,
+	infographicEmbedsToStandaloneDoc,
+} from "../../../lib/utils/exportDraftEmbeds";
 import { T, Icons, Icon, stripDraftSlashQueryFromHtmlString } from "../draftPageLib";
 import { THEMES } from "../../../lib/blogExportThemes";
 import { useCompactAssetsNav } from "../../../lib/hooks/useCompactAssetsNav";
@@ -53,17 +60,45 @@ export default function PreviewExportModal({
 		activeTheme && htmlForPreview.trim()
 			? buildThemedHTML(htmlForPreview, activeTheme, previewDocTitle)
 			: "";
+	const { previewSrcDoc, pending: previewMermaidPending } =
+		useThemedPreviewWithMermaid(themedDoc);
 	const isCopiedHtml =
 		copiedTheme?.key === previewTheme && copiedTheme?.format === "html";
 	const isCopiedReact =
 		copiedTheme?.key === previewTheme && copiedTheme?.format === "react";
 	const isCopiedMd =
 		copiedTheme?.key === previewTheme && copiedTheme?.format === "markdown";
+	const isCopiedMermaid =
+		copiedTheme?.key === previewTheme && copiedTheme?.format === "mermaid";
+	const isCopiedInfographic =
+		copiedTheme?.key === previewTheme && copiedTheme?.format === "infographic";
 	const isCopiedTxt =
 		copiedTheme?.key === previewTheme && copiedTheme?.format === "text";
 	const isCopiedPublicUrl =
 		copiedTheme?.key === previewTheme && copiedTheme?.format === "publicUrl";
 	const markdownExport = htmlForPreview.trim() ? htmlToMarkdown(htmlForPreview) || "" : "";
+	const mermaidBlocks = useMemo(
+		() => extractMermaidSourcesFromHtml(currentHTML),
+		[currentHTML],
+	);
+	const mermaidMarkdownExport = useMemo(
+		() => mermaidSourcesToMarkdown(mermaidBlocks),
+		[mermaidBlocks],
+	);
+	const infographicEmbeds = useMemo(
+		() => extractInfographicEmbedHtmlFromHtml(currentHTML),
+		[currentHTML],
+	);
+	const infographicStandaloneDoc = useMemo(
+		() =>
+			infographicEmbeds.length
+				? infographicEmbedsToStandaloneDoc(
+						infographicEmbeds,
+						previewDocTitle || "Infographics",
+					)
+				: "",
+		[infographicEmbeds, previewDocTitle],
+	);
 	const plainTextExport = useMemo(() => {
 		if (!htmlForPreview.trim()) return "";
 		try {
@@ -596,6 +631,192 @@ export default function PreviewExportModal({
 															{isCopiedMd ? "Markdown copied!" : "Copy Markdown"}
 														</button>
 
+														{/* Copy Mermaid source */}
+														<button
+															type="button"
+															disabled={!mermaidMarkdownExport.trim()}
+															onClick={() => {
+																if (!mermaidMarkdownExport.trim()) return;
+																navigator.clipboard
+																	.writeText(mermaidMarkdownExport)
+																	.catch(() => {});
+																setCopiedTheme({
+																	key: previewTheme,
+																	format: "mermaid",
+																});
+																setThemeExportOpen(false);
+																setTimeout(() => setCopiedTheme(null), 2200);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: isCopiedMermaid
+																	? "rgba(45,106,79,0.1)"
+																	: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: isCopiedMermaid ? "#2D6A4F" : T.accent,
+																cursor: mermaidMarkdownExport.trim()
+																	? "pointer"
+																	: "not-allowed",
+																opacity: mermaidMarkdownExport.trim() ? 1 : 0.45,
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon
+																d={Icons.workflow}
+																size={13}
+																stroke={
+																	isCopiedMermaid ? "#2D6A4F" : T.accent
+																}
+															/>
+															{isCopiedMermaid
+																? "Mermaid copied!"
+																: `Copy Mermaid (${mermaidBlocks.length || 0})`}
+														</button>
+
+														{/* Download Mermaid markdown */}
+														<button
+															type="button"
+															disabled={!mermaidMarkdownExport.trim()}
+															onClick={() => {
+																if (!mermaidMarkdownExport.trim()) return;
+																const blob = new Blob([mermaidMarkdownExport], {
+																	type: "text/markdown;charset=utf-8",
+																});
+																const a = document.createElement("a");
+																a.href = URL.createObjectURL(blob);
+																a.download = `${slugBase}-diagrams.md`;
+																a.click();
+																URL.revokeObjectURL(a.href);
+																setThemeExportOpen(false);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: T.accent,
+																cursor: mermaidMarkdownExport.trim()
+																	? "pointer"
+																	: "not-allowed",
+																opacity: mermaidMarkdownExport.trim() ? 1 : 0.45,
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
+															Download Mermaid .md
+														</button>
+
+														{/* Copy infographic embed HTML */}
+														<button
+															type="button"
+															disabled={!infographicEmbeds.length}
+															onClick={() => {
+																if (!infographicEmbeds.length) return;
+																navigator.clipboard
+																	.writeText(infographicEmbeds.join("\n\n"))
+																	.catch(() => {});
+																setCopiedTheme({
+																	key: previewTheme,
+																	format: "infographic",
+																});
+																setThemeExportOpen(false);
+																setTimeout(() => setCopiedTheme(null), 2200);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: isCopiedInfographic
+																	? "rgba(45,106,79,0.1)"
+																	: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: isCopiedInfographic
+																	? "#2D6A4F"
+																	: T.accent,
+																cursor: infographicEmbeds.length
+																	? "pointer"
+																	: "not-allowed",
+																opacity: infographicEmbeds.length ? 1 : 0.45,
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon
+																d={Icons.barChart}
+																size={13}
+																stroke={
+																	isCopiedInfographic ? "#2D6A4F" : T.accent
+																}
+															/>
+															{isCopiedInfographic
+																? "Infographics copied!"
+																: `Copy infographic HTML (${infographicEmbeds.length || 0})`}
+														</button>
+
+														{/* Download infographics HTML */}
+														<button
+															type="button"
+															disabled={!infographicStandaloneDoc.trim()}
+															onClick={() => {
+																if (!infographicStandaloneDoc.trim()) return;
+																const blob = new Blob([infographicStandaloneDoc], {
+																	type: "text/html;charset=utf-8",
+																});
+																const a = document.createElement("a");
+																a.href = URL.createObjectURL(blob);
+																a.download = `${slugBase}-infographics.html`;
+																a.click();
+																URL.revokeObjectURL(a.href);
+																setThemeExportOpen(false);
+															}}
+															style={{
+																width: "100%",
+																textAlign: "left",
+																padding: "9px 12px",
+																border: "none",
+																borderRadius: 8,
+																background: "transparent",
+																fontSize: 13,
+																fontWeight: 600,
+																color: T.accent,
+																cursor: infographicStandaloneDoc.trim()
+																	? "pointer"
+																	: "not-allowed",
+																opacity: infographicStandaloneDoc.trim() ? 1 : 0.45,
+																display: "flex",
+																alignItems: "center",
+																gap: 9,
+															}}
+														>
+															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
+															Download infographics .html
+														</button>
+
+														<div
+															style={{
+																height: 1,
+																background: T.border,
+																margin: "4px 6px",
+															}}
+														/>
+
 														{/* Copy plain text */}
 														<button
 															type="button"
@@ -745,15 +966,17 @@ export default function PreviewExportModal({
 											>
 												{themedDoc ? (
 													<iframe
-													key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}`}
-														srcDoc={themedDoc}
+													key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}-${previewSrcDoc ? "m" : "b"}`}
+														srcDoc={previewSrcDoc}
 														title={`Preview — ${activeTheme?.name}`}
-														sandbox="allow-same-origin"
+														sandbox="allow-scripts allow-same-origin"
 														style={{
 															width: "100%",
 															height: "100%",
 															border: "none",
 															display: "block",
+															opacity: previewMermaidPending ? 0.72 : 1,
+															transition: "opacity 0.15s ease",
 														}}
 													/>
 												) : (
