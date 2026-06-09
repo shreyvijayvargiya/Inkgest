@@ -149,7 +149,7 @@ export default function IconSelectorDropdown({ onSelect, onClose, style = {} }) 
 	return (
 		<div
 			style={{
-				width: 300,
+				width: 280,
 				background: "#FFFFFF",
 				border: "1px solid #E8E4DC",
 				borderRadius: 14,

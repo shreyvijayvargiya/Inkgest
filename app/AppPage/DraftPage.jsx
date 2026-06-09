@@ -2051,7 +2051,7 @@ export default function DraftPage() {
 											cursor: "pointer",
 										}}
 									>
-										<Icon d={Icons.plus} size={17} stroke="#fff" strokeWidth={2} />
+										<Icon d={Icons.plus} size={14} stroke="#fff" strokeWidth={2} />
 									</motion.button>
 								</div>
 							</div>

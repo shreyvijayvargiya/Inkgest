@@ -756,6 +756,7 @@ export default function inkgestApp() {
 								flexDirection: "column",
 								overflow: "hidden",
 								flexShrink: 0,
+								background: `${T.surface}`
 							}}
 						>
 							<div
@@ -865,6 +866,7 @@ export default function inkgestApp() {
 									padding: "12px 14px",
 									borderTop: `1px solid ${T.border}`,
 									flexShrink: 0,
+									
 								}}
 							>
 								<motion.div

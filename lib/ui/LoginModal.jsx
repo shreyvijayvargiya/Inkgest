@@ -176,6 +176,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 
 	return (
 		<AnimatePresence>
+			{!user && <AnimatedDotsBackground />}
 			{isOpen && (
 				<motion.div
 					initial={{ opacity: 0 }}
@@ -191,7 +192,7 @@ const LoginModal = ({ isOpen, onClose }) => {
 						onClick={(e) => e.stopPropagation()}
 						className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[#F7F5F0] shadow-2xl"
 					>
-						{!user && <AnimatedDotsBackground />}
+						
 
 						<div className="relative z-10 flex items-center justify-between border-b border-[#E8E4DC] p-4">
 							<h3 className="text-lg text-zinc-900">

@@ -112,15 +112,14 @@ export default function SidebarAssetCard({
 			onHoverStart={() => setHovering(true)}
 			onHoverEnd={() => setHovering(false)}
 			onClick={onClick}
+			className="p-1"
 			style={{
 				background: active ? T.surface : "transparent",
 				border: `1px solid ${active ? T.border : "transparent"}`,
 				borderRadius: 10,
-				padding: "10px 12px",
 				cursor: "pointer",
 				boxShadow: active ? "0 1px 8px rgba(0,0,0,0.07)" : "none",
 				position: "relative",
-				marginBottom: 4,
 				transition: "background 0.15s, border-color 0.15s",
 				overflow: pickerOpen ? "visible" : undefined,
 				zIndex: pickerOpen ? 20 : undefined,
@@ -144,7 +143,7 @@ export default function SidebarAssetCard({
 			<div
 				style={{
 					display: "flex",
-					alignItems: "flex-start",
+					alignItems: "center",
 					justifyContent: "space-between",
 					gap: 8,
 				}}
@@ -152,7 +151,7 @@ export default function SidebarAssetCard({
 				<div
 					style={{
 						display: "flex",
-						alignItems: "flex-start",
+						alignItems: "center",
 						gap: 10,
 						flex: 1,
 						minWidth: 0,
@@ -174,8 +173,8 @@ export default function SidebarAssetCard({
 							whileHover={onIconChange ? { background: "#F0ECE5" } : {}}
 							whileTap={onIconChange ? { scale: 0.94 } : {}}
 							style={{
-								width: 32,
-								height: 32,
+								width: 28,
+								height: 28,
 								borderRadius: 8,
 								border: `1px solid ${active ? T.border : "#E8E4DC"}`,
 								background: active ? T.surface : "#FAFAF8",
@@ -187,7 +186,7 @@ export default function SidebarAssetCard({
 								marginTop: 1,
 							}}
 						>
-							<SidebarIconGlyph icon={sidebarIcon} size={16} />
+							<SidebarIconGlyph icon={sidebarIcon} size={14} />
 						</motion.button>
 						<AnimatePresence>
 							{pickerOpen && onIconChange && (
@@ -220,11 +219,9 @@ export default function SidebarAssetCard({
 					<div style={{ flex: 1, minWidth: 0 }}>
 						<p
 							style={{
-								fontSize: 13,
-								fontWeight: 600,
+								fontSize: 12,
+								fontWeight: 500,
 								color: T.accent,
-								lineHeight: 1.4,
-								marginBottom: 6,
 								overflow: "hidden",
 								display: "-webkit-box",
 								WebkitLineClamp: 2,
@@ -233,7 +230,7 @@ export default function SidebarAssetCard({
 						>
 							{item.title || "Untitled"}
 						</p>
-						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+						{/* <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 							<span
 								style={{
 									fontSize: 10.5,
@@ -255,7 +252,7 @@ export default function SidebarAssetCard({
 							{date && (
 								<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
 							)}
-						</div>
+						</div> */}
 					</div>
 				</div>
 				<AnimatePresence>

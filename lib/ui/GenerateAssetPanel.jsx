@@ -80,8 +80,7 @@ export default function GenerateAssetPanel({
 
 	const format = formatProp ?? internalFormat;
 	const style = styleProp ?? internalStyle;
-	const setFormat = setFormatProp ?? setInternalFormat;
-	const setStyle = setStyleProp ?? setInternalStyle;
+
 
 	const hookAssetType =
 		assetType === "blank" || assetType === "agent" ? "blog" : assetType;
@@ -109,7 +108,6 @@ export default function GenerateAssetPanel({
 		onLogin,
 	});
 
-	const showFormatStyle = Boolean(showFormatControls && FORMATS && STYLES);
 
 	const selectedType = useMemo(
 		() =>
@@ -165,13 +163,6 @@ export default function GenerateAssetPanel({
 		}
 	}, [blankName, onLogin, queryClient, reduxUser, router]);
 
-	const applySuggestion = (s) => {
-		const n = normalizePromptSuggestion(s);
-		if (n.urls.length) setUrlInputs([...n.urls]);
-		else setUrlInputs([""]);
-		setPrompt(n.prompt);
-	};
-
 	const inputStyle = isApp
 		? {
 				background: T.surface,
@@ -219,16 +210,6 @@ export default function GenerateAssetPanel({
 				boxSizing: "border-box",
 			};
 
-	const suggestionsCardStyle = {
-		width: "100%",
-		background: T.surface,
-		border: `1px solid ${T.border}`,
-		borderRadius: 22,
-		boxShadow:
-			"0 1px 2px rgba(15, 23, 42, 0.04), 0 16px 40px -12px rgba(15, 23, 42, 0.1)",
-		padding: "clamp(20px, 3vw, 28px) clamp(20px, 3vw, 40px)",
-		boxSizing: "border-box",
-	};
 
 
 	return (
@@ -893,7 +874,89 @@ export default function GenerateAssetPanel({
 						</p>
 					)}
 
-					{!isAgentTab &&
+					{isAgentTab &&
+					(agentGen.multiBlog || agentGen.completedTasks.length > 1) &&
+					agentGen.completedTasks.length > 0 ? (
+						<div
+							style={{
+								display: "flex",
+								flexDirection: "column",
+								gap: 10,
+							}}
+						>
+							<p
+								style={{
+									fontSize: 12,
+									color: T.muted,
+									marginBottom: 4,
+									fontWeight: 600,
+								}}
+							>
+								{agentGen.completedTasks.length} asset
+								{agentGen.completedTasks.length === 1 ? "" : "s"} ready
+							</p>
+							{agentGen.completedTasks.map((t, i) => (
+								<motion.a
+									key={`${t.id}-${i}`}
+									href={t.path}
+									onClick={(e) => {
+										e.preventDefault();
+										router.push(t.path);
+									}}
+									whileHover={{ x: 2, scale: 1.01 }}
+									whileTap={{ scale: 0.99 }}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										justifyContent: "space-between",
+										padding: "12px 14px",
+										background: T.surface,
+										border: `1px solid ${T.border}`,
+										borderRadius: 10,
+										textDecoration: "none",
+										color: T.accent,
+										fontSize: 13,
+										fontWeight: 600,
+										cursor: "pointer",
+									}}
+								>
+									<span
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 8,
+											minWidth: 0,
+										}}
+									>
+										<span>{taskEmojiForType(t.type)}</span>
+										<span
+											style={{
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+												whiteSpace: "nowrap",
+											}}
+										>
+											{t.label || taskTitleForType(t.type)}
+											{t.multiBlogIndex != null &&
+											t.multiBlogTotal != null
+												? ` · ${t.multiBlogIndex}/${t.multiBlogTotal}`
+												: ""}
+										</span>
+									</span>
+									<span
+										style={{
+											fontSize: 12,
+											color: T.warm,
+											fontWeight: 700,
+											flexShrink: 0,
+										}}
+									>
+										Open →
+									</span>
+								</motion.a>
+							))}
+						</div>
+					) : !isAgentTab &&
 					Array.isArray(gen.slotOutputs) &&
 					gen.slotOutputs.length > 1 ? (
 						<div
@@ -1040,11 +1103,50 @@ export default function GenerateAssetPanel({
 								!(isAgentTab
 									? agentGen.streamedPreview
 									: gen.streamed) && (
-								<p style={{ fontSize: 13, color: T.muted }}>
-									{isAgentTab
-										? "Running agent and scraping sources…"
-										: "Working on your blog/newsletter..."}
-								</p>
+								<div>
+									<p style={{ fontSize: 13, color: T.muted }}>
+										{isAgentTab
+											? "Running agent and scraping sources…"
+											: "Working on your blog/newsletter..."}
+									</p>
+									{isAgentTab && agentGen.taskProgress.length > 0 && (
+										<div
+											style={{
+												display: "flex",
+												flexDirection: "column",
+												gap: 8,
+												marginTop: 12,
+											}}
+										>
+											{agentGen.taskProgress.map((task) => (
+												<div
+													key={task.key}
+													style={{
+														display: "flex",
+														alignItems: "center",
+														justifyContent: "space-between",
+														gap: 10,
+														padding: "8px 10px",
+														borderRadius: 8,
+														background: T.surface,
+														border: `1px solid ${T.border}`,
+														fontSize: 12,
+														color: T.accent,
+													}}
+												>
+													<span>{task.label}</span>
+													<span style={{ color: T.muted }}>
+														{task.status === "done"
+															? "Done"
+															: task.status === "error"
+																? "Failed"
+																: "…"}
+													</span>
+												</div>
+											))}
+										</div>
+									)}
+								</div>
 							)}
 							{(isAgentTab ? agentGen.streamedPreview : gen.streamed) && (
 								<pre
@@ -1067,7 +1169,8 @@ export default function GenerateAssetPanel({
 									{isAgentTab ? agentGen.streamedPreview : gen.streamed}
 								</pre>
 							)}
-							{(isAgentTab
+							{!(isAgentTab && agentGen.multiBlog) &&
+							(isAgentTab
 								? agentGen.completedTasks
 								: gen.completedTasks
 							).length > 0 && (
