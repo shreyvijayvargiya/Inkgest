@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
 import { buildThemedHTML } from "../../../lib/blogExportThemes";
@@ -9,11 +9,333 @@ import {
 	mermaidSourcesToMarkdown,
 	infographicEmbedsToStandaloneDoc,
 } from "../../../lib/utils/exportDraftEmbeds";
-import { T, Icons, Icon, stripDraftSlashQueryFromHtmlString } from "../draftPageLib";
+import { Icons, Icon, stripDraftSlashQueryFromHtmlString } from "../draftPageLib";
 import { THEMES } from "../../../lib/blogExportThemes";
 import { useCompactAssetsNav } from "../../../lib/hooks/useCompactAssetsNav";
 import DraftTranslationBar from "./DraftTranslationBar";
 import PreviewExportThemeList from "./PreviewExportThemeList";
+import BlogToAudioDropdown from "./BlogToAudioDropdown";
+
+const PREVIEW_EXPORT_TABS = [
+	{ id: "themes", label: "Themes" },
+	{ id: "language", label: "Language" },
+	// { id: "audio", label: "Audio" },
+	{ id: "export", label: "Export" },
+];
+
+function ExportActionButton({
+	onClick,
+	disabled,
+	active,
+	activeTone = "green",
+	children,
+	className = "",
+}) {
+	const activeClass =
+		activeTone === "blue"
+			? "bg-[rgba(30,58,95,0.1)] text-[#1E3A5F]"
+			: "bg-[rgba(45,106,79,0.1)] text-[#2D6A4F]";
+
+	return (
+		<button
+			type="button"
+			disabled={disabled}
+			onClick={onClick}
+			className={`flex w-full items-center gap-2 rounded-xl border-none px-3 py-2 text-left text-[13px] font-semibold transition-colors ${
+				active
+					? activeClass
+					: "bg-transparent text-[#111111] hover:bg-[#F0ECE5]"
+			} ${disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer"} ${className}`}
+		>
+			{children}
+		</button>
+	);
+}
+
+function PreviewExportActionsPanel({
+	activeTheme,
+	previewTheme,
+	themedDoc,
+	markdownExport,
+	plainTextExport,
+	mermaidMarkdownExport,
+	mermaidBlocks,
+	infographicEmbeds,
+	infographicStandaloneDoc,
+	slugBase,
+	isPublic,
+	draft,
+	slugInput,
+	toSlug,
+	getPublicUrl,
+	isCopiedHtml,
+	isCopiedReact,
+	isCopiedMd,
+	isCopiedMermaid,
+	isCopiedInfographic,
+	isCopiedTxt,
+	isCopiedPublicUrl,
+	onCopyThemeHTML,
+	onCopyThemeReact,
+	setCopiedTheme,
+}) {
+	return (
+		<div className="flex flex-col gap-0.5">
+			<p className="m-0 mb-2 text-[10px] font-bold uppercase tracking-wider text-[#888888]">
+				Export — {activeTheme?.name}
+			</p>
+
+			<ExportActionButton
+				onClick={() => {
+					if (!themedDoc) return;
+					const blob = new Blob([themedDoc], {
+						type: "text/html;charset=utf-8",
+					});
+					const a = document.createElement("a");
+					a.href = URL.createObjectURL(blob);
+					a.download = `${slugBase}-${(activeTheme?.name || "theme").toLowerCase().replace(/\s+/g, "-")}.html`;
+					a.click();
+					URL.revokeObjectURL(a.href);
+				}}
+				disabled={!themedDoc}
+			>
+				<svg
+					width={13}
+					height={13}
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={2}
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				>
+					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+					<polyline points="7 10 12 15 17 10" />
+					<line x1="12" y1="15" x2="12" y2="3" />
+				</svg>
+				Download .html
+			</ExportActionButton>
+
+			<ExportActionButton
+				active={isCopiedHtml}
+				onClick={() => onCopyThemeHTML(previewTheme)}
+			>
+				<Icon
+					d={Icons.copy}
+					size={13}
+					stroke={isCopiedHtml ? "#2D6A4F" : "#111111"}
+				/>
+				{isCopiedHtml ? "HTML copied!" : `Copy HTML — ${activeTheme?.name}`}
+			</ExportActionButton>
+
+			<ExportActionButton
+				active={isCopiedPublicUrl}
+				disabled={!isPublic}
+				title={
+					isPublic
+						? "Full URL viewers can open to see this post with the selected export theme"
+						: "Publish first to enable a shareable live URL"
+				}
+				onClick={() => {
+					if (!isPublic) return;
+					const u = getPublicUrl(
+						draft?.slug || toSlug(slugInput) || undefined,
+						previewTheme,
+					);
+					navigator.clipboard.writeText(u).catch(() => {});
+					setCopiedTheme({ key: previewTheme, format: "publicUrl" });
+					setTimeout(() => setCopiedTheme(null), 2200);
+				}}
+			>
+				<svg
+					width={13}
+					height={13}
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={2}
+					strokeLinecap="round"
+				>
+					<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+					<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+				</svg>
+				{isCopiedPublicUrl ? "Link copied!" : "Copy public URL (this theme)"}
+			</ExportActionButton>
+
+			<ExportActionButton
+				active={isCopiedReact}
+				activeTone="blue"
+				title="Copies a React component (iframe embed) you can paste into a Next.js or Vite app"
+				onClick={() => onCopyThemeReact(previewTheme)}
+			>
+				<svg
+					width={13}
+					height={13}
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth={2}
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				>
+					<polyline points="16 18 22 12 16 6" />
+					<polyline points="8 6 2 12 8 18" />
+				</svg>
+				{isCopiedReact ? "React copied!" : `Copy React — ${activeTheme?.name}`}
+			</ExportActionButton>
+
+			<ExportActionButton
+				disabled={!markdownExport.trim()}
+				onClick={() => {
+					if (!markdownExport.trim()) return;
+					const blob = new Blob([markdownExport], {
+						type: "text/markdown;charset=utf-8",
+					});
+					const a = document.createElement("a");
+					a.href = URL.createObjectURL(blob);
+					a.download = `${slugBase}.md`;
+					a.click();
+					URL.revokeObjectURL(a.href);
+				}}
+			>
+				<Icon d={Icons.fileText} size={13} stroke="#111111" />
+				Download .md
+			</ExportActionButton>
+
+			<ExportActionButton
+				disabled={!plainTextExport.trim()}
+				onClick={() => {
+					if (!plainTextExport.trim()) return;
+					const blob = new Blob([plainTextExport], {
+						type: "text/plain;charset=utf-8",
+					});
+					const a = document.createElement("a");
+					a.href = URL.createObjectURL(blob);
+					a.download = `${slugBase}.txt`;
+					a.click();
+					URL.revokeObjectURL(a.href);
+				}}
+			>
+				<Icon d={Icons.fileText} size={13} stroke="#111111" />
+				Download .txt
+			</ExportActionButton>
+
+			<ExportActionButton
+				active={isCopiedMd}
+				disabled={!markdownExport.trim()}
+				onClick={() => {
+					if (!markdownExport.trim()) return;
+					navigator.clipboard.writeText(markdownExport).catch(() => {});
+					setCopiedTheme({ key: previewTheme, format: "markdown" });
+					setTimeout(() => setCopiedTheme(null), 2200);
+				}}
+			>
+				<Icon
+					d={Icons.copy}
+					size={13}
+					stroke={isCopiedMd ? "#2D6A4F" : "#111111"}
+				/>
+				{isCopiedMd ? "Markdown copied!" : "Copy Markdown"}
+			</ExportActionButton>
+
+			<ExportActionButton
+				active={isCopiedMermaid}
+				disabled={!mermaidMarkdownExport.trim()}
+				onClick={() => {
+					if (!mermaidMarkdownExport.trim()) return;
+					navigator.clipboard.writeText(mermaidMarkdownExport).catch(() => {});
+					setCopiedTheme({ key: previewTheme, format: "mermaid" });
+					setTimeout(() => setCopiedTheme(null), 2200);
+				}}
+			>
+				<Icon
+					d={Icons.workflow}
+					size={13}
+					stroke={isCopiedMermaid ? "#2D6A4F" : "#111111"}
+				/>
+				{isCopiedMermaid
+					? "Mermaid copied!"
+					: `Copy Mermaid (${mermaidBlocks.length || 0})`}
+			</ExportActionButton>
+
+			<ExportActionButton
+				disabled={!mermaidMarkdownExport.trim()}
+				onClick={() => {
+					if (!mermaidMarkdownExport.trim()) return;
+					const blob = new Blob([mermaidMarkdownExport], {
+						type: "text/markdown;charset=utf-8",
+					});
+					const a = document.createElement("a");
+					a.href = URL.createObjectURL(blob);
+					a.download = `${slugBase}-diagrams.md`;
+					a.click();
+					URL.revokeObjectURL(a.href);
+				}}
+			>
+				<Icon d={Icons.fileText} size={13} stroke="#111111" />
+				Download Mermaid .md
+			</ExportActionButton>
+
+			<ExportActionButton
+				active={isCopiedInfographic}
+				disabled={!infographicEmbeds.length}
+				onClick={() => {
+					if (!infographicEmbeds.length) return;
+					navigator.clipboard.writeText(infographicEmbeds.join("\n\n")).catch(() => {});
+					setCopiedTheme({ key: previewTheme, format: "infographic" });
+					setTimeout(() => setCopiedTheme(null), 2200);
+				}}
+			>
+				<Icon
+					d={Icons.barChart}
+					size={13}
+					stroke={isCopiedInfographic ? "#2D6A4F" : "#111111"}
+				/>
+				{isCopiedInfographic
+					? "Infographics copied!"
+					: `Copy infographic HTML (${infographicEmbeds.length || 0})`}
+			</ExportActionButton>
+
+			<ExportActionButton
+				disabled={!infographicStandaloneDoc.trim()}
+				onClick={() => {
+					if (!infographicStandaloneDoc.trim()) return;
+					const blob = new Blob([infographicStandaloneDoc], {
+						type: "text/html;charset=utf-8",
+					});
+					const a = document.createElement("a");
+					a.href = URL.createObjectURL(blob);
+					a.download = `${slugBase}-infographics.html`;
+					a.click();
+					URL.revokeObjectURL(a.href);
+				}}
+			>
+				<Icon d={Icons.fileText} size={13} stroke="#111111" />
+				Download infographics .html
+			</ExportActionButton>
+
+			<div className="mx-1.5 my-1 h-px bg-[#E2E2E2]" />
+
+			<ExportActionButton
+				active={isCopiedTxt}
+				disabled={!plainTextExport.trim()}
+				onClick={() => {
+					if (!plainTextExport.trim()) return;
+					navigator.clipboard.writeText(plainTextExport).catch(() => {});
+					setCopiedTheme({ key: previewTheme, format: "text" });
+					setTimeout(() => setCopiedTheme(null), 2200);
+				}}
+			>
+				<Icon
+					d={Icons.copy}
+					size={13}
+					stroke={isCopiedTxt ? "#2D6A4F" : "#111111"}
+				/>
+				{isCopiedTxt ? "Text copied!" : "Copy plain text"}
+			</ExportActionButton>
+		</div>
+	);
+}
 
 export default function PreviewExportModal({
 	open,
@@ -35,9 +357,6 @@ export default function PreviewExportModal({
 	translationSaved,
 	savedLangs,
 	creditEstimate,
-	themeExportOpen,
-	setThemeExportOpen,
-	themeExportRef,
 	copiedTheme,
 	setCopiedTheme,
 	copiedPubThemeRow,
@@ -50,6 +369,7 @@ export default function PreviewExportModal({
 	onCopyThemeReact,
 }) {
 	const isCompact = useCompactAssetsNav();
+	const [activeTab, setActiveTab] = useState("themes");
 	const activeTheme = THEMES[previewTheme] || THEMES.ink;
 	const currentHTML = stripDraftSlashQueryFromHtmlString(
 		editorRef.current?.innerHTML || draft?.body || "",
@@ -125,888 +445,206 @@ export default function PreviewExportModal({
 		setCopiedPubThemeRow,
 	};
 
+	const exportPanelProps = {
+		activeTheme,
+		previewTheme,
+		themedDoc,
+		markdownExport,
+		plainTextExport,
+		mermaidMarkdownExport,
+		mermaidBlocks,
+		infographicEmbeds,
+		infographicStandaloneDoc,
+		slugBase,
+		isPublic,
+		draft,
+		slugInput,
+		toSlug,
+		getPublicUrl,
+		isCopiedHtml,
+		isCopiedReact,
+		isCopiedMd,
+		isCopiedMermaid,
+		isCopiedInfographic,
+		isCopiedTxt,
+		isCopiedPublicUrl,
+		onCopyThemeHTML,
+		onCopyThemeReact,
+		setCopiedTheme,
+	};
+
+	const renderTabContent = () => {
+		switch (activeTab) {
+			case "themes":
+				return (
+					<PreviewExportThemeList
+						layout={isCompact ? "strip" : "sidebar"}
+						embedded
+						{...themeListProps}
+					/>
+				);
+			case "language":
+				return (
+					<div className="flex flex-col gap-3">
+						<p className="m-0 text-[10px] font-bold uppercase tracking-wider text-[#888888]">
+							Translate blog
+						</p>
+						<div className="w-full min-w-0">
+							<DraftTranslationBar
+								compact
+								translationLang={translationLang}
+								setTranslationLang={setTranslationLang}
+								onTranslate={onTranslate}
+								onSaveTranslation={onSaveTranslation}
+								onShowOriginal={onShowOriginal}
+								translating={translating}
+								savingTranslation={savingTranslation}
+								translationError={translationError}
+								translationSaved={translationSaved}
+								savedLangs={savedLangs}
+								creditEstimate={creditEstimate}
+								hasTranslatedPreview={Boolean(translatedHTML?.trim())}
+							/>
+						</div>
+						{translationError ? (
+							<p className="m-0 text-[11px] leading-snug text-[#B45309]">
+								{translationError}
+							</p>
+						) : null}
+					</div>
+				);
+			case "audio":
+				return (
+					<BlogToAudioDropdown
+						inline
+						content={plainTextExport}
+						title={previewDocTitle}
+						isCompact={isCompact}
+					/>
+				);
+			case "export":
+				return <PreviewExportActionsPanel {...exportPanelProps} />;
+			default:
+				return null;
+		}
+	};
+
 	return (
 		<AnimatePresence>
 			{open && (
-							<>
-								{/* Backdrop */}
-								<motion.div
-									key="theme-backdrop"
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-								onClick={onClose}
-									style={{
-										position: "fixed",
-										inset: 0,
-										background: "rgba(0,0,0,0.5)",
-										zIndex: 300,
-										backdropFilter: "blur(4px)",
-									}}
-								/>
+				<>
+					<motion.div
+						key="theme-backdrop"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						onClick={onClose}
+						className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-sm"
+					/>
 
-								{/* Centering shell — flexbox positions the modal, pointer-events:none lets backdrop work */}
-								<motion.div
-									key="theme-modal"
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									transition={{ duration: 0.22 }}
-									style={{
-										position: "fixed",
-										inset: 0,
-										zIndex: 301,
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "center",
-										pointerEvents: "none",
-									}}
-								>
-									{/* Actual modal panel */}
-									<motion.div
-										initial={{ scale: 0.95, y: 24 }}
-										animate={{ scale: 1, y: 0 }}
-										exit={{ scale: 0.95, y: 24 }}
-										transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-										style={{
-											width: isCompact ? "100%" : "92vw",
-											maxWidth: isCompact ? "100%" : 1280,
-											height: isCompact ? "100dvh" : "90vh",
-											maxHeight: isCompact ? "100dvh" : undefined,
-											background: T.surface,
-											borderRadius: isCompact ? 0 : 16,
-											border: isCompact
-												? "none"
-												: `1px solid ${T.border}`,
-											display: "flex",
-											flexDirection: "column",
-											boxShadow: isCompact
-												? "none"
-												: "0 32px 80px rgba(0,0,0,0.28)",
-											overflow: "hidden",
-											pointerEvents: "all",
-										}}
+					<motion.div
+						key="theme-modal"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.22 }}
+						className="pointer-events-none fixed inset-0 z-[301] flex items-center justify-center"
+					>
+						<motion.div
+							initial={{ scale: 0.95, y: 24 }}
+							animate={{ scale: 1, y: 0 }}
+							exit={{ scale: 0.95, y: 24 }}
+							transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+							className={`pointer-events-auto flex flex-col overflow-hidden bg-white ${
+								isCompact
+									? "h-dvh max-h-dvh w-full rounded-none border-none shadow-none"
+									: "h-[90vh] w-[92vw] max-w-[1280px] rounded-2xl border border-[#E2E2E2] shadow-[0_32px_80px_rgba(0,0,0,0.28)]"
+							}`}
+						>
+							{/* Header */}
+							<div className="shrink-0 border-b border-[#E2E2E2] bg-white">
+								<div className="flex items-center justify-between gap-3 px-3 py-2.5 md:px-5 md:py-2.5">
+									<p className="m-0 min-w-0 flex-1 truncate text-sm font-bold text-[#111111] md:text-[15px]">
+										Preview & Export
+									</p>
+									<motion.button
+										whileHover={{ backgroundColor: "#F0ECE5" }}
+										whileTap={{ scale: 0.93 }}
+										onClick={onClose}
+										type="button"
+										className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-xl border border-[#E2E2E2] bg-transparent"
 									>
-										{/* ─ Top bar ─ */}
-										<div
-											style={{
-												borderBottom: `1px solid ${T.border}`,
-												flexShrink: 0,
-												background: T.surface,
-											}}
+										<svg
+											width={14}
+											height={14}
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="#888888"
+											strokeWidth={2}
+											strokeLinecap="round"
 										>
-											<div
-												style={{
-													display: "flex",
-													flexDirection: "column",
-													padding: isCompact ? "10px 12px" : "10px 20px",
-													gap: isCompact ? 10 : 0,
-													minHeight: isCompact ? undefined : 56,
-												}}
-											>
-												{/* Row 1: title · translation (desktop) · export · close */}
-												<div
-													style={{
-														display: "flex",
-														flexDirection: "row",
-														alignItems: "center",
-														gap: 8,
-														width: "100%",
-														minWidth: 0,
-														flex: isCompact ? undefined : 1,
-													}}
-												>
-													<p
-														style={{
-															fontSize: isCompact ? 14 : 15,
-															fontWeight: 700,
-															color: T.accent,
-															margin: 0,
-															whiteSpace: "nowrap",
-															flex: isCompact ? "1 1 auto" : undefined,
-															flexShrink: isCompact ? 1 : 0,
-															minWidth: 0,
-															overflow: "hidden",
-															textOverflow: "ellipsis",
-														}}
-													>
-														Preview & Export
-													</p>
+											<path d="M18 6L6 18M6 6l12 12" />
+										</svg>
+									</motion.button>
+								</div>
 
-													{!isCompact ? (
-														<>
-															<DraftTranslationBar
-																translationLang={translationLang}
-																setTranslationLang={setTranslationLang}
-																onTranslate={onTranslate}
-																onSaveTranslation={onSaveTranslation}
-																onShowOriginal={onShowOriginal}
-																translating={translating}
-																savingTranslation={savingTranslation}
-																translationError=""
-																translationSaved={translationSaved}
-																savedLangs={savedLangs}
-																creditEstimate={creditEstimate}
-																hasTranslatedPreview={Boolean(
-																	translatedHTML?.trim(),
-																)}
-															/>
-															<div style={{ flex: 1, minWidth: 8 }} />
-														</>
-													) : null}
-
-										{/* Export dropdown */}
-										<div
-											ref={themeExportRef}
-											style={{ position: "relative", flexShrink: 0 }}
-										>
-											<motion.button
+								{/* Tab bar */}
+								<div className="hidescrollbar flex gap-1 overflow-x-auto px-3 pb-2 md:px-5">
+									{PREVIEW_EXPORT_TABS.map((tab) => {
+										const isActive = activeTab === tab.id;
+										return (
+											<button
+												key={tab.id}
 												type="button"
-												whileHover={{ background: "#F0ECE5" }}
-												whileTap={{ scale: 0.95 }}
-												onClick={() => setThemeExportOpen((o) => !o)}
-												style={{
-													display: "flex",
-													alignItems: "center",
-													gap: 6,
-													background: T.base,
-													border: `1px solid ${T.border}`,
-													borderRadius: 9,
-													padding: isCompact ? "7px 10px" : "8px 14px",
-													fontSize: isCompact ? 12 : 13,
-													fontWeight: 600,
-													color: T.accent,
-													cursor: "pointer",
-													flexShrink: 0,
-													whiteSpace: "nowrap",
-												}}
+												onClick={() => setActiveTab(tab.id)}
+												className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+													isActive
+														? "bg-[#111111] text-white"
+														: "bg-[#F2F2F2] text-[#888888] hover:bg-[#E8E4DC] hover:text-[#111111]"
+												}`}
 											>
-												<Icon d={Icons.copy} size={13} stroke={T.accent} />
-												{isCompact
-													? "Export"
-													: `Export — ${activeTheme?.name}`}
-												<span
-													style={{
-														display: "inline-flex",
-														transform: themeExportOpen
-															? "rotate(180deg)"
-															: "none",
-														transition: "transform 0.18s ease",
-													}}
-												>
-													<Icon
-														d={Icons.chevronD}
-														size={14}
-														stroke={T.accent}
-													/>
-												</span>
-											</motion.button>
+												{tab.label}
+											</button>
+										);
+									})}
+								</div>
+							</div>
 
-											<AnimatePresence>
-												{themeExportOpen && (
-													<motion.div
-														initial={{ opacity: 0, y: -6 }}
-														animate={{ opacity: 1, y: 0 }}
-														exit={{ opacity: 0, y: -6 }}
-														transition={{
-															duration: 0.14,
-															ease: [0.16, 1, 0.3, 1],
-														}}
-														style={{
-															position: "absolute",
-															top: "100%",
-															right: 0,
-															marginTop: 6,
-															minWidth: 260,
-															background: T.surface,
-															border: `1px solid ${T.border}`,
-															borderRadius: 10,
-															boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
-															padding: 6,
-															zIndex: 400,
-														}}
-													>
-														{/* Download HTML */}
-														<button
-															type="button"
-												onClick={() => {
-													if (!themedDoc) return;
-													const blob = new Blob([themedDoc], {
-														type: "text/html;charset=utf-8",
-													});
-													const a = document.createElement("a");
-													a.href = URL.createObjectURL(blob);
-													a.download = `${slugBase}-${(activeTheme?.name || "theme").toLowerCase().replace(/\s+/g, "-")}.html`;
-													a.click();
-													URL.revokeObjectURL(a.href);
-																setThemeExportOpen(false);
-												}}
-												style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: "transparent",
-													fontSize: 13,
-													fontWeight: 600,
-																color: T.accent,
-													cursor: "pointer",
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-												}}
-											>
-												<svg
-													width={13}
-													height={13}
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													strokeWidth={2}
-													strokeLinecap="round"
-													strokeLinejoin="round"
-												>
-													<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-													<polyline points="7 10 12 15 17 10" />
-													<line x1="12" y1="15" x2="12" y2="3" />
-												</svg>
-												Download .html
-														</button>
+							{/* Body */}
+							<div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+								{/* Left panel: active tab content */}
+								<div
+									className={`flex min-h-0 shrink-0 flex-col bg-zinc-50 md:w-[248px] md:border-r md:border-[#E2E2E2] ${
+										isCompact ? "max-h-[38%] border-b border-zinc-50" : ""
+									}`}
+								>
+									<div className="min-h-0 flex-1 overflow-y-auto p-3">
+										{renderTabContent()}
+									</div>
+								</div>
 
-														{/* Copy HTML */}
-														<button
-															type="button"
-															onClick={() => {
-																onCopyThemeHTML(previewTheme);
-																setThemeExportOpen(false);
-															}}
-												style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: isCopiedHtml
-																	? "rgba(45,106,79,0.1)"
-																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: isCopiedHtml ? "#2D6A4F" : T.accent,
-																cursor: "pointer",
-													display: "flex",
-													alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon
-																d={Icons.copy}
-																size={13}
-																stroke={
-																	isCopiedHtml ? "#2D6A4F" : T.accent
-																}
-															/>
-															{isCopiedHtml
-																? "HTML copied!"
-																: `Copy HTML — ${activeTheme?.name}`}
-														</button>
-
-														{/* Copy public themed URL */}
-														<button
-															type="button"
-															disabled={!isPublic}
-															title={
-																isPublic
-																	? "Full URL viewers can open to see this post with the selected export theme"
-																	: "Publish first to enable a shareable live URL"
-															}
-															onClick={() => {
-																if (!isPublic) return;
-																const u = getPublicUrl(
-																	draft?.slug ||
-																		toSlug(slugInput) ||
-																		undefined,
-																	previewTheme,
-																);
-																navigator.clipboard.writeText(u).catch(() => {});
-																setCopiedTheme({
-																	key: previewTheme,
-																	format: "publicUrl",
-																});
-																setThemeExportOpen(false);
-																setTimeout(() => setCopiedTheme(null), 2200);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: isCopiedPublicUrl
-																	? "rgba(45,106,79,0.1)"
-																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: isCopiedPublicUrl
-																	? "#2D6A4F"
-																	: isPublic
-																		? T.accent
-																		: T.muted,
-																cursor: isPublic ? "pointer" : "not-allowed",
-																opacity: isPublic ? 1 : 0.5,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<svg
-																width={13}
-																height={13}
-																viewBox="0 0 24 24"
-																fill="none"
-																stroke="currentColor"
-																strokeWidth={2}
-																strokeLinecap="round"
-															>
-																<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-																<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-															</svg>
-															{isCopiedPublicUrl
-																? "Link copied!"
-																: "Copy public URL (this theme)"}
-														</button>
-
-														{/* Copy React */}
-														<button
-															type="button"
-															title="Copies a React component (iframe embed) you can paste into a Next.js or Vite app"
-															onClick={() => {
-																onCopyThemeReact(previewTheme);
-																setThemeExportOpen(false);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-													border: "none",
-																borderRadius: 8,
-																background: isCopiedReact
-																	? "rgba(30,58,95,0.1)"
-																	: "transparent",
-													fontSize: 13,
-													fontWeight: 600,
-																color: isCopiedReact
-																	? "#1E3A5F"
-																	: T.accent,
-													cursor: "pointer",
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-												}}
-											>
-														<svg
-															width={13}
-															height={13}
-															viewBox="0 0 24 24"
-															fill="none"
-																stroke="currentColor"
-															strokeWidth={2}
-															strokeLinecap="round"
-															strokeLinejoin="round"
-														>
-																<polyline points="16 18 22 12 16 6" />
-																<polyline points="8 6 2 12 8 18" />
-														</svg>
-															{isCopiedReact
-																? "React copied!"
-																: `Copy React — ${activeTheme?.name}`}
-														</button>
-
-														{/* Download Markdown */}
-														<button
-															type="button"
-															onClick={() => {
-																if (!markdownExport.trim()) return;
-																const blob = new Blob([markdownExport], {
-																	type: "text/markdown;charset=utf-8",
-																});
-																const a = document.createElement("a");
-																a.href = URL.createObjectURL(blob);
-																a.download = `${slugBase}.md`;
-																a.click();
-																URL.revokeObjectURL(a.href);
-																setThemeExportOpen(false);
-															}}
-												style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: T.accent,
-																cursor: markdownExport.trim() ? "pointer" : "not-allowed",
-																opacity: markdownExport.trim() ? 1 : 0.45,
-													display: "flex",
-													alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
-															Download .md
-														</button>
-
-														{/* Download plain text */}
-														<button
-															type="button"
-															onClick={() => {
-																if (!plainTextExport.trim()) return;
-																const blob = new Blob([plainTextExport], {
-																	type: "text/plain;charset=utf-8",
-																});
-																const a = document.createElement("a");
-																a.href = URL.createObjectURL(blob);
-																a.download = `${slugBase}.txt`;
-																a.click();
-																URL.revokeObjectURL(a.href);
-																setThemeExportOpen(false);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: "transparent",
-													fontSize: 13,
-													fontWeight: 600,
-																color: T.accent,
-																cursor: plainTextExport.trim() ? "pointer" : "not-allowed",
-																opacity: plainTextExport.trim() ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
-															Download .txt
-														</button>
-
-														{/* Copy Markdown */}
-														<button
-															type="button"
-															onClick={() => {
-																if (!markdownExport.trim()) return;
-																navigator.clipboard.writeText(markdownExport).catch(() => {});
-																setCopiedTheme({ key: previewTheme, format: "markdown" });
-																setThemeExportOpen(false);
-																setTimeout(() => setCopiedTheme(null), 2200);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: isCopiedMd
-																	? "rgba(45,106,79,0.1)"
-																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: isCopiedMd ? "#2D6A4F" : T.accent,
-																cursor: markdownExport.trim() ? "pointer" : "not-allowed",
-																opacity: markdownExport.trim() ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon
-																d={Icons.copy}
-																size={13}
-																stroke={isCopiedMd ? "#2D6A4F" : T.accent}
-															/>
-															{isCopiedMd ? "Markdown copied!" : "Copy Markdown"}
-														</button>
-
-														{/* Copy Mermaid source */}
-														<button
-															type="button"
-															disabled={!mermaidMarkdownExport.trim()}
-															onClick={() => {
-																if (!mermaidMarkdownExport.trim()) return;
-																navigator.clipboard
-																	.writeText(mermaidMarkdownExport)
-																	.catch(() => {});
-																setCopiedTheme({
-																	key: previewTheme,
-																	format: "mermaid",
-																});
-																setThemeExportOpen(false);
-																setTimeout(() => setCopiedTheme(null), 2200);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: isCopiedMermaid
-																	? "rgba(45,106,79,0.1)"
-																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: isCopiedMermaid ? "#2D6A4F" : T.accent,
-																cursor: mermaidMarkdownExport.trim()
-																	? "pointer"
-																	: "not-allowed",
-																opacity: mermaidMarkdownExport.trim() ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon
-																d={Icons.workflow}
-																size={13}
-																stroke={
-																	isCopiedMermaid ? "#2D6A4F" : T.accent
-																}
-															/>
-															{isCopiedMermaid
-																? "Mermaid copied!"
-																: `Copy Mermaid (${mermaidBlocks.length || 0})`}
-														</button>
-
-														{/* Download Mermaid markdown */}
-														<button
-															type="button"
-															disabled={!mermaidMarkdownExport.trim()}
-															onClick={() => {
-																if (!mermaidMarkdownExport.trim()) return;
-																const blob = new Blob([mermaidMarkdownExport], {
-																	type: "text/markdown;charset=utf-8",
-																});
-																const a = document.createElement("a");
-																a.href = URL.createObjectURL(blob);
-																a.download = `${slugBase}-diagrams.md`;
-																a.click();
-																URL.revokeObjectURL(a.href);
-																setThemeExportOpen(false);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: T.accent,
-																cursor: mermaidMarkdownExport.trim()
-																	? "pointer"
-																	: "not-allowed",
-																opacity: mermaidMarkdownExport.trim() ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
-															Download Mermaid .md
-														</button>
-
-														{/* Copy infographic embed HTML */}
-														<button
-															type="button"
-															disabled={!infographicEmbeds.length}
-															onClick={() => {
-																if (!infographicEmbeds.length) return;
-																navigator.clipboard
-																	.writeText(infographicEmbeds.join("\n\n"))
-																	.catch(() => {});
-																setCopiedTheme({
-																	key: previewTheme,
-																	format: "infographic",
-																});
-																setThemeExportOpen(false);
-																setTimeout(() => setCopiedTheme(null), 2200);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: isCopiedInfographic
-																	? "rgba(45,106,79,0.1)"
-																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: isCopiedInfographic
-																	? "#2D6A4F"
-																	: T.accent,
-																cursor: infographicEmbeds.length
-																	? "pointer"
-																	: "not-allowed",
-																opacity: infographicEmbeds.length ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon
-																d={Icons.barChart}
-																size={13}
-																stroke={
-																	isCopiedInfographic ? "#2D6A4F" : T.accent
-																}
-															/>
-															{isCopiedInfographic
-																? "Infographics copied!"
-																: `Copy infographic HTML (${infographicEmbeds.length || 0})`}
-														</button>
-
-														{/* Download infographics HTML */}
-														<button
-															type="button"
-															disabled={!infographicStandaloneDoc.trim()}
-															onClick={() => {
-																if (!infographicStandaloneDoc.trim()) return;
-																const blob = new Blob([infographicStandaloneDoc], {
-																	type: "text/html;charset=utf-8",
-																});
-																const a = document.createElement("a");
-																a.href = URL.createObjectURL(blob);
-																a.download = `${slugBase}-infographics.html`;
-																a.click();
-																URL.revokeObjectURL(a.href);
-																setThemeExportOpen(false);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: T.accent,
-																cursor: infographicStandaloneDoc.trim()
-																	? "pointer"
-																	: "not-allowed",
-																opacity: infographicStandaloneDoc.trim() ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon d={Icons.fileText} size={13} stroke={T.accent} />
-															Download infographics .html
-														</button>
-
-														<div
-															style={{
-																height: 1,
-																background: T.border,
-																margin: "4px 6px",
-															}}
-														/>
-
-														{/* Copy plain text */}
-														<button
-															type="button"
-															onClick={() => {
-																if (!plainTextExport.trim()) return;
-																navigator.clipboard.writeText(plainTextExport).catch(() => {});
-																setCopiedTheme({ key: previewTheme, format: "text" });
-																setThemeExportOpen(false);
-																setTimeout(() => setCopiedTheme(null), 2200);
-															}}
-															style={{
-																width: "100%",
-																textAlign: "left",
-																padding: "9px 12px",
-																border: "none",
-																borderRadius: 8,
-																background: isCopiedTxt
-																	? "rgba(45,106,79,0.1)"
-																	: "transparent",
-																fontSize: 13,
-																fontWeight: 600,
-																color: isCopiedTxt ? "#2D6A4F" : T.accent,
-																cursor: plainTextExport.trim() ? "pointer" : "not-allowed",
-																opacity: plainTextExport.trim() ? 1 : 0.45,
-																display: "flex",
-																alignItems: "center",
-																gap: 9,
-															}}
-														>
-															<Icon
-																d={Icons.copy}
-																size={13}
-																stroke={isCopiedTxt ? "#2D6A4F" : T.accent}
-															/>
-															{isCopiedTxt ? "Text copied!" : "Copy plain text"}
-														</button>
-													</motion.div>
-												)}
-											</AnimatePresence>
+								{/* Preview */}
+								<div className="relative min-h-0 min-w-0 flex-1 bg-[#e5e7eb]">
+									{themedDoc ? (
+										<iframe
+											key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}-${previewSrcDoc ? "m" : "b"}`}
+											srcDoc={previewSrcDoc}
+											title={`Preview — ${activeTheme?.name}`}
+											sandbox="allow-scripts allow-same-origin"
+											className={`block h-full w-full border-0 transition-opacity duration-150 ${
+												previewMermaidPending ? "opacity-70" : "opacity-100"
+											}`}
+										/>
+									) : (
+										<div className="flex h-full items-center justify-center text-sm text-[#888888]">
+											No content yet — write something in the editor first.
 										</div>
-
-											{/* Close */}
-											<motion.button
-												whileHover={{ background: "#F0ECE5" }}
-												whileTap={{ scale: 0.93 }}
-											onClick={onClose}
-												style={{
-													background: "transparent",
-													border: `1px solid ${T.border}`,
-													borderRadius: 8,
-													width: 34,
-													height: 34,
-													display: "flex",
-													alignItems: "center",
-													justifyContent: "center",
-													cursor: "pointer",
-													flexShrink: 0,
-												}}
-											>
-												<svg
-													width={14}
-													height={14}
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke={T.muted}
-													strokeWidth={2}
-													strokeLinecap="round"
-												>
-													<path d="M18 6L6 18M6 6l12 12" />
-												</svg>
-											</motion.button>
-												</div>
-
-											{isCompact ? (
-												<div
-													className="hidescrollbar"
-													style={{
-														width: "100%",
-														minWidth: 0,
-														overflowX: "auto",
-														WebkitOverflowScrolling: "touch",
-														paddingBottom: 2,
-													}}
-												>
-													<DraftTranslationBar
-														compact
-														translationLang={translationLang}
-														setTranslationLang={setTranslationLang}
-														onTranslate={onTranslate}
-														onSaveTranslation={onSaveTranslation}
-														onShowOriginal={onShowOriginal}
-														translating={translating}
-														savingTranslation={savingTranslation}
-														translationError=""
-														translationSaved={translationSaved}
-														savedLangs={savedLangs}
-														creditEstimate={creditEstimate}
-														hasTranslatedPreview={Boolean(
-															translatedHTML?.trim(),
-														)}
-													/>
-												</div>
-											) : null}
-											</div>
-
-											{translationError ? (
-												<div
-													style={{
-														padding: "6px 20px 10px",
-														fontSize: 11,
-														color: "#B45309",
-														lineHeight: 1.35,
-														borderTop: `1px solid ${T.border}`,
-														background: "#FFFBEB",
-													}}
-												>
-													{translationError}
-												</div>
-											) : null}
-										</div>
-
-										{/* ─ Body: themes + preview (column on mobile) ─ */}
-										<div
-											style={{
-												flex: 1,
-												display: "flex",
-												flexDirection: isCompact ? "column" : "row",
-												overflow: "hidden",
-												minHeight: 0,
-											}}
-										>
-											{!isCompact ? (
-												<PreviewExportThemeList
-													layout="sidebar"
-													{...themeListProps}
-												/>
-											) : null}
-
-											<div
-												style={{
-													flex: 1,
-													position: "relative",
-													background: "#e5e7eb",
-													minHeight: 0,
-													minWidth: 0,
-												}}
-											>
-												{themedDoc ? (
-													<iframe
-													key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}-${previewSrcDoc ? "m" : "b"}`}
-														srcDoc={previewSrcDoc}
-														title={`Preview — ${activeTheme?.name}`}
-														sandbox="allow-scripts allow-same-origin"
-														style={{
-															width: "100%",
-															height: "100%",
-															border: "none",
-															display: "block",
-															opacity: previewMermaidPending ? 0.72 : 1,
-															transition: "opacity 0.15s ease",
-														}}
-													/>
-												) : (
-													<div
-														style={{
-															height: "100%",
-															display: "flex",
-															alignItems: "center",
-															justifyContent: "center",
-															color: T.muted,
-															fontSize: 14,
-														}}
-													>
-														No content yet — write something in the editor
-														first.
-													</div>
-												)}
-											</div>
-
-											{isCompact ? (
-												<PreviewExportThemeList
-													layout="strip"
-													{...themeListProps}
-												/>
-											) : null}
-										</div>
-									</motion.div>
-									{/* end centering shell */}
-								</motion.div>
-							</>
+									)}
+								</div>
+							</div>
+						</motion.div>
+					</motion.div>
+				</>
 			)}
 		</AnimatePresence>
 	);

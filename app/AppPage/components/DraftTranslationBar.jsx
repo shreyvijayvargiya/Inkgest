@@ -26,14 +26,11 @@ export default function DraftTranslationBar({
 	return (
 		<div
 			style={{
-				display: "flex",
-				alignItems: "center",
 				gap: compact ? 6 : 8,
-				flexShrink: 0,
-				flexWrap: "nowrap",
 				width: compact ? "max-content" : undefined,
 				minWidth: compact ? "100%" : undefined,
 			}}
+			className="space-y-2 h-full"
 		>
 			<div style={{ flex: compact ? "1 1 140px" : undefined, minWidth: compact ? 120 : undefined, maxWidth: compact ? 200 : undefined }}>
 				<TranslationLanguageSelect

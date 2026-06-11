@@ -6,9 +6,11 @@ const STRIP_TILE_WIDTH = 76;
 
 /**
  * @param {"sidebar" | "strip"} layout — vertical list (desktop) or horizontal scroll (mobile)
+ * @param {boolean} embedded — nested inside tab panel (no outer chrome)
  */
 export default function PreviewExportThemeList({
 	layout = "sidebar",
+	embedded = false,
 	previewTheme,
 	setPreviewTheme,
 	isPublic,
@@ -28,23 +30,33 @@ export default function PreviewExportThemeList({
 				isStrip
 					? {
 							flexShrink: 0,
-							borderTop: `1px solid ${T.border}`,
-							background: T.base,
-							paddingTop: 8,
-							paddingBottom:
-								"calc(10px + env(safe-area-inset-bottom, 0px))",
+							borderTop: embedded ? "none" : `1px solid ${T.border}`,
+							background: embedded ? "transparent" : T.base,
+							paddingTop: embedded ? 0 : 8,
+							paddingBottom: embedded
+								? 0
+								: "calc(10px + env(safe-area-inset-bottom, 0px))",
 						}
-					: {
-							width: 210,
-							borderRight: `1px solid ${T.border}`,
-							overflowY: "auto",
-							flexShrink: 0,
-							background: T.base,
-							padding: "12px 10px",
-							display: "flex",
-							flexDirection: "column",
-							gap: 3,
-						}
+					: embedded
+						? {
+								width: "100%",
+								overflowY: "auto",
+								flexShrink: 0,
+								display: "flex",
+								flexDirection: "column",
+								gap: 3,
+							}
+						: {
+								width: 210,
+								borderRight: `1px solid ${T.border}`,
+								overflowY: "auto",
+								flexShrink: 0,
+								background: T.base,
+								padding: "12px 10px",
+								display: "flex",
+								flexDirection: "column",
+								gap: 3,
+							}
 			}
 		>
 			{isStrip ? (
@@ -83,7 +95,7 @@ export default function PreviewExportThemeList({
 						{themeEntries.length}
 					</span>
 				</div>
-			) : (
+			) : embedded ? null : (
 				<p
 					style={{
 						fontSize: 10,
