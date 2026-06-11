@@ -15,7 +15,7 @@ const inkgest = {
 const defaultStyles = {
 	container: "w-full border border-zinc-200 rounded-xl",
 	header: "border-b border-zinc-200",
-	headerCell: "px-4 py-3 text-left text-xs font-semibold text-zinc-700 uppercase tracking-wider",
+	headerCell: "px-4 py-3 text-left text-xs font-semibold text-zinc-700  tracking-wider",
 	headerCellSortable: "cursor-pointer hover:bg-zinc-50 transition-colors",
 	body: "divide-y divide-zinc-200",
 	row: "border-b border-zinc-200 rounded-xl last:border-b-0",

@@ -15,14 +15,15 @@ import {
 } from "../lib/utils/cookies";
 import { onAuthStateChange } from "../lib/api/auth";
 import { toast } from "sonner";
+import { FREE_CREDIT_LIMIT } from "../lib/utils/credits";
 
 /* ─── Fonts ─── */
 const FontLink = () => (
 	<style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Comic:wght@300;400;500;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { font-family: 'Outfit', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
-    button, input { font-family: 'Outfit', sans-serif; }
+    html, body { font-family: 'Comic', sans-serif; background: #F7F5F0; -webkit-font-smoothing: antialiased; }
+    button, input { font-family: 'Comic', sans-serif; }
   `}</style>
 );
 
@@ -33,7 +34,7 @@ const T = {
 	warm: "#C17B2F",
 	muted: "#7A7570",
 	border: "#E8E4DC",
-	sidebar: "#FDFCF9",
+	sidebar: "#FFFFFF",
 };
 
 const PricingPage = () => {
@@ -108,20 +109,42 @@ const PricingPage = () => {
 			period: "month",
 			description: "Try inkgest with no commitment",
 			features: [
-				"10 credits / month",
+				`${FREE_CREDIT_LIMIT} credits free for first month`,
 				"AI Draft / Newsletter — 1 credit",
 				"URL Scrape — 1 credit",
 				"AI Chat message — ¼ credit",
-				"Table Creator — 2 credits",
-				"Blank drafts free, always",
+				"Built-in Writing & Editing tools",
 			],
 			popular: false,
 			type: "free",
 		},
 		{
 			id: "06d78a3d-29d8-485d-b4bb-c43a9f57ccbb",
+			name: "Starter",
+			price: "$20",
+			period: "month",
+			description: "Unlimited credits for serious creators",
+			features: [
+				"50 credits every month",
+				"All content formats",
+				"Multiple URL sources per draft",
+				"AI Chat with all models",
+				"Automatic SEO Optimization",
+				"Real-time Web Research",
+				"Automatic Internal & External Linking",
+				"All Integrations",
+				"Knowledge Bases",
+				"Auto Keyword Research",
+				"Themes, Infographics & Table Creator",
+				"Priority support",
+			],
+			popular: false,
+			type: "subscription",
+		},
+		{
+			id: "b9cdf090-c86b-41e1-b7ea-c1908d78c01b",
 			name: "Pro",
-			price: "$9",
+			price: "$49",
 			period: "month",
 			description: "Unlimited credits for serious creators",
 			features: [
@@ -129,7 +152,10 @@ const PricingPage = () => {
 				"All content formats",
 				"Multiple URL sources per draft",
 				"AI Chat with all models",
-				"Themes, Infographics & Table Creator",
+				"Autoblogging",
+				"Articles Generated & Published Automatically",
+				"Generate Articles in Bulk",
+				"Unlimited Websites",
 				"Priority support",
 			],
 			popular: true,
@@ -270,7 +296,7 @@ const PricingPage = () => {
 						<div>
 							<div
 								style={{
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 									fontSize: 24,
 									color: "white",
 									display: "flex",
@@ -296,7 +322,7 @@ const PricingPage = () => {
 									color: "rgba(255,255,255,0.4)",
 									maxWidth: 200,
 									lineHeight: 1.6,
-									fontFamily: "'Outfit', sans-serif",
+									fontFamily: "'Comic', sans-serif",
 								}}
 							>
 								Turn any URL into a newsletter, email, or blog post,
@@ -318,11 +344,11 @@ const PricingPage = () => {
 										style={{
 											fontSize: 12,
 											fontWeight: 700,
-											textTransform: "uppercase",
+											textTransform: "",
 											letterSpacing: "0.1em",
 											color: "rgba(255,255,255,0.35)",
 											marginBottom: 16,
-											fontFamily: "'Outfit', sans-serif",
+											fontFamily: "'Comic', sans-serif",
 										}}
 									>
 										{col.title}
@@ -337,7 +363,7 @@ const PricingPage = () => {
 												color: "rgba(255,255,255,0.6)",
 												textDecoration: "none",
 												marginBottom: 10,
-												fontFamily: "'Outfit', sans-serif",
+												fontFamily: "'Comic', sans-serif",
 												transition: "color 0.2s",
 											}}
 											onMouseEnter={(e) => (e.target.style.color = "white")}
@@ -366,7 +392,7 @@ const PricingPage = () => {
 							style={{
 								fontSize: 13,
 								color: "rgba(255,255,255,0.3)",
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 							}}
 						>
 							© 2025 inkgest. All rights reserved.
@@ -375,7 +401,7 @@ const PricingPage = () => {
 							style={{
 								fontSize: 13,
 								color: "rgba(255,255,255,0.3)",
-								fontFamily: "'Outfit', sans-serif",
+								fontFamily: "'Comic', sans-serif",
 							}}
 						>
 							Made for writers who publish on a deadline. Built using{" "}
@@ -410,7 +436,7 @@ const PricingPage = () => {
 				style={{
 					minHeight: "100vh",
 					background: T.base,
-					fontFamily: "'Outfit', sans-serif",
+					fontFamily: "'Comic', sans-serif",
 				}}
 			>
 				{/* ── TOP BAR ── */}
@@ -527,7 +553,7 @@ const PricingPage = () => {
 						style={{
 							fontSize: 12,
 							fontWeight: 700,
-							textTransform: "uppercase",
+							textTransform: "",
 							letterSpacing: "0.1em",
 							color: T.warm,
 							marginBottom: 14,
@@ -584,7 +610,7 @@ const PricingPage = () => {
 									style={{
 										fontSize: 11,
 										fontWeight: 700,
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: "0.08em",
 										color: "rgba(255,255,255,0.5)",
 										marginBottom: 8,
@@ -682,14 +708,7 @@ const PricingPage = () => {
 
 				{/* ── PLAN CARDS ── */}
 				<div
-					style={{
-						maxWidth: 760,
-						margin: "0 auto",
-						padding: "0 24px 80px",
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-						gap: 20,
-					}}
+					className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto"
 				>
 					{plans.map((plan, idx) => (
 						<motion.div
@@ -736,7 +755,7 @@ const PricingPage = () => {
 									style={{
 										fontSize: 12,
 										fontWeight: 700,
-										textTransform: "uppercase",
+										textTransform: "",
 										letterSpacing: "0.08em",
 										color: plan.popular ? "rgba(255,255,255,0.5)" : T.muted,
 										marginBottom: 6,
@@ -997,30 +1016,12 @@ const PricingPage = () => {
 						flexDirection: "column",
 						alignItems: "center",
 						justifyContent: "center",
-						gap: 12,
+						gap: 2,
 						marginBottom: 48,
 						textAlign: "center",
 					}}
 				>
-					<a
-						href="https://polar.sh"
-						target="_blank"
-						rel="noopener noreferrer"
-						style={{
-							fontSize: 12,
-							fontWeight: 600,
-							color: T.muted,
-							textDecoration: "none",
-							display: "inline-flex",
-							alignItems: "center",
-							gap: 6,
-							transition: "color 0.15s",
-						}}
-						onMouseEnter={(e) => (e.currentTarget.style.color = T.warm)}
-						onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
-					>
-						Powered by polar.sh
-					</a>
+					<br />
 					<div
 						style={{
 							display: "flex",
@@ -1054,7 +1055,7 @@ const PricingPage = () => {
 							style={{
 								fontSize: 12,
 								fontWeight: 700,
-								textTransform: "uppercase",
+								textTransform: "",
 								letterSpacing: "0.08em",
 								color: T.warm,
 								marginBottom: 20,
@@ -1065,7 +1066,7 @@ const PricingPage = () => {
 						{[
 							[
 								"What counts as a credit?",
-								"AI Draft, Newsletter, Infographics = 1 credit. URL Scrape = 1 credit. Table Creator = 2 credits. AI Chat message = ¼ credit. Blank drafts are free.",
+								"AI Draft, Newsletter = 1 credit, URL Scrape = 1 creditAI Chat message = ¼ credit. Blank drafts are free.",
 							],
 							[
 								"Does the free plan renew monthly?",
@@ -1073,7 +1074,7 @@ const PricingPage = () => {
 							],
 							[
 								"Can I cancel anytime?",
-								"Absolutely. Pro subscriptions can be cancelled at any time with no penalty.",
+								"Absolutely. Starter and Pro subscriptions can be cancelled at any time with no penalty.",
 							],
 						].map(([q, a]) => (
 							<div key={q} style={{ marginBottom: 18 }}>

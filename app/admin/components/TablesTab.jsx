@@ -392,7 +392,7 @@ const TableDetailView = ({ table, onBack }) => {
 								</div>
 							) : (
 								<div className="border border-zinc-200 rounded-xl overflow-hidden">
-									<div className="grid grid-cols-12 gap-4 px-4 py-3 bg-zinc-50 text-[10px] font-bold text-zinc-500 uppercase tracking-wider border-b border-zinc-200">
+									<div className="grid grid-cols-12 gap-4 px-4 py-3 bg-zinc-50 text-[10px] font-bold text-zinc-500  tracking-wider border-b border-zinc-200">
 										<div className="col-span-1">#</div>
 										<div className="col-span-4">Name</div>
 										<div className="col-span-3">Type</div>
@@ -467,19 +467,19 @@ const TableDetailView = ({ table, onBack }) => {
 									<table className="w-full min-w-[600px]">
 										<thead>
 											<tr className="bg-zinc-50 border-b border-zinc-200">
-												<th className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+												<th className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500  tracking-wider">
 													ID
 												</th>
 												{columns.slice(0, 5).map((col) => (
 													<th
 														key={col.name}
-														className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider"
+														className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500  tracking-wider"
 													>
 														{col.name}
 													</th>
 												))}
 												{columns.length > 5 && (
-													<th className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+													<th className="px-4 py-3 text-left text-[10px] font-bold text-zinc-500  tracking-wider">
 														...
 													</th>
 												)}
@@ -659,7 +659,7 @@ const TableCreator = ({ onBack, onSuccess, queryClient }) => {
 					<h2 className="text-sm font-semibold text-zinc-900">Table Details</h2>
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div>
-							<label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 block">
+							<label className="text-[10px] font-bold text-zinc-400  tracking-widest mb-1.5 block">
 								Table Name *
 							</label>
 							<input
@@ -678,7 +678,7 @@ const TableCreator = ({ onBack, onSuccess, queryClient }) => {
 						</div>
 
 						<div>
-							<label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5 block">
+							<label className="text-[10px] font-bold text-zinc-400  tracking-widest mb-1.5 block">
 								Description
 							</label>
 							<input

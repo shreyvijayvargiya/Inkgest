@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Mail, Lock, LogOut, User } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
+import { X, LogOut, User } from "lucide-react";
+import { useDispatch } from "react-redux";
 import {
-	signInWithEmail,
 	signInWithGoogle,
 	signOutUser,
 	onAuthStateChange,
@@ -15,23 +14,12 @@ import {
 } from "../utils/cookies";
 import { setUser, clearUser } from "../store/slices/userSlice";
 import { toast } from "sonner";
-import SignupModal from "./SignupModal";
 import { useRouter } from "next/router";
 import {
 	getUserCredits,
 	FREE_CREDIT_LIMIT,
 	formatRenewalDate,
 } from "../utils/credits";
-
-/* ── Design tokens ── */
-const T = {
-	base: "#F7F5F0",
-	surface: "#FFFFFF",
-	accent: "#1A1A1A",
-	warm: "#C17B2F",
-	muted: "#7A7570",
-	border: "#E8E4DC",
-};
 
 const CREDIT_COSTS = [
 	{ label: "AI Draft / Newsletter", cost: "1 credit" },
@@ -41,28 +29,75 @@ const CREDIT_COSTS = [
 	{ label: "Blank Draft", cost: "Free" },
 ];
 
+const DOT_COUNT = 48;
+
+function AnimatedDotsBackground() {
+	return (
+		<div
+			className="pointer-events-none absolute inset-0 grid grid-cols-8 grid-rows-6 gap-3 p-3 opacity-40"
+			aria-hidden
+		>
+			{Array.from({ length: DOT_COUNT }).map((_, i) => (
+				<motion.span
+					key={i}
+					className="h-1 w-1 justify-self-center self-center rounded-full bg-amber-800/35"
+					animate={{
+						opacity: [0.15, 0.65, 0.15],
+						scale: [0.75, 1.35, 0.75],
+					}}
+					transition={{
+						duration: 2.2 + (i % 4) * 0.35,
+						repeat: Infinity,
+						ease: "easeInOut",
+						delay: (i % 12) * 0.12,
+					}}
+				/>
+			))}
+		</div>
+	);
+}
+
+function GoogleIcon({ className }) {
+	return (
+		<svg
+			className={className}
+			viewBox="0 0 24 24"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			aria-hidden
+		>
+			<path
+				d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+				fill="#4285F4"
+			/>
+			<path
+				d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+				fill="#34A853"
+			/>
+			<path
+				d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+				fill="#FBBC05"
+			/>
+			<path
+				d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+				fill="#EA4335"
+			/>
+		</svg>
+	);
+}
+
 const LoginModal = ({ isOpen, onClose }) => {
 	const dispatch = useDispatch();
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [user, setLocalUser] = useState(null);
-	const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
 	const [credits, setCredits] = useState(null);
-	const subscription = useSelector((state) => state.subscription);
 	const router = useRouter();
 
-	// Check for existing user in cookie on mount and when modal opens
 	useEffect(() => {
 		const cookieUser = getUserCookie();
-		if (cookieUser) {
-			setLocalUser(cookieUser);
-		} else {
-			setLocalUser(null);
-		}
+		setLocalUser(cookieUser || null);
 	}, [isOpen]);
 
-	// Listen for auth state changes
 	useEffect(() => {
 		if (!isOpen) return;
 
@@ -84,7 +119,6 @@ const LoginModal = ({ isOpen, onClose }) => {
 				setUserCookie(userData);
 				setLocalUser(userData);
 				dispatch(setUser(userData));
-				// Load credits whenever user state resolves
 				getUserCredits(firebaseUser.uid).then(setCredits).catch(() => {});
 			} else {
 				removeUserCookie();
@@ -97,30 +131,10 @@ const LoginModal = ({ isOpen, onClose }) => {
 		return () => unsubscribe();
 	}, [isOpen, dispatch]);
 
-	const handleEmailLogin = async (e) => {
-		e.preventDefault();
-		if (!email || !password) {
-			toast.error("Please enter both email and password");
-			return;
-		}
-
-		setIsLoading(true);
-		try {
-			await signInWithEmail(email, password);
-			// User state will be updated via onAuthStateChange
-		} catch (error) {
-			console.error("Login error:", error);
-			toast.error(error.message || "Failed to login. Please try again.");
-		} finally {
-			setIsLoading(false);
-		}
-	};
-
 	const handleGoogleLogin = async () => {
 		setIsLoading(true);
 		try {
 			await signInWithGoogle();
-			// User state will be updated via onAuthStateChange
 		} catch (error) {
 			console.error("Google login error:", error);
 			toast.error(
@@ -148,294 +162,245 @@ const LoginModal = ({ isOpen, onClose }) => {
 		}
 	};
 
-	if (!isOpen && !isSignupModalOpen) return null;
+	if (!isOpen) return null;
+
+	const creditUsageRatio = credits
+		? Math.min(1, credits.creditsUsed / credits.creditsLimit)
+		: 0;
+	const creditsExhausted =
+		credits && credits.creditsUsed >= credits.creditsLimit;
+	const creditsWarning =
+		credits &&
+		!creditsExhausted &&
+		credits.creditsUsed >= credits.creditsLimit * 0.8;
 
 	return (
-		<>
-			<AnimatePresence>
-				{isOpen && (
+		<AnimatePresence>
+			{!user && <AnimatedDotsBackground />}
+			{isOpen && (
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					exit={{ opacity: 0 }}
+					className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+					onClick={onClose}
+				>
 					<motion.div
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
-						className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-						onClick={onClose}
+						initial={{ scale: 0.9, opacity: 0 }}
+						animate={{ scale: 1, opacity: 1 }}
+						exit={{ scale: 0.9, opacity: 0 }}
+						onClick={(e) => e.stopPropagation()}
+						className="relative w-full max-w-md overflow-hidden rounded-2xl bg-[#F7F5F0] shadow-2xl"
 					>
-						<motion.div
-							initial={{ scale: 0.9, opacity: 0 }}
-							animate={{ scale: 1, opacity: 1 }}
-							exit={{ scale: 0.9, opacity: 0 }}
-							onClick={(e) => e.stopPropagation()}
-							className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-							style={{ backgroundColor: T.base }}
-						>
-							{/* Header */}
-							<div className="flex items-center justify-between p-4 border-b border-zinc-200">
-								<h3 className="text-lg text-zinc-900">
-									{user ? "Account" : "Login"}
-								</h3>
-								<button
-									onClick={onClose}
-									className="p-2 text-zinc-400 hover:text-zinc-600 transition-colors"
-								>
-									<X className="w-4 h-4" />
-								</button>
-							</div>
+						
 
-							{/* Body */}
-							<div className="p-6">
-								{user ? (
-									// ── Logged in ──────────────────────────────────────────
-									<div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+						<div className="relative z-10 flex items-center justify-between border-b border-[#E8E4DC] p-4">
+							<h3 className="text-lg text-zinc-900">
+								{user ? "Account" : "Login"}
+							</h3>
+							<button
+								type="button"
+								onClick={onClose}
+								className="p-2 text-zinc-400 transition-colors hover:text-zinc-600"
+							>
+								<X className="h-4 w-4" />
+							</button>
+						</div>
 
-										{/* Avatar + name */}
-										<div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-											{user.photoURL ? (
-												<img
-													src={user.photoURL}
-													alt={user.displayName}
-													style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${T.border}` }}
-												/>
-											) : (
-												<div style={{ width: 52, height: 52, borderRadius: "50%", background: T.border, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-													<User size={22} color={T.muted} />
-												</div>
-											)}
-											<div style={{ flex: 1, minWidth: 0 }}>
-												<p style={{ fontSize: 15, fontWeight: 700, color: T.accent, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-													{user.displayName}
-												</p>
-												<p style={{ fontSize: 12, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-													{user.email}
-												</p>
+						<div className="relative z-10 p-6">
+							{user ? (
+								<div className="flex flex-col gap-4">
+									<div className="flex items-center gap-3.5">
+										{user.photoURL ? (
+											<img
+												src={user.photoURL}
+												alt={user.displayName}
+												className="h-[52px] w-[52px] shrink-0 rounded-full border-2 border-[#E8E4DC] object-cover"
+											/>
+										) : (
+											<div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-[#E8E4DC]">
+												<User className="h-[22px] w-[22px] text-[#7A7570]" />
 											</div>
-											{credits?.plan === "pro" ? (
-												<span style={{ fontSize: 11, fontWeight: 700, background: "#FEF3E2", color: T.warm, border: "1px solid #F5C97A", borderRadius: 100, padding: "3px 10px", flexShrink: 0 }}>
-													Pro ✦
-												</span>
-											) : (
-												<span style={{ fontSize: 11, fontWeight: 700, background: T.base, color: T.muted, border: `1px solid ${T.border}`, borderRadius: 100, padding: "3px 10px", flexShrink: 0 }}>
-													Free
-												</span>
-											)}
-										</div>
-
-										{/* ── Credits section ── */}
-										<div style={{ background: T.base, border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" }}>
-											{credits?.plan === "pro" ? (
-												<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-													<div>
-														<p style={{ fontSize: 13, fontWeight: 700, color: T.accent, marginBottom: 2 }}>Unlimited credits</p>
-														<p style={{ fontSize: 11.5, color: T.muted }}>Pro plan — no monthly limits</p>
-													</div>
-													<span style={{ fontSize: 20 }}>∞</span>
-												</div>
-											) : (
-												<>
-													{/* Usage header */}
-													<div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-														<p style={{ fontSize: 13, fontWeight: 700, color: T.accent }}>
-															Monthly credits
-														</p>
-														<p style={{ fontSize: 12, fontWeight: 700, color: credits && credits.creditsUsed >= credits.creditsLimit ? "#EF4444" : T.accent }}>
-															{credits ? `${+credits.creditsUsed.toFixed(2)} / ${credits.creditsLimit}` : `— / ${FREE_CREDIT_LIMIT}`}
-														</p>
-													</div>
-
-													{/* Progress bar */}
-													<div style={{ height: 7, background: T.border, borderRadius: 100, overflow: "hidden", marginBottom: 8 }}>
-														<motion.div
-															initial={{ width: 0 }}
-															animate={{
-																width: credits
-																	? `${Math.min(100, (credits.creditsUsed / credits.creditsLimit) * 100)}%`
-																	: "0%"
-															}}
-															transition={{ duration: 0.6, ease: "easeOut" }}
-															style={{
-																height: "100%",
-																borderRadius: 100,
-																background: credits && credits.creditsUsed >= credits.creditsLimit
-																	? "#EF4444"
-																	: credits && credits.creditsUsed >= credits.creditsLimit * 0.8
-																	? T.warm
-																	: "#4A7C59",
-															}}
-														/>
-													</div>
-
-													{/* Remaining label */}
-													<p style={{ fontSize: 11, color: T.muted, marginBottom: 12 }}>
-														{credits
-															? credits.creditsUsed >= credits.creditsLimit
-																? "No credits left this month."
-																: `${+(credits.creditsLimit - credits.creditsUsed).toFixed(2)} credits remaining · renews ${credits.renewsAt ? formatRenewalDate(credits.renewsAt) : "monthly"}`
-															: "Loading…"}
-													</p>
-
-													{/* Cost breakdown */}
-													<div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
-														{CREDIT_COSTS.map((row) => (
-															<div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-																<span style={{ fontSize: 11.5, color: T.muted }}>{row.label}</span>
-																<span style={{ fontSize: 11, fontWeight: 700, color: row.cost === "Free" ? "#4A7C59" : T.accent, background: row.cost === "Free" ? "#DCFCE7" : T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: "1px 7px" }}>
-																	{row.cost}
-																</span>
-															</div>
-														))}
-													</div>
-												</>
-											)}
-										</div>
-
-										{/* Upgrade CTA (free plan only) */}
-										{credits?.plan !== "pro" && (
-											<motion.button
-												whileHover={{ scale: 1.02, y: -1 }}
-												whileTap={{ scale: 0.97 }}
-												onClick={() => { router.push("/pricing"); onClose(); }}
-												style={{
-													width: "100%", background: T.accent, color: "white",
-													border: "none", padding: "11px 16px",
-													borderRadius: 10, fontSize: 13, fontWeight: 700,
-													cursor: "pointer", fontFamily: "'Outfit', sans-serif",
-													display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-												}}
-											>
-												<span>✦</span> Upgrade to Pro — unlimited credits
-											</motion.button>
 										)}
-
-										{/* Logout */}
-										<motion.button
-											whileHover={{ scale: 1.01 }}
-											whileTap={{ scale: 0.98 }}
-											onClick={handleLogout}
-											disabled={isLoading}
-											style={{
-												width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-												background: "none", border: `1px solid ${T.border}`,
-												padding: "9px 16px", borderRadius: 10,
-												fontSize: 13, fontWeight: 600, color: T.muted,
-												cursor: isLoading ? "not-allowed" : "pointer",
-												fontFamily: "'Outfit', sans-serif",
-												opacity: isLoading ? 0.5 : 1,
-											}}
-										>
-											<LogOut size={14} />
-											{isLoading ? "Logging out…" : "Log out"}
-										</motion.button>
-									</div>
-								) : (
-									// Login form
-									<div className="space-y-4">
-										<form onSubmit={handleEmailLogin} className="space-y-4">
-											<div>
-												<label
-													htmlFor="email"
-													className="block text-sm font-medium text-zinc-700 mb-1.5"
-												>
-													Email
-												</label>
-												<div className="relative">
-													<Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-400" />
-													<input
-														id="email"
-														type="email"
-														value={email}
-														onChange={(e) => setEmail(e.target.value)}
-														placeholder="Enter your email"
-														className="w-full pl-10 pr-4 py-2.5 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-transparent text-zinc-900"
-														required
-													/>
-												</div>
-											</div>
-											<div>
-												<label
-													htmlFor="password"
-													className="block text-sm font-medium text-zinc-700 mb-1.5"
-												>
-													Password
-												</label>
-												<div className="relative">
-													<Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-400" />
-													<input
-														id="password"
-														type="password"
-														value={password}
-														onChange={(e) => setPassword(e.target.value)}
-														placeholder="Enter your password"
-														className="w-full pl-10 pr-4 py-2.5 border border-zinc-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-100 focus:border-transparent text-zinc-900"
-														required
-													/>
-												</div>
-											</div>
-											<motion.button
-												whileHover={{ scale: 1.02 }}
-												whileTap={{ scale: 0.98 }}
-												type="submit"
-												disabled={isLoading}
-												className="w-full px-4 py-2.5 text-sm text-white bg-zinc-900 hover:bg-zinc-800 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-											>
-												{isLoading ? "Logging in..." : "Login"}
-											</motion.button>
-										</form>
-
-										<div className="relative">
-											<div className="absolute inset-0 flex items-center">
-												<div className="w-full border-t border-zinc-300"></div>
-											</div>
-											<div className="relative flex justify-center text-sm">
-												<span className="px-2 bg-white text-zinc-500">
-													Or continue with
-												</span>
-											</div>
+										<div className="min-w-0 flex-1">
+											<p className="mb-0.5 truncate text-[15px] font-bold text-[#1A1A1A]">
+												{user.displayName}
+											</p>
+											<p className="truncate text-xs text-[#7A7570]">
+												{user.email}
+											</p>
 										</div>
-
-										<motion.button
-											whileHover={{ scale: 1.02 }}
-											whileTap={{ scale: 0.98 }}
-											onClick={handleGoogleLogin}
-											disabled={isLoading}
-											className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-zinc-700 bg-white hover:bg-zinc-50 rounded-xl font-medium transition-colors border border-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed"
-										>
-											<svg
-												className="w-5 h-5"
-												viewBox="0 0 24 24"
-												fill="none"
-												xmlns="http://www.w3.org/2000/svg"
-											>
-												<path
-													d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-													fill="#4285F4"
-												/>
-												<path
-													d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-													fill="#34A853"
-												/>
-												<path
-													d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-													fill="#FBBC05"
-												/>
-												<path
-													d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-													fill="#EA4335"
-												/>
-											</svg>
-											{isLoading ? "Logging in..." : "Google"}
-										</motion.button>
+										{credits?.plan === "pro" ? (
+											<span className="shrink-0 rounded-full border border-[#F5C97A] bg-[#FEF3E2] px-2.5 py-0.5 text-[11px] font-bold text-[#C17B2F]">
+												Pro ✦
+											</span>
+										) : (
+											<span className="shrink-0 rounded-full border border-[#E8E4DC] bg-[#F7F5F0] px-2.5 py-0.5 text-[11px] font-bold text-[#7A7570]">
+												Free
+											</span>
+										)}
 									</div>
-								)}
-							</div>
-						</motion.div>
+
+									<div className="rounded-xl border border-[#E8E4DC] bg-[#F7F5F0] px-4 py-3.5">
+										{credits?.plan === "pro" ? (
+											<div className="flex items-center justify-between">
+												<div>
+													<p className="mb-0.5 text-[13px] font-bold text-[#1A1A1A]">
+														Unlimited credits
+													</p>
+													<p className="text-[11.5px] text-[#7A7570]">
+														Pro plan — no monthly limits
+													</p>
+												</div>
+												<span className="text-xl">∞</span>
+											</div>
+										) : (
+											<>
+												<div className="mb-2 flex items-baseline justify-between">
+													<p className="text-[13px] font-bold text-[#1A1A1A]">
+														Monthly credits
+													</p>
+													<p
+														className={`text-xs font-bold ${
+															creditsExhausted
+																? "text-red-500"
+																: "text-[#1A1A1A]"
+														}`}
+													>
+														{credits
+															? `${+credits.creditsUsed.toFixed(2)} / ${credits.creditsLimit}`
+															: `— / ${FREE_CREDIT_LIMIT}`}
+													</p>
+												</div>
+
+												<div className="mb-2 h-[7px] overflow-hidden rounded-full bg-[#E8E4DC]">
+													<motion.div
+														className={`h-full w-full origin-left rounded-full ${
+															creditsExhausted
+																? "bg-red-500"
+																: creditsWarning
+																	? "bg-[#C17B2F]"
+																	: "bg-[#4A7C59]"
+														}`}
+														initial={{ scaleX: 0 }}
+														animate={{ scaleX: creditUsageRatio }}
+														transition={{
+															duration: 0.6,
+															ease: "easeOut",
+														}}
+													/>
+												</div>
+
+												<p className="mb-3 text-[11px] text-[#7A7570]">
+													{credits
+														? creditsExhausted
+															? "No credits left this month."
+															: `${+(credits.creditsLimit - credits.creditsUsed).toFixed(2)} credits remaining · renews ${credits.renewsAt ? formatRenewalDate(credits.renewsAt) : "monthly"}`
+														: "Loading…"}
+												</p>
+
+												<div className="flex flex-col gap-1.5 border-t border-[#E8E4DC] pt-2.5">
+													{CREDIT_COSTS.map((row) => (
+														<div
+															key={row.label}
+															className="flex items-center justify-between"
+														>
+															<span className="text-[11.5px] text-[#7A7570]">
+																{row.label}
+															</span>
+															<span
+																className={`rounded-full border px-1.5 py-px text-[11px] font-bold ${
+																	row.cost === "Free"
+																		? "border-[#E8E4DC] bg-[#DCFCE7] text-[#4A7C59]"
+																		: "border-[#E8E4DC] bg-white text-[#1A1A1A]"
+																}`}
+															>
+																{row.cost}
+															</span>
+														</div>
+													))}
+												</div>
+											</>
+										)}
+									</div>
+
+									{credits?.plan !== "pro" && (
+										<motion.button
+											type="button"
+											whileHover={{ scale: 1.02, y: -1 }}
+											whileTap={{ scale: 0.97 }}
+											onClick={() => {
+												router.push("/pricing");
+												onClose();
+											}}
+											className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] border-none bg-[#1A1A1A] px-4 py-2.5 font-['Comic',sans-serif] text-[13px] font-bold text-white"
+										>
+											<span>✦</span> Upgrade to Pro — unlimited credits
+										</motion.button>
+									)}
+
+									<motion.button
+										type="button"
+										whileHover={{ scale: 1.01 }}
+										whileTap={{ scale: 0.98 }}
+										onClick={handleLogout}
+										disabled={isLoading}
+										className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[#E8E4DC] bg-transparent px-4 py-2 font-['Comic',sans-serif] text-[13px] font-semibold text-[#7A7570] disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										<LogOut className="h-3.5 w-3.5" />
+										{isLoading ? "Logging out…" : "Log out"}
+									</motion.button>
+								</div>
+							) : (
+								<div className="flex flex-col items-center gap-6 text-center">
+									<div className="flex flex-col items-center gap-2">
+										<motion.span
+											className="inline-block h-2.5 w-2.5 rounded-full bg-[#C17B2F]"
+											animate={{ scale: [1, 1.2, 1] }}
+											transition={{
+												duration: 2,
+												repeat: Infinity,
+												ease: "easeInOut",
+											}}
+										/>
+										<h2 className="font-['Comic',sans-serif] text-2xl font-semibold tracking-tight text-[#1A1A1A]">
+											inkgest
+										</h2>
+										<p className="max-w-xs text-sm text-[#7A7570]">
+											Sign in with Google to start drafting newsletters from
+											URLs.
+										</p>
+									</div>
+
+									<motion.button
+										type="button"
+										whileHover={{ scale: 1.02 }}
+										whileTap={{ scale: 0.98 }}
+										onClick={handleGoogleLogin}
+										disabled={isLoading}
+										className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										<GoogleIcon className="h-5 w-5" />
+										{isLoading ? "Signing in…" : "Continue with Google"}
+									</motion.button>
+
+									<p className="max-w-[280px] text-[11px] leading-relaxed text-[#7A7570]">
+										By continuing, you agree to our{" "}
+										<a
+											href="/"
+											className="underline underline-offset-2 transition-colors hover:text-[#1A1A1A]"
+										>
+											Terms & Conditions
+										</a>
+										.
+									</p>
+								</div>
+							)}
+						</div>
 					</motion.div>
-				)}
-			</AnimatePresence>
-			<SignupModal
-				isOpen={isSignupModalOpen}
-				onClose={() => setIsSignupModalOpen(false)}
-			/>
-		</>
+				</motion.div>
+			)}
+		</AnimatePresence>
 	);
 };
 
