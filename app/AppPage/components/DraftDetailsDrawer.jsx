@@ -79,7 +79,7 @@ export default function DraftDetailsDrawer({
         											]}
         											buttonClassName="!py-1 !px-2 !rounded-xl !text-xs"
         											dropdownClassName="!rounded-xl !shadow-md"
-        											optionClassName="!py-1 !px-2 !text-xs !rounded-md"
+        											optionClassName="!py-1 !px-2 !text-xs !rounded"
         										/>
         									</div>
         								</div>
@@ -110,7 +110,7 @@ export default function DraftDetailsDrawer({
         											]}
         											buttonClassName="!py-1 !px-2 !rounded-xl !text-xs"
         											dropdownClassName="!rounded-xl !shadow-md"
-        											optionClassName="!py-1 !px-2 !text-xs !rounded-md"
+        											optionClassName="!py-1 !px-2 !text-xs !rounded"
         										/>
         									</div>
         						</div>

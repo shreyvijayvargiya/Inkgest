@@ -162,7 +162,7 @@ export default function Footer() {
 						href="https://startupfa.me/s/inkgest?utm_source=inkgest.com"
 						target="_blank"
 						rel="noopener noreferrer"
-						className="inline-flex items-center justify-center min-h-12 py-2 px-1 rounded-lg"
+						className="inline-flex items-center justify-center min-h-12 py-2 px-1 rounded-xl"
 					>
 						<img
 							src="https://startupfa.me/badges/featured/default-small.webp"

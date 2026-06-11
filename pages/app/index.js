@@ -483,6 +483,25 @@ export default function inkgestApp() {
 		}
 	};
 
+	const handleSidebarRename = async (assetId, title) => {
+		if (!reduxUser) return;
+		const item = sidebarItems.find((i) => i.id === assetId);
+		const isAssetType = [
+			"table",
+			"infographics",
+			"landing_page",
+			"image_gallery",
+		].includes(item?.type);
+		const source = item?.source || (isAssetType ? "assets" : "drafts");
+		try {
+			await updateAsset(reduxUser.uid, assetId, { title }, source);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
+		} catch (e) {
+			console.error("Sidebar rename failed", e);
+		}
+	};
+
 	const confirmDelete = async () => {
 		if (!deleteConfirm || !reduxUser) return;
 		const item = sidebarItems.find((i) => i.id === deleteConfirm);
@@ -815,7 +834,7 @@ export default function inkgestApp() {
 										>
 											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
 											<p style={{ fontSize: 13, marginBottom: 12 }}>
-												No drafts or tables found
+												No drafts found
 											</p>
 											<p style={{ fontSize: 12, color: T.muted }}>
 												Use InkAgent above to create your first draft
@@ -847,6 +866,7 @@ export default function inkgestApp() {
 														Icon={Icon}
 														Icons={Icons}
 														onIconChange={handleSidebarIconChange}
+														onRename={handleSidebarRename}
 														onClick={() => {
 															router.push(`/app/${item.id}`);
 															if (compactAssetsNav)

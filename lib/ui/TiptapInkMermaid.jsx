@@ -112,7 +112,7 @@ function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 							onChange={(e) =>
 								updateAttributes({ code: e.target.value })
 							}
-							className="mt-2 w-full min-h-[100px] text-xs font-mono border border-zinc-200 rounded-lg p-2"
+							className="mt-2 w-full min-h-[100px] text-xs font-mono border border-zinc-200 rounded-xl p-2"
 							onMouseDown={(e) => e.stopPropagation()}
 						/>
 					</div>
@@ -127,7 +127,7 @@ function InkMermaidView({ node, updateAttributes, editor, getPos, selected }) {
 								onChange={(e) =>
 									updateAttributes({ code: e.target.value })
 								}
-								className="w-full min-h-[90px] text-xs font-mono border border-zinc-200 rounded-lg p-2 bg-white"
+								className="w-full min-h-[90px] text-xs font-mono border border-zinc-200 rounded-xl p-2 bg-white"
 								onMouseDown={(e) => e.stopPropagation()}
 							/>
 						</div>

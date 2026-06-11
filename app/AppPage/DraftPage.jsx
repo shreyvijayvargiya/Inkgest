@@ -658,10 +658,12 @@ export default function DraftPage() {
 			let html = editorRef.current?.innerHTML || "";
 			html = await uploadInlineImagesToUploadThing(html);
 			if (editorRef.current) editorRef.current.innerHTML = html;
+			const title =
+				titleRef.current?.innerText?.trim() || draft?.title || "Untitled";
 			await updateAsset(
 				reduxUser.uid,
 				draftId,
-				{ body: html },
+				{ body: html, title },
 				docData?.source || "drafts",
 			);
 		} catch (e) {
@@ -1292,8 +1294,9 @@ export default function DraftPage() {
 		handleSlashCommandRef,
 	});
 
-	const handleDelete = (id) => setDeleteConfirm(id);
 
+	const handleDelete = (id) => setDeleteConfirm(id);
+	
 	const handleSidebarIconChange = async (assetId, sidebarIcon) => {
 		if (!reduxUser) return;
 		const item = items.find((i) => i.id === assetId);
@@ -1308,6 +1311,24 @@ export default function DraftPage() {
 			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
 		} catch (e) {
 			console.error("Sidebar icon update failed", e);
+		}
+	};
+
+	const handleSidebarRename = async (assetId, title) => {
+		if (!reduxUser) return;
+		const item = items.find((i) => i.id === assetId);
+		const isAsset =
+			["infographics", "landing_page", "image_gallery"].includes(item?.type) ||
+			tables.some((t) => t.id === assetId);
+		const source =
+			item?.source ||
+			(isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
+		try {
+			await updateAsset(reduxUser.uid, assetId, { title }, source);
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			queryClient.invalidateQueries({ queryKey: ["doc"] });
+		} catch (e) {
+			console.error("Sidebar rename failed", e);
 		}
 	};
 
@@ -2098,6 +2119,7 @@ export default function DraftPage() {
 												item={d}
 												active={d.id === draftId}
 												onIconChange={handleSidebarIconChange}
+												onRename={handleSidebarRename}
 												onClick={() => {
 													openDraftInTab(d.id);
 													if (compactAssetsNav)

@@ -2215,7 +2215,7 @@ function FAQ() {
 						Still curious?{" "}
 						<a
 							href="mailto:shreyvijayvargiya26@gmail.com"
-							className="inline-flex items-center min-h-12 py-2 rounded-lg underline underline-offset-4"
+							className="inline-flex items-center min-h-12 py-2 rounded-xl underline underline-offset-4"
 							style={{ color: T.accent }}
 						>
 							Drop us an email.

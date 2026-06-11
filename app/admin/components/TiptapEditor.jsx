@@ -1055,7 +1055,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().addRowBefore().run()
 								}
-								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+								className="p-1.5 rounded hover:bg-zinc-100 text-zinc-700"
 							>
 								<ArrowUp className="w-3.5 h-3.5" />
 							</button>
@@ -1065,7 +1065,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().addRowAfter().run()
 								}
-								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+								className="p-1.5 rounded hover:bg-zinc-100 text-zinc-700"
 							>
 								<ArrowDown className="w-3.5 h-3.5" />
 							</button>
@@ -1075,7 +1075,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().deleteRow().run()
 								}
-								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+								className="p-1.5 rounded hover:bg-zinc-100 text-zinc-700"
 							>
 								<Minus className="w-3.5 h-3.5" />
 							</button>
@@ -1086,7 +1086,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().addColumnBefore().run()
 								}
-								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+								className="p-1.5 rounded hover:bg-zinc-100 text-zinc-700"
 							>
 								<ArrowLeft className="w-3.5 h-3.5" />
 							</button>
@@ -1096,7 +1096,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().addColumnAfter().run()
 								}
-								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+								className="p-1.5 rounded hover:bg-zinc-100 text-zinc-700"
 							>
 								<ArrowRight className="w-3.5 h-3.5" />
 							</button>
@@ -1106,7 +1106,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().deleteColumn().run()
 								}
-								className="p-1.5 rounded-md hover:bg-zinc-100 text-zinc-700"
+								className="p-1.5 rounded hover:bg-zinc-100 text-zinc-700"
 							>
 								<Minus className="w-3.5 h-3.5" />
 							</button>
@@ -1117,7 +1117,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().toggleHeaderRow().run()
 								}
-								className="px-2 py-1 rounded-md hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
+								className="px-2 py-1 rounded hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
 							>
 								H row
 							</button>
@@ -1127,7 +1127,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().toggleHeaderColumn().run()
 								}
-								className="px-2 py-1 rounded-md hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
+								className="px-2 py-1 rounded hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
 							>
 								H col
 							</button>
@@ -1137,7 +1137,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().toggleHeaderCell().run()
 								}
-								className="px-2 py-1 rounded-md hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
+								className="px-2 py-1 rounded hover:bg-zinc-100 text-[11px] font-semibold text-zinc-700"
 							>
 								H cell
 							</button>
@@ -1148,7 +1148,7 @@ const TiptapEditor = ({
 								onClick={() =>
 									editor.chain().focus().deleteTable().run()
 								}
-								className="p-1.5 rounded-md hover:bg-red-50 text-red-600"
+								className="p-1.5 rounded hover:bg-red-50 text-red-600"
 							>
 								<Trash2 className="w-3.5 h-3.5" />
 								<span className="sr-only">Delete table</span>

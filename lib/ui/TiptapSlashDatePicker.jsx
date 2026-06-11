@@ -164,14 +164,14 @@ export function TiptapSlashDatePicker({
 					<button
 						type="button"
 						onClick={goToday}
-						className="text-xs font-medium text-zinc-500 hover:text-zinc-800 px-1.5 py-0.5 rounded-md hover:bg-zinc-50"
+						className="text-xs font-medium text-zinc-500 hover:text-zinc-800 px-1.5 py-0.5 rounded hover:bg-zinc-50"
 					>
 						Today
 					</button>
 					<button
 						type="button"
 						aria-label="Previous month"
-						className="p-1 rounded-md hover:bg-zinc-100 text-zinc-600"
+						className="p-1 rounded hover:bg-zinc-100 text-zinc-600"
 						onClick={() => setViewMonth((m) => addMonths(m, -1))}
 					>
 						<ChevronLeft className="w-4 h-4 text-zinc-600" />
@@ -179,7 +179,7 @@ export function TiptapSlashDatePicker({
 					<button
 						type="button"
 						aria-label="Next month"
-						className="p-1 rounded-md hover:bg-zinc-100"
+						className="p-1 rounded hover:bg-zinc-100"
 						onClick={() => setViewMonth((m) => addMonths(m, 1))}
 					>
 						<ChevronRight className="w-4 h-4 text-zinc-600" />
@@ -204,7 +204,7 @@ export function TiptapSlashDatePicker({
 									type="button"
 									onClick={() => applyDate(cell.date)}
 									className={[
-										"h-8 rounded-md text-xs font-medium transition-colors",
+										"h-8 rounded text-xs font-medium transition-colors",
 										cell.muted ? "text-zinc-300" : "text-zinc-800",
 										isSel && !cell.muted
 											? "bg-blue-600 text-white hover:bg-blue-700"

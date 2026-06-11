@@ -385,11 +385,11 @@ const AnalyticsTab = () => {
 				<div>
 					<h2 className="text-2xl font-bold text-zinc-900">Web Analytics</h2>
 					<div className="flex items-center gap-2 mt-1">
-						<div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium text-zinc-600">
+						<div className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium text-zinc-600">
 							<Globe className="w-3 h-3" />
 							www.Inkgest.dev
 						</div>
-						<div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-50 rounded-md text-xs font-medium text-green-700">
+						<div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-50 rounded text-xs font-medium text-green-700">
 							<div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
 							2 online
 						</div>

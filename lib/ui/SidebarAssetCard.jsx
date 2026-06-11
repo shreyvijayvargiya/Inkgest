@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import IconSelectorDropdown from "./IconSelectorDropdown.jsx";
 import { getTheme } from "../utils/theme";
 import {
@@ -53,52 +54,65 @@ export default function SidebarAssetCard({
 	active,
 	onClick,
 	onDelete,
+	onRename,
 	onIconChange,
-	typeLabels = DEFAULT_LABELS,
 	Icon,
 	Icons,
 }) {
 	const [hovering, setHovering] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const [renaming, setRenaming] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
 	const iconWrapRef = useRef(null);
+	const menuWrapRef = useRef(null);
+	const renameInputRef = useRef(null);
 
-	const tag = typeLabels[item.type] || item.tag || "Draft";
-	const meta = item.type === "draft" ? `${item.words ?? 0}w` : "";
-	const date = item.date
-		? typeof item.date === "string"
-			? item.date
-			: (item.createdAt?.toDate?.()?.toLocaleDateString?.("en-US", {
-					weekday: "short",
-					month: "short",
-					day: "numeric",
-				}) ?? "")
-		: "";
+	
 	const sidebarIcon = resolveSidebarIcon(item);
 
 	useEffect(() => {
-		if (!pickerOpen) return undefined;
+		if (!pickerOpen && !menuOpen) return undefined;
 		const onDown = (e) => {
 			if (iconWrapRef.current?.contains(e.target)) return;
+			if (menuWrapRef.current?.contains(e.target)) return;
 			setPickerOpen(false);
+			setMenuOpen(false);
+			setRenaming(false);
 		};
 		document.addEventListener("mousedown", onDown);
 		return () => document.removeEventListener("mousedown", onDown);
-	}, [pickerOpen]);
+	}, [pickerOpen, menuOpen]);
+
+	useEffect(() => {
+		if (!renaming) return;
+		renameInputRef.current?.focus();
+		renameInputRef.current?.select();
+	}, [renaming]);
+
+	const panelOpen = pickerOpen || menuOpen;
+	const showActions = hovering || menuOpen;
+
+	const handleRenameBlur = () => {
+		const trimmed = renameValue.trim();
+		const current = (item.title || "").trim() || "Untitled";
+		if (onRename && trimmed && trimmed !== current) {
+			onRename(item.id, trimmed);
+		}
+		setRenaming(false);
+		setMenuOpen(false);
+	};
+
+	const startRename = (e) => {
+		e.stopPropagation();
+		setRenameValue(item.title || "");
+		setRenaming(true);
+	};
 
 	const TrashIcon = Icon && Icons ? (
 		<Icon d={Icons.trash} size={14} stroke="#EF4444" />
 	) : (
-		<svg
-			width={14}
-			height={14}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="#EF4444"
-			strokeWidth={2}
-			strokeLinecap="round"
-		>
-			<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-		</svg>
+		<Trash2 className="w-3.5 h-3.5 shrink-0 text-red-500" aria-hidden />
 	);
 
 	return (
@@ -112,7 +126,7 @@ export default function SidebarAssetCard({
 			onHoverStart={() => setHovering(true)}
 			onHoverEnd={() => setHovering(false)}
 			onClick={onClick}
-			className="p-1"
+			className="group p-1"
 			style={{
 				background: active ? T.surface : "transparent",
 				border: `1px solid ${active ? T.border : "transparent"}`,
@@ -121,8 +135,8 @@ export default function SidebarAssetCard({
 				boxShadow: active ? "0 1px 8px rgba(0,0,0,0.07)" : "none",
 				position: "relative",
 				transition: "background 0.15s, border-color 0.15s",
-				overflow: pickerOpen ? "visible" : undefined,
-				zIndex: pickerOpen ? 20 : undefined,
+				overflow: panelOpen ? "visible" : undefined,
+				zIndex: panelOpen ? 20 : undefined,
 			}}
 		>
 			{active && (
@@ -131,12 +145,12 @@ export default function SidebarAssetCard({
 					style={{
 						position: "absolute",
 						left: 0,
-						top: "50%",
+						top: "5%",
 						transform: "translateY(-50%)",
-						width: 3,
-						height: 32,
+						width: 2,
+						height: 36,
 						background: T.warm,
-						borderRadius: "0 3px 3px 0",
+						borderRadius: "12px",
 					}}
 				/>
 			)}
@@ -230,66 +244,104 @@ export default function SidebarAssetCard({
 						>
 							{item.title || "Untitled"}
 						</p>
-						{/* <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<span
-								style={{
-									fontSize: 10.5,
-									fontWeight: 600,
-									background: "#F0ECE5",
-									color: T.muted,
-									padding: "2px 7px",
-									borderRadius: 100,
-								}}
-							>
-								{tag}
-							</span>
-							{meta && (
-								<span style={{ fontSize: 10.5, color: T.muted }}>{meta}</span>
-							)}
-							{meta && date && (
-								<span style={{ fontSize: 10.5, color: T.muted }}>·</span>
-							)}
-							{date && (
-								<span style={{ fontSize: 10.5, color: T.muted }}>{date}</span>
-							)}
-						</div> */}
 					</div>
 				</div>
-				<AnimatePresence>
-					{hovering && (
+				{(onDelete || onRename) && (
 						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 2,
-								flexShrink: 0,
-							}}
+							ref={menuWrapRef}
+							className={`relative shrink-0 transition-opacity ${
+								showActions
+									? "opacity-100"
+									: "opacity-0 pointer-events-none max-sm:opacity-100 max-sm:pointer-events-auto"
+							}`}
+							onPointerDown={(e) => e.stopPropagation()}
+							onClick={(e) => e.stopPropagation()}
 						>
 							<motion.button
-								initial={{ opacity: 0, scale: 0.8 }}
-								animate={{ opacity: 1, scale: 1 }}
-								exit={{ opacity: 0, scale: 0.8 }}
-								onClick={(e) => {
-									e.stopPropagation();
-									onDelete(item.id);
+								type="button"
+								title="More actions"
+								onClick={() => {
+									setMenuOpen((v) => !v);
+									if (menuOpen) setRenaming(false);
 								}}
-								style={{
-									background: "none",
-									border: "none",
-									cursor: "pointer",
-									padding: 4,
-									borderRadius: 6,
-									flexShrink: 0,
-									color: "#EF4444",
-									transition: "background 0.15s",
-								}}
-								whileHover={{ background: "#FEE2E2" }}
+								className="flex items-center justify-center p-1 rounded cursor-pointer border-none bg-transparent text-[#888888] hover:bg-[#F0ECE5] transition-colors"
+								whileHover={{ background: "#F0ECE5" }}
+								whileTap={{ scale: 0.94 }}
 							>
-								{TrashIcon}
+								<MoreVertical className="w-3.5 h-3.5" aria-hidden />
 							</motion.button>
+
+							<AnimatePresence>
+								{menuOpen && (
+									<motion.div
+										initial={{ opacity: 0, y: -6, scale: 0.97 }}
+										animate={{ opacity: 1, y: 0, scale: 1 }}
+										exit={{ opacity: 0, y: -6, scale: 0.97 }}
+										transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+										className="absolute top-[calc(100%+4px)] right-0 max-sm:left-0 max-sm:right-auto z-[500] min-w-[148px] max-w-[min(220px,calc(100vw-24px))] rounded-[10px] border border-[#E2E2E2] bg-[#FFFFFF] shadow-[0_8px_28px_rgba(0,0,0,0.10),0_0_0_1px_rgba(0,0,0,0.04)] overflow-hidden"
+									>
+										{onRename && (
+											<div
+												className={`border-b border-[#E2E2E2] ${renaming ? "p-2" : ""}`}
+											>
+												{renaming ? (
+													<input
+														ref={renameInputRef}
+														type="text"
+														value={renameValue}
+														onChange={(e) => setRenameValue(e.target.value)}
+														onBlur={handleRenameBlur}
+														onKeyDown={(e) => {
+															if (e.key === "Enter") {
+																e.preventDefault();
+																renameInputRef.current?.blur();
+															}
+															if (e.key === "Escape") {
+																setRenaming(false);
+																setMenuOpen(false);
+															}
+														}}
+														className="w-full rounded border border-[#E2E2E2] bg-[#FAFAF8] px-2 py-1.5 text-xs font-medium text-[#111111] outline-none focus:border-[#C17B2F] focus:ring-1 focus:ring-[#C17B2F]/30"
+														placeholder="Name"
+													/>
+												) : (
+													<motion.button
+														type="button"
+														onClick={startRename}
+														whileHover={{ background: "#F7F5F0" }}
+														className="flex w-full items-center gap-2 border-none bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-medium text-[#111111] cursor-pointer transition-colors"
+													>
+														<Pencil
+															className="w-3.5 h-3.5 shrink-0 text-[#888888]"
+															aria-hidden
+														/>
+														Rename
+													</motion.button>
+												)}
+											</div>
+										)}
+
+										{onDelete && (
+											<motion.button
+												type="button"
+												onClick={(e) => {
+													e.stopPropagation();
+													setMenuOpen(false);
+													setRenaming(false);
+													onDelete(item.id);
+												}}
+												whileHover={{ background: "#FEE2E2" }}
+												className="flex w-full items-center gap-2 border-none bg-transparent px-3 py-2.5 text-left text-xs font-medium text-red-500 cursor-pointer transition-colors"
+											>
+												{TrashIcon}
+												Delete
+											</motion.button>
+										)}
+									</motion.div>
+								)}
+							</AnimatePresence>
 						</div>
-					)}
-				</AnimatePresence>
+				)}
 			</div>
 		</motion.div>
 	);
