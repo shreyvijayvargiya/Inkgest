@@ -100,11 +100,7 @@ export default function TasksPage() {
 				/>
 
 				<main
-					className="flex-1 min-h-0 overflow-hidden transition-[margin] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-					style={{
-						marginLeft:
-							reduxUser && sidebarOpen && !compactAssetsNav ? 280 : 0,
-					}}
+					className={`flex-1 min-h-0 overflow-hidden transition-[margin] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${reduxUser && sidebarOpen && !compactAssetsNav ? "ml-[280px]" : "ml-0"}`}
 				>
 					<WritingTasksKanban
 						userId={reduxUser?.uid}

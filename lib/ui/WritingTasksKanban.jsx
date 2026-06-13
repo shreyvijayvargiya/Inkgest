@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	Plus,
 	Search,
@@ -18,6 +18,9 @@ import {
 	Sparkles,
 	Loader2,
 	ExternalLink,
+	FolderKanban,
+	Trash2,
+	Pencil,
 } from "lucide-react";
 import {
 	DndContext,
@@ -39,7 +42,39 @@ import { CSS } from "@dnd-kit/utilities";
 import { useWritingTasks } from "../hooks/useWritingTasks";
 import { useWritingTaskAiDraft } from "../hooks/useWritingTaskAiDraft";
 import { WRITING_TASK_COLUMNS } from "../utils/writingTasksStore";
+import {
+	listCanvasProjects,
+	createCanvasProject,
+	updateCanvasProject,
+	deleteCanvasProject,
+} from "../api/canvasProjects";
 import AnimatedDropdown from "./AnimatedDropdown";
+
+const PROJECT_FILTER_ALL = "all";
+const PROJECT_FILTER_UNASSIGNED = "unassigned";
+
+function getProjectFilterStorageKey(userId) {
+	return `inkgest_tasks_project_filter_${userId || "guest"}`;
+}
+
+function loadProjectFilter(userId) {
+	if (typeof window === "undefined") return PROJECT_FILTER_ALL;
+	try {
+		return localStorage.getItem(getProjectFilterStorageKey(userId)) || PROJECT_FILTER_ALL;
+	} catch {
+		return PROJECT_FILTER_ALL;
+	}
+}
+
+function saveProjectFilter(userId, value) {
+	if (typeof window === "undefined") return;
+	localStorage.setItem(getProjectFilterStorageKey(userId), value);
+}
+
+function resolveProjectName(projects, projectId) {
+	if (!projectId) return null;
+	return projects.find((p) => p.id === projectId)?.name || "Project";
+}
 
 const PRIORITIES = ["High", "Medium", "Low"];
 
@@ -146,6 +181,7 @@ function ProgressRing({ progress, done }) {
 
 function TaskCardContent({
 	task,
+	projectName,
 	dragHandleProps,
 	isGenerating,
 	onGenerateAi,
@@ -154,9 +190,17 @@ function TaskCardContent({
 	return (
 		<>
 			<div className="flex items-start justify-between gap-2 mb-2">
-				<h4 className="font-semibold text-zinc-900 text-sm leading-snug flex-1">
-					{task.title}
-				</h4>
+				<div className="flex-1 min-w-0">
+					{projectName && (
+						<span className="inline-flex items-center gap-1 mb-1 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide">
+							<FolderKanban className="w-3 h-3" />
+							{projectName}
+						</span>
+					)}
+					<h4 className="font-semibold text-zinc-900 text-sm leading-snug">
+						{task.title}
+					</h4>
+				</div>
 				{dragHandleProps && (
 					<button
 						type="button"
@@ -249,7 +293,7 @@ function TaskCardContent({
 	);
 }
 
-function SortableTaskCard({ task, onEdit, isGenerating, onGenerateAi, onOpenDraft }) {
+function SortableTaskCard({ task, projectName, onEdit, isGenerating, onGenerateAi, onOpenDraft }) {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id: task.id });
 
@@ -269,6 +313,7 @@ function SortableTaskCard({ task, onEdit, isGenerating, onGenerateAi, onOpenDraf
 		>
 			<TaskCardContent
 				task={task}
+				projectName={projectName}
 				isGenerating={isGenerating}
 				onGenerateAi={onGenerateAi}
 				onOpenDraft={onOpenDraft}
@@ -326,10 +371,277 @@ function EmptyColumn({ columnId }) {
 	);
 }
 
+function NewProjectModal({ open, onClose, onCreate, isCreating }) {
+	const [name, setName] = useState("");
+
+	useEffect(() => {
+		if (open) setName("");
+	}, [open]);
+
+	if (!open) return null;
+
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		const trimmed = name.trim();
+		if (!trimmed || isCreating) return;
+		onCreate(trimmed);
+	};
+
+	return (
+		<AnimatePresence>
+			<motion.div
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				exit={{ opacity: 0 }}
+				className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+				onClick={onClose}
+			>
+				<motion.div
+					initial={{ opacity: 0, scale: 0.96, y: 8 }}
+					animate={{ opacity: 1, scale: 1, y: 0 }}
+					exit={{ opacity: 0, scale: 0.96, y: 8 }}
+					className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-4 sm:p-6"
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="flex items-center justify-between mb-5">
+						<h3 className="text-lg font-semibold text-zinc-900">New project</h3>
+						<button
+							type="button"
+							onClick={onClose}
+							className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					</div>
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<div>
+							<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
+								Project name
+							</label>
+							<input
+								autoFocus
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								placeholder="e.g. Newsletter Q2, Client blog"
+								className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300"
+							/>
+						</div>
+						<p className="text-xs text-zinc-500 leading-relaxed">
+							Group tasks and drafts under one project for clearer AI context and
+							organization.
+						</p>
+						<div className="flex items-center gap-2 pt-1">
+							<motion.button
+								type="submit"
+								disabled={!name.trim() || isCreating}
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								className="flex-1 py-2.5 bg-zinc-900 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
+							>
+								{isCreating ? (
+									<span className="inline-flex items-center justify-center gap-2">
+										<Loader2 className="w-4 h-4 animate-spin" />
+										Creating…
+									</span>
+								) : (
+									"Create project"
+								)}
+							</motion.button>
+							<motion.button
+								type="button"
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								onClick={onClose}
+								className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50"
+							>
+								Cancel
+							</motion.button>
+						</div>
+					</form>
+				</motion.div>
+			</motion.div>
+		</AnimatePresence>
+	);
+}
+
+function RenameProjectModal({
+	open,
+	initialName,
+	onClose,
+	onSave,
+	isSaving,
+}) {
+	const [name, setName] = useState("");
+
+	useEffect(() => {
+		if (open) setName(initialName || "");
+	}, [open, initialName]);
+
+	if (!open) return null;
+
+	const handleSubmit = (e) => {
+		e.preventDefault();
+		const trimmed = name.trim();
+		if (!trimmed || isSaving || trimmed === (initialName || "").trim()) return;
+		onSave(trimmed);
+	};
+
+	const unchanged = name.trim() === (initialName || "").trim();
+
+	return (
+		<AnimatePresence>
+			<motion.div
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				exit={{ opacity: 0 }}
+				className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+				onClick={onClose}
+			>
+				<motion.div
+					initial={{ opacity: 0, scale: 0.96, y: 8 }}
+					animate={{ opacity: 1, scale: 1, y: 0 }}
+					exit={{ opacity: 0, scale: 0.96, y: 8 }}
+					className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-4 sm:p-6"
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="flex items-center justify-between mb-5">
+						<h3 className="text-lg font-semibold text-zinc-900">Rename project</h3>
+						<button
+							type="button"
+							onClick={onClose}
+							className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					</div>
+					<form onSubmit={handleSubmit} className="space-y-4">
+						<div>
+							<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
+								Project name
+							</label>
+							<input
+								autoFocus
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+								placeholder="Project name"
+								className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300"
+							/>
+						</div>
+						<div className="flex items-center gap-2 pt-1">
+							<motion.button
+								type="submit"
+								disabled={!name.trim() || isSaving || unchanged}
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								className="flex-1 py-2.5 bg-zinc-900 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
+							>
+								{isSaving ? (
+									<span className="inline-flex items-center justify-center gap-2">
+										<Loader2 className="w-4 h-4 animate-spin" />
+										Saving…
+									</span>
+								) : (
+									"Save name"
+								)}
+							</motion.button>
+							<motion.button
+								type="button"
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								onClick={onClose}
+								className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50"
+							>
+								Cancel
+							</motion.button>
+						</div>
+					</form>
+				</motion.div>
+			</motion.div>
+		</AnimatePresence>
+	);
+}
+
+function DeleteProjectModal({ open, projectName, taskCount, onClose, onConfirm, isDeleting }) {
+	if (!open) return null;
+
+	return (
+		<AnimatePresence>
+			<motion.div
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				exit={{ opacity: 0 }}
+				className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+				onClick={onClose}
+			>
+				<motion.div
+					initial={{ opacity: 0, scale: 0.96, y: 8 }}
+					animate={{ opacity: 1, scale: 1, y: 0 }}
+					exit={{ opacity: 0, scale: 0.96, y: 8 }}
+					className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-4 sm:p-6"
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div className="flex items-start gap-3 mb-4">
+						<div className="p-2 rounded-xl bg-red-50 shrink-0">
+							<Trash2 className="w-5 h-5 text-red-600" />
+						</div>
+						<div>
+							<h3 className="text-lg font-semibold text-zinc-900">Delete project?</h3>
+							<p className="text-sm text-zinc-500 mt-1 leading-relaxed">
+								Remove{" "}
+								<span className="font-semibold text-zinc-800">
+									{projectName || "this project"}
+								</span>
+								. Tasks in this project will become unassigned but won&apos;t be
+								deleted. Drafts stay in your workspace.
+							</p>
+							{taskCount > 0 && (
+								<p className="text-xs text-amber-700 mt-2 font-medium">
+									{taskCount} task{taskCount === 1 ? "" : "s"} will be unassigned.
+								</p>
+							)}
+						</div>
+					</div>
+					<div className="flex items-center gap-2">
+						<motion.button
+							type="button"
+							disabled={isDeleting}
+							whileHover={{ scale: 1.02 }}
+							whileTap={{ scale: 0.98 }}
+							onClick={onConfirm}
+							className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
+						>
+							{isDeleting ? (
+								<span className="inline-flex items-center justify-center gap-2">
+									<Loader2 className="w-4 h-4 animate-spin" />
+									Deleting…
+								</span>
+							) : (
+								"Delete project"
+							)}
+						</motion.button>
+						<motion.button
+							type="button"
+							disabled={isDeleting}
+							whileHover={{ scale: 1.02 }}
+							whileTap={{ scale: 0.98 }}
+							onClick={onClose}
+							className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50 disabled:opacity-60"
+						>
+							Cancel
+						</motion.button>
+					</div>
+				</motion.div>
+			</motion.div>
+		</AnimatePresence>
+	);
+}
+
 function TaskModal({
 	open,
 	task,
 	defaultStatus,
+	defaultProjectId,
+	projects = [],
 	onClose,
 	onSave,
 	onDelete,
@@ -343,8 +655,21 @@ function TaskModal({
 		priority: "Medium",
 		status: "backlog",
 		progress: 0,
+		projectId: null,
 	});
 	const [openDropdown, setOpenDropdown] = useState(null);
+
+	const projectOptions = useMemo(
+		() => [
+			{ value: "", label: "No project", color: "bg-zinc-100 text-zinc-600" },
+			...projects.map((p) => ({
+				value: p.id,
+				label: p.name || "Untitled project",
+				color: "bg-violet-50 text-violet-700",
+			})),
+		],
+		[projects],
+	);
 
 	useEffect(() => {
 		if (!open) return;
@@ -356,6 +681,7 @@ function TaskModal({
 				priority: task.priority || "Medium",
 				status: task.status || "backlog",
 				progress: task.progress ?? 0,
+				projectId: task.projectId || null,
 			});
 		} else {
 			setForm({
@@ -364,16 +690,20 @@ function TaskModal({
 				priority: "Medium",
 				status: defaultStatus || "backlog",
 				progress: 0,
+				projectId: defaultProjectId || null,
 			});
 		}
-	}, [open, task, defaultStatus]);
+	}, [open, task, defaultStatus, defaultProjectId]);
 
 	if (!open) return null;
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
 		if (!form.title.trim()) return;
-		onSave(form);
+		onSave({
+			...form,
+			projectId: form.projectId || null,
+		});
 	};
 
 	return (
@@ -497,6 +827,42 @@ function TaskModal({
 								/>
 							</div>
 						</div>
+						{projects.length > 0 && (
+							<div>
+								<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
+									Project
+								</label>
+								<AnimatedDropdown
+									isOpen={openDropdown === "project"}
+									onToggle={() =>
+										setOpenDropdown((k) => (k === "project" ? null : "project"))
+									}
+									onSelect={(value) => {
+										setForm((f) => ({
+											...f,
+											projectId: value || null,
+										}));
+										setOpenDropdown(null);
+									}}
+									options={projectOptions}
+									value={form.projectId || ""}
+									placeholder="No project"
+									buttonClassName="px-3 py-2 border-zinc-200 text-sm"
+									renderButton={(selectedOption, isOpen) => (
+										<TaskModalDropdownButton
+											selectedOption={selectedOption}
+											isOpen={isOpen}
+											placeholder="No project"
+											onClick={() =>
+												setOpenDropdown((k) =>
+													k === "project" ? null : "project",
+												)
+											}
+										/>
+									)}
+								/>
+							</div>
+						)}
 						<div>
 							<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
 								Progress — {form.progress}%
@@ -592,7 +958,15 @@ export default function WritingTasksKanban({
 }) {
 	const router = useRouter();
 	const queryClient = useQueryClient();
-	const { tasks, addTask, updateTask, deleteTask, moveTask } = useWritingTasks(userId);
+	const { tasks, addTask, updateTask, deleteTask, moveTask, detachTasksFromProject } =
+		useWritingTasks(userId);
+
+	const { data: projects = [] } = useQuery({
+		queryKey: ["canvasProjects", userId],
+		queryFn: () => listCanvasProjects(userId),
+		enabled: !!userId,
+		staleTime: 2 * 60 * 1000,
+	});
 
 	const { generateFromTask, generatingTaskId } = useWritingTaskAiDraft({
 		reduxUser,
@@ -607,12 +981,156 @@ export default function WritingTasksKanban({
 	const [searchQuery, setSearchQuery] = useState("");
 	const [viewMode, setViewMode] = useState("board");
 	const [filterPriority, setFilterPriority] = useState(null);
+	const [filterProjectId, setFilterProjectId] = useState(PROJECT_FILTER_ALL);
 	const [showFilter, setShowFilter] = useState(false);
+	const [projectFilterOpen, setProjectFilterOpen] = useState(false);
+	const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
+	const [renameProjectModalOpen, setRenameProjectModalOpen] = useState(false);
+	const [deleteProjectModalOpen, setDeleteProjectModalOpen] = useState(false);
+	const [creatingProject, setCreatingProject] = useState(false);
+	const [renamingProject, setRenamingProject] = useState(false);
+	const [deletingProject, setDeletingProject] = useState(false);
 	const [activeId, setActiveId] = useState(null);
 	const [modalOpen, setModalOpen] = useState(false);
 	const [editingTask, setEditingTask] = useState(null);
 	const [defaultStatus, setDefaultStatus] = useState("backlog");
 	const filterRef = useRef(null);
+	const projectFilterRef = useRef(null);
+
+	useEffect(() => {
+		if (!userId) {
+			setFilterProjectId(PROJECT_FILTER_ALL);
+			return;
+		}
+		setFilterProjectId(loadProjectFilter(userId));
+	}, [userId]);
+
+	const handleProjectFilterChange = useCallback(
+		(value) => {
+			setFilterProjectId(value);
+			if (userId) saveProjectFilter(userId, value);
+			setProjectFilterOpen(false);
+		},
+		[userId],
+	);
+
+	const projectFilterOptions = useMemo(
+		() => [
+			{ value: PROJECT_FILTER_ALL, label: "All projects" },
+			{ value: PROJECT_FILTER_UNASSIGNED, label: "No project" },
+			...projects.map((p) => ({
+				value: p.id,
+				label: p.name || "Untitled project",
+			})),
+		],
+		[projects],
+	);
+
+	const defaultProjectIdForNewTask = useMemo(() => {
+		if (
+			filterProjectId !== PROJECT_FILTER_ALL &&
+			filterProjectId !== PROJECT_FILTER_UNASSIGNED
+		) {
+			return filterProjectId;
+		}
+		return null;
+	}, [filterProjectId]);
+
+	const showProjectOnCards =
+		filterProjectId === PROJECT_FILTER_ALL && projects.length > 0;
+
+	const activeSelectedProject = useMemo(() => {
+		if (
+			filterProjectId === PROJECT_FILTER_ALL ||
+			filterProjectId === PROJECT_FILTER_UNASSIGNED
+		) {
+			return null;
+		}
+		return projects.find((p) => p.id === filterProjectId) || null;
+	}, [filterProjectId, projects]);
+
+	const tasksInActiveProject = useMemo(() => {
+		if (!activeSelectedProject) return 0;
+		return tasks.filter((t) => t.projectId === activeSelectedProject.id).length;
+	}, [tasks, activeSelectedProject]);
+
+	const handleCreateProject = useCallback(
+		async (name) => {
+			if (!userId || creatingProject) return;
+			setCreatingProject(true);
+			try {
+				const id = await createCanvasProject(userId, {
+					name: name.trim(),
+					assetIds: [],
+				});
+				await queryClient.invalidateQueries({
+					queryKey: ["canvasProjects", userId],
+				});
+				handleProjectFilterChange(id);
+				setNewProjectModalOpen(false);
+			} catch (e) {
+				console.error("[tasks] create project", e);
+			} finally {
+				setCreatingProject(false);
+			}
+		},
+		[userId, creatingProject, queryClient, handleProjectFilterChange],
+	);
+
+	const openNewProjectModal = useCallback(() => {
+		if (!reduxUser) {
+			onLogin?.();
+			return;
+		}
+		setNewProjectModalOpen(true);
+	}, [reduxUser, onLogin]);
+
+	const handleRenameProject = useCallback(
+		async (name) => {
+			if (!userId || !activeSelectedProject || renamingProject) return;
+			setRenamingProject(true);
+			try {
+				await updateCanvasProject(userId, activeSelectedProject.id, {
+					name: name.trim(),
+				});
+				await queryClient.invalidateQueries({
+					queryKey: ["canvasProjects", userId],
+				});
+				setRenameProjectModalOpen(false);
+			} catch (e) {
+				console.error("[tasks] rename project", e);
+			} finally {
+				setRenamingProject(false);
+			}
+		},
+		[userId, activeSelectedProject, renamingProject, queryClient],
+	);
+
+	const handleDeleteProject = useCallback(async () => {
+		if (!userId || !activeSelectedProject || deletingProject) return;
+		setDeletingProject(true);
+		try {
+			const projectId = activeSelectedProject.id;
+			detachTasksFromProject(projectId);
+			await deleteCanvasProject(userId, projectId);
+			await queryClient.invalidateQueries({
+				queryKey: ["canvasProjects", userId],
+			});
+			handleProjectFilterChange(PROJECT_FILTER_ALL);
+			setDeleteProjectModalOpen(false);
+		} catch (e) {
+			console.error("[tasks] delete project", e);
+		} finally {
+			setDeletingProject(false);
+		}
+	}, [
+		userId,
+		activeSelectedProject,
+		deletingProject,
+		detachTasksFromProject,
+		queryClient,
+		handleProjectFilterChange,
+	]);
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -624,10 +1142,20 @@ export default function WritingTasksKanban({
 			if (filterRef.current && !filterRef.current.contains(e.target)) {
 				setShowFilter(false);
 			}
+			if (projectFilterRef.current && !projectFilterRef.current.contains(e.target)) {
+				setProjectFilterOpen(false);
+			}
 		};
 		document.addEventListener("mousedown", handleClick);
 		return () => document.removeEventListener("mousedown", handleClick);
 	}, []);
+
+	useEffect(() => {
+		if (filterProjectId === PROJECT_FILTER_ALL) return;
+		if (filterProjectId === PROJECT_FILTER_UNASSIGNED) return;
+		if (projects.some((p) => p.id === filterProjectId)) return;
+		handleProjectFilterChange(PROJECT_FILTER_ALL);
+	}, [projects, filterProjectId, handleProjectFilterChange]);
 
 	const filteredTasks = useMemo(() => {
 		let list = tasks;
@@ -642,8 +1170,13 @@ export default function WritingTasksKanban({
 		if (filterPriority) {
 			list = list.filter((t) => t.priority === filterPriority);
 		}
+		if (filterProjectId === PROJECT_FILTER_UNASSIGNED) {
+			list = list.filter((t) => !t.projectId);
+		} else if (filterProjectId !== PROJECT_FILTER_ALL) {
+			list = list.filter((t) => t.projectId === filterProjectId);
+		}
 		return list;
-	}, [tasks, searchQuery, filterPriority]);
+	}, [tasks, searchQuery, filterPriority, filterProjectId]);
 
 	const getColumnTasks = (status) =>
 		filteredTasks.filter((t) => t.status === status);
@@ -716,6 +1249,80 @@ export default function WritingTasksKanban({
 		<div className="flex flex-col h-full min-h-0 bg-transparent font-sans">
 			{/* Header */}
 			<div className="flex-shrink-0 px-4 sm:px-6 pt-6 pb-4">
+				{reduxUser && (
+					<div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-5 pb-4 border-b border-zinc-200/80">
+						<div className="flex items-center gap-2 min-w-0">
+							<div className="relative flex-1 sm:flex-none sm:min-w-[12rem]" ref={projectFilterRef}>
+								<AnimatedDropdown
+									isOpen={projectFilterOpen}
+									onToggle={() => setProjectFilterOpen((s) => !s)}
+									onSelect={handleProjectFilterChange}
+									options={projectFilterOptions}
+									value={filterProjectId}
+									placeholder="All projects"
+									className="w-full"
+									buttonClassName="px-3 py-2 border-zinc-200 text-sm bg-white"
+									renderButton={(selectedOption, isOpen) => (
+										<motion.button
+											type="button"
+											whileHover={{ scale: 1.01 }}
+											whileTap={{ scale: 0.99 }}
+											onClick={() => setProjectFilterOpen((s) => !s)}
+											className="flex items-center justify-center gap-2 px-3 py-2 w-full sm:w-auto min-w-[12rem] bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700"
+										>
+											<FolderKanban className="w-4 h-4 text-violet-500 shrink-0" />
+											<span className="truncate">
+												{selectedOption?.label || "All projects"}
+											</span>
+											<ChevronDown
+												className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${
+													isOpen ? "rotate-180" : ""
+												}`}
+											/>
+										</motion.button>
+									)}
+								/>
+							</div>
+						</div>
+						<div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+							<motion.button
+								type="button"
+								whileHover={{ scale: 1.02 }}
+								whileTap={{ scale: 0.98 }}
+								onClick={openNewProjectModal}
+								className="inline-flex items-center justify-center gap-1.5 px-3 py-2 flex-1 sm:flex-none bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+							>
+								<Plus className="w-4 h-4" />
+								New project
+							</motion.button>
+							{activeSelectedProject && (
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={() => setRenameProjectModalOpen(true)}
+									className="inline-flex items-center justify-center gap-1.5 px-3 py-2 flex-1 sm:flex-none bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+								>
+									<Pencil className="w-4 h-4" />
+									Rename
+								</motion.button>
+							)}
+							{activeSelectedProject && (
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={() => setDeleteProjectModalOpen(true)}
+									className="inline-flex items-center justify-center gap-1.5 px-3 py-2 flex-1 sm:flex-none border border-red-200 bg-red-50 text-red-700 rounded-xl text-sm font-medium hover:bg-red-100"
+								>
+									<Trash2 className="w-4 h-4" />
+									Delete project
+								</motion.button>
+							)}
+						</div>
+					</div>
+				)}
+
 				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
 					<div>
 						<h1 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">
@@ -887,6 +1494,11 @@ export default function WritingTasksKanban({
 														<SortableTaskCard
 															key={task.id}
 															task={task}
+															projectName={
+																showProjectOnCards
+																	? resolveProjectName(projects, task.projectId)
+																	: null
+															}
 															onEdit={openEdit}
 															isGenerating={generatingTaskId === task.id}
 															onGenerateAi={handleGenerateAi}
@@ -936,6 +1548,11 @@ export default function WritingTasksKanban({
 											>
 												{task.priority}
 											</span>
+											{showProjectOnCards && task.projectId && (
+												<span className="shrink-0 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide hidden sm:inline">
+													{resolveProjectName(projects, task.projectId)}
+												</span>
+											)}
 											<div className="flex-1 min-w-0">
 												<p className="text-sm font-semibold text-zinc-900 truncate">
 													{task.title}
@@ -991,6 +1608,8 @@ export default function WritingTasksKanban({
 				open={modalOpen}
 				task={editingTask}
 				defaultStatus={defaultStatus}
+				defaultProjectId={defaultProjectIdForNewTask}
+				projects={projects}
 				isGenerating={editingTask && generatingTaskId === editingTask.id}
 				onGenerateAi={handleGenerateAi}
 				onOpenDraft={handleOpenDraft}
@@ -1004,6 +1623,30 @@ export default function WritingTasksKanban({
 					setModalOpen(false);
 					setEditingTask(null);
 				}}
+			/>
+
+			<NewProjectModal
+				open={newProjectModalOpen}
+				onClose={() => setNewProjectModalOpen(false)}
+				onCreate={handleCreateProject}
+				isCreating={creatingProject}
+			/>
+
+			<RenameProjectModal
+				open={renameProjectModalOpen}
+				initialName={activeSelectedProject?.name}
+				onClose={() => setRenameProjectModalOpen(false)}
+				onSave={handleRenameProject}
+				isSaving={renamingProject}
+			/>
+
+			<DeleteProjectModal
+				open={deleteProjectModalOpen}
+				projectName={activeSelectedProject?.name}
+				taskCount={tasksInActiveProject}
+				onClose={() => setDeleteProjectModalOpen(false)}
+				onConfirm={handleDeleteProject}
+				isDeleting={deletingProject}
 			/>
 		</div>
 	);
