@@ -18,8 +18,15 @@ export default function BlogAudioPlayer({
 	name = "Audio track",
 	caption = "",
 	onDownload,
+	onCopyUrl,
+	onSave,
 	downloading = false,
+	saving = false,
+	copiedUrl = false,
+	savedFlash = false,
 	showDownload = true,
+	showCopyUrl = false,
+	showSave = false,
 }) {
 	const audioRef = useRef(null);
 	const [playing, setPlaying] = useState(false);
@@ -111,46 +118,108 @@ export default function BlogAudioPlayer({
 							{name}
 						</div>
 					</div>
-					{showDownload && onDownload ? (
-						<motion.button
-							type="button"
-							whileHover={{ background: "#F0ECE5" }}
-							whileTap={{ scale: 0.95 }}
-							disabled={downloading}
-							onClick={onDownload}
-							title="Download audio"
+					{(showCopyUrl && onCopyUrl) ||
+					(showSave && onSave) ||
+					(showDownload && onDownload) ? (
+						<div
 							style={{
-								flexShrink: 0,
 								display: "flex",
 								alignItems: "center",
-								gap: 5,
-								padding: "5px 10px",
-								borderRadius: 8,
-								border: "1px solid #E8E4DC",
-								background: "#fff",
-								color: "#37352F",
-								fontSize: 11,
-								fontWeight: 600,
-								cursor: downloading ? "wait" : "pointer",
-								opacity: downloading ? 0.7 : 1,
+								gap: 6,
+								flexShrink: 0,
 							}}
 						>
-							<svg
-								width={12}
-								height={12}
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								strokeWidth={2}
-								strokeLinecap="round"
-								strokeLinejoin="round"
-							>
-								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-								<polyline points="7 10 12 15 17 10" />
-								<line x1="12" y1="15" x2="12" y2="3" />
-							</svg>
-							{downloading ? "…" : "Download"}
-						</motion.button>
+							{showCopyUrl && onCopyUrl ? (
+								<motion.button
+									type="button"
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.95 }}
+									onClick={onCopyUrl}
+									title="Copy audio URL"
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										padding: "5px 10px",
+										borderRadius: 8,
+										border: `1px solid ${copiedUrl ? "#8BC57E" : "#E8E4DC"}`,
+										background: copiedUrl ? "#EFF6EE" : "#fff",
+										color: copiedUrl ? "#2D6A4F" : "#37352F",
+										fontSize: 11,
+										fontWeight: 600,
+										cursor: "pointer",
+									}}
+								>
+									{copiedUrl ? "Copied!" : "Copy URL"}
+								</motion.button>
+							) : null}
+							{showSave && onSave ? (
+								<motion.button
+									type="button"
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.95 }}
+									disabled={saving}
+									onClick={onSave}
+									title="Save to draft"
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										padding: "5px 10px",
+										borderRadius: 8,
+										border: `1px solid ${savedFlash ? "#8BC57E" : "#E8E4DC"}`,
+										background: savedFlash ? "#EFF6EE" : "#fff",
+										color: savedFlash ? "#2D6A4F" : "#37352F",
+										fontSize: 11,
+										fontWeight: 600,
+										cursor: saving ? "wait" : "pointer",
+										opacity: saving ? 0.7 : 1,
+									}}
+								>
+									{saving ? "Saving…" : savedFlash ? "Saved!" : "Save"}
+								</motion.button>
+							) : null}
+							{showDownload && onDownload ? (
+								<motion.button
+									type="button"
+									whileHover={{ background: "#F0ECE5" }}
+									whileTap={{ scale: 0.95 }}
+									disabled={downloading}
+									onClick={onDownload}
+									title="Download audio"
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 5,
+										padding: "5px 10px",
+										borderRadius: 8,
+										border: "1px solid #E8E4DC",
+										background: "#fff",
+										color: "#37352F",
+										fontSize: 11,
+										fontWeight: 600,
+										cursor: downloading ? "wait" : "pointer",
+										opacity: downloading ? 0.7 : 1,
+									}}
+								>
+									<svg
+										width={12}
+										height={12}
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth={2}
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+										<polyline points="7 10 12 15 17 10" />
+										<line x1="12" y1="15" x2="12" y2="3" />
+									</svg>
+									{downloading ? "…" : "Download"}
+								</motion.button>
+							) : null}
+						</div>
 					) : null}
 				</div>
 

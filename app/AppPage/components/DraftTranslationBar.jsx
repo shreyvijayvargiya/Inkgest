@@ -46,7 +46,7 @@ export default function DraftTranslationBar({
 				whileTap={{ scale: 0.97 }}
 				disabled={translating || isSourceLanguage(translationLang)}
 				onClick={onTranslate}
-				title={`Uses ~${creditEstimate} credit${creditEstimate === 1 ? "" : "s"} (1 per 1,000 words, min 0.25)`}
+				title={`Uses ${creditEstimate} credit per translation`}
 				style={{
 					padding: "6px 12px",
 					borderRadius: 8,

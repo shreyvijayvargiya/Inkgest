@@ -24,6 +24,7 @@ import { persistGenerateResponse } from "../../lib/utils/persistGenerateResponse
 import { requestGenerate } from "../../lib/api/generateClient";
 import { listCanvasProjects } from "../../lib/api/canvasProjects";
 import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
+import AppSidebarTasksNav from "../../lib/ui/AppSidebarTasksNav";
 import SidebarAssetCard from "../../lib/ui/SidebarAssetCard";
 import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
 
@@ -819,8 +820,13 @@ export default function inkgestApp() {
 								</div>
 							</div>
 
-							{/* Draft list */}
+							{/* Tasks nav + draft list */}
 							<div style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
+								<AppSidebarTasksNav
+									onNavigate={() => {
+										if (compactAssetsNav) setSidebarOpen(false);
+									}}
+								/>
 								<AnimatePresence>
 									{filtered.length === 0 ? (
 										<motion.div

@@ -28,7 +28,7 @@ import { deductCredits } from "../api/deductCredits";
 import { fetchTranslate } from "../api/inkgestScrapeClient";
 import { useInkgestScrape } from "../hooks/useInkgestScrape";
 import {
-	creditsForTranslationWords,
+	LLM_JOB_CREDIT,
 	countWordsInText,
 } from "../utils/translationCredits";
 import {
@@ -1388,7 +1388,7 @@ export default function AIChatSidebar({
 								});
 							} else {
 								const words = countWordsInText(text);
-								const creditsNeeded = creditsForTranslationWords(words);
+								const creditsNeeded = LLM_JOB_CREDIT;
 								if (
 									credits &&
 									credits.plan !== "pro" &&
@@ -1422,7 +1422,7 @@ export default function AIChatSidebar({
 									title: "Translation",
 									sub: langLabel,
 									lines: [
-										`${words} words · ${creditsNeeded} credit${creditsNeeded === 1 ? "" : "s"}`,
+										`${words} words · ${creditsNeeded} credit`,
 									],
 								});
 								payload = JSON.stringify({

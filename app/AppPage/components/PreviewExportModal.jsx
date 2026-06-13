@@ -14,12 +14,12 @@ import { THEMES } from "../../../lib/blogExportThemes";
 import { useCompactAssetsNav } from "../../../lib/hooks/useCompactAssetsNav";
 import DraftTranslationBar from "./DraftTranslationBar";
 import PreviewExportThemeList from "./PreviewExportThemeList";
-import BlogToAudioDropdown from "./BlogToAudioDropdown";
+import PreviewExportAudioPanel from "./PreviewExportAudioPanel";
 
 const PREVIEW_EXPORT_TABS = [
 	{ id: "themes", label: "Themes" },
 	{ id: "language", label: "Language" },
-	// { id: "audio", label: "Audio" },
+	{ id: "audio", label: "Audio" },
 	{ id: "export", label: "Export" },
 ];
 
@@ -367,6 +367,7 @@ export default function PreviewExportModal({
 	getPublicUrl,
 	onCopyThemeHTML,
 	onCopyThemeReact,
+	blogAudio,
 }) {
 	const isCompact = useCompactAssetsNav();
 	const [activeTab, setActiveTab] = useState("themes");
@@ -513,15 +514,6 @@ export default function PreviewExportModal({
 						) : null}
 					</div>
 				);
-			case "audio":
-				return (
-					<BlogToAudioDropdown
-						inline
-						content={plainTextExport}
-						title={previewDocTitle}
-						isCompact={isCompact}
-					/>
-				);
 			case "export":
 				return <PreviewExportActionsPanel {...exportPanelProps} />;
 			default:
@@ -611,37 +603,41 @@ export default function PreviewExportModal({
 							</div>
 
 							{/* Body */}
-							<div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
-								{/* Left panel: active tab content */}
-								<div
-									className={`flex min-h-0 shrink-0 flex-col bg-zinc-50 md:w-[248px] md:border-r md:border-[#E2E2E2] ${
-										isCompact ? "max-h-[38%] border-b border-zinc-50" : ""
-									}`}
-								>
-									<div className="min-h-0 flex-1 overflow-y-auto p-3">
-										{renderTabContent()}
+							{activeTab === "audio" && blogAudio ? (
+								<PreviewExportAudioPanel {...blogAudio} />
+							) : (
+								<div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+									{/* Left panel: active tab content */}
+									<div
+										className={`flex min-h-0 shrink-0 flex-col bg-zinc-50 md:w-[248px] md:border-r md:border-[#E2E2E2] ${
+											isCompact ? "max-h-[38%] border-b border-zinc-50" : ""
+										}`}
+									>
+										<div className="min-h-0 flex-1 overflow-y-auto p-3">
+											{renderTabContent()}
+										</div>
+									</div>
+
+									{/* Preview */}
+									<div className="relative min-h-0 min-w-0 flex-1 bg-[#e5e7eb]">
+										{themedDoc ? (
+											<iframe
+												key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}-${previewSrcDoc ? "m" : "b"}`}
+												srcDoc={previewSrcDoc}
+												title={`Preview — ${activeTheme?.name}`}
+												sandbox="allow-scripts allow-same-origin"
+												className={`block h-full w-full border-0 transition-opacity duration-150 ${
+													previewMermaidPending ? "opacity-70" : "opacity-100"
+												}`}
+											/>
+										) : (
+											<div className="flex h-full items-center justify-center text-sm text-[#888888]">
+												No content yet — write something in the editor first.
+											</div>
+										)}
 									</div>
 								</div>
-
-								{/* Preview */}
-								<div className="relative min-h-0 min-w-0 flex-1 bg-[#e5e7eb]">
-									{themedDoc ? (
-										<iframe
-											key={`${previewTheme}-${translationLang}-${translatedHTML ? "t" : "o"}-${previewSrcDoc ? "m" : "b"}`}
-											srcDoc={previewSrcDoc}
-											title={`Preview — ${activeTheme?.name}`}
-											sandbox="allow-scripts allow-same-origin"
-											className={`block h-full w-full border-0 transition-opacity duration-150 ${
-												previewMermaidPending ? "opacity-70" : "opacity-100"
-											}`}
-										/>
-									) : (
-										<div className="flex h-full items-center justify-center text-sm text-[#888888]">
-											No content yet — write something in the editor first.
-										</div>
-									)}
-								</div>
-							</div>
+							)}
 						</motion.div>
 					</motion.div>
 				</>
