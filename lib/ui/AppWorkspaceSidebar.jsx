@@ -344,7 +344,7 @@ export default function AppWorkspaceSidebar({
 								<button
 									type="button"
 									onClick={() => setDeleteConfirm(null)}
-									className="px-4 py-2 rounded-lg text-sm font-semibold"
+									className="px-4 py-2 rounded-xl text-sm font-semibold"
 									style={{ color: T.muted, border: `1px solid ${T.border}` }}
 								>
 									Cancel
@@ -352,7 +352,7 @@ export default function AppWorkspaceSidebar({
 								<button
 									type="button"
 									onClick={confirmDelete}
-									className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white"
+									className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white"
 								>
 									Delete
 								</button>

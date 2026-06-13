@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import LoginModal from "../../lib/ui/LoginModal";
 import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
 import AppWorkspaceSidebar from "../../lib/ui/AppWorkspaceSidebar";
-import WritingTasksKanban from "../../lib/ui/WritingTasksKanban";
+import WritingMapGraph from "../../lib/ui/WritingMapGraph";
 import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
 import {
 	getUserCredits,
@@ -24,7 +24,7 @@ const FontLink = () => (
 
 const T = getTheme();
 
-export default function TasksPage() {
+export default function MapPage() {
 	const router = useRouter();
 	const reduxUser = useSelector((state) => state.user?.user ?? null);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -106,12 +106,9 @@ export default function TasksPage() {
 							reduxUser && sidebarOpen && !compactAssetsNav ? 0 : 0,
 					}}
 				>
-					<WritingTasksKanban
-						userId={reduxUser?.uid}
+					<WritingMapGraph
 						reduxUser={reduxUser}
-						creditRemaining={creditRemaining}
 						onLogin={() => setLoginModalOpen(true)}
-						onCreditsUsed={refreshCredits}
 					/>
 				</main>
 			</div>
