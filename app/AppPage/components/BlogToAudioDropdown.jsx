@@ -196,7 +196,7 @@ export default function BlogToAudioDropdown({
 			const { url } = await requestBlogToAudio({
 				content,
 				language,
-				voiceOver: voice,
+				voice,
 				signal: controller.signal,
 			});
 			setAudioUrl(url);

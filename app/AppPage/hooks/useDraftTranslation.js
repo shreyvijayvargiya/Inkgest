@@ -5,10 +5,7 @@ import { deductCredits } from "../../../lib/api/deductCredits";
 import { updateAsset } from "../../../lib/api/userAssets";
 import { htmlToMarkdown } from "../../../lib/utils/htmlToMarkdown";
 import { FREE_CREDIT_LIMIT } from "../../../lib/utils/credits";
-import {
-	creditsForTranslationWords,
-	countWordsInText,
-} from "../../../lib/utils/translationCredits";
+import { LLM_JOB_CREDIT } from "../../../lib/utils/translationCredits";
 import {
 	getDraftTranslationHtml,
 	listDraftTranslationLangs,
@@ -61,10 +58,7 @@ export function useDraftTranslation({
 		return html.trim() ? htmlToMarkdown(html) || "" : "";
 	}, [getSourceHtml]);
 
-	const creditEstimate = useMemo(() => {
-		const md = getSourceMarkdown();
-		return creditsForTranslationWords(countWordsInText(md));
-	}, [getSourceMarkdown]);
+	const creditEstimate = LLM_JOB_CREDIT;
 
 	/** When language changes, load cached Firestore translation or clear for source. */
 	useEffect(() => {
@@ -102,15 +96,9 @@ export function useDraftTranslation({
 			return;
 		}
 
-		const words = countWordsInText(markdown);
-		const creditsNeeded = creditsForTranslationWords(words);
-
-		if (
-			creditRemaining !== Infinity &&
-			creditRemaining < creditsNeeded
-		) {
+		if (creditRemaining !== Infinity && creditRemaining < LLM_JOB_CREDIT) {
 			setTranslationError(
-				`Not enough credits (need ${creditsNeeded}, have ${Number(creditRemaining).toFixed(2)}).`,
+				`Not enough credits (need ${LLM_JOB_CREDIT}, have ${Number(creditRemaining).toFixed(2)}).`,
 			);
 			return;
 		}
@@ -151,7 +139,7 @@ export function useDraftTranslation({
 			const html = formatBody(translatedMd);
 			setTranslatedHTML(html);
 
-			deductCredits(idToken, creditsNeeded);
+			deductCredits(idToken, LLM_JOB_CREDIT);
 			queryClient?.invalidateQueries({
 				queryKey: ["credits", reduxUser?.uid],
 			});

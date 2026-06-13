@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useSelector } from "react-redux";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import LoginModal from "../../lib/ui/LoginModal";
+import AppSidebarTasksNav from "../../lib/ui/AppSidebarTasksNav";
 import AIChatSidebar from "../../lib/ui/AIChatSidebar";
 import {
 	listAssets,
@@ -79,6 +80,7 @@ import { buildThemedHTML } from "../../lib/blogExportThemes";
 import { useDraftPageRuntime } from "./hooks/useDraftPageRuntime";
 import { useDraftIconPicker } from "./hooks/useDraftIconPicker";
 import { useDraftTranslation } from "./hooks/useDraftTranslation";
+import { useDraftBlogAudio } from "./hooks/useDraftBlogAudio";
 import DraftIconPickerPortal from "./components/DraftIconPickerPortal";
 import DraftBlockCategoryDropdown from "./components/DraftBlockCategoryDropdown";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
@@ -557,6 +559,31 @@ export default function DraftPage() {
 		themeDrawerOpen,
 		queryClient,
 		creditRemaining,
+	});
+
+	const audioSourceText = useMemo(() => {
+		const html = stripDraftSlashQueryFromHtmlString(
+			translatedHTML || draft?.body || "",
+		);
+		if (!html.trim()) return "";
+		try {
+			const d = document.createElement("div");
+			d.innerHTML = html;
+			return (d.innerText || "").trim();
+		} catch {
+			return "";
+		}
+	}, [translatedHTML, draft?.body]);
+
+	const draftBlogAudio = useDraftBlogAudio({
+		reduxUser,
+		draft,
+		draftId,
+		docSource: docData?.source,
+		queryClient,
+		creditRemaining,
+		content: audioSourceText,
+		title: draft?.title || "Blog audio",
 	});
 
 	/* Sync tabs to URL when we have draftId but no tabs query (e.g. direct link) */
@@ -2077,8 +2104,13 @@ export default function DraftPage() {
 								</div>
 							</div>
 
-							{/* Draft list */}
+							{/* Tasks nav + draft list */}
 							<div style={{ flex: 1, overflowY: "auto", padding: "10px 10px" }}>
+								<AppSidebarTasksNav
+									onNavigate={() => {
+										if (compactAssetsNav) setSidebarOpen(false);
+									}}
+								/>
 								<AnimatePresence>
 									{filtered.length === 0 ? (
 										<motion.div
@@ -2907,6 +2939,7 @@ export default function DraftPage() {
 					translationSaved: draftTranslation.translationSaved,
 					savedLangs: draftTranslation.savedLangs,
 					creditEstimate: draftTranslation.creditEstimate,
+					blogAudio: draftBlogAudio,
 				}}
 				exportThemes={{
 					open: translationModalOpen,
