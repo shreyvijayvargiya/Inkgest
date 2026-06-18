@@ -14,7 +14,7 @@
  *   onAgentDraftCreated  fn?(draftId: string) — after agent approves creating a draft
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { auth } from "../config/firebase";
@@ -40,6 +40,11 @@ import {
 	createDraft,
 	getAsset,
 } from "../api/userAssets";
+import { listWorkspaceNodes } from "../api/workspaceTree";
+import {
+	buildAssetPathMap,
+	formatWorkspaceTreeForAi,
+} from "../utils/buildWorkspaceTree";
 import {
 	AIChatSidebarAgentBar,
 	CHAT_MODE_ASK,
@@ -831,6 +836,21 @@ export default function AIChatSidebar({
 		staleTime: 45_000,
 	});
 
+	const { data: workspaceNodes = [] } = useQuery({
+		queryKey: ["workspaceNodes", effectiveUserId],
+		queryFn: () => listWorkspaceNodes(effectiveUserId),
+		enabled: libraryToolsActive,
+		staleTime: 45_000,
+	});
+
+	const agentAssetsWithPaths = useMemo(() => {
+		const pathMap = buildAssetPathMap(workspaceNodes, agentAssets);
+		return agentAssets.map((a) => ({
+			...a,
+			path: pathMap.get(a.id) || "",
+		}));
+	}, [agentAssets, workspaceNodes]);
+
 	const createAgentDraftMutation = useMutation({
 		mutationFn: async ({ uid, draft }) => {
 			if (!uid) throw new Error("Sign in required.");
@@ -1169,6 +1189,8 @@ export default function AIChatSidebar({
 		}
 		if (plainContext) contextPrefix += `[Editor context — current draft: "${plainContext}"]\n\n`;
 		if (selectionPlain) contextPrefix += `[User-selected text for focus: "${selectionPlain}"]\n\n`;
+		const treeBlock = formatWorkspaceTreeForAi(workspaceNodes, agentAssets);
+		if (treeBlock) contextPrefix += treeBlock;
 
 		let thread = [
 			...recentHistory,
@@ -1562,7 +1584,7 @@ export default function AIChatSidebar({
 							}
 						} else if (name === "search_user_assets") {
 							const hits = searchAssetsWithFuse(
-								agentAssets || [],
+								agentAssetsWithPaths || [],
 								args.query ?? "",
 								12,
 							);
@@ -1834,6 +1856,8 @@ export default function AIChatSidebar({
 		refreshCredits,
 		chatMode,
 		effectiveUserId,
+		agentAssetsWithPaths,
+		workspaceNodes,
 		agentAssets,
 		draftTitle,
 	]);

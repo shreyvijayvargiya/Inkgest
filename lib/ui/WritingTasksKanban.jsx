@@ -192,7 +192,7 @@ function TaskCardContent({
 			<div className="flex items-start justify-between gap-2 mb-2">
 				<div className="flex-1 min-w-0">
 					{projectName && (
-						<span className="inline-flex items-center gap-1 mb-1 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide">
+						<span className="inline-flex items-center gap-1 mb-1 px-2 py-0.5 rounded-xl bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide">
 							<FolderKanban className="w-3 h-3" />
 							{projectName}
 						</span>
@@ -1549,7 +1549,7 @@ export default function WritingTasksKanban({
 												{task.priority}
 											</span>
 											{showProjectOnCards && task.projectId && (
-												<span className="shrink-0 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide hidden sm:inline">
+												<span className="shrink-0 px-2 py-0.5 rounded-xl bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide hidden sm:inline">
 													{resolveProjectName(projects, task.projectId)}
 												</span>
 											)}

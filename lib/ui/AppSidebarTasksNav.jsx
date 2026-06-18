@@ -1,11 +1,16 @@
 import { motion } from "framer-motion";
 import { LayoutGrid } from "lucide-react";
 import { useRouter } from "next/router";
+import WorkspaceAddActions from "./WorkspaceAddActions";
 
 /**
- * Sidebar nav: Tasks link above the Workspace (drafts/assets) section.
+ * Sidebar nav: Tasks link + Workspace section header with add folder/file actions.
  */
-export default function AppSidebarTasksNav({ onNavigate }) {
+export default function AppSidebarTasksNav({
+	onNavigate,
+	onAddFolder,
+	onAddFile,
+}) {
 	const router = useRouter();
 	const isActive = router.pathname === "/tasks";
 
@@ -28,9 +33,12 @@ export default function AppSidebarTasksNav({ onNavigate }) {
 				<LayoutGrid className="w-4 h-4 shrink-0" />
 				Tasks
 			</motion.button>
-			<p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5 px-1 text-zinc-400">
-				Workspace
-			</p>
+			<div className="flex items-center justify-between mt-3 mb-1.5 px-1 gap-2">
+				<p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">
+					Workspace
+				</p>
+				<WorkspaceAddActions onAddFolder={onAddFolder} onAddFile={onAddFile} />
+			</div>
 		</div>
 	);
 }

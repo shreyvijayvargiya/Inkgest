@@ -2,19 +2,33 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWorkspaceSidebarWidth } from "../hooks/useWorkspaceSidebarWidth";
+import WorkspaceSidebarResizeHandle from "./WorkspaceSidebarResizeHandle";
 import {
 	listAssets,
 	deleteAsset,
 	updateAsset,
+	createDraft,
 } from "../api/userAssets";
-import { listCanvasProjects } from "../api/canvasProjects";
-import SidebarAssetCard from "./SidebarAssetCard";
-import AppSidebarTasksNav from "./AppSidebarTasksNav";
 import {
-	SIDEBAR_ASSET_LABELS,
-	SIDEBAR_ICONS,
-	groupSidebarByProject,
-} from "../utils/appSidebar";
+	listWorkspaceNodes,
+	createFolder,
+	createFileNode,
+	renameWorkspaceNode,
+	deleteWorkspaceNode,
+	deleteFileNodesForAsset,
+	updateWorkspaceNode,
+	moveWorkspaceNode,
+	placeAssetInTree,
+} from "../api/workspaceTree";
+import WorkspaceSidebarTree from "./WorkspaceSidebarTree";
+import AppSidebarTasksNav from "./AppSidebarTasksNav";
+import { SIDEBAR_ICONS } from "../utils/appSidebar";
+import {
+	buildWorkspaceTree,
+	flattenWorkspaceForSearch,
+	filterWorkspaceSearch,
+} from "../utils/buildWorkspaceTree";
 
 function Icon({ d, size = 16, stroke, fill = "none", strokeWidth = 1.75, T }) {
 	return (
@@ -44,7 +58,7 @@ function getAssetSource(item) {
 }
 
 /**
- * Shared drafts/assets sidebar (Tasks nav + Workspace list).
+ * Shared drafts/assets sidebar (Tasks nav + workspace folder tree).
  */
 export default function AppWorkspaceSidebar({
 	T,
@@ -59,19 +73,23 @@ export default function AppWorkspaceSidebar({
 	const queryClient = useQueryClient();
 	const [search, setSearch] = useState("");
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
+	const [deleteFolderConfirm, setDeleteFolderConfirm] = useState(null);
+	const { width: sidebarWidth, onResizePointerDown } = useWorkspaceSidebarWidth();
+
+	const uid = reduxUser?.uid;
 
 	const { data: items = [] } = useQuery({
-		queryKey: ["assets", reduxUser?.uid],
-		queryFn: () => listAssets(reduxUser.uid),
-		enabled: !!reduxUser,
+		queryKey: ["assets", uid],
+		queryFn: () => listAssets(uid),
+		enabled: !!uid,
 		staleTime: 2 * 60 * 1000,
 	});
 
-	const { data: canvasProjects = [] } = useQuery({
-		queryKey: ["canvasProjects", reduxUser?.uid],
-		queryFn: () => listCanvasProjects(reduxUser.uid),
-		enabled: !!reduxUser,
-		staleTime: 60 * 1000,
+	const { data: workspaceNodes = [] } = useQuery({
+		queryKey: ["workspaceNodes", uid],
+		queryFn: () => listWorkspaceNodes(uid),
+		enabled: !!uid,
+		staleTime: 2 * 60 * 1000,
 	});
 
 	const sidebarItems = useMemo(() => {
@@ -87,64 +105,137 @@ export default function AppWorkspaceSidebar({
 		});
 	}, [items]);
 
-	const filtered = useMemo(() => {
-		const q = search.toLowerCase().trim();
-		if (!q) return sidebarItems;
-		return sidebarItems.filter((item) => {
-			const title = (item.title || "").toLowerCase();
-			const preview = (item.preview || item.description || "").toLowerCase();
-			const type = (item.type || "").toLowerCase();
-			const tag = (SIDEBAR_ASSET_LABELS[item.type] || item.tag || "Draft").toLowerCase();
-			const format = (item.format || "").toLowerCase();
-			return (
-				title.includes(q) ||
-				preview.includes(q) ||
-				type.includes(q) ||
-				tag.includes(q) ||
-				format.includes(q)
-			);
-		});
-	}, [sidebarItems, search]);
-
-	const sidebarGrouped = useMemo(
-		() => groupSidebarByProject(filtered, canvasProjects),
-		[filtered, canvasProjects],
+	const { roots, looseAssets, assetMap } = useMemo(
+		() => buildWorkspaceTree(workspaceNodes, sidebarItems),
+		[workspaceNodes, sidebarItems],
 	);
 
+	const searchResults = useMemo(() => {
+		const q = search.trim();
+		if (!q) return null;
+		const flat = flattenWorkspaceForSearch(workspaceNodes, sidebarItems);
+		return filterWorkspaceSearch(flat, q);
+	}, [search, workspaceNodes, sidebarItems]);
+
+	const invalidateWorkspace = () => {
+		queryClient.invalidateQueries({ queryKey: ["workspaceNodes", uid] });
+	};
+
 	const handleSidebarIconChange = async (assetId, sidebarIcon) => {
-		if (!reduxUser) return;
+		if (!uid) return;
 		const item = sidebarItems.find((i) => i.id === assetId);
 		try {
-			await updateAsset(reduxUser.uid, assetId, { sidebarIcon }, getAssetSource(item));
-			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			await updateAsset(uid, assetId, { sidebarIcon }, getAssetSource(item));
+			queryClient.invalidateQueries({ queryKey: ["assets", uid] });
 		} catch (e) {
 			console.error("Sidebar icon update failed", e);
 		}
 	};
 
 	const handleSidebarRename = async (assetId, title) => {
-		if (!reduxUser) return;
+		if (!uid) return;
 		const item = sidebarItems.find((i) => i.id === assetId);
 		try {
-			await updateAsset(reduxUser.uid, assetId, { title }, getAssetSource(item));
-			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			await updateAsset(uid, assetId, { title }, getAssetSource(item));
+			queryClient.invalidateQueries({ queryKey: ["assets", uid] });
 			queryClient.invalidateQueries({ queryKey: ["doc"] });
 		} catch (e) {
 			console.error("Sidebar rename failed", e);
 		}
 	};
 
-	const confirmDelete = async () => {
-		if (!deleteConfirm || !reduxUser) return;
+	const handleRenameFolder = async (nodeId, name) => {
+		if (!uid) return;
+		try {
+			await renameWorkspaceNode(uid, nodeId, name);
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Folder rename failed", e);
+		}
+	};
+
+	const handleFolderIconChange = async (nodeId, sidebarIcon) => {
+		if (!uid) return;
+		try {
+			await updateWorkspaceNode(uid, nodeId, { sidebarIcon });
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Folder icon update failed", e);
+		}
+	};
+
+	const handleMoveNode = async (nodeId, { parentId, order }) => {
+		if (!uid) return;
+		try {
+			await moveWorkspaceNode(uid, nodeId, { parentId, order });
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Move node failed", e);
+		}
+	};
+
+	const handlePlaceAsset = async (assetId, parentId) => {
+		if (!uid) return;
+		try {
+			await placeAssetInTree(uid, assetId, parentId);
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Place asset failed", e);
+		}
+	};
+
+	const handleAddFolder = async (parentId = null) => {
+		if (!uid) return;
+		try {
+			await createFolder(uid, { parentId, name: "New folder" });
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Create folder failed", e);
+		}
+	};
+
+	const handleAddFile = async (parentId = null) => {
+		if (!uid) return;
+		try {
+			const { id: assetId } = await createDraft(uid, {
+				title: "Untitled",
+				body: "",
+				preview: "",
+			});
+			await createFileNode(uid, { parentId, assetId, name: "Untitled" });
+			queryClient.invalidateQueries({ queryKey: ["assets", uid] });
+			invalidateWorkspace();
+			router.push(`/app/${assetId}`);
+			if (compactAssetsNav) onCloseSidebar?.();
+		} catch (e) {
+			console.error("Create draft in folder failed", e);
+		}
+	};
+
+	const confirmDeleteAsset = async () => {
+		if (!deleteConfirm || !uid) return;
 		const item = sidebarItems.find((i) => i.id === deleteConfirm);
 		try {
-			await deleteAsset(reduxUser.uid, deleteConfirm, getAssetSource(item));
-			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			await deleteFileNodesForAsset(uid, deleteConfirm);
+			await deleteAsset(uid, deleteConfirm, getAssetSource(item));
+			queryClient.invalidateQueries({ queryKey: ["assets", uid] });
 			queryClient.invalidateQueries({ queryKey: ["doc"] });
+			invalidateWorkspace();
 		} catch (e) {
 			console.error("Delete failed", e);
 		}
 		setDeleteConfirm(null);
+	};
+
+	const confirmDeleteFolder = async () => {
+		if (!deleteFolderConfirm || !uid) return;
+		try {
+			await deleteWorkspaceNode(uid, deleteFolderConfirm);
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Delete folder failed", e);
+		}
+		setDeleteFolderConfirm(null);
 	};
 
 	if (!reduxUser) return null;
@@ -177,7 +268,7 @@ export default function AppWorkspaceSidebar({
 						animate={
 							compactAssetsNav
 								? { x: 0, opacity: 1 }
-								: { width: 280, opacity: 1 }
+								: { width: sidebarWidth, opacity: 1 }
 						}
 						exit={
 							compactAssetsNav
@@ -185,14 +276,15 @@ export default function AppWorkspaceSidebar({
 								: { width: 0, opacity: 0 }
 						}
 						transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-						className={`flex flex-col overflow-hidden shrink-0 border-r ${
+						className={`relative flex flex-col overflow-hidden shrink-0 border-r ${
 							compactAssetsNav
-								? "fixed top-14 left-0 bottom-0 w-[280px] z-[45] shadow-[8px_0_32px_rgba(0,0,0,0.12)]"
+								? "fixed top-14 left-0 bottom-0 z-[45] shadow-[8px_0_32px_rgba(0,0,0,0.12)]"
 								: ""
 						}`}
 						style={{
 							background: T.surface,
 							borderColor: T.border,
+							width: compactAssetsNav ? sidebarWidth : undefined,
 						}}
 					>
 						<div
@@ -206,7 +298,7 @@ export default function AppWorkspaceSidebar({
 								<input
 									value={search}
 									onChange={(e) => setSearch(e.target.value)}
-									placeholder="Search drafts, tables, blog, scrape…"
+									placeholder="Search drafts, folders, tables…"
 									className="w-full rounded-[9px] py-[7px] pl-[30px] pr-2.5 text-[13px] outline-none transition-colors"
 									style={{
 										background: T.surface,
@@ -222,52 +314,40 @@ export default function AppWorkspaceSidebar({
 								onNavigate={() => {
 									if (compactAssetsNav) onCloseSidebar?.();
 								}}
+								onAddFolder={() => handleAddFolder(null)}
+								onAddFile={() => handleAddFile(null)}
 							/>
-							<AnimatePresence>
-								{filtered.length === 0 ? (
-									<motion.div
-										initial={{ opacity: 0 }}
-										animate={{ opacity: 1 }}
-										className="text-center py-10 px-4"
-										style={{ color: T.muted }}
-									>
-										<p className="text-[32px] mb-2.5">📭</p>
-										<p className="text-[13px] mb-3">No drafts found</p>
-										<p className="text-xs">Use InkAgent to create your first draft</p>
-									</motion.div>
-								) : (
-									sidebarGrouped.map((section) => (
-										<div key={section.id} className="mb-3.5">
-											{sidebarGrouped.length > 1 && (
-												<p
-													className="text-[10px] font-bold tracking-widest mx-1 mb-2"
-													style={{ color: T.muted }}
-												>
-													{section.name}
-												</p>
-											)}
-											{section.items.map((item) => (
-												<SidebarAssetCard
-													key={item.id}
-													item={item}
-													active={item.id === activeAssetId}
-													typeLabels={SIDEBAR_ASSET_LABELS}
-													Icon={(props) => <Icon {...props} T={T} />}
-													Icons={SIDEBAR_ICONS}
-													onIconChange={handleSidebarIconChange}
-													onRename={handleSidebarRename}
-													onClick={() => {
-														router.push(`/app/${item.id}`);
-														if (compactAssetsNav) onCloseSidebar?.();
-													}}
-													onDelete={setDeleteConfirm}
-												/>
-											))}
-										</div>
-									))
-								)}
-							</AnimatePresence>
+							<WorkspaceSidebarTree
+								roots={roots}
+								looseAssets={looseAssets}
+								assetMap={assetMap}
+								searchQuery={search}
+								searchResults={searchResults}
+								activeAssetId={activeAssetId}
+								Icon={(props) => <Icon {...props} T={T} />}
+								Icons={SIDEBAR_ICONS}
+								onIconChange={handleSidebarIconChange}
+								onFolderIconChange={handleFolderIconChange}
+								onRenameAsset={handleSidebarRename}
+								onRenameFolder={handleRenameFolder}
+								onDeleteAsset={setDeleteConfirm}
+								onDeleteFolder={setDeleteFolderConfirm}
+								onAddFolder={handleAddFolder}
+								onAddFile={handleAddFile}
+								onMoveNode={handleMoveNode}
+								onPlaceAsset={handlePlaceAsset}
+								onAssetClick={(item) => {
+									router.push(`/app/${item.id}`);
+									if (compactAssetsNav) onCloseSidebar?.();
+								}}
+							/>
 						</div>
+
+						{!compactAssetsNav && (
+							<WorkspaceSidebarResizeHandle
+								onPointerDown={onResizePointerDown}
+							/>
+						)}
 
 						<div
 							className="px-3.5 py-3 shrink-0"
@@ -344,17 +424,66 @@ export default function AppWorkspaceSidebar({
 								<button
 									type="button"
 									onClick={() => setDeleteConfirm(null)}
-									className="px-4 py-2 rounded-lg text-sm font-semibold"
+									className="px-4 py-2 rounded-xl text-sm font-semibold"
 									style={{ color: T.muted, border: `1px solid ${T.border}` }}
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
-									onClick={confirmDelete}
-									className="px-4 py-2 rounded-lg text-sm font-semibold bg-red-600 text-white"
+									onClick={confirmDeleteAsset}
+									className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white"
 								>
 									Delete
+								</button>
+							</div>
+						</motion.div>
+					</>
+				)}
+			</AnimatePresence>
+
+			<AnimatePresence>
+				{deleteFolderConfirm && (
+					<>
+						<motion.div
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							onClick={() => setDeleteFolderConfirm(null)}
+							className="fixed inset-0 z-[200] bg-black/35 backdrop-blur-[3px]"
+						/>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.92, y: 12 }}
+							animate={{ opacity: 1, scale: 1, y: 0 }}
+							exit={{ opacity: 0, scale: 0.92, y: 12 }}
+							transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+							className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[360px] z-[201] rounded-2xl p-7 shadow-2xl"
+							style={{
+								background: T.surface,
+								border: `1px solid ${T.border}`,
+							}}
+						>
+							<p className="text-lg font-bold mb-2" style={{ color: T.accent }}>
+								Delete folder?
+							</p>
+							<p className="text-sm mb-5" style={{ color: T.muted }}>
+								Contents will move to the parent level. Files are not deleted.
+							</p>
+							<div className="flex gap-2 justify-end">
+								<button
+									type="button"
+									onClick={() => setDeleteFolderConfirm(null)}
+									className="px-4 py-2 rounded-xl text-sm font-semibold"
+									style={{ color: T.muted, border: `1px solid ${T.border}` }}
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={confirmDeleteFolder}
+									className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white"
+								>
+									Delete folder
 								</button>
 							</div>
 						</motion.div>

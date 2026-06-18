@@ -6,6 +6,7 @@ import AppInkgestTopBar from "../../lib/ui/AppInkgestTopBar";
 import AppWorkspaceSidebar from "../../lib/ui/AppWorkspaceSidebar";
 import WritingTasksKanban from "../../lib/ui/WritingTasksKanban";
 import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
+import { useWorkspaceSidebarWidth } from "../../lib/hooks/useWorkspaceSidebarWidth";
 import {
 	getUserCredits,
 	FREE_CREDIT_LIMIT,
@@ -31,6 +32,7 @@ export default function TasksPage() {
 	const [credits, setCredits] = useState(null);
 	const [sidebarOpen, setSidebarOpen] = useState(true);
 	const compactAssetsNav = useCompactAssetsNav();
+	const { width: sidebarWidth } = useWorkspaceSidebarWidth();
 	const sidebarOpenPrefsReady = useRef(false);
 
 	useLayoutEffect(() => {
@@ -100,7 +102,13 @@ export default function TasksPage() {
 				/>
 
 				<main
-					className={`flex-1 min-h-0 overflow-hidden transition-[margin] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${reduxUser && sidebarOpen && !compactAssetsNav ? "ml-[280px]" : "ml-0"}`}
+					className="flex-1 min-h-0 overflow-hidden transition-[margin] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+					style={{
+						marginLeft:
+							reduxUser && sidebarOpen && !compactAssetsNav
+								? sidebarWidth
+								: 0,
+					}}
 				>
 					<WritingTasksKanban
 						userId={reduxUser?.uid}

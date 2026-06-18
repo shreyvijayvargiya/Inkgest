@@ -11,11 +11,31 @@ import {
 	getAsset,
 	updateAsset,
 	deleteAsset,
+	createDraft,
 } from "../../lib/api/userAssets";
+import {
+	listWorkspaceNodes,
+	createFolder,
+	createFileNode,
+	renameWorkspaceNode,
+	deleteWorkspaceNode,
+	deleteFileNodesForAsset,
+	updateWorkspaceNode,
+	moveWorkspaceNode,
+	placeAssetInTree,
+} from "../../lib/api/workspaceTree";
+import WorkspaceSidebarTree from "../../lib/ui/WorkspaceSidebarTree";
+import {
+	buildWorkspaceTree,
+	flattenWorkspaceForSearch,
+	filterWorkspaceSearch,
+} from "../../lib/utils/buildWorkspaceTree";
 import { uploadFile } from "../../lib/api/upload";
 import { uploadInlineImagesToUploadThing } from "../../lib/fileUpload";
 import { FREE_CREDIT_LIMIT, getUserCredits } from "../../lib/utils/credits";
 import { useCompactAssetsNav } from "../../lib/hooks/useCompactAssetsNav";
+import { useWorkspaceSidebarWidth } from "../../lib/hooks/useWorkspaceSidebarWidth";
+import WorkspaceSidebarResizeHandle from "../../lib/ui/WorkspaceSidebarResizeHandle";
 import { useMermaidHydrateEditorRoot } from "../../lib/hooks/useMermaidHydrateEditorRoot";
 import MotionSelect from "../../lib/ui/MotionSelect";
 import {
@@ -28,7 +48,6 @@ import {
 	T,
 	Icons,
 	Icon,
-	ItemCard,
 	MAX_TABS,
 	insertDraftRichBlock,
 	deleteDraftSlashFromCaret,
@@ -168,6 +187,7 @@ export default function DraftPage() {
 	const [wordCount, setWordCount] = useState(0);
 	const [loginModalOpen, setLoginModalOpen] = useState(false);
 	const [deleteConfirm, setDeleteConfirm] = useState(null);
+	const [deleteFolderConfirm, setDeleteFolderConfirm] = useState(null);
 	const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
 	const [copiedTheme, setCopiedTheme] = useState(null); // { key, format: 'html' | 'react' | 'markdown' | 'text' | 'publicUrl' }
 	const [previewTheme, setPreviewTheme] = useState("ink");
@@ -271,6 +291,45 @@ export default function DraftPage() {
 		enabled: !!reduxUser,
 		staleTime: 2 * 60 * 1000,
 	});
+	const { data: workspaceNodes = [] } = useQuery({
+		queryKey: ["workspaceNodes", reduxUser?.uid],
+		queryFn: () => listWorkspaceNodes(reduxUser.uid),
+		enabled: !!reduxUser,
+		staleTime: 2 * 60 * 1000,
+	});
+
+	const sidebarItems = useMemo(() => {
+		const draftsList = items.filter((i) => i.type === "draft");
+		const tablesList = items.filter((i) => i.type === "table");
+		const otherAssets = items.filter((i) =>
+			["infographics", "landing_page", "image_gallery"].includes(i.type),
+		);
+		return [...draftsList, ...tablesList, ...otherAssets].sort((a, b) => {
+			const aT = a.createdAt?.toMillis?.() ?? a.createdAt?.getTime?.() ?? 0;
+			const bT = b.createdAt?.toMillis?.() ?? b.createdAt?.getTime?.() ?? 0;
+			return bT - aT;
+		});
+	}, [items]);
+
+	const { roots, looseAssets, assetMap } = useMemo(
+		() => buildWorkspaceTree(workspaceNodes, sidebarItems),
+		[workspaceNodes, sidebarItems],
+	);
+
+	const searchResults = useMemo(() => {
+		const q = search.trim();
+		if (!q) return null;
+		const flat = flattenWorkspaceForSearch(workspaceNodes, sidebarItems);
+		return filterWorkspaceSearch(flat, q);
+	}, [search, workspaceNodes, sidebarItems]);
+
+	const invalidateWorkspace = () => {
+		if (reduxUser?.uid) {
+			queryClient.invalidateQueries({
+				queryKey: ["workspaceNodes", reduxUser.uid],
+			});
+		}
+	};
 
 	const drafts = useMemo(
 		() => items.filter((i) => i.type === "draft"),
@@ -366,6 +425,7 @@ export default function DraftPage() {
 
 
 	const compactAssetsNav = useCompactAssetsNav();
+	const { width: sidebarWidth, onResizePointerDown } = useWorkspaceSidebarWidth();
 	const draftNavHeaderStackRef = useRef(null);
 	const [compactNavTopInset, setCompactNavTopInset] = useState(56);
 
@@ -1359,6 +1419,74 @@ export default function DraftPage() {
 		}
 	};
 
+	const handleRenameFolder = async (nodeId, name) => {
+		if (!reduxUser) return;
+		try {
+			await renameWorkspaceNode(reduxUser.uid, nodeId, name);
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Folder rename failed", e);
+		}
+	};
+
+	const handleFolderIconChange = async (nodeId, sidebarIcon) => {
+		if (!reduxUser) return;
+		try {
+			await updateWorkspaceNode(reduxUser.uid, nodeId, { sidebarIcon });
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Folder icon update failed", e);
+		}
+	};
+
+	const handleMoveNode = async (nodeId, { parentId, order }) => {
+		if (!reduxUser) return;
+		try {
+			await moveWorkspaceNode(reduxUser.uid, nodeId, { parentId, order });
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Move node failed", e);
+		}
+	};
+
+	const handlePlaceAsset = async (assetId, parentId) => {
+		if (!reduxUser) return;
+		try {
+			await placeAssetInTree(reduxUser.uid, assetId, parentId);
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Place asset failed", e);
+		}
+	};
+
+	const handleAddFolder = async (parentId = null) => {
+		if (!reduxUser) return;
+		try {
+			await createFolder(reduxUser.uid, { parentId, name: "New folder" });
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Create folder failed", e);
+		}
+	};
+
+	const handleAddFile = async (parentId = null) => {
+		if (!reduxUser) return;
+		try {
+			const { id: assetId } = await createDraft(reduxUser.uid, {
+				title: "Untitled",
+				body: "",
+				preview: "",
+			});
+			await createFileNode(reduxUser.uid, { parentId, assetId, name: "Untitled" });
+			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser.uid] });
+			invalidateWorkspace();
+			openDraftInTab(assetId);
+			if (compactAssetsNav) setSidebarOpen(false);
+		} catch (e) {
+			console.error("Create draft in folder failed", e);
+		}
+	};
+
 	const confirmDelete = async () => {
 		try {
 			const item = items.find((i) => i.id === deleteConfirm);
@@ -1369,9 +1497,11 @@ export default function DraftPage() {
 			const source =
 				item?.source ||
 				(isAsset ? "assets" : item?.type === "table" ? "tables" : "drafts");
+			await deleteFileNodesForAsset(reduxUser.uid, deleteConfirm);
 			await deleteAsset(reduxUser.uid, deleteConfirm, source);
 			queryClient.invalidateQueries({ queryKey: ["assets", reduxUser?.uid] });
 			queryClient.invalidateQueries({ queryKey: ["doc"] });
+			invalidateWorkspace();
 			if (deleteConfirm === draftId) {
 				router.push("/app");
 			}
@@ -1379,6 +1509,17 @@ export default function DraftPage() {
 			console.error("Delete failed", e);
 		}
 		setDeleteConfirm(null);
+	};
+
+	const confirmDeleteFolder = async () => {
+		if (!deleteFolderConfirm || !reduxUser) return;
+		try {
+			await deleteWorkspaceNode(reduxUser.uid, deleteFolderConfirm);
+			invalidateWorkspace();
+		} catch (e) {
+			console.error("Delete folder failed", e);
+		}
+		setDeleteFolderConfirm(null);
 	};
 
 	const handleCopyThemeHTML = (themeKey) => {
@@ -1408,25 +1549,6 @@ export default function DraftPage() {
 	};
 
 	
-
-	const filtered = items.filter((i) => {
-		const q = search.toLowerCase().trim();
-		if (!q) return true;
-		const title = (i.title || "").toLowerCase();
-		const preview = (i.preview || i.description || "").toLowerCase();
-		const type = (i.type || "").toLowerCase();
-		const tag = (ASSET_TYPE_LABELS[i.type] || i.tag || "Draft").toLowerCase();
-		const format = (i.format || "").toLowerCase();
-		const prompt = (i.prompt || "").toLowerCase();
-		return (
-			title.includes(q) ||
-			preview.includes(q) ||
-			type.includes(q) ||
-			tag.includes(q) ||
-			format.includes(q) ||
-			prompt.includes(q)
-		);
-	});
 
 	const asset =
 		draft ||
@@ -2012,7 +2134,7 @@ export default function DraftPage() {
 							animate={
 								compactAssetsNav
 									? { x: 0, opacity: 1 }
-									: { width: 280, opacity: 1 }
+									: { width: sidebarWidth, opacity: 1 }
 							}
 							exit={
 								compactAssetsNav
@@ -2027,11 +2149,11 @@ export default function DraftPage() {
 											top: compactNavTopInset,
 											left: 0,
 											bottom: 0,
-											width: 280,
+											width: sidebarWidth,
 											zIndex: 45,
 											boxShadow: "8px 0 32px rgba(0,0,0,0.12)",
 										}
-									: {}),
+									: { width: sidebarWidth }),
 								background: T.sidebar,
 								borderRight: `1px solid ${T.border}`,
 								display: "flex",
@@ -2039,6 +2161,7 @@ export default function DraftPage() {
 								overflow: "hidden",
 								flexShrink: 0,
 							}}
+							className="relative"
 						>
 							<div
 								style={{
@@ -2064,7 +2187,7 @@ export default function DraftPage() {
 									<input
 										value={search}
 										onChange={(e) => setSearch(e.target.value)}
-										placeholder="Search drafts, tables, blog, scrape…"
+										placeholder="Search drafts, folders, tables…"
 										style={{
 											width: "100%",
 											background: T.surface,
@@ -2110,59 +2233,40 @@ export default function DraftPage() {
 									onNavigate={() => {
 										if (compactAssetsNav) setSidebarOpen(false);
 									}}
+									onAddFolder={() => handleAddFolder(null)}
+									onAddFile={() => handleAddFile(null)}
 								/>
-								<AnimatePresence>
-									{filtered.length === 0 ? (
-										<motion.div
-											initial={{ opacity: 0 }}
-											animate={{ opacity: 1 }}
-											style={{
-												textAlign: "center",
-												padding: "40px 16px",
-												color: T.muted,
-											}}
-										>
-											<p style={{ fontSize: 32, marginBottom: 10 }}>📭</p>
-											<p style={{ fontSize: 13, marginBottom: 12 }}>
-												No inkgest found
-											</p>
-											<motion.button
-												whileHover={{ scale: 1.02 }}
-												whileTap={{ scale: 0.98 }}
-												onClick={() => router.push("/app")}
-												style={{
-													fontSize: 12,
-													fontWeight: 600,
-											color: "#111",
-													background: "transparent",
-													border: `1px solid ${T.border}`,
-													borderRadius: 8,
-													padding: "8px 14px",
-													cursor: "pointer",
-												}}
-											>
-												Create New →
-											</motion.button>
-										</motion.div>
-									) : (
-										filtered.map((d) => (
-											<ItemCard
-												key={d.id}
-												item={d}
-												active={d.id === draftId}
-												onIconChange={handleSidebarIconChange}
-												onRename={handleSidebarRename}
-												onClick={() => {
-													openDraftInTab(d.id);
-													if (compactAssetsNav)
-														setSidebarOpen(false);
-												}}
-												onDelete={handleDelete}
-											/>
-										))
-									)}
-								</AnimatePresence>
+								<WorkspaceSidebarTree
+									roots={roots}
+									looseAssets={looseAssets}
+									assetMap={assetMap}
+									searchQuery={search}
+									searchResults={searchResults}
+									activeAssetId={draftId}
+									Icon={Icon}
+									Icons={Icons}
+									onIconChange={handleSidebarIconChange}
+									onFolderIconChange={handleFolderIconChange}
+									onRenameAsset={handleSidebarRename}
+									onRenameFolder={handleRenameFolder}
+									onDeleteAsset={handleDelete}
+									onDeleteFolder={setDeleteFolderConfirm}
+									onAddFolder={handleAddFolder}
+									onAddFile={handleAddFile}
+									onMoveNode={handleMoveNode}
+									onPlaceAsset={handlePlaceAsset}
+									onAssetClick={(item) => {
+										openDraftInTab(item.id);
+										if (compactAssetsNav) setSidebarOpen(false);
+									}}
+								/>
 							</div>
+
+							{!compactAssetsNav && (
+								<WorkspaceSidebarResizeHandle
+									onPointerDown={onResizePointerDown}
+								/>
+							)}
 
 						{/* Sidebar footer — credits + upgrade */}
 						{reduxUser && (
@@ -2962,6 +3066,15 @@ export default function DraftPage() {
 				open={Boolean(deleteConfirm)}
 				onClose={() => setDeleteConfirm(null)}
 				onConfirm={confirmDelete}
+			/>
+
+			<DeleteConfirmModal
+				open={Boolean(deleteFolderConfirm)}
+				onClose={() => setDeleteFolderConfirm(null)}
+				onConfirm={confirmDeleteFolder}
+				title="Delete folder?"
+				message="Contents will move to the parent level. Files are not deleted."
+				confirmLabel="Delete folder"
 			/>
 
 		</div>

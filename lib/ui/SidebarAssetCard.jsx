@@ -1,53 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDraggable } from "@dnd-kit/core";
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import IconSelectorDropdown from "./IconSelectorDropdown.jsx";
-import { getTheme } from "../utils/theme";
+import { SidebarIconGlyph, SidebarDragHandle } from "./sidebarRowShared";
 import {
-	findLucideIcon,
 	pickToSidebarIcon,
 	resolveSidebarIcon,
 } from "../utils/assetSidebarIcon";
 
-const T = getTheme();
-
-const DEFAULT_LABELS = {
-	table: "Table",
-	draft: "Draft",
-	infographics: "Infographics",
-	landing_page: "Landing Page",
-	image_gallery: "Gallery",
-};
-
-function SidebarIconGlyph({ icon, size = 16, color = "#5A5550" }) {
-	if (!icon) return null;
-	if (icon.type === "emoji") {
-		return (
-			<span style={{ fontSize: size, lineHeight: 1 }} aria-hidden>
-				{icon.value}
-			</span>
-		);
-	}
-	const luc = findLucideIcon(icon.name);
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke={color}
-			strokeWidth={2}
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			aria-hidden
-		>
-			<path d={luc.path} />
-		</svg>
-	);
-}
-
 /**
- * Sidebar row for drafts / tables / assets — icon (editable), title, type tag, date.
+ * Sidebar row for drafts / tables / assets.
  */
 export default function SidebarAssetCard({
 	item,
@@ -58,6 +21,8 @@ export default function SidebarAssetCard({
 	onIconChange,
 	Icon,
 	Icons,
+	dragId = null,
+	indentClass = "",
 }) {
 	const [hovering, setHovering] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState(false);
@@ -68,8 +33,25 @@ export default function SidebarAssetCard({
 	const menuWrapRef = useRef(null);
 	const renameInputRef = useRef(null);
 
-	
 	const sidebarIcon = resolveSidebarIcon(item);
+	const isTreeFile = Boolean(item._workspaceNodeId);
+	const dragIdentifier =
+		dragId || (isTreeFile ? `node-${item._workspaceNodeId}` : `asset-${item.id}`);
+
+	const {
+		attributes,
+		listeners,
+		setNodeRef,
+		isDragging,
+	} = useDraggable({
+		id: dragIdentifier,
+		data: {
+			type: isTreeFile ? "file" : dragId?.startsWith("loose-") ? "loose" : "asset",
+			assetId: item.id,
+			nodeId: item._workspaceNodeId || null,
+		},
+		disabled: !item.id,
+	});
 
 	useEffect(() => {
 		if (!pickerOpen && !menuOpen) return undefined;
@@ -117,63 +99,28 @@ export default function SidebarAssetCard({
 
 	return (
 		<motion.div
+			ref={setNodeRef}
 			layout
 			initial={{ opacity: 0, x: -12 }}
-			animate={{ opacity: 1, x: 0 }}
+			animate={{ opacity: isDragging ? 0.45 : 1, x: 0 }}
 			exit={{ opacity: 0, x: -12, scale: 0.95 }}
-			whileHover={{ x: 2 }}
 			transition={{ duration: 0.22 }}
-			onHoverStart={() => setHovering(true)}
-			onHoverEnd={() => setHovering(false)}
+			onMouseEnter={() => setHovering(true)}
+			onMouseLeave={() => setHovering(false)}
 			onClick={onClick}
-			className="group p-1"
-			style={{
-				background: active ? T.surface : "transparent",
-				border: `1px solid ${active ? T.border : "transparent"}`,
-				borderRadius: 10,
-				cursor: "pointer",
-				boxShadow: active ? "0 1px 8px rgba(0,0,0,0.07)" : "none",
-				position: "relative",
-				transition: "background 0.15s, border-color 0.15s",
-				overflow: panelOpen ? "visible" : undefined,
-				zIndex: panelOpen ? 20 : undefined,
-			}}
+			className={`group p-1 rounded-xl cursor-pointer transition-colors relative ${
+				indentClass || ""
+			} ${
+				active
+					? "bg-[#FAFAF8] border border-[#E8E4DC] shadow-sm"
+					: "border border-transparent hover:bg-[#F7F5F0]"
+			} ${panelOpen ? "z-20 overflow-visible" : ""} ${isDragging ? "opacity-45" : ""}`}
 		>
-			{active && (
-				<motion.div
-					layoutId="active-pill"
-					style={{
-						position: "absolute",
-						left: 0,
-						top: "5%",
-						transform: "translateY(-50%)",
-						width: 2,
-						height: 36,
-						background: T.warm,
-						borderRadius: "12px",
-					}}
-				/>
-			)}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					gap: 8,
-				}}
-			>
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						flex: 1,
-						minWidth: 0,
-					}}
-				>
+			<div className="flex items-center justify-between gap-2">
+				<div className="flex items-center gap-2.5 flex-1 min-w-0">
 					<div
 						ref={iconWrapRef}
-						style={{ position: "relative", flexShrink: 0 }}
+						className="relative shrink-0"
 						onPointerDown={(e) => e.stopPropagation()}
 						onClick={(e) => e.stopPropagation()}
 					>
@@ -184,21 +131,12 @@ export default function SidebarAssetCard({
 							onClick={() => {
 								if (onIconChange) setPickerOpen((v) => !v);
 							}}
-							whileHover={onIconChange ? { background: "#F0ECE5" } : {}}
 							whileTap={onIconChange ? { scale: 0.94 } : {}}
-							style={{
-								width: 28,
-								height: 28,
-								borderRadius: 8,
-								border: `1px solid ${active ? T.border : "#E8E4DC"}`,
-								background: active ? T.surface : "#FAFAF8",
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-								cursor: onIconChange ? "pointer" : "default",
-								padding: 0,
-								marginTop: 1,
-							}}
+							className={`w-7 h-7 rounded-xl border flex items-center justify-center p-0 mt-px ${
+								active
+									? "border-[#E8E4DC] bg-[#FAFAF8]"
+									: "border-[#E8E4DC] bg-[#FAFAF8]"
+							} ${onIconChange ? "cursor-pointer hover:bg-[#F0ECE5]" : "cursor-default"}`}
 						>
 							<SidebarIconGlyph icon={sidebarIcon} size={14} />
 						</motion.button>
@@ -209,13 +147,8 @@ export default function SidebarAssetCard({
 									initial={{ opacity: 0, y: -6, scale: 0.97 }}
 									animate={{ opacity: 1, y: 0, scale: 1 }}
 									exit={{ opacity: 0, y: -6, scale: 0.97 }}
-									transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-									style={{
-										position: "absolute",
-										top: "calc(100% + 6px)",
-										left: 0,
-										zIndex: 500,
-									}}
+									transition={{ duration: 0.14 }}
+									className="absolute top-[calc(100%+6px)] left-0 z-[500]"
 								>
 									<IconSelectorDropdown
 										onSelect={(pick) => {
@@ -230,32 +163,39 @@ export default function SidebarAssetCard({
 						</AnimatePresence>
 					</div>
 
-					<div style={{ flex: 1, minWidth: 0 }}>
+					<div className="flex-1 min-w-0">
 						<p
-							style={{
-								fontSize: 12,
-								fontWeight: 500,
-								color: T.accent,
-								overflow: "hidden",
-								display: "-webkit-box",
-								WebkitLineClamp: 2,
-								WebkitBoxOrient: "vertical",
-							}}
+							className={`text-xs font-medium m-0 overflow-hidden line-clamp-2 ${
+								active ? "text-[#111111]" : "text-[#111111]"
+							}`}
 						>
 							{item.title || "Untitled"}
 						</p>
 					</div>
 				</div>
+
 				{(onDelete || onRename) && (
+					<div
+						className="flex items-center shrink-0"
+						onPointerDown={(e) => e.stopPropagation()}
+						onClick={(e) => e.stopPropagation()}
+					>
 						<div
-							ref={menuWrapRef}
-							className={`relative shrink-0 transition-opacity ${
+							className={`transition-opacity ${
 								showActions
 									? "opacity-100"
 									: "opacity-0 pointer-events-none max-sm:opacity-100 max-sm:pointer-events-auto"
 							}`}
-							onPointerDown={(e) => e.stopPropagation()}
-							onClick={(e) => e.stopPropagation()}
+						>
+							<SidebarDragHandle listeners={listeners} attributes={attributes} />
+						</div>
+						<div
+							ref={menuWrapRef}
+							className={`relative transition-opacity ${
+								showActions
+									? "opacity-100"
+									: "opacity-0 pointer-events-none max-sm:opacity-100 max-sm:pointer-events-auto"
+							}`}
 						>
 							<motion.button
 								type="button"
@@ -264,8 +204,7 @@ export default function SidebarAssetCard({
 									setMenuOpen((v) => !v);
 									if (menuOpen) setRenaming(false);
 								}}
-								className="flex items-center justify-center p-1 rounded cursor-pointer border-none bg-transparent text-[#888888] hover:bg-[#F0ECE5] transition-colors"
-								whileHover={{ background: "#F0ECE5" }}
+								className="flex items-center justify-center p-1 rounded border-none bg-transparent text-[#888888] hover:bg-[#F0ECE5] cursor-pointer"
 								whileTap={{ scale: 0.94 }}
 							>
 								<MoreVertical className="w-3.5 h-3.5" aria-hidden />
@@ -277,8 +216,8 @@ export default function SidebarAssetCard({
 										initial={{ opacity: 0, y: -6, scale: 0.97 }}
 										animate={{ opacity: 1, y: 0, scale: 1 }}
 										exit={{ opacity: 0, y: -6, scale: 0.97 }}
-										transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-										className="absolute top-[calc(100%+4px)] right-0 max-sm:left-0 max-sm:right-auto z-[500] min-w-[148px] max-w-[min(220px,calc(100vw-24px))] rounded-[10px] border border-[#E2E2E2] bg-[#FFFFFF] shadow-[0_8px_28px_rgba(0,0,0,0.10),0_0_0_1px_rgba(0,0,0,0.04)] overflow-hidden"
+										transition={{ duration: 0.14 }}
+										className="absolute top-[calc(100%+4px)] right-0 max-sm:left-0 max-sm:right-auto z-[500] min-w-[148px] max-w-[min(220px,calc(100vw-24px))] rounded-xl border border-[#E2E2E2] bg-white shadow-lg overflow-hidden"
 									>
 										{onRename && (
 											<div
@@ -301,15 +240,14 @@ export default function SidebarAssetCard({
 																setMenuOpen(false);
 															}
 														}}
-														className="w-full rounded border border-[#E2E2E2] bg-[#FAFAF8] px-2 py-1.5 text-xs font-medium text-[#111111] outline-none focus:border-[#C17B2F] focus:ring-1 focus:ring-[#C17B2F]/30"
+														className="w-full rounded border border-[#E2E2E2] bg-[#FAFAF8] px-2 py-1.5 text-xs font-medium text-[#111111] outline-none focus:border-[#C17B2F]"
 														placeholder="Name"
 													/>
 												) : (
 													<motion.button
 														type="button"
 														onClick={startRename}
-														whileHover={{ background: "#F7F5F0" }}
-														className="flex w-full items-center gap-2 border-none bg-[#FFFFFF] px-3 py-2.5 text-left text-xs font-medium text-[#111111] cursor-pointer transition-colors"
+														className="flex w-full items-center gap-2 border-none bg-white px-3 py-2.5 text-left text-xs font-medium text-[#111111] cursor-pointer hover:bg-[#F7F5F0]"
 													>
 														<Pencil
 															className="w-3.5 h-3.5 shrink-0 text-[#888888]"
@@ -330,8 +268,7 @@ export default function SidebarAssetCard({
 													setRenaming(false);
 													onDelete(item.id);
 												}}
-												whileHover={{ background: "#FEE2E2" }}
-												className="flex w-full items-center gap-2 border-none bg-transparent px-3 py-2.5 text-left text-xs font-medium text-red-500 cursor-pointer transition-colors"
+												className="flex w-full items-center gap-2 border-none bg-transparent px-3 py-2.5 text-left text-xs font-medium text-red-500 cursor-pointer hover:bg-red-50"
 											>
 												{TrashIcon}
 												Delete
@@ -341,6 +278,7 @@ export default function SidebarAssetCard({
 								)}
 							</AnimatePresence>
 						</div>
+					</div>
 				)}
 			</div>
 		</motion.div>
