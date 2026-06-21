@@ -14,7 +14,10 @@
 		"start": "next start",
 		"clean": "yarn cache clean",
 		"lint": "next lint",
-		"configure": "node scripts/configure.js"
+		"configure": "node scripts/configure.js",
+		"mcp": "node mcp-server/index.js",
+		"mcp:install": "cd mcp-server && npm install",
+		"mcp:key": "node scripts/create-mcp-key.js"
 	},
 	"dependencies": {
 		"@dnd-kit/core": "^6.3.1",
@@ -53,6 +56,7 @@
 		"archiver": "^7.0.1",
 		"autoprefixer": "^10.4.20",
 		"firebase": "^11.3.1",
+		"firebase-admin": "^14.0.0",
 		"framer-motion": "^12.6.2",
 		"fuse.js": "^7.1.0",
 		"html2canvas": "^1.4.1",

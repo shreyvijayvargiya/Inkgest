@@ -1,6 +1,7 @@
 .next
 node_modules
 .env.local
+*firebase-service-account*.json
 
 .github
 .vercel

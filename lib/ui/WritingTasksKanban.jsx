@@ -192,7 +192,7 @@ function TaskCardContent({
 			<div className="flex items-start justify-between gap-2 mb-2">
 				<div className="flex-1 min-w-0">
 					{projectName && (
-						<span className="inline-flex items-center gap-1 mb-1 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide">
+						<span className="inline-flex items-center gap-1 mb-1 px-2 py-0.5 rounded-xl bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide">
 							<FolderKanban className="w-3 h-3" />
 							{projectName}
 						</span>
@@ -464,29 +464,42 @@ function NewProjectModal({ open, onClose, onCreate, isCreating }) {
 	);
 }
 
-function RenameProjectModal({
+function EditProjectModal({
 	open,
-	initialName,
+	project,
+	taskCount,
 	onClose,
 	onSave,
+	onDelete,
 	isSaving,
+	isDeleting,
 }) {
 	const [name, setName] = useState("");
+	const [description, setDescription] = useState("");
+	const [confirmDelete, setConfirmDelete] = useState(false);
 
 	useEffect(() => {
-		if (open) setName(initialName || "");
-	}, [open, initialName]);
+		if (open && project) {
+			setName(project.name || "");
+			setDescription(project.description || "");
+			setConfirmDelete(false);
+		}
+	}, [open, project]);
 
-	if (!open) return null;
+	if (!open || !project) return null;
+
+	const initialName = (project.name || "").trim();
+	const initialDescription = (project.description || "").trim();
+	const trimmedName = name.trim();
+	const trimmedDescription = description.trim();
+	const unchanged =
+		trimmedName === initialName && trimmedDescription === initialDescription;
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		const trimmed = name.trim();
-		if (!trimmed || isSaving || trimmed === (initialName || "").trim()) return;
-		onSave(trimmed);
+		if (!trimmedName || isSaving || unchanged) return;
+		onSave({ name: trimmedName, description: trimmedDescription });
 	};
-
-	const unchanged = name.trim() === (initialName || "").trim();
 
 	return (
 		<AnimatePresence>
@@ -501,11 +514,11 @@ function RenameProjectModal({
 					initial={{ opacity: 0, scale: 0.96, y: 8 }}
 					animate={{ opacity: 1, scale: 1, y: 0 }}
 					exit={{ opacity: 0, scale: 0.96, y: 8 }}
-					className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-4 sm:p-6"
+					className="bg-white rounded-2xl shadow-xl w-full max-w-md p-4 sm:p-6"
 					onClick={(e) => e.stopPropagation()}
 				>
 					<div className="flex items-center justify-between mb-5">
-						<h3 className="text-lg font-semibold text-zinc-900">Rename project</h3>
+						<h3 className="text-lg font-semibold text-zinc-900">Edit project</h3>
 						<button
 							type="button"
 							onClick={onClose}
@@ -514,122 +527,123 @@ function RenameProjectModal({
 							<X className="w-4 h-4" />
 						</button>
 					</div>
-					<form onSubmit={handleSubmit} className="space-y-4">
-						<div>
-							<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
-								Project name
-							</label>
-							<input
-								autoFocus
-								value={name}
-								onChange={(e) => setName(e.target.value)}
-								placeholder="Project name"
-								className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300"
-							/>
-						</div>
-						<div className="flex items-center gap-2 pt-1">
-							<motion.button
-								type="submit"
-								disabled={!name.trim() || isSaving || unchanged}
-								whileHover={{ scale: 1.02 }}
-								whileTap={{ scale: 0.98 }}
-								className="flex-1 py-2.5 bg-zinc-900 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
-							>
-								{isSaving ? (
-									<span className="inline-flex items-center justify-center gap-2">
-										<Loader2 className="w-4 h-4 animate-spin" />
-										Saving…
-									</span>
-								) : (
-									"Save name"
-								)}
-							</motion.button>
-							<motion.button
-								type="button"
-								whileHover={{ scale: 1.02 }}
-								whileTap={{ scale: 0.98 }}
-								onClick={onClose}
-								className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50"
-							>
-								Cancel
-							</motion.button>
-						</div>
-					</form>
-				</motion.div>
-			</motion.div>
-		</AnimatePresence>
-	);
-}
 
-function DeleteProjectModal({ open, projectName, taskCount, onClose, onConfirm, isDeleting }) {
-	if (!open) return null;
-
-	return (
-		<AnimatePresence>
-			<motion.div
-				initial={{ opacity: 0 }}
-				animate={{ opacity: 1 }}
-				exit={{ opacity: 0 }}
-				className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-				onClick={onClose}
-			>
-				<motion.div
-					initial={{ opacity: 0, scale: 0.96, y: 8 }}
-					animate={{ opacity: 1, scale: 1, y: 0 }}
-					exit={{ opacity: 0, scale: 0.96, y: 8 }}
-					className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-4 sm:p-6"
-					onClick={(e) => e.stopPropagation()}
-				>
-					<div className="flex items-start gap-3 mb-4">
-						<div className="p-2 rounded-xl bg-red-50 shrink-0">
-							<Trash2 className="w-5 h-5 text-red-600" />
+					{confirmDelete ? (
+						<div className="space-y-4">
+							<div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+								<Trash2 className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+								<div>
+									<p className="text-sm font-semibold text-zinc-900">Delete this project?</p>
+									<p className="text-sm text-zinc-600 mt-1 leading-relaxed">
+										Remove{" "}
+										<span className="font-semibold text-zinc-800">
+											{project.name || "this project"}
+										</span>
+										. Tasks will become unassigned but won&apos;t be deleted.
+									</p>
+									{taskCount > 0 && (
+										<p className="text-xs text-amber-700 mt-2 font-medium">
+											{taskCount} task{taskCount === 1 ? "" : "s"} will be unassigned.
+										</p>
+									)}
+								</div>
+							</div>
+							<div className="flex items-center gap-2">
+								<motion.button
+									type="button"
+									disabled={isDeleting}
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={onDelete}
+									className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
+								>
+									{isDeleting ? (
+										<span className="inline-flex items-center justify-center gap-2">
+											<Loader2 className="w-4 h-4 animate-spin" />
+											Deleting…
+										</span>
+									) : (
+										"Delete project"
+									)}
+								</motion.button>
+								<motion.button
+									type="button"
+									disabled={isDeleting}
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={() => setConfirmDelete(false)}
+									className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50"
+								>
+									Cancel
+								</motion.button>
+							</div>
 						</div>
-						<div>
-							<h3 className="text-lg font-semibold text-zinc-900">Delete project?</h3>
-							<p className="text-sm text-zinc-500 mt-1 leading-relaxed">
-								Remove{" "}
-								<span className="font-semibold text-zinc-800">
-									{projectName || "this project"}
-								</span>
-								. Tasks in this project will become unassigned but won&apos;t be
-								deleted. Drafts stay in your workspace.
-							</p>
-							{taskCount > 0 && (
-								<p className="text-xs text-amber-700 mt-2 font-medium">
-									{taskCount} task{taskCount === 1 ? "" : "s"} will be unassigned.
-								</p>
-							)}
-						</div>
-					</div>
-					<div className="flex items-center gap-2">
-						<motion.button
-							type="button"
-							disabled={isDeleting}
-							whileHover={{ scale: 1.02 }}
-							whileTap={{ scale: 0.98 }}
-							onClick={onConfirm}
-							className="flex-1 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
-						>
-							{isDeleting ? (
-								<span className="inline-flex items-center justify-center gap-2">
-									<Loader2 className="w-4 h-4 animate-spin" />
-									Deleting…
-								</span>
-							) : (
-								"Delete project"
-							)}
-						</motion.button>
-						<motion.button
-							type="button"
-							disabled={isDeleting}
-							whileHover={{ scale: 1.02 }}
-							whileTap={{ scale: 0.98 }}
-							onClick={onClose}
-							className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50 disabled:opacity-60"
-						>
-							Cancel
-						</motion.button>
-					</div>
+					) : (
+						<form onSubmit={handleSubmit} className="space-y-4">
+							<div>
+								<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
+									Project name
+								</label>
+								<input
+									autoFocus
+									value={name}
+									onChange={(e) => setName(e.target.value)}
+									placeholder="Project name"
+									className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300"
+								/>
+							</div>
+							<div>
+								<label className="block text-xs font-semibold text-zinc-500 mb-1.5">
+									Description
+								</label>
+								<textarea
+									value={description}
+									onChange={(e) => setDescription(e.target.value)}
+									placeholder="What this project is for — helps AI and your team stay aligned"
+									rows={4}
+									className="w-full px-3 py-2 border border-zinc-200 rounded-xl text-sm resize-y min-h-[6rem] focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300"
+								/>
+							</div>
+							<div className="flex items-center gap-2 pt-1">
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={() => setConfirmDelete(true)}
+									className="inline-flex items-center gap-1.5 px-3 py-2.5 border border-red-200 text-red-700 text-sm font-semibold rounded-xl hover:bg-red-50"
+								>
+									<Trash2 className="w-4 h-4" />
+									Delete
+								</motion.button>
+								<div className="flex-1" />
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									onClick={onClose}
+									className="px-4 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-semibold rounded-xl hover:bg-zinc-50"
+								>
+									Cancel
+								</motion.button>
+								<motion.button
+									type="submit"
+									disabled={!trimmedName || isSaving || unchanged}
+									whileHover={{ scale: 1.02 }}
+									whileTap={{ scale: 0.98 }}
+									className="px-4 py-2.5 bg-zinc-900 text-white text-sm font-semibold rounded-xl disabled:opacity-60"
+								>
+									{isSaving ? (
+										<span className="inline-flex items-center justify-center gap-2">
+											<Loader2 className="w-4 h-4 animate-spin" />
+											Saving…
+										</span>
+									) : (
+										"Save"
+									)}
+								</motion.button>
+							</div>
+						</form>
+					)}
 				</motion.div>
 			</motion.div>
 		</AnimatePresence>
@@ -985,10 +999,9 @@ export default function WritingTasksKanban({
 	const [showFilter, setShowFilter] = useState(false);
 	const [projectFilterOpen, setProjectFilterOpen] = useState(false);
 	const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
-	const [renameProjectModalOpen, setRenameProjectModalOpen] = useState(false);
-	const [deleteProjectModalOpen, setDeleteProjectModalOpen] = useState(false);
+	const [editProjectModalOpen, setEditProjectModalOpen] = useState(false);
 	const [creatingProject, setCreatingProject] = useState(false);
-	const [renamingProject, setRenamingProject] = useState(false);
+	const [savingProject, setSavingProject] = useState(false);
 	const [deletingProject, setDeletingProject] = useState(false);
 	const [activeId, setActiveId] = useState(null);
 	const [modalOpen, setModalOpen] = useState(false);
@@ -1085,25 +1098,26 @@ export default function WritingTasksKanban({
 		setNewProjectModalOpen(true);
 	}, [reduxUser, onLogin]);
 
-	const handleRenameProject = useCallback(
-		async (name) => {
-			if (!userId || !activeSelectedProject || renamingProject) return;
-			setRenamingProject(true);
+	const handleSaveProject = useCallback(
+		async ({ name, description }) => {
+			if (!userId || !activeSelectedProject || savingProject) return;
+			setSavingProject(true);
 			try {
 				await updateCanvasProject(userId, activeSelectedProject.id, {
 					name: name.trim(),
+					description: description.trim(),
 				});
 				await queryClient.invalidateQueries({
 					queryKey: ["canvasProjects", userId],
 				});
-				setRenameProjectModalOpen(false);
+				setEditProjectModalOpen(false);
 			} catch (e) {
-				console.error("[tasks] rename project", e);
+				console.error("[tasks] save project", e);
 			} finally {
-				setRenamingProject(false);
+				setSavingProject(false);
 			}
 		},
-		[userId, activeSelectedProject, renamingProject, queryClient],
+		[userId, activeSelectedProject, savingProject, queryClient],
 	);
 
 	const handleDeleteProject = useCallback(async () => {
@@ -1117,7 +1131,7 @@ export default function WritingTasksKanban({
 				queryKey: ["canvasProjects", userId],
 			});
 			handleProjectFilterChange(PROJECT_FILTER_ALL);
-			setDeleteProjectModalOpen(false);
+			setEditProjectModalOpen(false);
 		} catch (e) {
 			console.error("[tasks] delete project", e);
 		} finally {
@@ -1283,6 +1297,19 @@ export default function WritingTasksKanban({
 									)}
 								/>
 							</div>
+							{activeSelectedProject && (
+								<motion.button
+									type="button"
+									whileHover={{ scale: 1.05 }}
+									whileTap={{ scale: 0.95 }}
+									onClick={() => setEditProjectModalOpen(true)}
+									title="Edit project"
+									aria-label="Edit project"
+									className="inline-flex items-center justify-center w-9 h-9 shrink-0 bg-white border border-zinc-200 rounded-xl text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+								>
+									<Pencil className="w-4 h-4" />
+								</motion.button>
+							)}
 						</div>
 						<div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
 							<motion.button
@@ -1295,30 +1322,6 @@ export default function WritingTasksKanban({
 								<Plus className="w-4 h-4" />
 								New project
 							</motion.button>
-							{activeSelectedProject && (
-								<motion.button
-									type="button"
-									whileHover={{ scale: 1.02 }}
-									whileTap={{ scale: 0.98 }}
-									onClick={() => setRenameProjectModalOpen(true)}
-									className="inline-flex items-center justify-center gap-1.5 px-3 py-2 flex-1 sm:flex-none bg-white border border-zinc-200 rounded-xl text-sm font-medium text-zinc-700 hover:bg-zinc-50"
-								>
-									<Pencil className="w-4 h-4" />
-									Rename
-								</motion.button>
-							)}
-							{activeSelectedProject && (
-								<motion.button
-									type="button"
-									whileHover={{ scale: 1.02 }}
-									whileTap={{ scale: 0.98 }}
-									onClick={() => setDeleteProjectModalOpen(true)}
-									className="inline-flex items-center justify-center gap-1.5 px-3 py-2 flex-1 sm:flex-none border border-red-200 bg-red-50 text-red-700 rounded-xl text-sm font-medium hover:bg-red-100"
-								>
-									<Trash2 className="w-4 h-4" />
-									Delete project
-								</motion.button>
-							)}
 						</div>
 					</div>
 				)}
@@ -1549,7 +1552,7 @@ export default function WritingTasksKanban({
 												{task.priority}
 											</span>
 											{showProjectOnCards && task.projectId && (
-												<span className="shrink-0 px-2 py-0.5 rounded-lg bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide hidden sm:inline">
+												<span className="shrink-0 px-2 py-0.5 rounded-xl bg-violet-50 text-violet-700 text-[10px] font-bold uppercase tracking-wide hidden sm:inline">
 													{resolveProjectName(projects, task.projectId)}
 												</span>
 											)}
@@ -1632,20 +1635,14 @@ export default function WritingTasksKanban({
 				isCreating={creatingProject}
 			/>
 
-			<RenameProjectModal
-				open={renameProjectModalOpen}
-				initialName={activeSelectedProject?.name}
-				onClose={() => setRenameProjectModalOpen(false)}
-				onSave={handleRenameProject}
-				isSaving={renamingProject}
-			/>
-
-			<DeleteProjectModal
-				open={deleteProjectModalOpen}
-				projectName={activeSelectedProject?.name}
+			<EditProjectModal
+				open={editProjectModalOpen}
+				project={activeSelectedProject}
 				taskCount={tasksInActiveProject}
-				onClose={() => setDeleteProjectModalOpen(false)}
-				onConfirm={handleDeleteProject}
+				onClose={() => setEditProjectModalOpen(false)}
+				onSave={handleSaveProject}
+				onDelete={handleDeleteProject}
+				isSaving={savingProject}
 				isDeleting={deletingProject}
 			/>
 		</div>
