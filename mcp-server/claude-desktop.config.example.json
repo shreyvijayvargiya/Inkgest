@@ -2,10 +2,10 @@
 	"mcpServers": {
 		"inkgest": {
 			"command": "node",
-			"args": ["/Users/shreyvijayvargiya/Desktop/projects/Inkgest/mcp-server/index.js"],
+			"args": ["/FULL/PATH/TO/Inkgest/mcp-server/index.js"],
 			"env": {
-				"INKGEST_API_URL": "http://localhost:3000",
-				"INKGEST_API_KEY": "ink_93585868dac8953f5cec90cfbd3f175b1ccc58c5b3a33faf"
+				"INKGEST_API_URL": "https://inkgest.com",
+				"INKGEST_API_KEY": "ink_PASTE_YOUR_KEY_HERE"
 			}
 		}
 	}

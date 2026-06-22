@@ -91,6 +91,17 @@ Env-based keys (`MCP_API_KEYS`) still work for dev/ops.
 yarn mcp:install
 ```
 
+### Claude Code marketplace
+
+This repo includes `.claude-plugin/marketplace.json` for Claude Code:
+
+```text
+/plugin marketplace add shreyvijayvargiya/Inkgest
+/plugin install inkgest-mcp@inkgest
+```
+
+Then set `INKGEST_API_KEY` (from Settings → Integrations) in Claude MCP env. Run `yarn mcp:install` once for Node dependencies.
+
 ### Claude Desktop config
 
 Copy `mcp-server/claude-desktop.config.example.json` into Claude Desktop MCP settings. Set:

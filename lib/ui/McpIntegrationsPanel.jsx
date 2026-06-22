@@ -681,7 +681,36 @@ export default function McpIntegrationsPanel({ reduxUser, onLogin }) {
 						<CodeBlock code={claudeDesktopConfig} copyLabel="Copy config" />
 					</SetupSection>
 
-					<SetupSection title="Claude Code" icon={Terminal}>
+					<SetupSection title="Claude Code (marketplace)" icon={Terminal} defaultOpen>
+						<ol className="text-sm text-zinc-600 space-y-2 list-decimal list-inside leading-relaxed">
+							<li>
+								In Claude Code, run{" "}
+								<code className="text-xs bg-zinc-100 px-1 rounded">/plugin marketplace add</code>{" "}
+								with the Inkgest GitHub repo (must be the repo root — it contains{" "}
+								<code className="text-xs bg-zinc-100 px-1 rounded">.claude-plugin/marketplace.json</code>)
+							</li>
+							<li>
+								Install the plugin:{" "}
+								<code className="text-xs bg-zinc-100 px-1 rounded">
+									/plugin install inkgest-mcp@inkgest
+								</code>
+							</li>
+							<li>
+								Run <code className="text-xs bg-zinc-100 px-1 rounded">yarn mcp:install</code>{" "}
+								once in your cloned Inkgest folder (MCP needs Node deps)
+							</li>
+							<li>
+								Set <code className="text-xs bg-zinc-100 px-1 rounded">INKGEST_API_KEY</code> in
+								Claude MCP env settings (API key from step 1)
+							</li>
+						</ol>
+						<CodeBlock
+							code={`/plugin marketplace add shreyvijayvargiya/Inkgest\n/plugin install inkgest-mcp@inkgest`}
+							copyLabel="Copy commands"
+						/>
+					</SetupSection>
+
+					<SetupSection title="Claude Code (manual .mcp.json)" icon={Terminal}>
 						<ol className="text-sm text-zinc-600 space-y-2 list-decimal list-inside leading-relaxed">
 							<li>
 								In your project, add{" "}

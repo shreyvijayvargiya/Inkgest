@@ -1,0 +1,12 @@
+{
+	"name": "inkgest-mcp",
+	"description": "Inkgest MCP server — search, read, create, and update drafts; manage writing tasks; translate and save to your library.",
+	"version": "1.0.0",
+	"author": {
+		"name": "Inkgest"
+	},
+	"homepage": "https://inkgest.com/settings/integrations",
+	"repository": "https://github.com/shreyvijayvargiya/Inkgest",
+	"license": "MIT",
+	"mcpServers": ".mcp.json"
+}
