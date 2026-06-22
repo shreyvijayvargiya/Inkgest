@@ -1,7 +1,7 @@
 {
 	"name": "saas-starter-boilerplate",
 	"version": "1.0.0",
-	"description": "Inkgest: Link to Gest",
+	"description": "Inkgest — Agentic AI editor to scrape, write, publish & translate",
 	"main": "pages/index.js",
 	"repository": "https://github.com/shreyvijayvargiya/profiler",
 	"author": "shreyvijayvargiya",

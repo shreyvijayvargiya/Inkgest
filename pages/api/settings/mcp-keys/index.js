@@ -10,7 +10,7 @@ function adminConfigError(res) {
 	return res.status(503).json({
 		ok: false,
 		error:
-			"MCP keys require Firebase Admin on the server. Add GOOGLE_APPLICATION_CREDENTIALS=./your-service-account.json to .env.local (or FIREBASE_SERVICE_ACCOUNT_JSON as a single line), then restart the dev server.",
+			"MCP keys require Firebase Admin on the server. On Vercel set FIREBASE_SERVICE_ACCOUNT_BASE64 (recommended) or FIREBASE_SERVICE_ACCOUNT_JSON. Locally use GOOGLE_APPLICATION_CREDENTIALS=./your-service-account.json in .env.local, then redeploy or restart.",
 		code: "ADMIN_NOT_CONFIGURED",
 	});
 }

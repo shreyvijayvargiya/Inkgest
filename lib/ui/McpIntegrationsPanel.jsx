@@ -38,7 +38,7 @@ async function fetchMcpKeys(idToken) {
 	return {
 		keys: data.keys || [],
 		integration: data.integration || null,
-		adminConfigured: data.adminConfigured !== false,
+		adminConfigured: data.adminConfigured === true,
 	};
 }
 
@@ -326,7 +326,7 @@ export default function McpIntegrationsPanel({ reduxUser, onLogin }) {
 
 	const keys = keysData?.keys ?? [];
 	const integration = keysData?.integration;
-	const adminConfigured = keysData?.adminConfigured !== false;
+	const adminConfigured = keysData?.adminConfigured === true;
 
 	const isConnected =
 		integration?.status === "connected" ||
@@ -513,25 +513,9 @@ export default function McpIntegrationsPanel({ reduxUser, onLogin }) {
 					</div>
 
 					{!adminConfigured && !isLoading && (
-						<div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+						<div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
 							<p className="text-sm font-semibold text-amber-900">
-								Server setup required
-							</p>
-							<p className="text-xs text-amber-800 leading-relaxed">
-								Add your Firebase service account JSON file and point to it in{" "}
-								<code className="bg-white/80 px-1 rounded">.env.local</code>, then
-								restart the dev server:
-							</p>
-							<CodeBlock
-								code={`GOOGLE_APPLICATION_CREDENTIALS=./inkgest-firebase-service-account.json`}
-								copyLabel="Copy env line"
-							/>
-							<p className="text-xs text-amber-800 leading-relaxed">
-								Get the JSON from Firebase Console → Project settings → Service
-								accounts → Generate new private key. Or run locally:{" "}
-								<code className="bg-white/80 px-1 rounded">
-									node scripts/create-mcp-key.js YOUR_UID
-								</code>
+								Error in connecting MCP server
 							</p>
 						</div>
 					)}

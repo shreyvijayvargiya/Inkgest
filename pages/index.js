@@ -154,6 +154,20 @@ const LANDING_AI_FEATURES = [
 		tag: "AI Agent",
 	},
 	{
+		title: "AI Draft from Tasks",
+		description:
+			"Add an idea to your Kanban board and hit Generate — the agent scrapes sources and creates a full draft, linked back to the task automatically.",
+		icon: "✨",
+		tag: "New",
+	},
+	{
+		title: "Writing Tasks Board",
+		description:
+			"Organize ideas in Backlog, In Progress, and Done. Group by project, set priorities, link drafts, and track your entire content pipeline.",
+		icon: "📋",
+		tag: "Tasks",
+	},
+	{
 		title: "Advanced Writing Editor",
 		description:
 			"A rich Tiptap-powered editor with slash commands, code blocks, tables, image embeds, and real-time formatting — designed for serious writers.",
@@ -168,18 +182,25 @@ const LANDING_AI_FEATURES = [
 		tag: "AI Chat",
 	},
 	{
-		title: "AI Automations",
+		title: "Global Translation",
 		description:
-			"Chain scrape → draft → format → export into a single automated workflow. Set it once, run it on any URL.",
-		icon: "⚡",
-		tag: "Automation",
+			"Translate any draft to Spanish, French, German, and more. Each language is saved separately — switch versions without losing the original.",
+		icon: "🌍",
+		tag: "Translate",
 	},
 	{
-		title: "Export to React / HTML / Markdown",
+		title: "Claude MCP Server",
 		description:
-			"One-click export to clean Markdown for your CMS, production HTML for email, or a JSX component for your React app.",
+			"Connect Claude Desktop to your Inkgest library. Search, read, create, and update drafts, manage tasks, and save translations — all from chat.",
+		icon: "🔌",
+		tag: "MCP",
+	},
+	{
+		title: "One-Click Publish",
+		description:
+			"Publish drafts to a public Inkgest blog with a custom slug and theme. Share a live link instantly — no CMS setup required.",
 		icon: "📤",
-		tag: "Export",
+		tag: "Publish",
 	},
 	{
 		title: "AI Infographics & Tables",
@@ -358,14 +379,14 @@ function Hero() {
 		: FREE_CREDIT_LIMIT;
 
 	const texts = [
-		{ icon: "🔗", text: "Scrape any URL → newsletter in 60 seconds" },
-		{ icon: "📝", text: "Turn 5 links into a publish-ready SEO blog" },
-		{ icon: "📦", text: "Export your draft as React, HTML, or Markdown" },
-		{ icon: "💬", text: "Chat with your draft, rewrite in one click" },
-		{ icon: "⚡", text: "AI automations for your entire content workflow" },
-		{ icon: "🖼️", text: "Generate images & assets directly in your draft" },
-		{ icon: "🔍", text: "SEO analysis and keyword suggestions built-in" },
-		{ icon: "📤", text: "One-click publish to your blog or CMS" },
+		{ icon: "🤖", text: "Agentic AI turns links into publish-ready drafts" },
+		{ icon: "💬", text: "AI chatbot sidebar — rewrite without leaving the editor" },
+		{ icon: "📤", text: "One-click publish to your Inkgest blog" },
+		{ icon: "🌍", text: "Translate drafts to any language instantly" },
+		{ icon: "🔌", text: "Connect Claude to your library via MCP" },
+		{ icon: "📦", text: "Export as Markdown, HTML, or React" },
+		{ icon: "🖼️", text: "AI infographics & tables from any source" },
+		{ icon: "📋", text: "Kanban board to track your writing pipeline" },
 	];
 
 	function AnimatedText() {
@@ -421,8 +442,9 @@ function Hero() {
 				style={{ y }}
 				className="relative max-w-7xl mx-auto px-6 text-left"
 			>
+				<div className="flex flex-wrap items-center justify-center gap-2 mb-4">
 				<a
-					className="bg-amber-50/50 hover:bg-amber-50 text-xs w-fit mx-auto mb-4 border border-amber-200 rounded-full flex gap-2 items-center min-h-12 px-4 py-2"
+					className="bg-amber-50/50 hover:bg-amber-50 text-xs border border-amber-200 rounded-full flex gap-2 items-center min-h-12 px-4 py-2"
 					href="https://www.producthunt.com/products/inkgest-link-to-gest"
 					target="_blank"
 					rel="noopener noreferrer"
@@ -430,6 +452,14 @@ function Hero() {
 					<SparkleIcon className="w-3 h-3 shrink-0" aria-hidden />
 					We are live on Product Hunt
 				</a>
+				<a
+					className="bg-violet-50/80 hover:bg-violet-50 text-xs border border-violet-200 rounded-full flex gap-2 items-center min-h-12 px-4 py-2"
+					href="/blog/inkgest-mcp-server-claude-desktop"
+				>
+					<span aria-hidden>🔌</span>
+					New — Claude MCP server + tasks board + translation
+				</a>
+				</div>
 		<motion.div className="max-w-7xl mx-auto my-10 w-full">
 			{/* Headline — design-tool annotation style */}
 			<motion.div
@@ -507,7 +537,7 @@ function Hero() {
 						}}
 					>
 						<span style={{ width: 8, height: 8, borderRadius: "50%", background: T.warm, display: "inline-block", flexShrink: 0 }} />
-						Customisation
+						Translate + MCP
 					</motion.div>
 					<br />
 					{/* The text with selection border */}
@@ -556,7 +586,7 @@ function Hero() {
 						}}
 					>
 						<span className="w-2 h-2 mx-1 inline-block rounded-full bg-green-100" />
-						Advance Editor
+						Tasks + Publish
 					</motion.div>
 				</div>
 				<br />
@@ -591,7 +621,7 @@ function Hero() {
 						>
 							New
 						</span>
-						Start from links and a prompt—then open your draft in the editor below.
+						Scrape, draft with agentic AI, edit with chat, translate, and publish — all in one workspace.
 						Sign in when you generate; your first runs use free credits.
 					</p>
 					<div
@@ -654,8 +684,8 @@ function Hero() {
 							<span style={{ fontSize: 11, color: T.muted }}>— AI Content Editor</span>
 						</div>
 						<div style={{ display: "flex", gap: 6 }}>
-							{["Preview", "Theme", "Export"].map((label) => (
-								<div key={label} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: `1px solid ${T.border}`, color: T.accent, background: T.base, cursor: "default" }}>{label}</div>
+							{["Preview", "Translate", "Publish", "Export"].map((label) => (
+								<div key={label} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: `1px solid ${T.border}`, color: label === "Publish" ? "white" : T.accent, background: label === "Publish" ? T.accent : T.base, cursor: "default" }}>{label}</div>
 							))}
 						</div>
 					</div>
@@ -732,9 +762,9 @@ function Hero() {
 							</div>
 							<div style={{ flex: 1, overflowY: "auto", padding: "10px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
 								{[
-									{ role: "ai", text: "I've drafted your YC newsletter. Want me to add a CTA or make the tone more conversational?" },
+									{ role: "ai", text: "I've drafted your YC newsletter. Want me to add a CTA or translate it to Spanish?" },
 									{ role: "user", text: "Make it punchier and add 3 key takeaways at the end." },
-									{ role: "ai", text: "Done! Added a bold takeaways section. I also tightened the opening paragraph to hook readers faster." },
+									{ role: "ai", text: "Done! Added a bold takeaways section. You can also publish it or open the tasks board to track the next issue." },
 								].map((msg, i) => (
 									<div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
 										<div style={{ maxWidth: "85%", padding: "8px 10px", borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px", background: msg.role === "user" ? T.accent : T.surface, color: msg.role === "user" ? "white" : T.accent, fontSize: 11.5, lineHeight: 1.6, border: msg.role === "ai" ? `1px solid ${T.border}` : "none" }}>
@@ -835,7 +865,7 @@ function AIFeaturesSection() {
 							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						From AI web scraping to an advanced editor, chatbot, automations, and multi-format export — the full stack for professional content creation.
+						From AI scraping to a tasks board, in-editor chat, global translation, one-click publish, and a Claude MCP server — the full stack for modern content creators.
 					</p>
 				</FadeUp>
 
@@ -919,24 +949,29 @@ const FEATURES = [
 		emoji: "⚡",
 	},
 	{
+		title: "Writing tasks board — backlog to done, grouped by project, with AI draft generation",
+		word: "Tasks Board",
+		emoji: "📋",
+	},
+	{
 		title: "AI chatbot sidebar — rewrite, expand, or change tone without leaving the editor",
 		word: "AI Chat",
 		emoji: "💬",
 	},
 	{
-		title: "Preview your content in beautiful themes before exporting",
-		word: "Theme Preview",
-		emoji: "🎨",
+		title: "Generate a full draft from any task in one click — agent scrapes and links it back",
+		word: "AI Draft",
+		emoji: "✨",
 	},
 	{
-		title: "AI-generated infographics and tables from any source URL",
-		word: "Visualize",
-		emoji: "📊",
+		title: "Translate drafts to any language — saved per locale, switch without losing the original",
+		word: "Translate",
+		emoji: "🌍",
 	},
 	{
-		title: "Advanced rich-text editor with slash commands, code blocks, and autosave",
-		word: "Advanced Editor",
-		emoji: "✏️",
+		title: "Connect Claude Desktop to your library via MCP — search, edit, and manage tasks from chat",
+		word: "Claude MCP",
+		emoji: "🔌",
 	},
 ];
 
@@ -976,9 +1011,9 @@ function Features() {
 							letterSpacing: "-0.5px",
 						}}
 					>
-						Scrape. Edit. Chat.
+						Scrape. Plan. Edit.
 						<br />
-						Export. Done.
+						Translate. Publish.
 					</h2>
 					<p
 						style={{
@@ -989,7 +1024,7 @@ function Features() {
 							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						Every screen in Inkgest is designed to cut time from idea to published content — no tab switching, no copy-pasting.
+						Every screen in Inkgest is designed to cut time from idea to published content — tasks board, AI drafts, translation, MCP, and one-click publish included.
 					</p>
 				</FadeUp>
 
@@ -1019,7 +1054,7 @@ function Features() {
 								}}
 								transition={{ duration: 0.25 }}
 								style={{
-									gridColumn: i < 2 ? "span 3" : "span 2",
+									gridColumn: "span 2",
 									display: "block",
 									textDecoration: "none",
 									background: T.base,
@@ -1257,27 +1292,33 @@ function HowItWorks() {
 	const steps = [
 		{
 			n: "01",
-			title: "Scrape any URL",
-			body: "Paste one or multiple URLs — blog posts, news, research, Substack. The AI agent reads the full page, no copy-pasting required.",
+			title: "Scrape or generate",
+			body: "Paste URLs or describe your angle — newsletter, blog, table, or infographic. The agentic AI reads sources and builds a structured first draft in under 60 seconds.",
 			icon: "🔗",
 		},
 		{
 			n: "02",
-			title: "Generate your draft",
-			body: "Describe your angle and content format — newsletter, blog, table, infographic. A structured draft is ready in under 60 seconds.",
-			icon: "⚡",
+			title: "Track on your tasks board",
+			body: "Capture ideas in Backlog, move them In Progress, and group by project. Hit Generate on any task to create an AI draft linked back to the card.",
+			icon: "📋",
 		},
 		{
 			n: "03",
-			title: "Edit with AI assistance",
-			body: "Open the advanced editor. Use the AI chatbot to rewrite sections, adjust tone, expand ideas, or run automations — all inline.",
+			title: "Edit with AI chat",
+			body: "Open the rich editor. Use the AI sidebar to rewrite sections, adjust tone, expand ideas, or add infographics — all inline, with autosave.",
 			icon: "✍️",
 		},
 		{
 			n: "04",
-			title: "Export to your format",
-			body: "One click to export clean Markdown, semantic HTML, or a ready-to-use React component. Ship to any platform instantly.",
-			icon: "📤",
+			title: "Translate & publish",
+			body: "Save translations in any language alongside the original. Publish to your public Inkgest blog with a custom slug, or export Markdown, HTML, or React.",
+			icon: "🌍",
+		},
+		{
+			n: "05",
+			title: "Connect Claude via MCP",
+			body: "Link Claude Desktop to your library with an API key. Search drafts, update posts, manage tasks, and save translations — without leaving the chat.",
+			icon: "🔌",
 		},
 	];
 
@@ -1316,7 +1357,7 @@ function HowItWorks() {
 							letterSpacing: "-0.5px",
 						}}
 					>
-						Four steps.
+						Five steps.
 						<br />
 						Full content workflow.
 					</h2>
@@ -1329,7 +1370,7 @@ function HowItWorks() {
 							fontFamily: "'Comic', sans-serif",
 						}}
 					>
-						No prompt engineering. No tab switching. No copy-pasting from five different places. Scrape → draft → edit → export.
+						No prompt engineering. No tab switching. Scrape → plan on your board → edit → translate → publish — or manage it all from Claude via MCP.
 					</p>
 				</FadeUp>
 
@@ -1421,7 +1462,7 @@ function HowItWorks() {
 /* ── Stats strip ── */
 function StatsStrip() {
 	const stats = [
-		{ num: "60", suffix: "s", label: "URL to publish-ready draft" },
+		{ num: "60", suffix: "s", label: "Source to publish-ready draft" },
 		{ num: "3", suffix: "hrs", label: "Saved per content piece on average" },
 		{ num: "3", suffix: "formats", label: "Export to React, HTML, or Markdown" },
 		{ num: "∞", suffix: "", label: "URLs you can scrape per draft on Pro" },
@@ -1479,10 +1520,10 @@ function StatsStrip() {
 /* ── Use Cases strip ── */
 function UseCasesStrip() {
 	const cases = [
-		{ icon: "📰", title: "Newsletter writers", body: "Go from 5 URLs to a structured issue in under 60 seconds. Never miss a publish day." },
-		{ icon: "✍️", title: "Blog content creators", body: "Research, draft, and format SEO-ready blog posts from multiple sources — no tab juggling." },
-		{ icon: "📱", title: "Social media managers", body: "Turn long-form articles into Twitter threads, LinkedIn posts, or short-form content instantly." },
-		{ icon: "🏢", title: "Content teams", body: "Run AI automations for recurring formats. Consistent quality at scale without growing headcount." },
+		{ icon: "📰", title: "Newsletter writers", body: "Go from 5 URLs to a structured issue in under 60 seconds. Track each edition on the tasks board and never miss a publish day." },
+		{ icon: "✍️", title: "Blog content creators", body: "Research, draft, translate, and publish SEO-ready posts from multiple sources — one workspace, no tab juggling." },
+		{ icon: "🔌", title: "Claude & AI power users", body: "Connect Inkgest to Claude Desktop via MCP. Search your library, create drafts, move tasks, and save translations from chat." },
+		{ icon: "🏢", title: "Content teams", body: "Kanban board with projects, AI draft generation from tasks, and shared publish links — consistent quality at scale." },
 	];
 	return (
 		<section
@@ -1576,14 +1617,19 @@ function UseCasesStrip() {
 function Pricing() {
 	const free = [
 		"50 credits every month",
-		"Full editor access",
-		"Copy to clipboard",
+		"Full editor + AI chat",
+		"Writing tasks board",
+		"Translation + publish",
+		"Claude MCP integration",
 		"Save up to 3 drafts",
 		"Google login",
 	];
 	const starter = [
 		"50 credits every month",
 		"All content formats",
+		"Tasks board + AI draft from task",
+		"Translation + one-click publish",
+		"Claude MCP server access",
 		"Multiple URL sources per draft",
 		"AI Chat with all models",
 		"Priority support",
@@ -1591,6 +1637,9 @@ function Pricing() {
 	const pro = [
 		"100 credits every month",
 		"All content formats",
+		"Tasks board + AI draft from task",
+		"Translation + one-click publish",
+		"Claude MCP server access",
 		"Multiple URL sources per draft",
 		"AI Chat with all models",
 		"Priority support",
@@ -2128,20 +2177,28 @@ function FAQ() {
 	const [open, setOpen] = useState(null);
 	const faqs = [
 		{
+			q: "What is the Inkgest MCP server?",
+			a: "MCP (Model Context Protocol) lets Claude Desktop connect to your Inkgest account. Create an API key in Settings → Integrations, install the local MCP server, and Claude can search, read, create, and update your drafts, manage tasks, and save translations — all from chat.",
+		},
+		{
+			q: "How does the writing tasks board work?",
+			a: "The tasks board is a Kanban workspace with Backlog, In Progress, and Done columns. Group tasks by project, set priorities, link drafts, and hit Generate on any card to create an AI draft from the task description and URLs.",
+		},
+		{
+			q: "Can I translate my drafts?",
+			a: "Yes. Open any draft and save translations in multiple languages — Spanish, French, German, and more. Each language is stored separately so you can switch versions without overwriting the original.",
+		},
+		{
 			q: "What URLs does it support?",
 			a: "Most publicly accessible web pages — blog posts, news articles, research papers, Medium, Substack, LinkedIn articles. Paywalled content won't work. We use Firecrawl so JavaScript-rendered pages are handled correctly.",
 		},
 		{
 			q: "What export formats are supported?",
-			a: "Inkgest exports to three formats: clean Markdown (.md) for Ghost, Notion, or any CMS; semantic HTML for emails or landing pages; and a JSX React component ready to drop into your Next.js or React app.",
+			a: "Inkgest exports to three formats: clean Markdown (.md) for Ghost, Notion, or any CMS; semantic HTML for emails or landing pages; and a JSX React component ready to drop into your Next.js or React app. You can also publish directly to a public Inkgest blog.",
 		},
 		{
 			q: "How does the AI chatbot work in the editor?",
 			a: "Once your draft is open in the editor, a collapsible AI sidebar lets you chat with the document. Ask it to rewrite a section, adjust the tone, expand a paragraph, add bullet points, or summarize — it knows the full context of your draft.",
-		},
-		{
-			q: "What are AI automations?",
-			a: "Automations let you chain scrape → draft → format into a repeatable workflow. Set up a sequence once and run it on any URL — useful for newsletters on a schedule or content teams with recurring formats.",
 		},
 		{
 			q: "How good is the output, really?",
