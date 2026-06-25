@@ -19,7 +19,7 @@ export const CHAT_MODE_OPTIONS = [
 	{
 		id: CHAT_MODE_AGENT,
 		label: "Agent",
-		sub: "AI can edit the content",
+		sub: "Edit, tasks & save",
 		dot: "#C17B2F",
 	},
 ];

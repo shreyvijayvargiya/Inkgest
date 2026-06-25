@@ -223,13 +223,28 @@ const AGENT_MODE_APPEND = `
 AGENT MODE — Inkgest workspace (client-executed tools):
 • search_user_assets — fuzzy search the user's drafts and tables by title/preview. Use when they ask to find a note, draft, or "that table about X".
 • read_user_asset — load stored content for one asset id from search results. Drafts return markdown body (truncated in tool result). Tables return a short JSON summary of columns/rows.
-• propose_create_draft — when the user wants a **new** draft/note/blog **saved to their library**. Put the **entire** article in bodyMarkdown and a clear title. The app will show **Approve / Decline**; nothing is saved until they approve. You may still write a short reply in normal text.
+• propose_create_draft — when the user wants a **new** draft/note/blog **saved to their library**. Put the **entire** article in bodyMarkdown and a clear title. The app will show **Approve / Decline**; nothing is saved until they approve.
+• propose_update_draft — when the user wants to **edit an existing** draft (current editor draft or any library item by asset_id). Pass asset_id and the **full updated** bodyMarkdown and/or title. UI shows Approve / Decline before Firestore is updated.
+• propose_save_translation — after translate_text (or your own translation), when the user wants to **persist** a translation: save_as **new_draft** (separate library item) or **translation_on_draft** (stored on the draft's translations field). Requires bodyMarkdown and language.
+• list_writing_tasks / create_writing_task / update_writing_task — Kanban tasks board (Backlog, In Progress, Done). Use for "add a task…", "move X to in-progress", "what's on my board?". Task changes apply immediately (no approval card).
 • You still have scrape_url / scrape_urls / scrape_youtube, **translate_text**, **generate_infographics**, and **generate_mermaid** when they want visuals from web or grounded text.
 
 Rules for propose_create_draft:
 • Call it when the user asks for a **new** saved item: e.g. "save as draft", "new blog", "add to my library", "create a post from this link", or summarize a pasted URL **into** something they keep.
 • If they paste an https URL and want that content turned into a saved draft: **(1)** call scrape_url, scrape_urls, or **scrape_youtube** (for YouTube) first **(2)** then call propose_create_draft with the **full** blog/article markdown (from the scrape + your edits)—do **not** stop after only scraping or only chatting in text; the UI card appears only when you call this tool.
-• After calling it, briefly say they can approve below to save (do not repeat the entire body if it is long).`;
+• After calling it, briefly say they can approve below to save (do not repeat the entire body if it is long).
+
+Rules for propose_update_draft:
+• Use when they ask to update, rewrite, or save changes to an **existing** draft — including the draft open in the editor (use its asset_id from context or search/read first).
+• Pass the complete revised bodyMarkdown when changing content. UI requires Approve before writing.
+
+Rules for propose_save_translation:
+• Call after translate_text when they say "save the Spanish version", "save translation as new draft", etc.
+• save_as new_draft → separate item; translation_on_draft → attaches to asset_id (default: current open draft).
+
+Rules for writing tasks:
+• list_writing_tasks before update when the user refers to a task by title ("move finish intro…") to get task_id.
+• create_writing_task for new cards; update_writing_task to change status (backlog | in-progress | done), title, or link draftId.`;
 
 const ASK_MODE_APPEND = `
 
@@ -293,6 +308,149 @@ const AGENT_TOOLS = [
 					},
 				},
 				required: ["title", "bodyMarkdown"],
+			},
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "propose_update_draft",
+			description:
+				"Stage updates to an EXISTING draft for user approval (Approve / Decline). Use when editing the open draft or any library draft by asset_id. Pass full bodyMarkdown when changing content.",
+			parameters: {
+				type: "object",
+				properties: {
+					asset_id: {
+						type: "string",
+						description: "Draft document id (from editor context, search, or read_user_asset)",
+					},
+					title: { type: "string", description: "New title (optional)" },
+					bodyMarkdown: {
+						type: "string",
+						description: "Full revised draft in markdown (optional if only title changes)",
+					},
+					prompt: {
+						type: "string",
+						description: "Optional notes / source prompt",
+					},
+				},
+				required: ["asset_id"],
+			},
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "propose_save_translation",
+			description:
+				"Persist a translation for user approval. Call after translate_text when user wants to save. save_as new_draft creates a library item; translation_on_draft stores on the draft translations field.",
+			parameters: {
+				type: "object",
+				properties: {
+					language: {
+						type: "string",
+						description: "Target language code or name (es, spanish, french, …)",
+					},
+					bodyMarkdown: {
+						type: "string",
+						description: "Full translated markdown",
+					},
+					save_as: {
+						type: "string",
+						enum: ["new_draft", "translation_on_draft"],
+						description: "new_draft = separate item; translation_on_draft = attach to draft",
+					},
+					asset_id: {
+						type: "string",
+						description: "Draft id for translation_on_draft (defaults to current open draft)",
+					},
+					title: {
+						type: "string",
+						description: "Title when save_as is new_draft",
+					},
+				},
+				required: ["language", "bodyMarkdown", "save_as"],
+			},
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "list_writing_tasks",
+			description:
+				"List tasks on the user's writing Kanban board. Filter by status or search title/description.",
+			parameters: {
+				type: "object",
+				properties: {
+					query: {
+						type: "string",
+						description: "Optional search in title/description",
+					},
+					status: {
+						type: "string",
+						enum: ["backlog", "in-progress", "done"],
+						description: "Filter by column",
+					},
+					limit: {
+						type: "number",
+						description: "Max results (default 20)",
+					},
+				},
+			},
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "create_writing_task",
+			description:
+				"Create a task on the writing board. Applies immediately. Example: 'Add a task: finish intro draft'.",
+			parameters: {
+				type: "object",
+				properties: {
+					title: { type: "string", description: "Task title" },
+					description: { type: "string", description: "Optional details" },
+					status: {
+						type: "string",
+						enum: ["backlog", "in-progress", "done"],
+						description: "Column (default backlog)",
+					},
+					priority: {
+						type: "string",
+						enum: ["High", "Medium", "Low"],
+					},
+					draft_id: {
+						type: "string",
+						description: "Optional linked draft asset id",
+					},
+				},
+				required: ["title"],
+			},
+		},
+	},
+	{
+		type: "function",
+		function: {
+			name: "update_writing_task",
+			description:
+				"Update a task (move column, rename, link draft). Use task_id from list_writing_tasks. Applies immediately.",
+			parameters: {
+				type: "object",
+				properties: {
+					task_id: { type: "string", description: "Writing task id" },
+					title: { type: "string" },
+					description: { type: "string" },
+					status: {
+						type: "string",
+						enum: ["backlog", "in-progress", "done"],
+					},
+					priority: {
+						type: "string",
+						enum: ["High", "Medium", "Low"],
+					},
+					draft_id: { type: "string", description: "Link to draft asset id" },
+				},
+				required: ["task_id"],
 			},
 		},
 	},

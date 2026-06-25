@@ -1359,6 +1359,33 @@ export default function DraftPage() {
 		}
 	};
 
+	const handleAgentDraftUpdated = useCallback(async () => {
+		if (!reduxUser?.uid || !draftId) return;
+		await queryClient.invalidateQueries({
+			queryKey: ["doc", draftId, reduxUser.uid],
+		});
+		const refreshed = await queryClient.fetchQuery({
+			queryKey: ["doc", draftId, reduxUser.uid],
+			queryFn: async () => {
+				const result = await getAsset(reduxUser.uid, draftId);
+				if (result) return result;
+				return null;
+			},
+		});
+		const body = refreshed?.doc?.body;
+		if (body != null && editorRef.current) {
+			editorRef.current.innerHTML = formatBody(body);
+			migrateCalloutIconSelectors(editorRef.current);
+			normalizeTodoLists(editorRef.current);
+		}
+	}, [
+		reduxUser?.uid,
+		draftId,
+		queryClient,
+		formatBody,
+		editorRef,
+	]);
+
 	const confirmDelete = async () => {
 		try {
 			const item = items.find((i) => i.id === deleteConfirm);
@@ -2896,9 +2923,12 @@ export default function DraftPage() {
 					)}
 					draftTitle={draft?.title || "Draft"}
 					userId={reduxUser?.uid || ""}
+					draftId={draftId || ""}
+					docSource={docData?.source || "assets"}
 					onAgentDraftCreated={(newDraftId) =>
 						router.push(`/app/${newDraftId}`)
 					}
+					onDraftUpdated={handleAgentDraftUpdated}
 					selectionContext={selectionContext}
 					asPanel={!compactAssetsNav}
 					clampOverlayToViewport={compactAssetsNav}

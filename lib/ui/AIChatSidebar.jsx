@@ -11,7 +11,10 @@
  *   draftContent    string — current editor innerHTML (passed to AI as context)
  *   draftTitle      string — draft title (context)
  *   userId          string — Firebase UID for agent tools / cache (falls back to auth)
+ *   draftId         string — open draft id (agent update / translation)
+ *   docSource       string — Firestore source for updateAsset (assets|drafts|…)
  *   onAgentDraftCreated  fn?(draftId: string) — after agent approves creating a draft
+ *   onDraftUpdated  fn?() — after agent approves updating the open draft
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -33,13 +36,20 @@ import {
 } from "../utils/translationCredits";
 import {
 	languageCodeToApiLabel,
+	normalizeTranslationLangCode,
 	resolveTranslationLanguageLabel,
 } from "../utils/translateLanguage";
 import {
 	listAssets,
 	createDraft,
 	getAsset,
+	updateAsset,
 } from "../api/userAssets";
+import {
+	listWritingTasks,
+	createWritingTask,
+	updateWritingTask,
+} from "../api/writingTasks";
 import {
 	AIChatSidebarAgentBar,
 	CHAT_MODE_ASK,
@@ -47,6 +57,8 @@ import {
 } from "./AIChatSidebarAgentBar";
 import { searchAssetsWithFuse } from "../agent/searchUserAssetsWithFuse";
 import { buildAgentDraftRecord } from "../agent/buildAgentDraftRecord";
+import { buildDraftMarkdownUpdates } from "../agent/buildDraftMarkdownUpdates";
+import { mergeDraftTranslations } from "../utils/draftTranslationStore";
 import router from "next/router";
 import { SparklesIcon } from "lucide-react";
 
@@ -189,7 +201,107 @@ function formatChatInline(s) {
 	return linkifyInternalAppPaths(linkifyBareUrls(s));
 }
 
-/** Dedupe by id — accumulates assets surfaced via search_user_assets. */
+function filterWritingTasks(tasks, { query, status, limit = 20 } = {}) {
+	let list = Array.isArray(tasks) ? [...tasks] : [];
+	if (status) list = list.filter((t) => t.status === status);
+	const q = String(query || "").trim().toLowerCase();
+	if (q) {
+		list = list.filter(
+			(t) =>
+				String(t.title || "").toLowerCase().includes(q) ||
+				String(t.description || "").toLowerCase().includes(q),
+		);
+	}
+	return list.slice(0, Math.min(Math.max(limit, 1), 50));
+}
+
+/** Shared Approve / Decline card for agent proposals. */
+function AgentApprovalCard({
+	label,
+	subtitle,
+	approving,
+	onApprove,
+	onDecline,
+	approveLabel = "Approve",
+}) {
+	return (
+		<div
+			onClick={(e) => e.stopPropagation()}
+			style={{
+				marginTop: 10,
+				padding: "10px 11px",
+				border: "1px solid #E8CFB0",
+				borderRadius: 10,
+				background: "#FFFCF7",
+			}}
+		>
+			<p style={{ fontSize: 11, fontWeight: 700, color: "#5e5e5e", margin: "0 0 6px" }}>
+				{label}
+			</p>
+			{subtitle ? (
+				<p
+					style={{
+						fontSize: 12,
+						fontWeight: 600,
+						color: "#1A1A1A",
+						margin: "0 0 10px",
+						lineHeight: 1.4,
+					}}
+				>
+					{subtitle}
+				</p>
+			) : null}
+			<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+				<motion.button
+					type="button"
+					whileHover={{ scale: 1.03 }}
+					whileTap={{ scale: 0.97 }}
+					disabled={approving}
+					onClick={(e) => {
+						e.stopPropagation();
+						onApprove();
+					}}
+					style={{
+						background: "linear-gradient(135deg,#C17B2F,#CF8B38)",
+						border: "none",
+						borderRadius: 8,
+						padding: "6px 14px",
+						fontSize: 12,
+						fontWeight: 700,
+						color: "white",
+						cursor: approving ? "wait" : "pointer",
+						opacity: approving ? 0.7 : 1,
+					}}
+				>
+					{approving ? "Saving…" : approveLabel}
+				</motion.button>
+				<motion.button
+					type="button"
+					whileHover={{ background: "#F0ECE5" }}
+					whileTap={{ scale: 0.97 }}
+					disabled={approving}
+					onClick={(e) => {
+						e.stopPropagation();
+						onDecline();
+					}}
+					style={{
+						background: "transparent",
+						border: "1px solid #E8E4DC",
+						borderRadius: 8,
+						padding: "6px 14px",
+						fontSize: 12,
+						fontWeight: 600,
+						color: "#5A5550",
+						cursor: approving ? "wait" : "pointer",
+					}}
+				>
+					Decline
+				</motion.button>
+			</div>
+		</div>
+	);
+}
+
 function mergeAssetLinks(prev = [], rows = []) {
 	const seen = new Set(prev.map((r) => r.id).filter(Boolean));
 	const out = [...prev];
@@ -782,12 +894,15 @@ export default function AIChatSidebar({
 	/** When overlay mode (`!asPanel`), cap width so small viewports aren’t clipped. */
 	clampOverlayToViewport = false,
 	userId: userIdProp = "",
+	draftId = "",
+	docSource = "assets",
 	onAgentDraftCreated,
+	onDraftUpdated,
 }) {
 	const [messages, setMessages] = useState([{
 		id: "w0", role: "assistant", done: true,
 		content:
-			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** — it appears as a chip above the box and I'll scrape it with the Inkgest API. **Paste or attach images** (chips with preview); vision is coming soon, but filenames are included for context. Ask for **infographics**, **Mermaid diagrams**, or **translations** from your draft or scraped text",
+			"I'm your **AI writing assistant**.\n\nAsk me to write hooks, headlines, full sections, rewrites, CTAs or outlines. **Paste a link** — it appears as a chip above the box and I'll scrape it with the Inkgest API. **Paste or attach images** (chips with preview); vision is coming soon, but filenames are included for context. Ask for **infographics**, **Mermaid diagrams**, or **translations** from your draft or scraped text.\n\nSwitch to **Agent** mode to edit drafts (Approve/Decline), save translations, and manage your **tasks board**.",
 		chatTranslations: [],
 	}]);
 	const [input, setInput]         = useState("");
@@ -824,11 +939,21 @@ export default function AIChatSidebar({
 		Boolean(effectiveUserId) &&
 		(chatMode === CHAT_MODE_AGENT || chatMode === CHAT_MODE_ASK);
 
+	const agentToolsActive =
+		open && Boolean(effectiveUserId) && chatMode === CHAT_MODE_AGENT;
+
 	const { data: agentAssets = [] } = useQuery({
 		queryKey: ["assets", effectiveUserId],
 		queryFn: () => listAssets(effectiveUserId),
 		enabled: libraryToolsActive,
 		staleTime: 45_000,
+	});
+
+	const { data: agentTasks = [] } = useQuery({
+		queryKey: ["writingTasks", effectiveUserId],
+		queryFn: () => listWritingTasks(effectiveUserId),
+		enabled: agentToolsActive,
+		staleTime: 30_000,
 	});
 
 	const createAgentDraftMutation = useMutation({
@@ -1162,7 +1287,10 @@ export default function AIChatSidebar({
 		let contextPrefix = "";
 		if (chatMode === CHAT_MODE_AGENT) {
 			contextPrefix +=
-				"[Assistant mode: Agent — workspace search, read saved drafts/tables, scrape links, and propose new drafts for user approval.]\n\n";
+				"[Assistant mode: Agent — search/read library, propose create or update drafts (Approve/Decline), save translations, manage writing tasks, scrape links.]\n\n";
+			if (draftId) {
+				contextPrefix += `[Current open draft id: "${draftId}" — use for propose_update_draft or translation_on_draft when the user means this document.]\n\n`;
+			}
 		} else if (chatMode === CHAT_MODE_ASK) {
 			contextPrefix +=
 				"[Assistant mode: Ask — search the user's saved drafts/tables for 'find my…' / 'my blog about…'; use web scrape only for pasted https URLs.]\n\n";
@@ -1294,8 +1422,13 @@ export default function AIChatSidebar({
 					if (name === "generate_mermaid") return 3;
 					if (name === "search_user_assets") return 4;
 					if (name === "read_user_asset") return 5;
-					if (name === "propose_create_draft") return 6;
-					return 7;
+					if (name === "list_writing_tasks") return 6;
+					if (name === "create_writing_task") return 7;
+					if (name === "update_writing_task") return 8;
+					if (name === "propose_create_draft") return 9;
+					if (name === "propose_update_draft") return 10;
+					if (name === "propose_save_translation") return 11;
+					return 12;
 				};
 				normalised.sort(
 					(a, b) =>
@@ -1313,6 +1446,8 @@ export default function AIChatSidebar({
 
 				const traceBatch = [];
 				let proposalThisRound = null;
+				let updateProposalThisRound = null;
+				let translationProposalThisRound = null;
 				let haltAfterTools = false;
 				let roundAssetLinks = [];
 
@@ -1666,6 +1801,201 @@ export default function AIChatSidebar({
 							}
 						} else if (
 							chatMode === CHAT_MODE_AGENT &&
+							name === "list_writing_tasks"
+						) {
+							const hits = filterWritingTasks(agentTasks, {
+								query: args.query,
+								status: args.status,
+								limit: args.limit ?? 20,
+							});
+							traceBatch.push({
+								title: "Tasks board",
+								sub: args.status || args.query || "all",
+								lines: hits.length
+									? hits.slice(0, 8).map(
+											(t) =>
+												`[${t.status}] ${t.title}${t.id ? ` (${t.id})` : ""}`,
+										)
+									: ["No matching tasks."],
+							});
+							payload = JSON.stringify({
+								ok: true,
+								count: hits.length,
+								results: hits.map((t) => ({
+									id: t.id,
+									title: t.title,
+									status: t.status,
+									priority: t.priority,
+									draftId: t.draftId,
+								})),
+							});
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "create_writing_task"
+						) {
+							if (!effectiveUserId) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "Sign in required to create tasks.",
+								});
+							} else if (!String(args.title || "").trim()) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "title is required",
+								});
+							} else {
+								const linkedDraft = args.draft_id || draftId || null;
+								const task = await createWritingTask(effectiveUserId, {
+									title: String(args.title).trim(),
+									description: args.description || "",
+									status: args.status || "backlog",
+									priority: args.priority || "Medium",
+									draftId: linkedDraft,
+									draftPath: linkedDraft ? `/app/${linkedDraft}` : null,
+								});
+								queryClient.invalidateQueries({
+									queryKey: ["writingTasks", effectiveUserId],
+								});
+								traceBatch.push({
+									title: "Task created",
+									sub: task.title,
+									lines: [`${task.status} · ${task.id}`],
+								});
+								payload = JSON.stringify({ ok: true, task });
+							}
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "update_writing_task"
+						) {
+							if (!effectiveUserId) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "Sign in required to update tasks.",
+								});
+							} else if (!args.task_id) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "task_id is required",
+								});
+							} else {
+								const updates = {};
+								if (args.title != null) updates.title = String(args.title).trim();
+								if (args.description != null)
+									updates.description = String(args.description);
+								if (args.status != null) updates.status = args.status;
+								if (args.priority != null) updates.priority = args.priority;
+								if (args.draft_id != null) {
+									updates.draftId = args.draft_id || null;
+									updates.draftPath = args.draft_id
+										? `/app/${args.draft_id}`
+										: null;
+								}
+								await updateWritingTask(
+									effectiveUserId,
+									String(args.task_id),
+									updates,
+								);
+								queryClient.invalidateQueries({
+									queryKey: ["writingTasks", effectiveUserId],
+								});
+								traceBatch.push({
+									title: "Task updated",
+									sub: String(args.task_id),
+									lines: Object.keys(updates).length
+										? Object.entries(updates).map(
+												([k, v]) => `${k}: ${v ?? "—"}`,
+											)
+										: ["No fields changed"],
+								});
+								payload = JSON.stringify({
+									ok: true,
+									task_id: args.task_id,
+									updated: updates,
+								});
+							}
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "propose_update_draft"
+						) {
+							const assetId = String(args.asset_id || "").trim();
+							if (!assetId) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "asset_id is required",
+								});
+							} else if (
+								args.bodyMarkdown == null &&
+								args.title == null &&
+								args.prompt == null
+							) {
+								payload = JSON.stringify({
+									ok: false,
+									error: "Provide title, bodyMarkdown, and/or prompt to update",
+								});
+							} else {
+								updateProposalThisRound = {
+									assetId,
+									title: args.title != null ? String(args.title) : undefined,
+									bodyMarkdown:
+										args.bodyMarkdown != null
+											? String(args.bodyMarkdown)
+											: undefined,
+									prompt: args.prompt != null ? String(args.prompt) : undefined,
+									displayTitle:
+										String(args.title || "").trim() ||
+										draftTitle ||
+										"Draft update",
+								};
+								haltAfterTools = true;
+								payload = JSON.stringify({
+									ok: true,
+									status: "awaiting_user_approval_in_ui",
+								});
+							}
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
+							name === "propose_save_translation"
+						) {
+							const langCode = normalizeTranslationLangCode(args.language);
+							const bodyMd = String(args.bodyMarkdown || "").trim();
+							const saveAs = args.save_as;
+							if (!langCode || !bodyMd || !saveAs) {
+								payload = JSON.stringify({
+									ok: false,
+									error:
+										"language, bodyMarkdown, and save_as (new_draft | translation_on_draft) are required",
+								});
+							} else {
+								const targetAsset =
+									saveAs === "translation_on_draft"
+										? String(args.asset_id || draftId || "").trim()
+										: "";
+								if (saveAs === "translation_on_draft" && !targetAsset) {
+									payload = JSON.stringify({
+										ok: false,
+										error:
+											"asset_id or an open draft is required for translation_on_draft",
+									});
+								} else {
+									translationProposalThisRound = {
+										language: langCode,
+										languageLabel: resolveTranslationLanguageLabel(langCode),
+										bodyMarkdown: bodyMd,
+										saveAs,
+										assetId: targetAsset || undefined,
+										title:
+											String(args.title || "").trim() ||
+											`${resolveTranslationLanguageLabel(langCode)} — ${draftTitle || "Translation"}`,
+									};
+									haltAfterTools = true;
+									payload = JSON.stringify({
+										ok: true,
+										status: "awaiting_user_approval_in_ui",
+									});
+								}
+							}
+						} else if (
+							chatMode === CHAT_MODE_AGENT &&
 							name === "propose_create_draft"
 						) {
 							proposalThisRound = {
@@ -1703,7 +2033,10 @@ export default function AIChatSidebar({
 						if (
 							chatMode === CHAT_MODE_AGENT ||
 							name === "search_user_assets" ||
-							name === "read_user_asset"
+							name === "read_user_asset" ||
+							name === "list_writing_tasks" ||
+							name === "create_writing_task" ||
+							name === "update_writing_task"
 						) {
 							traceBatch.push({
 								title: `Tool error: ${name}`,
@@ -1750,6 +2083,22 @@ export default function AIChatSidebar({
 										? {
 												draftProposal: {
 													...proposalThisRound,
+													resolved: null,
+												},
+											}
+										: {}),
+									...(updateProposalThisRound
+										? {
+												updateProposal: {
+													...updateProposalThisRound,
+													resolved: null,
+												},
+											}
+										: {}),
+									...(translationProposalThisRound
+										? {
+												translationProposal: {
+													...translationProposalThisRound,
 													resolved: null,
 												},
 											}
@@ -1835,7 +2184,10 @@ export default function AIChatSidebar({
 		chatMode,
 		effectiveUserId,
 		agentAssets,
+		agentTasks,
+		draftId,
 		draftTitle,
+		queryClient,
 	]);
 
 	const approveDraftProposal = useCallback(
@@ -1895,6 +2247,194 @@ export default function AIChatSidebar({
 							...m,
 							draftProposal: {
 								...m.draftProposal,
+								resolved: "declined",
+							},
+					  }
+					: m,
+			),
+		);
+	}, []);
+
+	const approveUpdateProposal = useCallback(
+		async (msg) => {
+			const p = msg?.updateProposal;
+			if (!p || p.resolved) return;
+			const uid = effectiveUserId;
+			if (!uid) {
+				showToast("Sign in required to update a draft.");
+				return;
+			}
+			setApprovingForMsgId(msg.id);
+			try {
+				const got = await getAsset(uid, p.assetId);
+				if (!got || got.type !== "draft") {
+					throw new Error("Draft not found or not editable");
+				}
+				const updates = buildDraftMarkdownUpdates({
+					title: p.title,
+					bodyMarkdown: p.bodyMarkdown,
+					prompt: p.prompt,
+				});
+				if (Object.keys(updates).length === 0) {
+					throw new Error("No updates to apply");
+				}
+				const source = got.source || docSource || "assets";
+				await updateAsset(uid, p.assetId, updates, source);
+				queryClient.invalidateQueries({ queryKey: ["assets", uid] });
+				queryClient.invalidateQueries({
+					queryKey: ["doc", p.assetId, uid],
+				});
+				if (p.assetId === draftId) {
+					onDraftUpdated?.();
+				}
+				setMessages((prev) =>
+					prev.map((m) =>
+						m.id === msg.id && m.updateProposal
+							? {
+									...m,
+									updateProposal: {
+										...m.updateProposal,
+										resolved: "approved",
+									},
+							  }
+							: m,
+					),
+				);
+				showToast("✓ Draft updated");
+			} catch (e) {
+				showToast(e?.message || "Could not update draft");
+			} finally {
+				setApprovingForMsgId(null);
+			}
+		},
+		[
+			effectiveUserId,
+			docSource,
+			draftId,
+			queryClient,
+			onDraftUpdated,
+		],
+	);
+
+	const declineUpdateProposal = useCallback((msgId) => {
+		setMessages((prev) =>
+			prev.map((m) =>
+				m.id === msgId && m.updateProposal
+					? {
+							...m,
+							updateProposal: {
+								...m.updateProposal,
+								resolved: "declined",
+							},
+					  }
+					: m,
+			),
+		);
+	}, []);
+
+	const approveTranslationProposal = useCallback(
+		async (msg) => {
+			const p = msg?.translationProposal;
+			if (!p || p.resolved) return;
+			const uid = effectiveUserId;
+			if (!uid) {
+				showToast("Sign in required to save translation.");
+				return;
+			}
+			setApprovingForMsgId(msg.id);
+			try {
+				if (p.saveAs === "new_draft") {
+					const draft = buildAgentDraftRecord({
+						title: p.title,
+						bodyMarkdown: p.bodyMarkdown,
+						prompt: `Translation (${p.languageLabel})`,
+					});
+					draft.tag = `Translation · ${p.languageLabel}`;
+					const newId = await createAgentDraftMutation.mutateAsync({
+						uid,
+						draft,
+					});
+					setMessages((prev) =>
+						prev.map((m) =>
+							m.id === msg.id && m.translationProposal
+								? {
+										...m,
+										translationProposal: {
+											...m.translationProposal,
+											resolved: "approved",
+											createdId: newId,
+										},
+								  }
+								: m,
+						),
+					);
+					showToast("✓ Translation saved as new draft");
+					onAgentDraftCreated?.(newId);
+				} else {
+					const assetId = p.assetId || draftId;
+					if (!assetId) throw new Error("No draft to attach translation");
+					const got = await getAsset(uid, assetId);
+					if (!got || got.type !== "draft") {
+						throw new Error("Draft not found");
+					}
+					const html = mdEditor(p.bodyMarkdown);
+					const translations = mergeDraftTranslations(
+						got.doc.translations,
+						p.language,
+						{ html, markdown: p.bodyMarkdown },
+					);
+					await updateAsset(
+						uid,
+						assetId,
+						{ translations },
+						got.source || docSource || "assets",
+					);
+					queryClient.invalidateQueries({ queryKey: ["assets", uid] });
+					queryClient.invalidateQueries({
+						queryKey: ["doc", assetId, uid],
+					});
+					if (assetId === draftId) onDraftUpdated?.();
+					setMessages((prev) =>
+						prev.map((m) =>
+							m.id === msg.id && m.translationProposal
+								? {
+										...m,
+										translationProposal: {
+											...m.translationProposal,
+											resolved: "approved",
+											createdId: assetId,
+										},
+								  }
+								: m,
+						),
+					);
+					showToast(`✓ ${p.languageLabel} translation saved on draft`);
+				}
+			} catch (e) {
+				showToast(e?.message || "Could not save translation");
+			} finally {
+				setApprovingForMsgId(null);
+			}
+		},
+		[
+			effectiveUserId,
+			draftId,
+			docSource,
+			queryClient,
+			createAgentDraftMutation,
+			onAgentDraftCreated,
+			onDraftUpdated,
+		],
+	);
+
+	const declineTranslationProposal = useCallback((msgId) => {
+		setMessages((prev) =>
+			prev.map((m) =>
+				m.id === msgId && m.translationProposal
+					? {
+							...m,
+							translationProposal: {
+								...m.translationProposal,
 								resolved: "declined",
 							},
 					  }
@@ -2408,6 +2948,92 @@ export default function AIChatSidebar({
 																	margin: "8px 0 0",
 																}}>
 																	Cancelled · draft not saved
+																</p>
+															)}
+															{msg.updateProposal?.resolved === "approved" && (
+																<p style={{
+																	fontSize: 11,
+																	color: "#4A7C59",
+																	margin: "10px 0 0",
+																	fontWeight: 600,
+																}}>
+																	✓ Draft updated
+																</p>
+															)}
+															{msg.updateProposal &&
+																msg.updateProposal.resolved == null &&
+																msg.done && (
+																	<AgentApprovalCard
+																		label="Apply draft update?"
+																		subtitle={msg.updateProposal.displayTitle}
+																		approving={approvingForMsgId === msg.id}
+																		onApprove={() => approveUpdateProposal(msg)}
+																		onDecline={() => declineUpdateProposal(msg.id)}
+																	/>
+																)}
+															{msg.updateProposal?.resolved === "declined" && (
+																<p style={{
+																	fontSize: 11,
+																	color: "#A8A29C",
+																	margin: "8px 0 0",
+																}}>
+																	Cancelled · draft not updated
+																</p>
+															)}
+															{msg.translationProposal?.resolved === "approved" && (
+																<p style={{
+																	fontSize: 11,
+																	color: "#4A7C59",
+																	margin: "10px 0 0",
+																	fontWeight: 600,
+																}}>
+																	✓ Translation saved
+																	{msg.translationProposal.createdId &&
+																	msg.translationProposal.saveAs === "new_draft" ? (
+																		<>
+																			{" · "}
+																			<button
+																				onClick={() =>
+																					router.push(
+																						`/app/${msg.translationProposal.createdId}`,
+																						undefined,
+																						{ shallow: false },
+																					)
+																				}
+																				style={{
+																					color: "#C17B2F",
+																					fontWeight: 700,
+																					textDecoration: "none",
+																				}}
+																			>
+																				Open in app
+																			</button>
+																		</>
+																	) : null}
+																</p>
+															)}
+															{msg.translationProposal &&
+																msg.translationProposal.resolved == null &&
+																msg.done && (
+																	<AgentApprovalCard
+																		label={
+																			msg.translationProposal.saveAs === "new_draft"
+																				? "Save translation as new draft?"
+																				: "Save translation on draft?"
+																		}
+																		subtitle={`${msg.translationProposal.languageLabel} — ${msg.translationProposal.title}`}
+																		approving={approvingForMsgId === msg.id}
+																		onApprove={() => approveTranslationProposal(msg)}
+																		onDecline={() => declineTranslationProposal(msg.id)}
+																	/>
+																)}
+															{msg.translationProposal?.resolved === "declined" && (
+																<p style={{
+																	fontSize: 11,
+																	color: "#A8A29C",
+																	margin: "8px 0 0",
+																}}>
+																	Cancelled · translation not saved
 																</p>
 															)}
 														</div>

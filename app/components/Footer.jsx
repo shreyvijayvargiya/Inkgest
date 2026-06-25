@@ -172,6 +172,9 @@ export default function Footer() {
 							className="block max-h-9 w-auto"
 						/>
 					</a>
+					<a href="https://sellwithboost.com" target="_blank" rel="noopener noreferrer">
+						<img src="https://sellwithboost.com/badge/listing.svg" alt="Listed on Sell With boost" style="height: 40px; width: auto;" />
+					</a>
 				</div>
 			</div>
 		</footer>
