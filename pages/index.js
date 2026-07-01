@@ -519,7 +519,7 @@ function Hero() {
 							top: -8,
 							right: -4,
 							background: T.surface,
-							zIndex: 10,
+							zIndex: 100,
 							border: `1px solid ${T.border}`,
 							borderRadius: 5,
 							padding: "2px 8px",
@@ -534,7 +534,7 @@ function Hero() {
 							boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
 						}}
 					>
-						<span style={{ width: 8, height: 8, borderRadius: "50%", background: T.warm, display: "inline-block", flexShrink: 0, zIndex: 10, }} />
+						<span style={{ width: 8, height: 8, borderRadius: "50%", background: T.warm, display: "inline-block", flexShrink: 0, zIndex: 100, }} />
 						Translate + MCP
 					</motion.div>
 					<br />
@@ -557,7 +557,7 @@ function Hero() {
 							<div key={`${v}-${h}`} style={{ position: "absolute", [v]: -2, [h]: -2, width: 7, height: 7, borderRadius: 2, background: "white", border: `1.5px solid ${T.warm}` }} />
 						))}
 						
-						<span style={{ fontStyle: "italic", fontSize: "48px", fontWeight: 400, color: T.warm, lineHeight: 1.05, letterSpacing: "-2px", zIndex: 10, }} className="text-zinc-500 text-4xl">
+						<span style={{ fontStyle: "italic", fontSize: "24px", fontWeight: 400, color: T.warm, lineHeight: 1.05, letterSpacing: "-2px", zIndex: 10, }} className="text-zinc-500 text-4xl">
 							content creators
 						</span>
 					</motion.div>
@@ -624,7 +624,6 @@ function Hero() {
 								background: T.surface,
 								display: "flex",
 								flexDirection: "column",
-								minHeight: 520,
 								flex: 1,
 								minWidth: 0,
 							}}
@@ -678,7 +677,7 @@ function AIFeaturesSection() {
 			id="features"
 			className="bg-white"
 		>
-			<div className="max-w-7xl mx-auto">
+			<div className="max-w-7xl mx-auto p-4">
 				<FadeUp>
 				<p
 					style={{
@@ -691,7 +690,7 @@ function AIFeaturesSection() {
 						fontFamily: "'Comic', sans-serif",
 					}}
 				>
-					Platform Features
+					Inkgest features
 				</p>
 					<h2
 						style={{
@@ -828,14 +827,9 @@ function Features() {
 	return (
 		<section
 			id="product-showcase"
-			style={{
-				padding: "96px 24px",
-				background: "white",
-				borderTop: `1px solid ${T.border}`,
-				borderBottom: `1px solid ${T.border}`,
-			}}
+			className="bg-white py-10"
 		>
-			<div className="max-w-7xl mx-auto">
+			<div className="max-w-7xl mx-auto p-4">
 				<FadeUp>
 					<p
 					style={{
@@ -1824,15 +1818,10 @@ function OpenSource() {
 		<section
 			className="bg-white"
 		>
-			<div className="max-w-7xl mx-auto">
+			<div className="max-w-7xl mx-auto p-4">
 				<FadeUp>
 					<div
-						style={{
-							display: "grid",
-							gridTemplateColumns: "1fr 1fr",
-							gap: 64,
-							alignItems: "center",
-						}}
+						className="flex flex-wrap gap-4 items-center"
 					>
 						{/* Left */}
 						<div>
@@ -2070,13 +2059,7 @@ function FAQ() {
 	return (
 		<section id="faq" className="bg-white py-10">
 			<div
-				className="max-w-7xl mx-auto"
-				style={{
-					display: "grid",
-					gridTemplateColumns: "1fr 1.6fr",
-					gap: 64,
-					alignItems: "start",
-				}}
+				className="max-w-7xl mx-auto flex items-center gap-4 flex-wrap p-4"
 			>
 				<FadeUp>
 					<p
