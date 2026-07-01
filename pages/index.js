@@ -787,7 +787,7 @@ function Hero() {
 				</motion.div>
 					</div>
 				</motion.div>
-				<motion.p
+				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					transition={{ delay: 0.55 }}
@@ -798,13 +798,20 @@ function Hero() {
 						marginTop: 16,
 						marginBottom: 32,
 					}}
-					className="flex items-center justify-center gap-2"
+					className="flex flex-wrap items-center justify-center gap-2"
 				>
 					<strong style={{ color: T.accent }} className="flex items-center gap-2">
 						<SparkleIcon className="w-4 h-4" /> {FREE_CREDIT_LIMIT} free credits
-					</strong>{" "}
-					· <div className="flex items-center gap-2"><CreditCardIcon className="w-4 h-4" /> No credit card </div>· <div className="flex items-center gap-2"><XCircleIcon className="w-4 h-4" /> Cancel anytime</div>
-				</motion.p>
+					</strong>
+					<span aria-hidden>·</span>
+					<span className="flex items-center gap-2">
+						<CreditCardIcon className="w-4 h-4" /> No credit card
+					</span>
+					<span aria-hidden>·</span>
+					<span className="flex items-center gap-2">
+						<XCircleIcon className="w-4 h-4" /> Cancel anytime
+					</span>
+				</motion.div>
 			</motion.div>
 			</motion.div>
 			<br />
@@ -1151,7 +1158,7 @@ function ExportFormats() {
 					>
 						Write once.
 						<br />
-						<span style={{ color: T.warm }}>Export anywhere.</span>
+						<span className="text-warm">Export anywhere.</span>
 					</h2>
 					<p
 						style={{
