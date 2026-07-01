@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 
 const WAVE_GRAY =
 	"repeating-linear-gradient(90deg,#9A9490 0,#9A9490 2px,transparent 2px,transparent 8px)";
-const WAVE_AMBER =
+const WAVE_zinc =
 	"repeating-linear-gradient(90deg,#C17B2F 0,#C17B2F 2px,transparent 2px,transparent 8px)";
 
 function fmtTime(s) {
@@ -348,7 +348,7 @@ export default function BlogAudioPlayer({
 										style={{
 											width: 9999,
 											height: 3,
-											background: WAVE_AMBER,
+											background: WAVE_zinc,
 											borderRadius: 2,
 										}}
 									/>

@@ -150,7 +150,7 @@ const HomeTab = ({ onNavigate }) => {
 			value: contentStats.blogs.published,
 			subtitle: `${contentStats.blogs.total} total posts`,
 			icon: FileText,
-			color: "from-amber-400 to-orange-500",
+			color: "from-zinc-400 to-orange-500",
 			tab: "blogs"
 		},
 		{

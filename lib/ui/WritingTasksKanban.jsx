@@ -149,7 +149,7 @@ function ProgressRing({ progress, done }) {
 	const pct = Math.min(100, Math.max(0, progress || 0));
 	const dash = (pct / 100) * 62.83;
 	const ringColor =
-		pct >= 100 ? "text-emerald-500" : pct >= 40 ? "text-amber-400" : "text-zinc-300";
+		pct >= 100 ? "text-emerald-500" : pct >= 40 ? "text-zinc-400" : "text-zinc-300";
 
 	return (
 		<div className="flex items-center gap-1.5">
@@ -219,7 +219,7 @@ function TaskCardContent({
 			{(isGenerating || task.draftPath) && (
 				<div className="flex flex-wrap items-center gap-2 mb-3">
 					{isGenerating && (
-						<span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xl bg-amber-50 text-amber-800 text-xs font-medium">
+						<span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xl bg-zinc-50 text-zinc-800 text-xs font-medium">
 							<Loader2 className="w-3 h-3 animate-spin" />
 							InkAgent drafting…
 						</span>
@@ -542,7 +542,7 @@ function EditProjectModal({
 										. Tasks will become unassigned but won&apos;t be deleted.
 									</p>
 									{taskCount > 0 && (
-										<p className="text-xs text-amber-700 mt-2 font-medium">
+										<p className="text-xs text-zinc-700 mt-2 font-medium">
 											{taskCount} task{taskCount === 1 ? "" : "s"} will be unassigned.
 										</p>
 									)}
@@ -899,7 +899,7 @@ function TaskModal({
 									InkAgent · 1 credit per draft
 								</p>
 								{isGenerating && (
-									<p className="text-xs text-amber-700 flex items-center gap-1.5">
+									<p className="text-xs text-zinc-700 flex items-center gap-1.5">
 										<Loader2 className="w-3.5 h-3.5 animate-spin" />
 										Writing your draft…
 									</p>

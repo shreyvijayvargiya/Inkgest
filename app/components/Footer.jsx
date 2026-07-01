@@ -3,8 +3,8 @@ import { theme } from "../../lib/utils/theme";
 export default function Footer() {
 	const T = theme;
 	return (
-		<footer style={{ background: T.accent, padding: "56px 24px 36px" }}>
-			<div className="max-w-6xl mx-auto">
+		<footer style={{ background: T.surface, padding: "56px 24px 36px" }}>
+			<div className="max-w-6xl mx-auto text-black">
 				<div
 					style={{
 						display: "flex",
@@ -20,7 +20,6 @@ export default function Footer() {
 							style={{
 								fontFamily: "'Comic', sans-serif",
 								fontSize: 24,
-								color: "white",
 								display: "flex",
 								alignItems: "center",
 								gap: 8,
@@ -41,14 +40,12 @@ export default function Footer() {
 						<p
 							style={{
 								fontSize: 13,
-								color: "rgba(255,255,255,0.4)",
 								maxWidth: 200,
 								lineHeight: 1.6,
 								fontFamily: "'Comic', sans-serif",
 							}}
 						>
-							Turn any URL into a newsletter, email, or blog post, infographics
-							etc
+							Inkgest: A writing pad of 21st century
 						</p>
 					</div>
 					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
@@ -74,7 +71,6 @@ export default function Footer() {
 										fontWeight: 700,
 										textTransform: "",
 										letterSpacing: "0.1em",
-										color: "rgba(255,255,255,0.35)",
 										marginBottom: 16,
 										fontFamily: "'Comic', sans-serif",
 									}}
@@ -98,15 +94,14 @@ export default function Footer() {
 											alignItems: "center",
 											minHeight: 48,
 											fontSize: 14,
-											color: "rgba(255,255,255,0.6)",
 											textDecoration: "none",
 											marginBottom: 4,
 											fontFamily: "'Comic', sans-serif",
 											transition: "color 0.2s",
 										}}
-										onMouseEnter={(e) => (e.target.style.color = "white")}
+										onMouseEnter={(e) => (e.target.style.color = "black")}
 										onMouseLeave={(e) =>
-											(e.target.style.color = "rgba(255,255,255,0.6)")
+											(e.target.style.color = "black")
 										}
 									>
 										{item.label}
@@ -118,7 +113,7 @@ export default function Footer() {
 				</div>
 				<div
 					style={{
-						borderTop: "1px solid rgba(255,255,255,0.1)",
+						borderTop: "1px solid #E2E2E2",
 						paddingTop: 28,
 						display: "flex",
 						justifyContent: "space-between",
@@ -129,7 +124,6 @@ export default function Footer() {
 					<span
 						style={{
 							fontSize: 13,
-							color: "rgba(255,255,255,0.3)",
 							fontFamily: "'Comic', sans-serif",
 						}}
 					>
@@ -138,7 +132,6 @@ export default function Footer() {
 					<span
 						style={{
 							fontSize: 13,
-							color: "rgba(255,255,255,0.3)",
 							fontFamily: "'Comic', sans-serif",
 						}}
 					>
@@ -147,7 +140,6 @@ export default function Footer() {
 							href="https://buildsaas.dev"
 							target="_blank"
 							className="inline-flex items-center min-h-12 px-0.5 rounded-sm underline-offset-2"
-							style={{ color: T.surface }}
 							rel="noopener noreferrer"
 						>
 							Buildsaas
@@ -155,8 +147,8 @@ export default function Footer() {
 					</span>
 				</div>
 			</div>
-			<div className="flex items-center justify-between gap-2 my-4 max-w-6xl mx-auto border-t border-white/10 pt-4">
-				<p className="text-sm text-white">Listed/Features on</p>
+			<div className="flex items-center justify-between gap-2 my-4 max-w-6xl mx-auto border-t border-zinc-200 pt-4">
+				<p className="text-sm ">Listed/Features on</p>
 				<div className="flex items-center gap-2">
 					<a
 						href="https://startupfa.me/s/inkgest?utm_source=inkgest.com"

@@ -40,7 +40,7 @@ function AnimatedDotsBackground() {
 			{Array.from({ length: DOT_COUNT }).map((_, i) => (
 				<motion.span
 					key={i}
-					className="h-1 w-1 justify-self-center self-center rounded-full bg-amber-800/35"
+					className="h-1 w-1 justify-self-center self-center rounded-full bg-zinc-800/35"
 					animate={{
 						opacity: [0.15, 0.65, 0.15],
 						scale: [0.75, 1.35, 0.75],

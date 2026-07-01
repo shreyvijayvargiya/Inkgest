@@ -154,7 +154,7 @@ const SELECTION_TEXT_COLORS = [
 	{ label: "Zinc 800", hex: "#27272a" },
 	{ label: "Red 600", hex: "#dc2626" },
 	{ label: "Orange 600", hex: "#ea580c" },
-	{ label: "Amber 600", hex: "#d97706" },
+	{ label: "zinc 600", hex: "#d97706" },
 	{ label: "Yellow 700", hex: "#a16207" },
 	{ label: "Lime 600", hex: "#65a30d" },
 	{ label: "Green 600", hex: "#16a34a" },
@@ -177,7 +177,7 @@ const SELECTION_BG_COLORS = [
 	{ label: "Slate 200", hex: "#e2e8f0" },
 	{ label: "Red 100", hex: "#fee2e2" },
 	{ label: "Orange 100", hex: "#ffedd5" },
-	{ label: "Amber 100", hex: "#fef3c7" },
+	{ label: "zinc 100", hex: "#fef3c7" },
 	{ label: "Yellow 100", hex: "#fef9c3" },
 	{ label: "Lime 100", hex: "#ecfccb" },
 	{ label: "Green 100", hex: "#dcfce7" },
@@ -1124,7 +1124,7 @@ function makeAudioBlockHtml(src = "", name = "Audio track", caption = "") {
 	const safeName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	const safeCaption = caption.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	const waveGray  = "repeating-linear-gradient(90deg,#9A9490 0,#9A9490 2px,transparent 2px,transparent 8px)";
-	const waveAmber = "repeating-linear-gradient(90deg,#C17B2F 0,#C17B2F 2px,transparent 2px,transparent 8px)";
+	const wavezinc = "repeating-linear-gradient(90deg,#C17B2F 0,#C17B2F 2px,transparent 2px,transparent 8px)";
 	/* Play icon ▶ and Pause icon ⏸ — both kept in DOM, toggled via display */
 	const playSvg  = `<svg data-pi width="14" height="14" viewBox="0 0 24 24" style="display:block"><polygon points="5,3 19,12 5,21" fill="white" stroke="none"/></svg>`;
 	const pauseSvg = `<svg data-qi width="14" height="14" viewBox="0 0 24 24" style="display:none"><rect x="5" y="3" width="4" height="18" fill="white" rx="1"/><rect x="15" y="3" width="4" height="18" fill="white" rx="1"/></svg>`;
@@ -1155,7 +1155,7 @@ function makeAudioBlockHtml(src = "", name = "Audio track", caption = "") {
 						`</div>` +
 						`<div data-ap style="position:absolute;left:0;top:0;height:100%;width:0%;overflow:hidden;pointer-events:none">` +
 							`<div style="position:absolute;inset:0;display:flex;align-items:center">` +
-								`<div style="width:9999px;height:3px;background:${waveAmber};border-radius:2px"></div>` +
+								`<div style="width:9999px;height:3px;background:${wavezinc};border-radius:2px"></div>` +
 							`</div>` +
 						`</div>` +
 					`</div>` +

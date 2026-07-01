@@ -1038,7 +1038,7 @@ function Minimap({
 }
 
 /**
- * Node-based canvas for chained generate/{type} calls — theme matches app (stone/amber).
+ * Node-based canvas for chained generate/{type} calls — theme matches app (stone/zinc).
  */
 const CANVAS_HIDDEN_KEY = (uid) =>
 	uid ? `inkgest-canvas-hidden-${uid}` : "";

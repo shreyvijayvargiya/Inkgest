@@ -1672,7 +1672,7 @@ export default function DraftPage() {
 								<div className="flex gap-2 mb-4 bg-zinc-50 rounded-xl p-1">
 									{[{ val: false, label: "Private", icon: "🔒" }, { val: true, label: "Public", icon: "🌐" }].map(opt => (
 										<button key={String(opt.val)} type="button" onClick={() => setIsPublic(opt.val)}
-										className={`flex-1 flex items-center justify-center gap-2 p-1.5 rounded-xl text-sm font-medium ${isPublic === opt.val ? (opt.val ? "bg-amber-50 text-amber-700" : "bg-zinc-50 text-zinc-900") : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"}`}>
+										className={`flex-1 flex items-center justify-center gap-2 p-1.5 rounded-xl text-sm font-medium ${isPublic === opt.val ? (opt.val ? "bg-zinc-50 text-zinc-700" : "bg-zinc-50 text-zinc-900") : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"}`}>
 											{opt.icon} {opt.label}
 										</button>
 									))}

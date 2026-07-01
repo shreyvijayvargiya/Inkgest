@@ -223,7 +223,7 @@ const TableDetailView = ({ table, onBack }) => {
 			email: "bg-cyan-100 text-cyan-700",
 			url: "bg-indigo-100 text-indigo-700",
 			array: "bg-pink-100 text-pink-700",
-			object: "bg-amber-100 text-amber-700",
+			object: "bg-zinc-100 text-zinc-700",
 		};
 		return colors[type] || "bg-zinc-100 text-zinc-700";
 	};

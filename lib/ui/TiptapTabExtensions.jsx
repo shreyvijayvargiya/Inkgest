@@ -181,7 +181,7 @@ function TabGroupView({ node, editor, getPos, updateAttributes }) {
 								aria-selected={isActive}
 								className={`shrink-0 flex items-center border-r border-zinc-200 min-w-[88px] max-w-[200px] ${
 									isActive
-										? "bg-white border-b-2 border-b-amber-500 -mb-px"
+										? "bg-white border-b-2 border-b-zinc-500 -mb-px"
 										: "bg-transparent hover:bg-zinc-100/80"
 								}`}
 								onPointerDown={(e) => {

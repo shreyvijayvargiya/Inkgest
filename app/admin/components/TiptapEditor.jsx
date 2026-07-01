@@ -1433,7 +1433,7 @@ const TiptapEditor = ({
 									onClick={() => setInfographicPanelOpen((o) => !o)}
 									className={`p-2 rounded transition-colors ${
 										infographicPanelOpen
-											? "bg-amber-100 text-amber-900"
+											? "bg-zinc-100 text-zinc-900"
 											: "hover:bg-zinc-100 text-zinc-700"
 									}`}
 									title="Infographics from selection"

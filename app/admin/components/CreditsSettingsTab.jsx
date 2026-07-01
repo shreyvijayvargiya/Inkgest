@@ -98,7 +98,7 @@ const CreditsSettingsTab = ({ queryClient }) => {
 					)}
 				</div>
 				{!isAdmin && (
-					<p className="text-xs text-amber-600 mt-2">
+					<p className="text-xs text-zinc-600 mt-2">
 						Only admins can change this setting.
 					</p>
 				)}
