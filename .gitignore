@@ -1,6 +1,8 @@
 .next
 node_modules
 .env.local
+*firebase-service-account*.json
+inkgest-firebase-service-account.json
 
 .github
 .vercel

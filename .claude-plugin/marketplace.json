@@ -1,0 +1,20 @@
+{
+	"name": "inkgest",
+	"owner": {
+		"name": "Inkgest",
+		"email": "hello@inkgest.com"
+	},
+	"plugins": [
+		{
+			"name": "inkgest-mcp",
+			"source": "./mcp-server",
+			"description": "Connect Claude to your Inkgest library — search and edit drafts, manage the writing tasks board, and save translations.",
+			"version": "1.0.0",
+			"category": "integrations",
+			"keywords": ["inkgest", "mcp", "writing", "newsletter", "blog", "tasks"],
+			"homepage": "https://inkgest.com/settings/integrations",
+			"repository": "https://github.com/shreyvijayvargiya/Inkgest",
+			"license": "MIT"
+		}
+	]
+}

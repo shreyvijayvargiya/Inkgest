@@ -23,40 +23,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { doc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { assetRef } from "../api/userAssets";
-
-/* ─── Builds a fully self-contained HTML file from a card's rendered DOM ─── */
-function wrapStandaloneHTML(innerHTML, igType = "") {
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Infographic — ${igType}</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Outfit', sans-serif;
-    background: #ffffff;
-    -webkit-font-smoothing: antialiased;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 40px 24px;
-  }
-  .ig-root { width: 100%; max-width: 520px; }
-  /* Restore framer-motion inline transforms to static */
-  [style*="transform"] { transform: none !important; }
-</style>
-</head>
-<body>
-<div class="ig-root">
-${innerHTML}
-</div>
-</body>
-</html>`;
-}
+import { fetchInfographicsFromAgent } from "../api/infographicsAgentClient";
+import { buildStandaloneIframeSrcDoc } from "../utils/standaloneInfographicDoc";
 
 /* ── App light tokens (modal chrome) ── */
 const T = {
@@ -148,7 +116,7 @@ function DonutChart({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -233,7 +201,7 @@ function DonutChart({ data }) {
 								y={cy + 14}
 								textAnchor="middle"
 								style={{
-									fontFamily: "Outfit,sans-serif",
+									fontFamily: "Comic,sans-serif",
 									fontSize: 10,
 									fill: D.muted,
 								}}
@@ -331,7 +299,7 @@ function BarChart({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -376,7 +344,7 @@ function BarChart({ data }) {
 								x={pad - 6}
 								y={y + 4}
 								textAnchor="end"
-								style={{ fontSize: 9, fill: D.muted, fontFamily: "Outfit" }}
+								style={{ fontSize: 9, fill: D.muted, fontFamily: "Comic" }}
 							>
 								{Math.round((max * pct) / 100)}
 								{yLabel || ""}
@@ -413,7 +381,7 @@ function BarChart({ data }) {
 									fontSize: 10,
 									fill: col,
 									fontWeight: 700,
-									fontFamily: "Outfit",
+									fontFamily: "Comic",
 								}}
 							>
 								{b.value}
@@ -423,7 +391,7 @@ function BarChart({ data }) {
 								x={x + barW / 2}
 								y={H + 18}
 								textAnchor="middle"
-								style={{ fontSize: 10, fill: D.muted, fontFamily: "Outfit" }}
+								style={{ fontSize: 10, fill: D.muted, fontFamily: "Comic" }}
 							>
 								{b.label}
 							</text>
@@ -453,7 +421,7 @@ function StepFlow({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -565,7 +533,7 @@ function ComparisonCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: accent(data),
 					marginBottom: 6,
@@ -644,7 +612,7 @@ function ComparisonCard({ data }) {
 									fontSize: 12,
 									fontWeight: 700,
 									color: col.iconColor,
-									textTransform: "uppercase",
+									textTransform: "",
 									letterSpacing: "0.06em",
 								}}
 							>
@@ -724,7 +692,7 @@ function StatCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 14,
@@ -859,7 +827,7 @@ function TimelineCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -995,7 +963,7 @@ function ProgressCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1094,7 +1062,7 @@ function MetricGridCard({ data }) {
 				style={{
 					fontSize: 11,
 					fontWeight: 700,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					color: col,
 					marginBottom: 6,
@@ -1239,7 +1207,7 @@ function BatchDivider({ number }) {
 					fontSize: 11,
 					fontWeight: 700,
 					color: D.muted,
-					textTransform: "uppercase",
+					textTransform: "",
 					letterSpacing: "0.1em",
 					whiteSpace: "nowrap",
 				}}
@@ -1347,17 +1315,17 @@ export default function InfographicsModal({
 			}
 
 			try {
-				const res = await fetch("/api/agent/inkagent", {
-					method: "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ content, title, idToken, excludeTypes }),
-				});
 				clearInterval(stepTimer.current);
 
-				const data = await res.json();
-				if (!res.ok) throw new Error(data.error || "Generation failed");
+				const { infographics: newBatch } = await fetchInfographicsFromAgent({
+					userId,
+					idToken,
+					htmlOrTextContent: content,
+					title,
+					excludeTypes,
+					visualFormatId: null,
+				});
 
-				const newBatch = data.infographics || [];
 				if (isMore) {
 					setBatches((prev) => [...prev, newBatch]);
 				} else {
@@ -1408,7 +1376,10 @@ export default function InfographicsModal({
 		const el = document.getElementById(`ig-content-${globalIdx}`);
 		const ig = batches[bIdx]?.[iIdx];
 		if (!el || !ig) return;
-		const html = wrapStandaloneHTML(el.innerHTML, ig.type.replace(/_/g, " "));
+		const html = buildStandaloneIframeSrcDoc(
+			el.innerHTML,
+			ig.type.replace(/_/g, " "),
+		);
 		navigator.clipboard.writeText(html).catch(() => {});
 		const key = `${bIdx}-${iIdx}`;
 		setCopiedHtml(key);
@@ -1424,9 +1395,9 @@ export default function InfographicsModal({
 		if (!el || !ig) return null;
 		return (
 			`<!-- Infographic: ${ig.type} -->\n` +
-			`<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">\n` +
+			`<link href="https://fonts.googleapis.com/css2?family=Comic:wght@400;600;700&display=swap" rel="stylesheet">\n` +
 			`<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}` +
-			`body{font-family:'Outfit',sans-serif;-webkit-font-smoothing:antialiased}</style>\n` +
+			`body{font-family:'Comic',sans-serif;-webkit-font-smoothing:antialiased}</style>\n` +
 			`<div style="max-width:520px;">\n${el.innerHTML}\n</div>`
 		);
 	};

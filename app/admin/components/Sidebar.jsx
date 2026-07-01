@@ -189,7 +189,7 @@ const SortableCategory = ({ category, activeTab, onSelect }) => {
 			}`}
 		>
 			<div className="flex items-center justify-between mb-1">
-				<p className="px-2.5 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+				<p className="px-2.5 py-1 text-[10px] font-semibold text-zinc-500  tracking-wider">
 					{category.title}
 				</p>
 				<button
@@ -451,7 +451,7 @@ const Sidebar = ({
 									className="absolute top-full left-0 mt-1 w-full bg-white border border-zinc-200 rounded-xl shadow-lg z-50 overflow-hidden"
 								>
 									<div className="p-2 border-b border-zinc-100 bg-zinc-50">
-										<p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider px-2">
+										<p className="text-[10px] font-semibold text-zinc-500  tracking-wider px-2">
 											Projects
 										</p>
 									</div>
@@ -527,7 +527,7 @@ const Sidebar = ({
 						{activeId ? (
 							isCategory(activeId) ? (
 								<div className="bg-white ring-2 ring-zinc-200 shadow-2xl rounded-xl p-2 opacity-90">
-									<p className="px-2.5 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+									<p className="px-2.5 py-1 text-[10px] font-semibold text-zinc-500  tracking-wider mb-2">
 										{activeItem.title}
 									</p>
 									<div className="space-y-1">

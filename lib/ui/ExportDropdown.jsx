@@ -47,7 +47,7 @@ const ExportDropdown = ({ dataType, data, className = "" }) => {
 			await exportData(format, dataType, data, {
 				filename: `${dataType}-export`,
 			});
-			toast.success(`Exported ${data.length} items as ${format.toUpperCase()}`);
+			toast.success(`Exported ${data.length} items as ${format.toLowerCase()}`);
 		} catch (error) {
 			console.error("Export error:", error);
 			toast.error(error.message || "Failed to export data");

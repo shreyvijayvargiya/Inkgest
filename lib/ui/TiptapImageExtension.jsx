@@ -5,16 +5,15 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
 	Settings,
-	ChevronDown,
-	X,
 	Square,
 	Circle,
 	Box,
 	Palette,
 	Layers,
-	Move,
 	Minus,
 	Maximize2,
+	Link2,
+	Type,
 } from "lucide-react";
 
 // Image Component with resize handles and styling options
@@ -41,6 +40,8 @@ const ImageComponent = ({
 	const shadow = node.attrs.shadow || "none";
 	const shadowOpacity = node.attrs.shadowOpacity || 0.1;
 	const objectFit = node.attrs.objectFit || "cover";
+	const caption = (node.attrs.caption || "").trim();
+	const captionHref = (node.attrs.captionHref || "").trim();
 
 	// Parse width - handle both string percentages and pixel values
 	const getWidthStyle = () => {
@@ -231,16 +232,19 @@ const ImageComponent = ({
 
 	return (
 		<NodeViewWrapper
-			className="my-4 block"
+			as="figure"
+			className="tiptap-image-figure my-4 block"
 			data-node-type="image"
 			style={{
 				position: "relative",
 				zIndex: selected ? 10 : "auto",
 				overflow: "visible",
+				marginLeft: "auto",
+				marginRight: "auto",
 			}}
 		>
 			<div
-				className="relative inline-block"
+				className="relative inline-block w-full"
 				style={{
 					...getWidthStyle(),
 					maxWidth: "100%",
@@ -497,7 +501,7 @@ const ImageComponent = ({
 									</div>
 
 									{/* Object Fit Options */}
-									<div>
+									<div className="mb-3">
 										<label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 mb-1.5">
 											<Box className="w-3.5 h-3.5" />
 											Object Fit
@@ -526,12 +530,70 @@ const ImageComponent = ({
 											})}
 										</div>
 									</div>
+
+									{/* Caption & link */}
+									<div className="border-t border-zinc-200 pt-3 space-y-2">
+										<label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700">
+											<Type className="w-3.5 h-3.5" />
+											Caption
+										</label>
+										<input
+											type="text"
+											value={node.attrs.caption || ""}
+											onChange={(e) =>
+												updateAttributes({ caption: e.target.value })
+											}
+											onMouseDown={(e) => e.stopPropagation()}
+											placeholder="Visible caption (optional)"
+											className="w-full px-2 py-1.5 text-xs border border-zinc-200 rounded outline-none focus:ring-1 focus:ring-zinc-300"
+										/>
+										<label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 pt-1">
+											<Link2 className="w-3.5 h-3.5" />
+											Caption URL
+										</label>
+										<input
+											type="url"
+											value={node.attrs.captionHref || ""}
+											onChange={(e) =>
+												updateAttributes({ captionHref: e.target.value })
+											}
+											onMouseDown={(e) => e.stopPropagation()}
+											placeholder="https://… (links caption or URL alone)"
+											className="w-full px-2 py-1.5 text-xs border border-zinc-200 rounded outline-none focus:ring-1 focus:ring-zinc-300"
+										/>
+									</div>
 								</motion.div>
 							)}
 						</AnimatePresence>
 					</div>
 				)}
 			</div>
+
+			{(caption || captionHref) && (
+				<figcaption
+					className="block w-full text-center text-sm text-zinc-600 mt-2 px-1"
+					contentEditable={false}
+				>
+					{captionHref ? (
+						<a
+							href={captionHref}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-sky-600 underline underline-offset-2 hover:text-sky-800 break-all"
+							onMouseDown={(e) => e.preventDefault()}
+							onClick={(e) => {
+								e.stopPropagation();
+								e.preventDefault();
+								window.open(captionHref, "_blank", "noopener,noreferrer");
+							}}
+						>
+							{caption || captionHref}
+						</a>
+					) : (
+						<span>{caption}</span>
+					)}
+				</figcaption>
+			)}
 		</NodeViewWrapper>
 	);
 };
@@ -617,24 +679,83 @@ export const CustomImage = Image.extend({
 					};
 				},
 			},
+			caption: {
+				default: "",
+				parseHTML: (element) => {
+					const fig = element.closest("figure");
+					const cap = fig?.querySelector("figcaption");
+					return (cap?.textContent || "").trim();
+				},
+				renderHTML: () => ({}),
+			},
+			captionHref: {
+				default: "",
+				parseHTML: (element) => {
+					const fig = element.closest("figure");
+					const a = fig?.querySelector("figcaption a[href]");
+					return (a?.getAttribute("href") || "").trim();
+				},
+				renderHTML: () => ({}),
+			},
 		};
 	},
 	addNodeView() {
 		return ReactNodeViewRenderer(ImageComponent);
 	},
-	renderHTML({ HTMLAttributes, node }) {
-		const { border, shadow, objectFit, width, ...attrs } = HTMLAttributes;
+	parseHTML() {
 		return [
-			"img",
-			mergeAttributes(attrs, {
-				width: node.attrs.width || width,
+			{
+				tag: "figure",
+				getAttrs: (dom) => {
+					if (!dom.classList?.contains?.("tiptap-image-figure")) return false;
+					const img = dom.querySelector("img[src]");
+					if (!img) return false;
+					const capEl = dom.querySelector("figcaption");
+					const link = capEl?.querySelector("a[href]");
+					return {
+						src: img.getAttribute("src"),
+						alt: img.getAttribute("alt") || "",
+						width: img.getAttribute("width") || "100%",
+						caption: (
+							capEl && !link
+								? capEl.textContent
+								: link?.textContent || ""
+						).trim(),
+						captionHref: (link?.getAttribute("href") || "").trim(),
+					};
+				},
+			},
+			{ tag: "img[src]" },
+		];
+	},
+	renderHTML({ HTMLAttributes, node }) {
+		const cap = (node.attrs.caption || "").trim();
+		const capHref = (node.attrs.captionHref || "").trim();
+		const imgAttrs = mergeAttributes(
+			{ ...HTMLAttributes },
+			{
+				src: node.attrs.src,
+				alt: node.attrs.alt || "",
+				width: node.attrs.width,
 				"data-border": node.attrs.border,
 				"data-shadow": node.attrs.shadow,
 				"data-object-fit": node.attrs.objectFit || "cover",
 				style: `border: ${node.attrs.border}; box-shadow: ${
 					node.attrs.shadow
 				}; object-fit: ${node.attrs.objectFit || "cover"};`,
-			}),
-		];
+			},
+		);
+		const inner = [["img", imgAttrs]];
+		if (cap || capHref) {
+			const label = cap || capHref;
+			inner.push([
+				"figcaption",
+				{},
+				capHref
+					? ["a", { href: capHref, rel: "noopener noreferrer", target: "_blank" }, label]
+					: label,
+			]);
+		}
+		return ["figure", { class: "tiptap-image-figure" }, ...inner];
 	},
 });

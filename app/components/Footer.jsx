@@ -1,178 +1,185 @@
-import React, { useState } from "react";
-import Link from "next/link";
-import { Mail, Twitter, Github, Linkedin, Send, Sparkles } from "lucide-react";
-import { addSubscriber } from "../../lib/api/subscribers";
-import { toast } from "sonner";
+import { theme } from "../../lib/utils/theme";
 
-const Footer = () => {
-	const currentYear = new Date().getFullYear();
-	const [newsletterEmail, setNewsletterEmail] = useState("");
-	const [newsletterName, setNewsletterName] = useState("");
-	const [isSubscribing, setIsSubscribing] = useState(false);
-
-	const handleNewsletterSubmit = async (e) => {
-		e.preventDefault();
-		if (!newsletterEmail) {
-			toast.warning("Email is required");
-			return;
-		}
-
-		setIsSubscribing(true);
-		try {
-			await addSubscriber({
-				email: newsletterEmail,
-				name: newsletterName || newsletterEmail.split("@")[0],
-			});
-			toast.success("Successfully subscribed to newsletter!");
-			setNewsletterEmail("");
-			setNewsletterName("");
-		} catch (error) {
-			console.error("Error subscribing:", error);
-			toast.error(error.message || "Failed to subscribe. Please try again.");
-		} finally {
-			setIsSubscribing(false);
-		}
-	};
-
-	const footerLinks = {
-		Product: [
-			{ href: "/#features", label: "Features" },
-			{ href: "/pricing", label: "Pricing" },
-			{ href: "/blog", label: "Blog" },
-			{ href: "/docs", label: "Documentation" },
-		],
-		Company: [
-			{ href: "/about", label: "About Us" },
-			{ href: "/contact", label: "Contact" },
-			{ href: "/careers", label: "Careers" },
-			{ href: "/changelog", label: "Changelog" },
-		],
-		Legal: [
-			{ href: "/legal", label: "Legal Center" },
-			{ href: "/privacy", label: "Privacy Policy" },
-			{ href: "/terms-and-conditions", label: "Terms of Service" },
-			{ href: "/cookies", label: "Cookie Policy" },
-		],
-	};
-
+export default function Footer() {
+	const T = theme;
 	return (
-		<footer className="bg-white border-t border-zinc-100">
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-				<div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
-					{/* Brand & Newsletter */}
-					<div className="lg:col-span-4 space-y-8">
-						<div>
-							<Link href="/" className="flex items-center gap-2 mb-4">
-								<span className="text-xl font-bold tracking-tight text-zinc-900 uppercase">
-									YourApp
-								</span>
-							</Link>
-							<p className="text-zinc-500 max-w-sm leading-relaxed">
-								The high-performance Inkgest for modern developers. Build,
-								launch, and scale your next idea with confidence.
-							</p>
+		<footer style={{ background: T.surface, padding: "56px 24px 36px" }}>
+			<div className="max-w-6xl mx-auto text-black">
+				<div
+					style={{
+						display: "flex",
+						alignItems: "flex-start",
+						justifyContent: "space-between",
+						marginBottom: 48,
+						gap: 40,
+						flexWrap: "wrap",
+					}}
+				>
+					<div>
+						<div
+							style={{
+								fontFamily: "'Comic', sans-serif",
+								fontSize: 24,
+								display: "flex",
+								alignItems: "center",
+								gap: 8,
+								marginBottom: 10,
+							}}
+						>
+							<span
+								style={{
+									width: 8,
+									height: 8,
+									borderRadius: "50%",
+									background: T.warm,
+									display: "inline-block",
+								}}
+							/>
+							inkgest
 						</div>
-
-						<div className="space-y-4">
-							<h4 className="text-sm font-bold text-zinc-900 uppercase tracking-widest">
-								Subscribe to updates
-							</h4>
-							<form
-								onSubmit={handleNewsletterSubmit}
-								className="flex flex-col sm:flex-row gap-2 max-w-md"
-							>
-								<div className="relative flex-1">
-									<input
-										type="email"
-										placeholder="email@example.com"
-										value={newsletterEmail}
-										onChange={(e) => setNewsletterEmail(e.target.value)}
-										required
-										className="w-full pl-4 pr-10 py-3 bg-zinc-50 border border-zinc-100 rounded-2xl focus:bg-white focus:outline-none focus:ring-4 focus:ring-zinc-900/5 transition-all text-sm"
-									/>
-									<Sparkles className="absolute right-3 top-3.5 w-4 h-4 text-zinc-300" />
-								</div>
-								<button
-									type="submit"
-									disabled={isSubscribing}
-									className="px-6 py-3 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
-								>
-									{isSubscribing ? "..." : <Send className="w-4 h-4" />}
-								</button>
-							</form>
-						</div>
+						<p
+							style={{
+								fontSize: 13,
+								maxWidth: 200,
+								lineHeight: 1.6,
+								fontFamily: "'Comic', sans-serif",
+							}}
+						>
+							Inkgest: A writing pad of 21st century
+						</p>
 					</div>
-
-					{/* Links */}
-					<div className="lg:col-span-1 hidden lg:block" />
-
-					<div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8">
-						{Object.entries(footerLinks).map(([category, links]) => (
-							<div key={category}>
-								<h4 className="text-sm font-bold text-zinc-900 mb-6 uppercase tracking-widest">
-									{category}
-								</h4>
-								<ul className="space-y-4">
-									{links.map((link) => (
-										<li key={link.href}>
-											<Link
-												href={link.href}
-												className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
-											>
-												{link.label}
-											</Link>
-										</li>
-									))}
-								</ul>
+					<div style={{ display: "flex", gap: 64, flexWrap: "wrap" }}>
+						{[
+							{
+								title: "Connect",
+								links: [
+									{
+										href: "https://x.com/treyvijay",
+										label: "X (@treyvijay)",
+									},
+									{
+										href: "mailto:shreyvijayvargiya26@gmail.com",
+										label: "Email",
+									},
+								],
+							},
+						].map((col) => (
+							<div key={col.title}>
+								<p
+									style={{
+										fontSize: 12,
+										fontWeight: 700,
+										textTransform: "",
+										letterSpacing: "0.1em",
+										marginBottom: 16,
+										fontFamily: "'Comic', sans-serif",
+									}}
+								>
+									{col.title}
+								</p>
+								{col.links.map((item) => (
+									<a
+										key={item.href}
+										href={item.href}
+										target={
+											item.href.startsWith("mailto:") ? undefined : "_blank"
+										}
+										rel={
+											item.href.startsWith("mailto:")
+												? undefined
+												: "noopener noreferrer"
+										}
+										style={{
+											display: "flex",
+											alignItems: "center",
+											minHeight: 48,
+											fontSize: 14,
+											textDecoration: "none",
+											marginBottom: 4,
+											fontFamily: "'Comic', sans-serif",
+											transition: "color 0.2s",
+										}}
+										onMouseEnter={(e) => (e.target.style.color = "black")}
+										onMouseLeave={(e) =>
+											(e.target.style.color = "black")
+										}
+									>
+										{item.label}
+									</a>
+								))}
 							</div>
 						))}
 					</div>
 				</div>
-
-				{/* Bottom Section */}
-				<div className="mt-20 pt-10 border-t border-zinc-100 flex flex-col md:flex-row items-center justify-between gap-6">
-					<div className="flex items-center gap-6">
-						<p className="text-sm text-zinc-500">
-							© {currentYear} YourApp. All rights reserved.
-						</p>
-						<div className="hidden sm:flex items-center gap-4">
-							<a
-								href="https://twitter.com"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-zinc-400 hover:text-zinc-900 transition-colors"
-							>
-								<Twitter className="w-5 h-5" />
-							</a>
-							<a
-								href="https://github.com"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-zinc-400 hover:text-zinc-900 transition-colors"
-							>
-								<Github className="w-5 h-5" />
-							</a>
-							<a
-								href="https://linkedin.com"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-zinc-400 hover:text-zinc-900 transition-colors"
-							>
-								<Linkedin className="w-5 h-5" />
-							</a>
-						</div>
-					</div>
-
-					<div className="flex items-center gap-2">
-						<div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-						<span className="text-sm font-medium text-zinc-600">
-							All Systems Operational
-						</span>
-					</div>
+				<div
+					style={{
+						borderTop: "1px solid #E2E2E2",
+						paddingTop: 28,
+						display: "flex",
+						justifyContent: "space-between",
+						flexWrap: "wrap",
+						gap: 12,
+					}}
+				>
+					<span
+						style={{
+							fontSize: 13,
+							fontFamily: "'Comic', sans-serif",
+						}}
+					>
+						© 2025 inkgest. All rights reserved.
+					</span>
+					<span
+						style={{
+							fontSize: 13,
+							fontFamily: "'Comic', sans-serif",
+						}}
+					>
+						Made for writers who publish on a deadline. Built using{" "}
+						<a
+							href="https://buildsaas.dev"
+							target="_blank"
+							className="inline-flex items-center min-h-12 px-0.5 rounded-sm underline-offset-2"
+							rel="noopener noreferrer"
+						>
+							Buildsaas
+						</a>
+					</span>
+				</div>
+			</div>
+			<div className="flex items-center justify-between gap-2 my-4 max-w-6xl mx-auto border-t border-zinc-200 pt-4">
+				<p className="text-sm ">Listed/Features on</p>
+				<div className="flex items-center gap-2">
+					<a
+						href="https://startupfa.me/s/inkgest?utm_source=inkgest.com"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center justify-center min-h-12 py-2 px-1 rounded-xl"
+					>
+						<img
+							src="https://startupfa.me/badges/featured/default-small.webp"
+							alt="Inkgest — Featured on Startup Fame"
+							width={224}
+							height={36}
+							className="block max-h-9 w-auto"
+						/>
+					</a>
+					<a
+						href="https://sellwithboost.com"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center justify-center min-h-12 py-2 px-1 rounded-xl"
+					>
+						<img
+							src="https://sellwithboost.com/badge/listing.svg"
+							alt="Listed on Sell With boost"
+							width={120}
+							height={40}
+							className="block h-10 w-auto"
+						/>
+					</a>
 				</div>
 			</div>
 		</footer>
 	);
-};
-
-export default Footer;
+}

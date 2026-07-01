@@ -241,7 +241,7 @@ const UsersTab = () => {
 																?.split(" ")
 																.map((n) => n[0])
 																.join("")
-																.toUpperCase() || "U"}
+																.toLowerCase() || "U"}
 														</span>
 													</div>
 												)}

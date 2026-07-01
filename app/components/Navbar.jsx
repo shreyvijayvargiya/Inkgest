@@ -135,7 +135,6 @@ const Navbar = () => {
 		{ href: "/blog", label: "Blog" },
 		{ href: "/pricing", label: "Pricing" },
 		{ href: "/contact", label: "Contact" },
-		{ href: "/docs", label: "Docs" },
 	];
 
 	const isActive = (href) => {
@@ -163,10 +162,11 @@ const Navbar = () => {
 								<Link
 									key={link.href}
 									href={link.href}
-									className={`text-sm font-medium transition-colors ${isActive(link.href)
-										? "text-zinc-900"
-										: "text-zinc-600 hover:text-zinc-900"
-										}`}
+									className={`text-sm font-medium transition-colors ${
+										isActive(link.href)
+											? "text-zinc-900"
+											: "text-zinc-600 hover:text-zinc-900"
+									}`}
 								>
 									{link.label}
 								</Link>
@@ -235,7 +235,7 @@ const Navbar = () => {
 														Subscription Status
 													</p>
 													{subscription.isSubscribed &&
-														subscription.status === "active" ? (
+													subscription.status === "active" ? (
 														<p className="text-sm font-medium text-green-600">
 															Active - {subscription.planName || "Pro"}
 														</p>
@@ -298,10 +298,11 @@ const Navbar = () => {
 										key={link.href}
 										href={link.href}
 										onClick={() => setIsMobileMenuOpen(false)}
-										className={`block text-sm font-medium transition-colors ${isActive(link.href)
-											? "text-zinc-900"
-											: "text-zinc-600 hover:text-zinc-900"
-											}`}
+										className={`block text-sm font-medium transition-colors ${
+											isActive(link.href)
+												? "text-zinc-900"
+												: "text-zinc-600 hover:text-zinc-900"
+										}`}
 									>
 										{link.label}
 									</Link>
@@ -337,7 +338,7 @@ const Navbar = () => {
 												Subscription Status
 											</p>
 											{subscription.isSubscribed &&
-												subscription.status === "active" ? (
+											subscription.status === "active" ? (
 												<p className="text-sm font-medium text-green-600">
 													Active - {subscription.planName || "Pro"}
 												</p>

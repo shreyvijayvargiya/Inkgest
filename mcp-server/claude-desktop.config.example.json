@@ -1,0 +1,12 @@
+{
+	"mcpServers": {
+		"inkgest": {
+			"command": "node",
+			"args": ["/FULL/PATH/TO/Inkgest/mcp-server/index.js"],
+			"env": {
+				"INKGEST_API_URL": "https://inkgest.com",
+				"INKGEST_API_KEY": "ink_PASTE_YOUR_KEY_HERE"
+			}
+		}
+	}
+}
